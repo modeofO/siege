@@ -11,6 +11,7 @@ import {
   craftAbility,
   type AbilityCost,
 } from "@/lib/craftingContracts";
+import { LAST_MATCH_KEY } from "@/components/Navbar";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "https://api.cartridge.gg/x/siege-dojo/torii";
@@ -84,6 +85,15 @@ export default function CraftPage() {
   const [inventory, setInventory] = useState<AbilityInventory>(EMPTY_INVENTORY);
   const [crafting, setCrafting] = useState<number | null>(null);
   const [error, setError] = useState("");
+  const [lastMatch, setLastMatch] = useState<string | null>(null);
+
+  useEffect(() => {
+    try {
+      setLastMatch(sessionStorage.getItem(LAST_MATCH_KEY));
+    } catch {
+      // sessionStorage may be unavailable — leave as null
+    }
+  }, []);
 
   useEffect(() => {
     if (!address) {
@@ -131,6 +141,17 @@ export default function CraftPage() {
           Burn resources to craft abilities. Use them in battle.
         </p>
       </div>
+
+      {lastMatch && (
+        <div className="flex justify-center">
+          <Link
+            href={lastMatch}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded border border-[#c8a44e]/40 bg-[#c8a44e]/10 text-[#c8a44e] text-xs tracking-wider font-serif hover:bg-[#c8a44e]/20 transition-colors"
+          >
+            ← RETURN TO MATCH
+          </Link>
+        </div>
+      )}
 
       {!isConnected && (
         <div className="text-[#ff3344] text-sm border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 text-center">
