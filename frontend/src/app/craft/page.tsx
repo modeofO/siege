@@ -131,111 +131,275 @@ export default function CraftPage() {
 
   const resourceBalances = resources as unknown as Record<string, number>;
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="text-center space-y-2">
-        <h1 className="text-3xl font-bold tracking-wider font-serif text-[#c8a44e]">
-          FORGE YOUR ARSENAL
-        </h1>
-        <p className="text-sm text-[#7a7060]">
-          Burn resources to craft abilities. Use them in battle.
-        </p>
-      </div>
+  // Per-ability card renderer. `side` drives the Y-rotation so the card
+  // leans toward the book's spine, matching the curve of the open pages.
+  const renderAbilityCard = (ability: typeof ABILITIES[number], side: "left" | "right") => {
+    const cost = ability.cost as unknown as AbilityCost;
+    const affordable = canAfford(cost, resourceBalances);
+    const owned = inventory[ABILITY_FIELDS[ability.id - 1]];
+    const isCrafting = crafting === ability.id;
 
-      {lastMatch && (
-        <div className="flex justify-center">
-          <Link
-            href={lastMatch}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded border border-[#c8a44e]/40 bg-[#c8a44e]/10 text-[#c8a44e] text-xs tracking-wider font-serif hover:bg-[#c8a44e]/20 transition-colors"
+    const rotY = side === "left" ? 6 : -6;
+    const baseTransform = `rotateX(14deg) rotateY(${rotY}deg)`;
+
+    return (
+      <div
+        key={ability.id}
+        className="relative rounded-sm p-3 space-y-2"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(232, 214, 170, 0.92) 0%, rgba(212, 188, 138, 0.88) 100%)",
+          border: "1px solid rgba(74, 48, 22, 0.55)",
+          boxShadow: [
+            "0 6px 14px rgba(30, 18, 8, 0.55)",
+            "0 2px 4px rgba(30, 18, 8, 0.35)",
+            "inset 0 1px 0 rgba(255, 240, 200, 0.6)",
+            "inset 0 -1px 0 rgba(74, 48, 22, 0.35)",
+          ].join(", "),
+          transform: baseTransform,
+          transformOrigin: "center bottom",
+          transformStyle: "preserve-3d",
+          transition: "transform 300ms ease-out",
+        }}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = `${baseTransform} translateZ(8px)`;
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = baseTransform;
+        }}
+      >
+        <div className="flex justify-between items-start">
+          <h3
+            className="text-sm font-bold font-serif"
+            style={{ color: "#3b2410", textShadow: "0 1px 0 rgba(255,240,200,0.5)" }}
           >
-            ← RETURN TO MATCH
-          </Link>
-        </div>
-      )}
-
-      {!isConnected && (
-        <div className="text-[#ff3344] text-sm border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 text-center">
-          Connect your wallet to craft abilities
-        </div>
-      )}
-
-      {/* Resource balances */}
-      <div className="flex items-center justify-center gap-2 flex-wrap">
-        {(Object.keys(resources) as (keyof ResourceBalances)[]).map((name) => (
-          <div
-            key={name}
-            className="flex items-center gap-1 px-3 py-1 bg-[#252019] rounded border border-[#3d3428] text-sm"
-          >
-            <span className={`font-bold ${RESOURCE_COLORS[name] || "text-[#d4cfc6]"}`}>
-              {resources[name]}
-            </span>
-            <span className="text-[#7a7060] text-xs capitalize">{name}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* Ability cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {ABILITIES.map((ability) => {
-          const cost = ability.cost as unknown as AbilityCost;
-          const affordable = canAfford(cost, resourceBalances);
-          const owned = inventory[ABILITY_FIELDS[ability.id - 1]];
-          const isCrafting = crafting === ability.id;
-
-          return (
-            <div
-              key={ability.id}
-              className="border border-[#3d3428] rounded-lg p-4 bg-[#1a1714] space-y-3"
+            {ability.name}
+          </h3>
+          {owned > 0 && (
+            <span
+              className="text-[10px] font-bold px-2 py-0.5 rounded-sm"
+              style={{
+                background: "rgba(74, 48, 22, 0.85)",
+                color: "#e8d6aa",
+                boxShadow: "inset 0 1px 0 rgba(255,240,200,0.25)",
+              }}
             >
-              <div className="flex justify-between items-start">
-                <h3 className="text-sm font-bold font-serif text-[#d4cfc6]">
-                  {ability.name}
-                </h3>
-                {owned > 0 && (
-                  <span className="text-[10px] bg-[#c8a44e]/20 text-[#c8a44e] px-2 py-0.5 rounded">
-                    Owned: {owned}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-[#7a7060]">{ability.effect}</p>
-              <div className="flex flex-wrap gap-1">
-                {Object.entries(ability.cost).map(([resource, amount]) => {
-                  const hasEnough = (resourceBalances[resource] || 0) >= amount;
-                  return (
-                    <span
-                      key={resource}
-                      className={`text-xs px-2 py-0.5 rounded border ${
-                        hasEnough
-                          ? "border-[#3d3428] text-[#d4cfc6]"
-                          : "border-[#ff3344]/30 text-[#ff3344]"
-                      }`}
-                    >
-                      {amount} <span className="capitalize">{resource}</span>
-                    </span>
-                  );
-                })}
-              </div>
-              <button
-                onClick={() => handleCraft(ability.id, cost)}
-                disabled={!isConnected || !affordable || isCrafting}
-                className="w-full py-2 rounded font-bold tracking-wider text-sm font-serif transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] hover:bg-[#c8a44e]/20"
+              Owned: {owned}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] leading-snug" style={{ color: "#5a3b1e" }}>
+          {ability.effect}
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {Object.entries(ability.cost).map(([resource, amount]) => {
+            const hasEnough = (resourceBalances[resource] || 0) >= amount;
+            return (
+              <span
+                key={resource}
+                className="text-[10px] px-1.5 py-0.5 rounded-sm"
+                style={{
+                  background: hasEnough
+                    ? "rgba(74, 48, 22, 0.12)"
+                    : "rgba(178, 34, 52, 0.15)",
+                  border: hasEnough
+                    ? "1px solid rgba(74, 48, 22, 0.4)"
+                    : "1px solid rgba(178, 34, 52, 0.5)",
+                  color: hasEnough ? "#3b2410" : "#8b1a2a",
+                }}
               >
-                {isCrafting ? "CRAFTING..." : "CRAFT"}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-
-      {error && <div className="text-[#ff3344] text-sm text-center">{error}</div>}
-
-      <div className="text-center">
-        <Link
-          href="/"
-          className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors"
+                {amount} <span className="capitalize">{resource}</span>
+              </span>
+            );
+          })}
+        </div>
+        <button
+          onClick={() => handleCraft(ability.id, cost)}
+          disabled={!isConnected || !affordable || isCrafting}
+          className="w-full py-1.5 rounded-sm font-bold tracking-wider text-xs font-serif transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          style={{
+            background:
+              "linear-gradient(180deg, rgba(74, 48, 22, 0.9) 0%, rgba(48, 30, 12, 0.95) 100%)",
+            color: "#e8d6aa",
+            border: "1px solid rgba(30, 18, 8, 0.8)",
+            boxShadow: [
+              "inset 0 1px 0 rgba(255, 220, 160, 0.25)",
+              "inset 0 -2px 4px rgba(0, 0, 0, 0.4)",
+              "0 2px 4px rgba(30, 18, 8, 0.4)",
+            ].join(", "),
+          }}
         >
-          ← Back to Home
-        </Link>
+          {isCrafting ? "CRAFTING..." : "CRAFT"}
+        </button>
+      </div>
+    );
+  };
+
+  // Split the 5 abilities across the two pages: 2 left, 3 right
+  const leftAbilities = ABILITIES.slice(0, 2);
+  const rightAbilities = ABILITIES.slice(2, 5);
+
+  return (
+    <div className="relative min-h-[90vh]">
+      {/* Open book background — fills the viewport behind the content */}
+      <div
+        aria-hidden
+        className="pointer-events-none hidden lg:block fixed inset-0 z-0"
+        style={{
+          backgroundImage: "url('/sprites/book_open.png')",
+          backgroundRepeat: "no-repeat",
+          backgroundPosition: "center center",
+          backgroundSize: "min(92vw, 1500px) auto",
+        }}
+      />
+
+      {/* Two-page spread — bounded to match the book's visible page area.
+          The container width matches the pages-visible zone of the book sprite. */}
+      <div
+        className="relative z-10 mx-auto"
+        style={{
+          width: "min(68vw, 1040px)",
+          paddingTop: "8vh",
+          paddingBottom: "7vh",
+          perspective: "1800px",
+          perspectiveOrigin: "center 40%",
+        }}
+      >
+        <div
+          className="flex items-stretch"
+          style={{
+            // spine gap roughly matches the visual spine in the sprite (~6% of width)
+            gap: "6%",
+          }}
+        >
+          {/* ============ LEFT PAGE ============ */}
+          <div
+            className="flex-1 flex flex-col gap-3 min-w-0"
+            style={{
+              padding: "0 5% 0 6%",
+            }}
+          >
+            {/* Header block — same tilt as the left-page cards so the title,
+                subtitle, return button, and resource pills feel embedded in
+                the curved page surface */}
+            <div
+              className="flex flex-col gap-2"
+              style={{
+                transform: "rotateX(14deg) rotateY(6deg)",
+                transformOrigin: "center bottom",
+                transformStyle: "preserve-3d",
+              }}
+            >
+              {/* Title + subtitle */}
+              <div className="text-center space-y-1">
+                <h1
+                  className="text-lg xl:text-xl font-bold tracking-wider font-serif"
+                  style={{
+                    color: "#3b2410",
+                    textShadow: "0 1px 0 rgba(255,240,200,0.5)",
+                  }}
+                >
+                  FORGE YOUR ARSENAL
+                </h1>
+                <p className="text-[10px]" style={{ color: "#5a3b1e" }}>
+                  Burn resources to craft abilities.
+                </p>
+              </div>
+
+              {/* Return to match pill */}
+              {lastMatch && (
+                <div className="flex justify-center">
+                  <Link
+                    href={lastMatch}
+                    className="inline-flex items-center gap-2 px-3 py-1 rounded-sm text-[10px] tracking-wider font-serif transition-colors"
+                    style={{
+                      background: "rgba(74, 48, 22, 0.15)",
+                      border: "1px solid rgba(74, 48, 22, 0.5)",
+                      color: "#3b2410",
+                    }}
+                  >
+                    ← RETURN TO MATCH
+                  </Link>
+                </div>
+              )}
+
+              {/* Not-connected warning */}
+              {!isConnected && (
+                <div
+                  className="text-[11px] text-center rounded-sm p-2"
+                  style={{
+                    background: "rgba(178, 34, 52, 0.12)",
+                    border: "1px solid rgba(178, 34, 52, 0.5)",
+                    color: "#8b1a2a",
+                  }}
+                >
+                  Connect your wallet to craft abilities
+                </div>
+              )}
+
+              {/* Resource balances */}
+              <div className="flex items-center justify-center gap-1 flex-wrap">
+                {(Object.keys(resources) as (keyof ResourceBalances)[]).map((name) => (
+                  <div
+                    key={name}
+                    className="flex items-center gap-1 px-2 py-0.5 rounded-sm text-[10px]"
+                    style={{
+                      background: "rgba(74, 48, 22, 0.12)",
+                      border: "1px solid rgba(74, 48, 22, 0.4)",
+                    }}
+                  >
+                    <span className={`font-bold ${RESOURCE_COLORS[name] || ""}`} style={{ color: "#3b2410" }}>
+                      {resources[name]}
+                    </span>
+                    <span className="capitalize" style={{ color: "#5a3b1e" }}>{name}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Left-page ability cards */}
+            <div className="space-y-3 mt-1">
+              {leftAbilities.map((ability) => renderAbilityCard(ability, "left"))}
+            </div>
+
+            {error && (
+              <div className="text-[10px] text-center" style={{ color: "#8b1a2a" }}>
+                {error}
+              </div>
+            )}
+          </div>
+
+          {/* ============ RIGHT PAGE ============ */}
+          <div
+            className="flex-1 flex flex-col gap-3 min-w-0"
+            style={{
+              padding: "0 6% 0 5%",
+            }}
+          >
+            {/* Right-page ability cards */}
+            <div className="space-y-3">
+              {rightAbilities.map((ability) => renderAbilityCard(ability, "right"))}
+            </div>
+
+            {/* Back home link at the bottom of the right page — tilted to match */}
+            <div
+              className="text-center mt-auto pt-2"
+              style={{
+                transform: "rotateX(14deg) rotateY(-6deg)",
+                transformOrigin: "center top",
+                transformStyle: "preserve-3d",
+              }}
+            >
+              <Link
+                href="/"
+                className="text-[10px] tracking-wider transition-colors font-serif"
+                style={{ color: "#5a3b1e" }}
+              >
+                ← Back to Home
+              </Link>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
