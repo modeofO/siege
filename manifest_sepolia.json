@@ -83,6 +83,17 @@
       ]
     },
     {
+      "address": "0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235",
+      "class_hash": "0x551e9a98f265ef816439a81b9e2707e22f5b9a4616e8aae05dacfe34aca73bf",
+      "init_calldata": [],
+      "tag": "siege_dojo-crafting_1v1",
+      "selector": "0x48ced6417f88e7c589f1f67c5e7c6a5b74d4c4cc465d50b11d54b4095a42747",
+      "systems": [
+        "craft_ability",
+        "upgrade"
+      ]
+    },
+    {
       "address": "0x4aa2e5246a0791d02d88c9f10fdc78a18331146b4498ea475e1f7b0faf4baad",
       "class_hash": "0x636964b849eb0e4f5eb97fc13541ec84fc39d8c8825e42b0a4c47ba957e01da",
       "init_calldata": [],
@@ -276,6 +287,43 @@
       "class_hash": "0x33425c0293254ae0325a812d601bd946db7d6059c7d076e9e39ed9635cf2950",
       "tag": "siege_dojo-NodeState",
       "selector": "0x4bb7be800153f78192f4f5d55503f14c51a2865e40caa558e244961a379bbf"
+    },
+    {
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "siege_sword",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "stone_cloak",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "ember_blast",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "hex",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "fortify",
+          "type": "core::integer::u8",
+          "key": false
+        }
+      ],
+      "class_hash": "0x41e3cd40560f80ee22c00db1afade592ee4fcad55a15d9e1e8deafe6a5f2d40",
+      "tag": "siege_dojo-PlayerAbilities",
+      "selector": "0x6a3e1dde13d4722701a8710bb54f1fe1aacdc86b7702bc5f2788ae33220e04f"
     },
     {
       "members": [
@@ -3256,6 +3304,68 @@
     },
     {
       "type": "struct",
+      "name": "siege_dojo::models::player_abilities::PlayerAbilities",
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "siege_sword",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "stone_cloak",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ember_blast",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "hex",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "fortify",
+          "type": "core::integer::u8"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::player_abilities::PlayerAbilitiesValue",
+      "members": [
+        {
+          "name": "siege_sword",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "stone_cloak",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ember_blast",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "hex",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "fortify",
+          "type": "core::integer::u8"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::models::player_abilities::m_PlayerAbilities::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "struct",
       "name": "siege_dojo::models::resource_config::ResourceConfig",
       "members": [
         {
@@ -4346,6 +4456,41 @@
     {
       "type": "event",
       "name": "siege_dojo::systems::commit_reveal_1v1::commit_reveal_1v1::Event",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "UpgradeableEvent",
+          "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+          "kind": "nested"
+        },
+        {
+          "name": "WorldProviderEvent",
+          "type": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+          "kind": "nested"
+        }
+      ]
+    },
+    {
+      "type": "interface",
+      "name": "siege_dojo::systems::crafting_1v1::ICrafting1v1",
+      "items": [
+        {
+          "type": "function",
+          "name": "craft_ability",
+          "inputs": [
+            {
+              "name": "ability_id",
+              "type": "core::integer::u8"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::systems::crafting_1v1::crafting_1v1::Event",
       "kind": "enum",
       "variants": [
         {
