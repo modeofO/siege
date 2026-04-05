@@ -16,6 +16,9 @@ export function Navbar() {
           <Link href="/how-to-play" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
             HOW TO PLAY
           </Link>
+          <Link href="/craft" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
+            FORGE
+          </Link>
         </div>
         {isDevMode() ? <AccountSelector /> : <ConnectWallet />}
       </div>
