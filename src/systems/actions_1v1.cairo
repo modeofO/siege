@@ -30,7 +30,7 @@ pub enum Source {
 
 #[dojo::contract]
 pub mod actions_1v1 {
-    use starknet::{ContractAddress, get_contract_address};
+    use starknet::{ContractAddress, get_contract_address, get_caller_address};
     use dojo::model::ModelStorage;
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::MatchState1v1;
@@ -40,6 +40,7 @@ pub mod actions_1v1 {
     use siege_dojo::models::events::MatchCreated1v1;
     use siege_dojo::models::resource_config::ResourceConfig;
     use dojo::event::EventStorage;
+    use dojo::world::IWorldDispatcherTrait;
     use super::{IVrfProviderDispatcher, IVrfProviderDispatcherTrait, Source};
 
     const VRF_PROVIDER_ADDRESS: felt252 =
@@ -158,6 +159,10 @@ pub mod actions_1v1 {
 
         fn set_ability_token(ref self: ContractState, ability_token: ContractAddress) {
             let mut world = self.world_default();
+            assert(
+                world.dispatcher.is_owner(world.namespace_hash, get_caller_address()),
+                'Not world owner',
+            );
             let mut config: ResourceConfig = world.read_model(0_u8);
             config.ability_token = ability_token;
             world.write_model(@config);
