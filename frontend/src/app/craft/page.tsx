@@ -11,26 +11,14 @@ import {
   craftAbility,
   type AbilityCost,
 } from "@/lib/craftingContracts";
+import {
+  fetchAbilityBalances,
+  EMPTY_ABILITY_INVENTORY,
+  type AbilityInventory,
+} from "@/lib/abilityToken";
 import { LAST_MATCH_KEY } from "@/components/Navbar";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "https://api.cartridge.gg/x/siege-dojo/torii";
-
-type AbilityInventory = {
-  siege_sword: number;
-  stone_cloak: number;
-  ember_blast: number;
-  hex: number;
-  fortify: number;
-};
-
-const EMPTY_INVENTORY: AbilityInventory = {
-  siege_sword: 0,
-  stone_cloak: 0,
-  ember_blast: 0,
-  hex: 0,
-  fortify: 0,
-};
 
 const ABILITY_FIELDS: (keyof AbilityInventory)[] = [
   "siege_sword",
@@ -49,40 +37,12 @@ const RESOURCE_COLORS: Record<string, string> = {
   seeds: "text-[#66cc66]",
 };
 
-async function fetchAbilities(playerAddr: string): Promise<AbilityInventory> {
-  try {
-    const res = await fetch(`${TORII_URL}/graphql`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: `{
-          siegeDojoPlayerAbilitiesModels(where: { player: "${playerAddr}" }) {
-            edges { node { siege_sword stone_cloak ember_blast hex fortify } }
-          }
-        }`,
-      }),
-    });
-    const data = await res.json();
-    const node = data?.data?.siegeDojoPlayerAbilitiesModels?.edges?.[0]?.node;
-    if (!node) return EMPTY_INVENTORY;
-    return {
-      siege_sword: Number(node.siege_sword) || 0,
-      stone_cloak: Number(node.stone_cloak) || 0,
-      ember_blast: Number(node.ember_blast) || 0,
-      hex: Number(node.hex) || 0,
-      fortify: Number(node.fortify) || 0,
-    };
-  } catch {
-    return EMPTY_INVENTORY;
-  }
-}
-
 export default function CraftPage() {
   const { account, address, status } = useAccount();
   const isConnected = status === "connected";
   const resources = useResourceBalances(address);
 
-  const [inventory, setInventory] = useState<AbilityInventory>(EMPTY_INVENTORY);
+  const [inventory, setInventory] = useState<AbilityInventory>(EMPTY_ABILITY_INVENTORY);
   const [crafting, setCrafting] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [lastMatch, setLastMatch] = useState<string | null>(null);
@@ -97,11 +57,12 @@ export default function CraftPage() {
 
   useEffect(() => {
     if (!address) {
-      setInventory(EMPTY_INVENTORY);
+      setInventory(EMPTY_ABILITY_INVENTORY);
       return;
     }
     let cancelled = false;
-    fetchAbilities(address).then((inv) => {
+    const provider = new RpcProvider({ nodeUrl: RPC_URL });
+    fetchAbilityBalances(provider, address).then((inv) => {
       if (!cancelled) setInventory(inv);
     });
     return () => {
@@ -118,7 +79,7 @@ export default function CraftPage() {
       const txHash = await craftAbility(account, abilityId, cost);
       await provider.waitForTransaction(txHash);
       if (address) {
-        const inv = await fetchAbilities(address);
+        const inv = await fetchAbilityBalances(provider, address);
         setInventory(inv);
       }
     } catch (e: unknown) {
