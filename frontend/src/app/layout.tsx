@@ -3,6 +3,7 @@ import { Geist_Mono, Cinzel } from "next/font/google";
 import "./globals.css";
 import { StarknetProvider } from "./providers";
 import { Navbar } from "@/components/Navbar";
+import { BookLink } from "@/components/BookLink";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 const serif = Cinzel({ variable: "--font-serif", subsets: ["latin"], weight: ["400", "700"] });
@@ -19,6 +20,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <StarknetProvider>
           <Navbar />
           <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+          <BookLink />
         </StarknetProvider>
       </body>
     </html>
