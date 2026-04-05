@@ -113,3 +113,15 @@ These items are OUT OF SCOPE for Phase 1 but should be kept in mind:
 - **Ability art/metadata** — Loot-style generative or hand-crafted art. IPFS metadata.
 - **Resource balancing** — may need to adjust yield rates (currently 1 per round per node) once crafting costs are defined.
 - **Resource marketplace** — since they're ERC-20, players can trade on any Starknet DEX.
+
+
+Based on the style reference image and what we've built so far, the next sprites I'd suggest are:
+
+    1. Gate sprites (East Gate, West Gate, Underground) — right now they're just text cards in the Battlefield panel. Small fortress gate/archway
+    sprites would make the battlefield feel like an actual fortress instead of a data table.
+    2. Resource node sprites (Forge, Quarry, Grove) — small isometric buildings to replace the plain colored dots. A furnace for Forge, a stone
+    quarry, and a grove of trees.
+    3. Resource token icons — tiny icons for Iron, Linen, Stone, Wood, Ember, Seeds to replace the plain text in the resources bar.
+
+    The gate sprites would have the most visual impact since the Battlefield panel is the centerpiece of the page. Three small illustrated
+    gate/archway sprites that match the citadel's isometric style would tie the whole look together.
