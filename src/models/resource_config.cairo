@@ -11,4 +11,5 @@ pub struct ResourceConfig {
     pub wood: ContractAddress,
     pub ember: ContractAddress,
     pub seeds: ContractAddress,
+    pub ability_token: ContractAddress,
 }

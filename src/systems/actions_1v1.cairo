@@ -14,6 +14,7 @@ pub trait IActions1v1<T> {
         stone: ContractAddress, wood: ContractAddress,
         ember: ContractAddress, seeds: ContractAddress,
     );
+    fn set_ability_token(ref self: T, ability_token: ContractAddress);
 }
 
 #[starknet::interface]
@@ -146,10 +147,20 @@ pub mod actions_1v1 {
             ember: ContractAddress, seeds: ContractAddress,
         ) {
             let mut world = self.world_default();
+            // Preserve an already-set ability_token so this method stays single-purpose
+            let existing: ResourceConfig = world.read_model(0_u8);
             world.write_model(@ResourceConfig {
                 id: 0,
                 iron, linen, stone, wood, ember, seeds,
+                ability_token: existing.ability_token,
             });
+        }
+
+        fn set_ability_token(ref self: ContractState, ability_token: ContractAddress) {
+            let mut world = self.world_default();
+            let mut config: ResourceConfig = world.read_model(0_u8);
+            config.ability_token = ability_token;
+            world.write_model(@config);
         }
     }
 }
