@@ -193,19 +193,30 @@ Each round, controlling a node mints 1 of each paired token to the player. Resou
 
 ### Abilities
 
-5 craftable abilities, burned from ERC-20 resources and stored in the `PlayerAbilities` model (persists across matches):
+5 craftable abilities stored as ERC-1155 tokens on the `AbilityToken` contract (token IDs 1–5). Tradeable, transferable, visible in the Cartridge wallet.
 
-| Ability | Cost | Effect (Phase 2B) |
-|---------|------|-------------------|
-| Siege Sword | 3 Iron + 2 Wood | Max damage (10) to one gate |
-| Stone Cloak | 3 Stone + 2 Linen | Block all gate damage |
-| Ember Blast | 3 Ember + 2 Seeds | 5 direct damage bypassing gates |
-| Hex | 2 Iron + 2 Stone + 1 Ember | Opponent budget -7 |
-| Fortify | 2 Stone + 2 Linen + 1 Wood | Double all defense |
+| ID | Ability | Cost | Effect (Phase 2B) |
+|----|---------|------|-------------------|
+| 1 | Siege Sword | 3 Iron + 2 Wood | Max damage (10) to one gate |
+| 2 | Stone Cloak | 3 Stone + 2 Linen | Block all gate damage |
+| 3 | Ember Blast | 3 Ember + 2 Seeds | 5 direct damage bypassing gates |
+| 4 | Hex | 2 Iron + 2 Stone + 1 Ember | Opponent budget -7 |
+| 5 | Fortify | 2 Stone + 2 Linen + 1 Wood | Double all defense |
 
-Crafting page at `/craft`. Players multicall `approve` on each required ERC-20 then `craft_ability(id)` on the `crafting_1v1` contract, which `transfer_from`s tokens to a burn address (`0x1`) and increments the ability counter. Effects are applied in Phase 2B (resolution integration).
+**Crafting flow:** frontend multicalls `approve` on each required ERC-20 then `craft_ability(id)` on `crafting_1v1`. The Dojo contract burns resources (`transfer_from` to `0x1`) and calls `AbilityToken.mint(caller, id, 1)`. Token IDs match ability IDs 1:1.
 
-Sepolia `crafting_1v1`: `0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235`
+**AbilityToken contract:** pure Starknet ERC-1155 (not a Dojo contract) in `src/tokens/ability_token.cairo`. Three roles:
+- `admin` — rotates minter/burner/base_uri (set at deploy to deployer address, immutable)
+- `minter` — only `crafting_1v1` can mint
+- `burner` — set when Phase 2B ships; starts at `0x0` (abilities are immortal until then)
+
+**Metadata:** served from `frontend/src/app/api/metadata/abilities/[id]/route.ts`. Contract's `uri()` returns `<host>/api/metadata/abilities/{id}` (base URI set by admin via `set_base_uri`); wallet substitutes `{id}`, route returns OpenSea-format JSON with name/description/image/attributes. Ability sprites at `frontend/public/sprites/abilities/<id>.png`. Updating art or descriptions does NOT require a contract redeploy — only redeploy the Next.js app.
+
+**Sepolia addresses:**
+- `crafting_1v1`: `0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235`
+- `AbilityToken`: `0x6de8e6addfd54cb600d5a7549e92fa5b275379ff85364626874a00bc138d37c`
+
+**Historical note:** Phase 2A used a `PlayerAbilities` Dojo model with u8 counters. Phase 2A.5 dropped it in favor of ERC-1155 so abilities would show in the wallet. The old model is still orphaned on-chain but not read by any live code.
 
 ## Project Structure
 
