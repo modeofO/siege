@@ -1,13 +1,17 @@
-// AbilityToken — ERC-1155 for crafted gameplay abilities.
+// AbilityToken v2 — ERC-1155 with fully on-chain metadata.
 //
 // Token ID = ability ID (1=Siege Sword, 2=Stone Cloak, 3=Ember Blast, 4=Hex, 5=Fortify).
-// Three roles:
-//   - admin: can rotate minter/burner/base_uri (set at constructor, immutable)
+// uri(token_id) returns a data:application/json;base64,... URI with inline SVG image.
+// No external server needed — metadata is constructed on-chain at read time.
+//
+// Three admin roles:
+//   - admin: can rotate minter/burner and update per-ability SVGs (set at constructor, immutable)
 //   - minter: can call mint (set by admin post-deploy — usually crafting_1v1)
 //   - burner: can call burn (set by admin when Phase 2B ships — starts at 0x0)
 //
-// Standard ERC-1155 read/transfer methods (balance_of, balance_of_batch,
-// safe_transfer_from, uri, etc.) come from ERC1155MixinImpl.
+// Phase 3 stub: get_ability_svg signature accepts (ability_type, color_seed) — the seed
+// is ignored in v2 (always reads from admin-settable storage) but the parameter is in
+// place for future per-token color generation.
 
 use starknet::ContractAddress;
 
@@ -17,7 +21,7 @@ pub trait IAbilityToken<T> {
     fn burn(ref self: T, from: ContractAddress, token_id: u256, amount: u256);
     fn set_minter(ref self: T, new_minter: ContractAddress);
     fn set_burner(ref self: T, new_burner: ContractAddress);
-    fn set_base_uri(ref self: T, new_uri: ByteArray);
+    fn set_ability_svg(ref self: T, ability_type: u8, svg: ByteArray);
     fn admin(self: @T) -> ContractAddress;
     fn minter(self: @T) -> ContractAddress;
     fn burner(self: @T) -> ContractAddress;
@@ -28,19 +32,28 @@ pub mod AbilityToken {
     use core::num::traits::Zero;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
-    use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
+    use starknet::storage::{
+        Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
+    };
     use openzeppelin_introspection::src5::SRC5Component;
     use openzeppelin_token::erc1155::{ERC1155Component, ERC1155HooksEmptyImpl};
+    use openzeppelin_interfaces::token::erc1155::IERC1155MetadataURI;
+    use siege_dojo::tokens::ability_metadata;
 
     component!(path: ERC1155Component, storage: erc1155, event: ERC1155Event);
     component!(path: SRC5Component, storage: src5, event: SRC5Event);
 
-    // ERC-1155 mixin provides balance_of, balance_of_batch, safe_transfer_from, uri, etc.
-    // (Also provides supports_interface via the embedded SRC5 — do not embed SRC5Impl
-    // separately or the contract will have duplicate entry points.)
+    // Selective embedding: core + camelCase, but NOT the metadata impl.
+    // We provide our own uri() below that returns on-chain data URIs.
     #[abi(embed_v0)]
-    impl ERC1155MixinImpl = ERC1155Component::ERC1155MixinImpl<ContractState>;
+    impl ERC1155Impl = ERC1155Component::ERC1155Impl<ContractState>;
+    #[abi(embed_v0)]
+    impl ERC1155CamelImpl = ERC1155Component::ERC1155CamelImpl<ContractState>;
     impl ERC1155InternalImpl = ERC1155Component::InternalImpl<ContractState>;
+
+    // SRC5 embedded separately — no duplicate since we're not using the mixin.
+    #[abi(embed_v0)]
+    impl SRC5Impl = SRC5Component::SRC5Impl<ContractState>;
 
     #[storage]
     struct Storage {
@@ -51,6 +64,7 @@ pub mod AbilityToken {
         admin_address: ContractAddress,
         minter_address: ContractAddress,
         burner_address: ContractAddress,
+        ability_svgs: Map<u8, ByteArray>,
     }
 
     #[event]
@@ -63,17 +77,26 @@ pub mod AbilityToken {
     }
 
     #[constructor]
-    fn constructor(
-        ref self: ContractState,
-        admin: ContractAddress,
-        base_uri: ByteArray,
-    ) {
+    fn constructor(ref self: ContractState, admin: ContractAddress) {
         assert(admin.is_non_zero(), 'Admin cannot be zero');
-        self.erc1155.initializer(base_uri);
+        // Initialize with empty base URI — uri() never reads it (we override below),
+        // but the component requires initializer to be called for SRC5 registration.
+        self.erc1155.initializer("");
         self.admin_address.write(admin);
-        // minter_address and burner_address default to 0x0.
-        // Until set_minter is called, no mints will succeed.
-        // Until set_burner is called, no burns will succeed (correct for Phase 2A.5).
+    }
+
+    // Custom on-chain metadata: returns data:application/json;base64,... per token ID.
+    #[abi(embed_v0)]
+    impl AbilityMetadataURI of IERC1155MetadataURI<ContractState> {
+        fn uri(self: @ContractState, token_id: u256) -> ByteArray {
+            // Token IDs are 1-5. Anything outside that range returns empty.
+            if token_id.high != 0 || token_id.low == 0 || token_id.low > 5 {
+                return "";
+            }
+            let ability_type: u8 = token_id.low.try_into().unwrap();
+            let svg = self.ability_svgs.entry(ability_type).read();
+            ability_metadata::build_ability_data_uri(ability_type, svg)
+        }
     }
 
     #[abi(embed_v0)]
@@ -102,9 +125,10 @@ pub mod AbilityToken {
             self.burner_address.write(new_burner);
         }
 
-        fn set_base_uri(ref self: ContractState, new_uri: ByteArray) {
+        fn set_ability_svg(ref self: ContractState, ability_type: u8, svg: ByteArray) {
             assert(get_caller_address() == self.admin_address.read(), 'Not admin');
-            self.erc1155._set_base_uri(new_uri);
+            assert(ability_type >= 1 && ability_type <= 5, 'Invalid ability type');
+            self.ability_svgs.entry(ability_type).write(svg);
         }
 
         fn admin(self: @ContractState) -> ContractAddress {
