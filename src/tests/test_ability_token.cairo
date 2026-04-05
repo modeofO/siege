@@ -77,7 +77,6 @@ mod tests {
     }
 
     // Deploys a mock SRC6 account contract and returns its address.
-    // We use a salt counter so repeated calls inside one test don't collide.
     fn deploy_user() -> ContractAddress {
         let (addr, _) = deploy_syscall(
             MockAccount::TEST_CLASS_HASH.try_into().unwrap(),
@@ -173,17 +172,12 @@ mod tests {
     #[test]
     #[should_panic(expected: ('Not burner', 'ENTRYPOINT_FAILED'))]
     fn test_burn_blocked_when_burner_unset() {
-        let (token, _erc1155) = deploy_token();
-        set_caller(ADMIN);
-        token.set_minter(MINTER.try_into().unwrap());
-
-        let user = deploy_user();
-        set_caller(MINTER);
-        token.mint(user, 1_u256, 1_u256);
-
-        // Burner is still 0x0, nobody can burn
+        let (token, _) = deploy_token();
+        // Burner defaults to 0x0 — the auth check fires before any balance lookup,
+        // so the `from` address doesn't need to exist or hold a balance.
+        let any_addr: ContractAddress = 0xDEAD.try_into().unwrap();
         set_caller(BURNER);
-        token.burn(user, 1_u256, 1_u256);
+        token.burn(any_addr, 1_u256, 1_u256);
     }
 
     #[test]
