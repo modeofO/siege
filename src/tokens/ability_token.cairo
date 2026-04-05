@@ -25,6 +25,7 @@ pub trait IAbilityToken<T> {
 
 #[starknet::contract]
 pub mod AbilityToken {
+    use core::num::traits::Zero;
     use starknet::ContractAddress;
     use starknet::get_caller_address;
     use starknet::storage::{StoragePointerReadAccess, StoragePointerWriteAccess};
@@ -67,6 +68,7 @@ pub mod AbilityToken {
         admin: ContractAddress,
         base_uri: ByteArray,
     ) {
+        assert(admin.is_non_zero(), 'Admin cannot be zero');
         self.erc1155.initializer(base_uri);
         self.admin_address.write(admin);
         // minter_address and burner_address default to 0x0.
@@ -81,6 +83,10 @@ pub mod AbilityToken {
             self.erc1155.mint_with_acceptance_check(to, token_id, amount, array![].span());
         }
 
+        // NOTE: burner is fully trusted — it can burn tokens from ANY address, not
+        // just the caller. The burner role should only be assigned to a contract
+        // that enforces "burn only from the token holder's own address" as an
+        // internal invariant. Phase 2B's ability-consume contract will do this.
         fn burn(ref self: ContractState, from: ContractAddress, token_id: u256, amount: u256) {
             assert(get_caller_address() == self.burner_address.read(), 'Not burner');
             self.erc1155.burn(from, token_id, amount);
