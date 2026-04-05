@@ -45,13 +45,14 @@
     },
     {
       "address": "0x7cbd822e0dc535d084dd71b76ba332d76cb370954c83a5ebe5625f36cdfa1c",
-      "class_hash": "0x45f39cab5dc4e8786665628697222f5fa1d2e352a6155c2687027b75ed96838",
+      "class_hash": "0x48d0fbb088d5ff8b159e417e1427050b7aaea1daa9d316a2d8dea1ed5423352",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
       "selector": "0x26e0eeadcc0c8f020b1da157b4d0f038ca209cb1d1ed9b6b52248376703705",
       "systems": [
         "create_match_1v1",
         "set_resource_config",
+        "set_ability_token",
         "upgrade"
       ]
     },
@@ -84,7 +85,7 @@
     },
     {
       "address": "0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235",
-      "class_hash": "0x551e9a98f265ef816439a81b9e2707e22f5b9a4616e8aae05dacfe34aca73bf",
+      "class_hash": "0x12c940ec02de659c7e3047c0018111406813d43bc9f4edb706f7a3cb775e6e4",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
       "selector": "0x48ced6417f88e7c589f1f67c5e7c6a5b74d4c4cc465d50b11d54b4095a42747",
@@ -106,7 +107,7 @@
     },
     {
       "address": "0x1b31a6098f1b9081e925e98cd9627c6a5cce39073e92c3f5bf827cb09abe36b",
-      "class_hash": "0x651846828ce20522f00cf8b9b3d08c1fd49555ae93d14fe2806ced21fe1a959",
+      "class_hash": "0x55653476056302213245f5be9b9daaa477ea95d3cb1312f2ee53952d2743c6d",
       "init_calldata": [],
       "tag": "siege_dojo-resolution_1v1",
       "selector": "0x3243785fc5c17bf6bc5b9d485ddaa1275e126e753d2eddd05e69e17e98f85fd",
@@ -291,43 +292,6 @@
     {
       "members": [
         {
-          "name": "player",
-          "type": "core::starknet::contract_address::ContractAddress",
-          "key": true
-        },
-        {
-          "name": "siege_sword",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "stone_cloak",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "ember_blast",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "hex",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "fortify",
-          "type": "core::integer::u8",
-          "key": false
-        }
-      ],
-      "class_hash": "0x41e3cd40560f80ee22c00db1afade592ee4fcad55a15d9e1e8deafe6a5f2d40",
-      "tag": "siege_dojo-PlayerAbilities",
-      "selector": "0x6a3e1dde13d4722701a8710bb54f1fe1aacdc86b7702bc5f2788ae33220e04f"
-    },
-    {
-      "members": [
-        {
           "name": "id",
           "type": "core::integer::u8",
           "key": true
@@ -361,9 +325,14 @@
           "name": "seeds",
           "type": "core::starknet::contract_address::ContractAddress",
           "key": false
+        },
+        {
+          "name": "ability_token",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": false
         }
       ],
-      "class_hash": "0x66501f7f735a64e12afb0df0eef8f3cc0889e1ef6760bb84e35daf4f048c8f4",
+      "class_hash": "0x6a27e343a298cac8d353073f9dc389134fa34565661e23e5ac62e107101b2c1",
       "tag": "siege_dojo-ResourceConfig",
       "selector": "0x62231c2dc0531535e3e15617d9a10dd402a509f2e37355500cac2c454cb1abf"
     },
@@ -3304,68 +3273,6 @@
     },
     {
       "type": "struct",
-      "name": "siege_dojo::models::player_abilities::PlayerAbilities",
-      "members": [
-        {
-          "name": "player",
-          "type": "core::starknet::contract_address::ContractAddress"
-        },
-        {
-          "name": "siege_sword",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "stone_cloak",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "ember_blast",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "hex",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "fortify",
-          "type": "core::integer::u8"
-        }
-      ]
-    },
-    {
-      "type": "struct",
-      "name": "siege_dojo::models::player_abilities::PlayerAbilitiesValue",
-      "members": [
-        {
-          "name": "siege_sword",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "stone_cloak",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "ember_blast",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "hex",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "fortify",
-          "type": "core::integer::u8"
-        }
-      ]
-    },
-    {
-      "type": "event",
-      "name": "siege_dojo::models::player_abilities::m_PlayerAbilities::Event",
-      "kind": "enum",
-      "variants": []
-    },
-    {
-      "type": "struct",
       "name": "siege_dojo::models::resource_config::ResourceConfig",
       "members": [
         {
@@ -3394,6 +3301,10 @@
         },
         {
           "name": "seeds",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "ability_token",
           "type": "core::starknet::contract_address::ContractAddress"
         }
       ]
@@ -3424,6 +3335,10 @@
         },
         {
           "name": "seeds",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "ability_token",
           "type": "core::starknet::contract_address::ContractAddress"
         }
       ]
@@ -4191,6 +4106,18 @@
             },
             {
               "name": "seeds",
+              "type": "core::starknet::contract_address::ContractAddress"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "set_ability_token",
+          "inputs": [
+            {
+              "name": "ability_token",
               "type": "core::starknet::contract_address::ContractAddress"
             }
           ],
