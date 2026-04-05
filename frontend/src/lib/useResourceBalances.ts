@@ -5,7 +5,7 @@ import { RpcProvider } from "starknet";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 
 // ERC-20 token addresses (deployed on Sepolia)
-const RESOURCE_TOKENS = {
+export const RESOURCE_TOKENS = {
   iron:  "0x2154b81255def0de319c2310b38eb54484794e64b54a7a9adce583e4079a77b",
   linen: "0x511a65b969eb95a9e510b7809dff5e9c53ac325002423dea0e35ce0a1880f2b",
   stone: "0x28f46611d132cab82fb0afb6614d95f13dbd20dca76d5d4601fc58acb71552d",

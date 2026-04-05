@@ -13,6 +13,8 @@ import { ControllerConnector } from "@cartridge/connector";
 import type { SessionPolicies } from "@cartridge/controller";
 import { CONTRACTS } from "@/lib/contracts";
 import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
+import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
+import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
 
 // ---------- Network mode ----------
 
@@ -131,6 +133,18 @@ const SESSION_POLICIES: SessionPolicies = {
         { name: "Request Random", entrypoint: "request_random" },
       ],
     },
+    [CRAFTING_1V1_ADDRESS]: {
+      methods: [
+        { name: "Craft Ability", entrypoint: "craft_ability" },
+      ],
+    },
+    // Approve policies for each resource ERC-20 so crafting can burn them
+    ...Object.fromEntries(
+      Object.values(RESOURCE_TOKENS).map((addr) => [
+        addr,
+        { methods: [{ name: "Approve", entrypoint: "approve" }] },
+      ]),
+    ),
   },
 };
 
