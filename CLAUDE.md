@@ -191,6 +191,22 @@ Poseidon hash is 14 elements (salt + 13 allocations).
 
 Each round, controlling a node mints 1 of each paired token to the player. Resources persist across matches and are tradeable. Token addresses stored in `ResourceConfig` model.
 
+### Abilities
+
+5 craftable abilities, burned from ERC-20 resources and stored in the `PlayerAbilities` model (persists across matches):
+
+| Ability | Cost | Effect (Phase 2B) |
+|---------|------|-------------------|
+| Siege Sword | 3 Iron + 2 Wood | Max damage (10) to one gate |
+| Stone Cloak | 3 Stone + 2 Linen | Block all gate damage |
+| Ember Blast | 3 Ember + 2 Seeds | 5 direct damage bypassing gates |
+| Hex | 2 Iron + 2 Stone + 1 Ember | Opponent budget -7 |
+| Fortify | 2 Stone + 2 Linen + 1 Wood | Double all defense |
+
+Crafting page at `/craft`. Players multicall `approve` on each required ERC-20 then `craft_ability(id)` on the `crafting_1v1` contract, which `transfer_from`s tokens to a burn address (`0x1`) and increments the ability counter. Effects are applied in Phase 2B (resolution integration).
+
+Sepolia `crafting_1v1`: `0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235`
+
 ## Project Structure
 
 - `src/systems/` — Cairo contracts (actions, commit_reveal, resolution)
