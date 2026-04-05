@@ -22,6 +22,7 @@ pub mod systems {
     pub mod commit_reveal_1v1;
     pub mod resolution;
     pub mod resolution_1v1;
+    pub mod crafting_1v1;
 }
 
 #[cfg(test)]

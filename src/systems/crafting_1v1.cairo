@@ -1,0 +1,97 @@
+use starknet::ContractAddress;
+
+#[starknet::interface]
+pub trait ICrafting1v1<T> {
+    fn craft_ability(ref self: T, ability_id: u8);
+}
+
+#[starknet::interface]
+pub trait IERC20Transfer<T> {
+    fn transfer_from(
+        ref self: T,
+        sender: ContractAddress,
+        recipient: ContractAddress,
+        amount: u256,
+    ) -> bool;
+    fn balance_of(self: @T, account: ContractAddress) -> u256;
+}
+
+#[dojo::contract]
+pub mod crafting_1v1 {
+    use starknet::{ContractAddress, get_caller_address};
+    use dojo::model::ModelStorage;
+    use siege_dojo::models::player_abilities::PlayerAbilities;
+    use siege_dojo::models::resource_config::ResourceConfig;
+    use super::{IERC20TransferDispatcher, IERC20TransferDispatcherTrait};
+
+    // Burn sink — tokens sent here are effectively burned (non-zero to avoid ERC20 zero-address reverts)
+    const BURN_ADDRESS: felt252 = 0x1;
+
+    #[generate_trait]
+    impl InternalImpl of InternalTrait {
+        fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
+            self.world(@"siege_dojo")
+        }
+    }
+
+    fn burn_tokens(token_addr: ContractAddress, from: ContractAddress, amount: u256) {
+        let mut token = IERC20TransferDispatcher { contract_address: token_addr };
+        let balance = token.balance_of(from);
+        assert(balance >= amount, 'Insufficient balance');
+        let burn_addr: ContractAddress = BURN_ADDRESS.try_into().unwrap();
+        token.transfer_from(from, burn_addr, amount);
+    }
+
+    #[abi(embed_v0)]
+    impl Crafting1v1Impl of super::ICrafting1v1<ContractState> {
+        fn craft_ability(ref self: ContractState, ability_id: u8) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            // Read resource config for token addresses (single row keyed by id=0)
+            let config: ResourceConfig = world.read_model(0_u8);
+
+            // Burn resources based on ability recipe
+            if ability_id == 1 {
+                // Siege Sword: 3 Iron + 2 Wood
+                burn_tokens(config.iron, caller, 3);
+                burn_tokens(config.wood, caller, 2);
+            } else if ability_id == 2 {
+                // Stone Cloak: 3 Stone + 2 Linen
+                burn_tokens(config.stone, caller, 3);
+                burn_tokens(config.linen, caller, 2);
+            } else if ability_id == 3 {
+                // Ember Blast: 3 Ember + 2 Seeds
+                burn_tokens(config.ember, caller, 3);
+                burn_tokens(config.seeds, caller, 2);
+            } else if ability_id == 4 {
+                // Hex: 2 Iron + 2 Stone + 1 Ember
+                burn_tokens(config.iron, caller, 2);
+                burn_tokens(config.stone, caller, 2);
+                burn_tokens(config.ember, caller, 1);
+            } else if ability_id == 5 {
+                // Fortify: 2 Stone + 2 Linen + 1 Wood
+                burn_tokens(config.stone, caller, 2);
+                burn_tokens(config.linen, caller, 2);
+                burn_tokens(config.wood, caller, 1);
+            } else {
+                panic!("Invalid ability ID");
+            }
+
+            // Increment ability count
+            let mut abilities: PlayerAbilities = world.read_model(caller);
+            if ability_id == 1 {
+                abilities.siege_sword += 1;
+            } else if ability_id == 2 {
+                abilities.stone_cloak += 1;
+            } else if ability_id == 3 {
+                abilities.ember_blast += 1;
+            } else if ability_id == 4 {
+                abilities.hex += 1;
+            } else if ability_id == 5 {
+                abilities.fortify += 1;
+            }
+            world.write_model(@abilities);
+        }
+    }
+}
