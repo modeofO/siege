@@ -20,7 +20,7 @@
 
 body {
   background-color: var(--color-bg);
-  background-image: url('/background.jpeg');
+  background-image: url('/sprites/desk_preview.png');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
