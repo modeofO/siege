@@ -59,8 +59,6 @@ mod tests {
         let admin: ContractAddress = ADMIN.try_into().unwrap();
         let mut calldata: Array<felt252> = array![];
         admin.serialize(ref calldata);
-        let base_uri: ByteArray = "https://example.test/{id}";
-        base_uri.serialize(ref calldata);
 
         let (addr, _) = deploy_syscall(
             AbilityToken::TEST_CLASS_HASH.try_into().unwrap(),
@@ -198,13 +196,44 @@ mod tests {
     }
 
     #[test]
-    fn test_admin_can_update_base_uri() {
+    fn test_admin_can_set_ability_svg() {
         let (token, erc1155) = deploy_token();
         set_caller(ADMIN);
-        let new_uri: ByteArray = "https://other.test/{id}";
-        token.set_base_uri(new_uri);
-        // uri(1) should now return the new base URI string verbatim.
+        let svg: ByteArray = "<svg><rect fill='gold'/></svg>";
+        token.set_ability_svg(1, svg);
+        // uri(1) should now return a data URI starting with the base64 JSON prefix
         let returned = erc1155.uri(1_u256);
-        assert(returned == "https://other.test/{id}", 'URI not updated');
+        let prefix: ByteArray = "data:application/json;base64,";
+        let mut matches = true;
+        let mut i: usize = 0;
+        while i < prefix.len() {
+            if i >= returned.len() {
+                matches = false;
+                break;
+            }
+            if returned.at(i).unwrap() != prefix.at(i).unwrap() {
+                matches = false;
+                break;
+            }
+            i += 1;
+        };
+        assert(matches, 'URI prefix mismatch');
+    }
+
+    #[test]
+    fn test_uri_empty_when_svg_not_set() {
+        let (_token, erc1155) = deploy_token();
+        // No set_ability_svg called — SVG storage is empty
+        let returned = erc1155.uri(1_u256);
+        // Should still return a data URI (with empty image field), not crash
+        let prefix: ByteArray = "data:application/json;base64,";
+        assert(returned.len() >= prefix.len(), 'URI should not be empty');
+    }
+
+    #[test]
+    fn test_uri_empty_for_invalid_id() {
+        let (_token, erc1155) = deploy_token();
+        let returned = erc1155.uri(99_u256);
+        assert(returned.len() == 0, 'Invalid ID should return empty');
     }
 }
