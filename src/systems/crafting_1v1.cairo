@@ -16,15 +16,20 @@ pub trait IERC20Transfer<T> {
     fn balance_of(self: @T, account: ContractAddress) -> u256;
 }
 
+#[starknet::interface]
+pub trait IAbilityTokenMint<T> {
+    fn mint(ref self: T, to: ContractAddress, token_id: u256, amount: u256);
+}
+
 #[dojo::contract]
 pub mod crafting_1v1 {
     use starknet::{ContractAddress, get_caller_address};
     use dojo::model::ModelStorage;
-    use siege_dojo::models::player_abilities::PlayerAbilities;
     use siege_dojo::models::resource_config::ResourceConfig;
     use super::{IERC20TransferDispatcher, IERC20TransferDispatcherTrait};
+    use super::{IAbilityTokenMintDispatcher, IAbilityTokenMintDispatcherTrait};
 
-    // Burn sink — tokens sent here are effectively burned (non-zero to avoid ERC20 zero-address reverts)
+    // Burn sink for ERC-20 resource tokens — tokens sent here are effectively burned.
     const BURN_ADDRESS: felt252 = 0x1;
 
     #[generate_trait]
@@ -45,7 +50,7 @@ pub mod crafting_1v1 {
     #[abi(embed_v0)]
     impl Crafting1v1Impl of super::ICrafting1v1<ContractState> {
         fn craft_ability(ref self: ContractState, ability_id: u8) {
-            let mut world = self.world_default();
+            let world = self.world_default();
             let caller = get_caller_address();
 
             // Read resource config for token addresses (single row keyed by id=0)
@@ -78,20 +83,11 @@ pub mod crafting_1v1 {
                 panic!("Invalid ability ID");
             }
 
-            // Increment ability count
-            let mut abilities: PlayerAbilities = world.read_model(caller);
-            if ability_id == 1 {
-                abilities.siege_sword += 1;
-            } else if ability_id == 2 {
-                abilities.stone_cloak += 1;
-            } else if ability_id == 3 {
-                abilities.ember_blast += 1;
-            } else if ability_id == 4 {
-                abilities.hex += 1;
-            } else if ability_id == 5 {
-                abilities.fortify += 1;
-            }
-            world.write_model(@abilities);
+            // Mint the ERC-1155 ability token (token_id == ability_id)
+            let ability_token = IAbilityTokenMintDispatcher {
+                contract_address: config.ability_token,
+            };
+            ability_token.mint(caller, ability_id.into(), 1_u256);
         }
     }
 }
