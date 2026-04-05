@@ -69,6 +69,7 @@ version = "1.0.0"
 dependencies = [
  "dojo",
  "dojo_cairo_test",
+ "openzeppelin_interfaces",
  "openzeppelin_introspection",
  "openzeppelin_token",
 ]
