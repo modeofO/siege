@@ -10,6 +10,7 @@ pub mod models {
     pub mod match_counter;
     pub mod events;
     pub mod resource_config;
+    pub mod player_abilities;
 }
 
 pub mod tokens;
