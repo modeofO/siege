@@ -18,6 +18,7 @@ use starknet::ContractAddress;
 
 #[dojo::contract]
 pub mod resolution_1v1 {
+    use core::num::traits::Zero;
     use starknet::get_contract_address;
     use dojo::model::ModelStorage;
     use dojo::event::EventStorage;
@@ -372,9 +373,14 @@ pub mod resolution_1v1 {
                 state.current_round = round + 1;
 
                 // Generate next round's modifiers via vRNG
-                let vrf = IVrfProviderResDispatcher {
-                    contract_address: VRF_PROVIDER_ADDRESS.try_into().unwrap(),
+                // Read VRF address from config; fall back to hardcoded if not set
+                let config: ResourceConfig = world.read_model(0_u8);
+                let vrf_addr = if config.vrf_provider.is_non_zero() {
+                    config.vrf_provider
+                } else {
+                    VRF_PROVIDER_ADDRESS.try_into().unwrap()
                 };
+                let vrf = IVrfProviderResDispatcher { contract_address: vrf_addr };
                 let random_value = vrf.consume_random(Source::Nonce(get_contract_address()));
                 let (g0, g1, g2) = random_to_modifiers(random_value);
                 world.write_model(@RoundModifiers1v1 {

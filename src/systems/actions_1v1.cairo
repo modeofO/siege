@@ -15,6 +15,7 @@ pub trait IActions1v1<T> {
         ember: ContractAddress, seeds: ContractAddress,
     );
     fn set_ability_token(ref self: T, ability_token: ContractAddress);
+    fn set_vrf_provider(ref self: T, vrf_provider: ContractAddress);
 }
 
 #[starknet::interface]
@@ -30,6 +31,7 @@ pub enum Source {
 
 #[dojo::contract]
 pub mod actions_1v1 {
+    use core::num::traits::Zero;
     use starknet::{ContractAddress, get_contract_address, get_caller_address};
     use dojo::model::ModelStorage;
     use siege_dojo::models::match_state::MatchStatus;
@@ -104,9 +106,14 @@ pub mod actions_1v1 {
             };
 
             // Generate round 1 modifiers via vRNG
-            let vrf = IVrfProviderDispatcher {
-                contract_address: VRF_PROVIDER_ADDRESS.try_into().unwrap(),
+            // Read VRF address from config; fall back to hardcoded if not set
+            let config: ResourceConfig = world.read_model(0_u8);
+            let vrf_addr = if config.vrf_provider.is_non_zero() {
+                config.vrf_provider
+            } else {
+                VRF_PROVIDER_ADDRESS.try_into().unwrap()
             };
+            let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
             let random_value = vrf.consume_random(Source::Nonce(get_contract_address()));
             let (g0, g1, g2) = random_to_modifiers(random_value);
             world.write_model(@RoundModifiers1v1 {
@@ -154,6 +161,7 @@ pub mod actions_1v1 {
                 id: 0,
                 iron, linen, stone, wood, ember, seeds,
                 ability_token: existing.ability_token,
+                vrf_provider: existing.vrf_provider,
             });
         }
 
@@ -165,6 +173,17 @@ pub mod actions_1v1 {
             );
             let mut config: ResourceConfig = world.read_model(0_u8);
             config.ability_token = ability_token;
+            world.write_model(@config);
+        }
+
+        fn set_vrf_provider(ref self: ContractState, vrf_provider: ContractAddress) {
+            let mut world = self.world_default();
+            assert(
+                world.dispatcher.is_owner(world.namespace_hash, get_caller_address()),
+                'Not world owner',
+            );
+            let mut config: ResourceConfig = world.read_model(0_u8);
+            config.vrf_provider = vrf_provider;
             world.write_model(@config);
         }
     }

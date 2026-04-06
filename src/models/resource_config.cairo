@@ -12,4 +12,5 @@ pub struct ResourceConfig {
     pub ember: ContractAddress,
     pub seeds: ContractAddress,
     pub ability_token: ContractAddress,
+    pub vrf_provider: ContractAddress,
 }
