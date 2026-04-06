@@ -26,6 +26,12 @@ export function ConnectWallet() {
           {address.slice(0, 6)}…{address.slice(-4)}
         </span>
         <button
+          onClick={() => controller.controller.openProfile("inventory")}
+          className="text-xs px-2 py-1 border border-[#c8a44e]/40 rounded text-[#c8a44e] hover:bg-[#c8a44e]/10 transition-colors"
+        >
+          Profile
+        </button>
+        <button
           onClick={() => disconnect()}
           className="text-xs px-2 py-1 border border-[#2a2a3a] rounded text-[#6a6a7a] hover:text-[#ff3344] hover:border-[#ff3344]/40 transition-colors"
         >

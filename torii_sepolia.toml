@@ -6,3 +6,14 @@ world_block = 8188551
 allowed_origins = ["*"]
 index_pending = true
 polling_interval = 1000
+contracts = [
+  # AbilityToken v2 (ERC-1155) — crafted ability NFTs with on-chain metadata
+  "erc1155:0xe1f7c5fd7bd557ff5c69db03b49a62e40f3cc01ee11524ef862a71952ddcfe",
+  # Resource tokens (ERC-20) — minted by controlling nodes during matches
+  "erc20:0x2154b81255def0de319c2310b38eb54484794e64b54a7a9adce583e4079a77b",
+  "erc20:0x511a65b969eb95a9e510b7809dff5e9c53ac325002423dea0e35ce0a1880f2b",
+  "erc20:0x28f46611d132cab82fb0afb6614d95f13dbd20dca76d5d4601fc58acb71552d",
+  "erc20:0x1014ccf9475d916d5164b44edc0480a2f0cd4e67b5bef6acd22a40c01e83c27",
+  "erc20:0x7e6b21bc243e02e8afac07822d58ec3f8b1c97dedead6849fd96d3026589b4e",
+  "erc20:0x704234ef94400154669e56ac5a490796b7bf2a277092ea2be46e99eedd03a50",
+]

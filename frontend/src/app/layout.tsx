@@ -4,6 +4,7 @@ import "./globals.css";
 import { StarknetProvider } from "./providers";
 import { Navbar } from "@/components/Navbar";
 import { BookLink } from "@/components/BookLink";
+import { CompassLink } from "@/components/CompassLink";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 const serif = Cinzel({ variable: "--font-serif", subsets: ["latin"], weight: ["400", "700"] });
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <StarknetProvider>
           <Navbar />
           <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
+          <CompassLink />
           <BookLink />
         </StarknetProvider>
       </body>
