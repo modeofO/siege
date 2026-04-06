@@ -1,3 +1,31 @@
+// Mock VRF provider that returns a deterministic value for testing.
+#[starknet::contract]
+pub mod MockVrfProvider {
+    use starknet::ContractAddress;
+
+    #[derive(Drop, Copy, Clone, Serde)]
+    pub enum Source {
+        Nonce: ContractAddress,
+        Salt: felt252,
+    }
+
+    #[storage]
+    struct Storage {}
+
+    #[constructor]
+    fn constructor(ref self: ContractState) {}
+
+    #[abi(per_item)]
+    #[generate_trait]
+    impl External of ExternalTrait {
+        #[external(v0)]
+        fn consume_random(ref self: ContractState, source: Source) -> felt252 {
+            // Returns 0 so random_to_modifiers produces (0,0,0) = Normal for all gates.
+            0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use core::poseidon::PoseidonTrait;
@@ -7,6 +35,7 @@ mod tests {
     use dojo_cairo_test::{spawn_test_world, NamespaceDef, TestResource, ContractDefTrait, ContractDef, WorldStorageTestTrait};
 
     use starknet::{contract_address_const, testing};
+    use starknet::SyscallResultTrait;
 
     use siege_dojo::systems::actions_1v1::{actions_1v1, IActions1v1Dispatcher, IActions1v1DispatcherTrait};
     use siege_dojo::systems::commit_reveal_1v1::{commit_reveal_1v1, ICommitReveal1v1Dispatcher, ICommitReveal1v1DispatcherTrait};
@@ -16,9 +45,23 @@ mod tests {
     use siege_dojo::models::node_state::{NodeState, m_NodeState, NodeOwner};
     use siege_dojo::models::commitment::{m_Commitment};
     use siege_dojo::models::round_moves_1v1::{m_RoundMoves1v1};
+    use siege_dojo::models::round_modifiers_1v1::m_RoundModifiers1v1;
     use siege_dojo::models::round_traps_1v1::m_RoundTraps1v1;
     use siege_dojo::models::match_counter::{m_MatchCounter};
+    use siege_dojo::models::resource_config::{ResourceConfig, m_ResourceConfig};
     use siege_dojo::models::events::{e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished};
+
+    use super::MockVrfProvider;
+
+    fn deploy_mock_vrf() -> starknet::ContractAddress {
+        let (addr, _) = starknet::syscalls::deploy_syscall(
+            MockVrfProvider::TEST_CLASS_HASH.try_into().unwrap(),
+            0,
+            array![].span(),
+            false,
+        ).unwrap_syscall();
+        addr
+    }
 
     fn namespace_def() -> NamespaceDef {
         NamespaceDef {
@@ -28,8 +71,10 @@ mod tests {
                 TestResource::Model(m_NodeState::TEST_CLASS_HASH),
                 TestResource::Model(m_Commitment::TEST_CLASS_HASH),
                 TestResource::Model(m_RoundMoves1v1::TEST_CLASS_HASH),
+                TestResource::Model(m_RoundModifiers1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_RoundTraps1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
+                TestResource::Model(m_ResourceConfig::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
@@ -78,6 +123,10 @@ mod tests {
         let actions_sys = IActions1v1Dispatcher { contract_address: actions_addr };
         let (cr_addr, _) = world.dns(@"commit_reveal_1v1").unwrap();
         let cr_sys = ICommitReveal1v1Dispatcher { contract_address: cr_addr };
+
+        // Deploy mock VRF and wire it into the world config
+        let mock_vrf_addr = deploy_mock_vrf();
+        actions_sys.set_vrf_provider(mock_vrf_addr);
 
         let addr1 = contract_address_const::<0x1>();
         let addr2 = contract_address_const::<0x2>();
@@ -166,6 +215,10 @@ mod tests {
         let actions_sys = IActions1v1Dispatcher { contract_address: actions_addr };
         let (cr_addr, _) = world.dns(@"commit_reveal_1v1").unwrap();
         let cr_sys = ICommitReveal1v1Dispatcher { contract_address: cr_addr };
+
+        // Deploy mock VRF and wire it into the world config
+        let mock_vrf_addr = deploy_mock_vrf();
+        actions_sys.set_vrf_provider(mock_vrf_addr);
 
         let addr1 = contract_address_const::<0x1>();
         let addr2 = contract_address_const::<0x2>();
