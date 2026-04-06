@@ -78,6 +78,8 @@ NEXT_PUBLIC_ACTIONS_ADDRESS=0x02e7aaec86013c6f4719227f995b91bb935571eb48ae11fed0
 NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x06c61d75ff72a9b5ccf82cd78b48777f3486d10e8077cf9456a6feff0a0273c8
 NEXT_PUBLIC_TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
 NEXT_PUBLIC_RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
+NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235
+NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0xe1f7c5fd7bd557ff5c69db03b49a62e40f3cc01ee11524ef862a71952ddcfe
 ```
 
 ### Session policies (Cartridge Controller)
@@ -205,16 +207,16 @@ Each round, controlling a node mints 1 of each paired token to the player. Resou
 
 **Crafting flow:** frontend multicalls `approve` on each required ERC-20 then `craft_ability(id)` on `crafting_1v1`. The Dojo contract burns resources (`transfer_from` to `0x1`) and calls `AbilityToken.mint(caller, id, 1)`. Token IDs match ability IDs 1:1.
 
-**AbilityToken contract:** pure Starknet ERC-1155 (not a Dojo contract) in `src/tokens/ability_token.cairo`. Three roles:
-- `admin` — rotates minter/burner/base_uri (set at deploy to deployer address, immutable)
+**AbilityToken contract:** pure Starknet ERC-1155 (not a Dojo contract) in `src/tokens/ability_token.cairo`. Supporting modules: `base64.cairo` (encoder), `ability_metadata.cairo` (JSON builder). Three roles:
+- `admin` — rotates minter/burner and per-ability SVGs (set at deploy to deployer address, immutable)
 - `minter` — only `crafting_1v1` can mint
 - `burner` — set when Phase 2B ships; starts at `0x0` (abilities are immortal until then)
 
-**Metadata:** served from `frontend/src/app/api/metadata/abilities/[id]/route.ts`. Contract's `uri()` returns `<host>/api/metadata/abilities/{id}` (base URI set by admin via `set_base_uri`); wallet substitutes `{id}`, route returns OpenSea-format JSON with name/description/image/attributes. Ability sprites at `frontend/public/sprites/abilities/<id>.png`. Updating art or descriptions does NOT require a contract redeploy — only redeploy the Next.js app.
+**Metadata:** fully on-chain. `uri(token_id)` returns `data:application/json;base64,...` with inline SVG image — no external server, no IPFS. Built at read time by `ability_metadata.cairo` using admin-settable per-ability SVGs stored in contract storage. Updating art requires one `set_ability_svg(ability_type, svg)` admin transaction per ability — no redeploy.
 
 **Sepolia addresses:**
 - `crafting_1v1`: `0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235`
-- `AbilityToken`: `0x6de8e6addfd54cb600d5a7549e92fa5b275379ff85364626874a00bc138d37c`
+- `AbilityToken` (v2): `0xe1f7c5fd7bd557ff5c69db03b49a62e40f3cc01ee11524ef862a71952ddcfe`
 
 **Historical note:** Phase 2A used a `PlayerAbilities` Dojo model with u8 counters. Phase 2A.5 dropped it in favor of ERC-1155 so abilities would show in the wallet. The old model is still orphaned on-chain but not read by any live code.
 
