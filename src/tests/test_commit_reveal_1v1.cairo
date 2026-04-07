@@ -49,6 +49,7 @@ mod tests {
     use siege_dojo::models::round_traps_1v1::m_RoundTraps1v1;
     use siege_dojo::models::match_counter::{m_MatchCounter};
     use siege_dojo::models::resource_config::{ResourceConfig, m_ResourceConfig};
+    use siege_dojo::models::match_abilities_1v1::{MatchAbilities1v1, m_MatchAbilities1v1};
     use siege_dojo::models::events::{e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished};
 
     use super::MockVrfProvider;
@@ -75,6 +76,7 @@ mod tests {
                 TestResource::Model(m_RoundTraps1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
                 TestResource::Model(m_ResourceConfig::TEST_CLASS_HASH),
+                TestResource::Model(m_MatchAbilities1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
@@ -98,14 +100,23 @@ mod tests {
         ].span()
     }
 
-    fn hash_1v1_move(salt: felt252, p0: u8, p1: u8, p2: u8, g0: u8, g1: u8, g2: u8, repair: u8, nc0: u8, nc1: u8, nc2: u8) -> felt252 {
+    fn hash_1v1_move(
+        salt: felt252,
+        p0: u8, p1: u8, p2: u8,
+        g0: u8, g1: u8, g2: u8,
+        repair: u8,
+        nc0: u8, nc1: u8, nc2: u8,
+        trap0: u8, trap1: u8, trap2: u8,
+        ability_id: u8, ability_target: u8,
+    ) -> felt252 {
         let mut h = PoseidonTrait::new();
         h = h.update(salt);
         h = h.update(p0.into()); h = h.update(p1.into()); h = h.update(p2.into());
         h = h.update(g0.into()); h = h.update(g1.into()); h = h.update(g2.into());
         h = h.update(repair.into());
         h = h.update(nc0.into()); h = h.update(nc1.into()); h = h.update(nc2.into());
-        h = h.update(0); h = h.update(0); h = h.update(0);
+        h = h.update(trap0.into()); h = h.update(trap1.into()); h = h.update(trap2.into());
+        h = h.update(ability_id.into()); h = h.update(ability_target.into());
         h.finalize()
     }
 
@@ -166,9 +177,9 @@ mod tests {
 
         let salt: felt252 = 42;
         // Player A: atk [3,2,1], def [2,1,0], repair 1, nodes [0,0,0] = total 10
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
         // Player B: atk [2,2,2], def [2,1,0], repair 1, nodes [0,0,0] = total 10
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -176,9 +187,9 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
         testing::set_contract_address(contract_address_const::<0x2>());
-        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
 
         let state: siege_dojo::models::match_state_1v1::MatchState1v1 = world.read_model(match_id);
         // Damage to B: max(0,3-2)+max(0,2-1)+max(0,1-0) = 1+1+1 = 3
@@ -196,7 +207,7 @@ mod tests {
 
         let salt: felt252 = 42;
         // Total = 5+5+3+0+0+0+0+0+0+0 = 13 > 10
-        let h = hash_1v1_move(salt, 5, 5, 3, 0, 0, 0, 0, 0, 0, 0);
+        let h = hash_1v1_move(salt, 5, 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h);
@@ -204,7 +215,7 @@ mod tests {
         cr_sys.commit(match_id, 'x');
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 5, 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 5, 5, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
     }
 
     #[test]
@@ -214,7 +225,7 @@ mod tests {
 
         let salt: felt252 = 42;
         // Commit with one set of values
-        let h = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0);
+        let h = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h);
@@ -223,6 +234,69 @@ mod tests {
 
         // Reveal with different values
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 4, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 4, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    #[test]
+    fn test_reveal_with_ability_stores_activation() {
+        let (mut world, _, cr_sys, match_id) = setup();
+
+        // Set up abilities for the match (player A has Siege Sword in slot 1)
+        world.write_model_test(@MatchAbilities1v1 {
+            match_id,
+            a_ability_1: 1, a_ability_2: 0, a_ability_3: 0,
+            b_ability_1: 0, b_ability_2: 0, b_ability_3: 0,
+            a_used_1: false, a_used_2: false, a_used_3: false,
+            b_used_1: false, b_used_2: false, b_used_3: false,
+        });
+
+        let salt: felt252 = 42;
+        // Player A activates ability 1 (Siege Sword) targeting gate 0
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.commit(match_id, h_a);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.commit(match_id, h_b);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+
+        // Verify ability stored in RoundMoves1v1
+        let rm: RoundMoves1v1 = world.read_model((match_id, 1_u32));
+        assert(rm.a_ability_id == 1, 'a_ability_id should be 1');
+        assert(rm.a_ability_target == 0, 'a_ability_target should be 0');
+
+        // Verify ability marked as used
+        let abilities: MatchAbilities1v1 = world.read_model(match_id);
+        assert(abilities.a_used_1, 'slot 1 should be used');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Ability not available', 'ENTRYPOINT_FAILED'))]
+    fn test_reveal_ability_not_in_set() {
+        let (mut world, _, cr_sys, match_id) = setup();
+
+        // Player A has no abilities
+        world.write_model_test(@MatchAbilities1v1 {
+            match_id,
+            a_ability_1: 0, a_ability_2: 0, a_ability_3: 0,
+            b_ability_1: 0, b_ability_2: 0, b_ability_3: 0,
+            a_used_1: false, a_used_2: false, a_used_3: false,
+            b_used_1: false, b_used_2: false, b_used_3: false,
+        });
+
+        let salt: felt252 = 42;
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.commit(match_id, h_a);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.commit(match_id, h_b);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
     }
 }

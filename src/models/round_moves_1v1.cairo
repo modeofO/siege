@@ -17,4 +17,9 @@ pub struct RoundMoves1v1 {
     pub b_g0: u8, pub b_g1: u8, pub b_g2: u8,
     pub b_repair: u8,
     pub b_nc0: u8, pub b_nc1: u8, pub b_nc2: u8,
+    // Ability activation per round (Phase 2B)
+    pub a_ability_id: u8,    // 0 = none, 1-5 = ability activated
+    pub a_ability_target: u8, // 0-2 = target gate (Siege Sword only)
+    pub b_ability_id: u8,
+    pub b_ability_target: u8,
 }

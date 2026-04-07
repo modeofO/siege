@@ -134,6 +134,7 @@ export default function Match1v1Page() {
           move[6].toString(),
           move[7].toString(), move[8].toString(), move[9].toString(),
           move[10].toString(), move[11].toString(), move[12].toString(),
+          "0", "0",
           includeVrf,
         );
       } catch (e) {
@@ -194,6 +195,7 @@ export default function Match1v1Page() {
         allocations[6],
         allocations[7], allocations[8], allocations[9],
         allocations[10], allocations[11], allocations[12],
+        0, 0,
       );
 
       await commitMove1v1(account, matchId, commitment);

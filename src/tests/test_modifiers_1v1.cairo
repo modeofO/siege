@@ -20,6 +20,7 @@ mod tests {
     use siege_dojo::models::round_modifiers_1v1::{RoundModifiers1v1, m_RoundModifiers1v1};
     use siege_dojo::models::round_traps_1v1::m_RoundTraps1v1;
     use siege_dojo::models::match_counter::m_MatchCounter;
+    use siege_dojo::models::match_abilities_1v1::m_MatchAbilities1v1;
     use siege_dojo::models::events::{e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished};
 
     fn hash_1v1(
@@ -36,6 +37,7 @@ mod tests {
         h = h.update(repair.into());
         h = h.update(nc0.into()); h = h.update(nc1.into()); h = h.update(nc2.into());
         h = h.update(0); h = h.update(0); h = h.update(0);
+        h = h.update(0); h = h.update(0);
         h.finalize()
     }
 
@@ -50,6 +52,7 @@ mod tests {
                 TestResource::Model(m_RoundModifiers1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_RoundTraps1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
+                TestResource::Model(m_MatchAbilities1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
@@ -126,9 +129,9 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(pa);
-        cr_sys.reveal(match_id, salt, ap0, ap1, ap2, ag0, ag1, ag2, ar, anc0, anc1, anc2, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, ap0, ap1, ap2, ag0, ag1, ag2, ar, anc0, anc1, anc2, 0, 0, 0, 0, 0);
         testing::set_contract_address(pb);
-        cr_sys.reveal(match_id, salt, bp0, bp1, bp2, bg0, bg1, bg2, br, bnc0, bnc1, bnc2, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, bp0, bp1, bp2, bg0, bg1, bg2, br, bnc0, bnc1, bnc2, 0, 0, 0, 0, 0);
 
         (world, match_id)
     }

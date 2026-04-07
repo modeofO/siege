@@ -90,6 +90,7 @@ export function computeCommitment1v1(
   repair: number,
   nc0: number, nc1: number, nc2: number,
   trap0: number, trap1: number, trap2: number,
+  abilityId: number, abilityTarget: number,
 ): string {
   return hash.computePoseidonHashOnElements([
     salt,
@@ -98,6 +99,7 @@ export function computeCommitment1v1(
     repair.toString(),
     nc0.toString(), nc1.toString(), nc2.toString(),
     trap0.toString(), trap1.toString(), trap2.toString(),
+    abilityId.toString(), abilityTarget.toString(),
   ]);
 }
 
