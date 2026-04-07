@@ -10,6 +10,7 @@ pub trait ICommitReveal1v1<T> {
         repair: u8,
         nc0: u8, nc1: u8, nc2: u8,
         trap0: u8, trap1: u8, trap2: u8,
+        ability_id: u8, ability_target: u8,
     );
     fn force_timeout(ref self: T, match_id: u64);
 }
@@ -27,6 +28,7 @@ pub mod commit_reveal_1v1 {
     use siege_dojo::models::commitment::Commitment;
     use siege_dojo::models::round_moves_1v1::RoundMoves1v1;
     use siege_dojo::models::round_traps_1v1::RoundTraps1v1;
+    use siege_dojo::models::match_abilities_1v1::MatchAbilities1v1;
     use siege_dojo::systems::resolution_1v1::{IResolution1v1Dispatcher, IResolution1v1DispatcherTrait};
     use siege_dojo::models::events::{MoveCommitted, MoveRevealed};
     use dojo::event::EventStorage;
@@ -113,6 +115,7 @@ pub mod commit_reveal_1v1 {
             repair: u8,
             nc0: u8, nc1: u8, nc2: u8,
             trap0: u8, trap1: u8, trap2: u8,
+            ability_id: u8, ability_target: u8,
         ) {
             let mut world = self.world_default();
             let caller = get_caller_address();
@@ -145,6 +148,8 @@ pub mod commit_reveal_1v1 {
             h = h.update(trap0.into());
             h = h.update(trap1.into());
             h = h.update(trap2.into());
+            h = h.update(ability_id.into());
+            h = h.update(ability_target.into());
             let computed = h.finalize();
             assert(computed == c.hash, 'Invalid reveal');
 
@@ -175,6 +180,44 @@ pub mod commit_reveal_1v1 {
                 assert(n.owner == owner_team, 'Cannot trap unowned node');
             }
 
+            // Ability validation
+            if ability_id > 0 {
+                assert(ability_id <= 5, 'Invalid ability ID');
+                assert(ability_target <= 2, 'Invalid ability target');
+
+                let mut abilities: MatchAbilities1v1 = world.read_model(match_id);
+
+                if is_player_a {
+                    let mut found = false;
+                    if abilities.a_ability_1 == ability_id && !abilities.a_used_1 {
+                        abilities.a_used_1 = true;
+                        found = true;
+                    } else if abilities.a_ability_2 == ability_id && !abilities.a_used_2 {
+                        abilities.a_used_2 = true;
+                        found = true;
+                    } else if abilities.a_ability_3 == ability_id && !abilities.a_used_3 {
+                        abilities.a_used_3 = true;
+                        found = true;
+                    }
+                    assert(found, 'Ability not available');
+                } else {
+                    let mut found = false;
+                    if abilities.b_ability_1 == ability_id && !abilities.b_used_1 {
+                        abilities.b_used_1 = true;
+                        found = true;
+                    } else if abilities.b_ability_2 == ability_id && !abilities.b_used_2 {
+                        abilities.b_used_2 = true;
+                        found = true;
+                    } else if abilities.b_ability_3 == ability_id && !abilities.b_used_3 {
+                        abilities.b_used_3 = true;
+                        found = true;
+                    }
+                    assert(found, 'Ability not available');
+                }
+
+                world.write_model(@abilities);
+            }
+
             c.revealed = true;
             world.write_model(@c);
 
@@ -186,11 +229,15 @@ pub mod commit_reveal_1v1 {
                 rm.a_g0 = g0; rm.a_g1 = g1; rm.a_g2 = g2;
                 rm.a_repair = repair;
                 rm.a_nc0 = nc0; rm.a_nc1 = nc1; rm.a_nc2 = nc2;
+                rm.a_ability_id = ability_id;
+                rm.a_ability_target = ability_target;
             } else {
                 rm.b_p0 = p0; rm.b_p1 = p1; rm.b_p2 = p2;
                 rm.b_g0 = g0; rm.b_g1 = g1; rm.b_g2 = g2;
                 rm.b_repair = repair;
                 rm.b_nc0 = nc0; rm.b_nc1 = nc1; rm.b_nc2 = nc2;
+                rm.b_ability_id = ability_id;
+                rm.b_ability_target = ability_target;
             }
 
             world.write_model(@rm);
