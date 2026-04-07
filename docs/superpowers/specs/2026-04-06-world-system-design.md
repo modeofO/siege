@@ -63,17 +63,20 @@ A single-round siege for direct territorial warfare. The attacker challenges a s
 - Attacker selects which of their abilities to bring (tactical use, not wagered).
 
 ### Defender's Preset Defense
-- Every player sets a **preset defense allocation** for their territory.
-- The preset is a budget allocation across gates, repair, and nodes — the same allocation structure as a regular round.
-- Defender has a **higher budget** than the attacker (e.g., 15 vs 10) **AND higher vault HP** (e.g., 75 vs 50).
+- Every player sets **3 preset defense configurations** for their territory.
+- Each preset allocates across **6 slots only**: p0, p1, p2 (attack) and g0, g1, g2 (defense). No nodes, no repair — single round makes them meaningless.
+- Defender budget: **12** per preset. Attacker budget: **10**.
+- Both sides start with **10 vault HP**. Whoever has the highest remaining HP wins. **Tie goes to defender** (home advantage).
+- All 3 presets are stored on-chain (publicly readable). When a conquest occurs, **VRF randomly selects which preset is used**. The attacker can see all 3 but doesn't know which will be active.
 - Abilities cannot be part of the preset — defense is budget-only.
-- Defenders can update their preset at any time. Active players optimize; inactive players have stale, potentially weak defenses.
+- Defenders can update their presets at any time. Active players optimize; inactive players have stale, potentially weak defenses.
 - Defender does NOT need to be online during the attack.
 
 ### Attack Resolution
-- Attacker submits their allocation **blind** — they cannot see the defender's preset.
-- Attacker CAN activate abilities during the single round.
-- Resolution uses the same gate/node/damage logic as a regular round.
+- Attacker submits their allocation **blind** — they know the 3 possible defenses but not which one VRF selects.
+- Attacker CAN use abilities during the single round (the attacker's key advantage).
+- Resolution: mutual damage at 3 gates. Damage per gate = max(0, attack - defense). Both sides take damage simultaneously.
+- Winner = highest remaining HP after damage. Tie = defender wins.
 
 ### Outcome
 - **Attacker wins:** Takes the targeted parcel. It becomes part of the attacker's territory.
@@ -144,7 +147,7 @@ The existing MCP server enables AI agents to:
 
 ## Open Design Decisions (Finalize During Implementation)
 
-- Exact defender budget and vault HP numbers (15/75 suggested, needs playtesting).
+- Fine-tuning budget (12 vs 10) and HP (10 vs 10) through playtesting.
 - Regular match resource generation rate (how many resources per parcel per match played).
 - Home parcel passive drip rate.
 - Hex grid coordinate system (axial, offset, or cube coordinates).

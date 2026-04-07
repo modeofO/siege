@@ -105,6 +105,8 @@ pub struct MatchStakes1v1 {
 
 - [ ] **Step 5: Create PresetDefense model**
 
+Stores 3 defense configurations per player. Each is 6 values (p0-p2 attack, g0-g2 defense). VRF selects which is used at conquest time. No nodes or repair — single round makes them meaningless.
+
 ```cairo
 // src/models/preset_defense.cairo
 use starknet::ContractAddress;
@@ -114,13 +116,16 @@ use starknet::ContractAddress;
 pub struct PresetDefense {
     #[key]
     pub player: ContractAddress,
-    pub g0: u8,
-    pub g1: u8,
-    pub g2: u8,
-    pub repair: u8,
-    pub nc0: u8,
-    pub nc1: u8,
-    pub nc2: u8,
+    // Preset 0
+    pub p0_p0: u8, pub p0_p1: u8, pub p0_p2: u8, // attack
+    pub p0_g0: u8, pub p0_g1: u8, pub p0_g2: u8, // defense
+    // Preset 1
+    pub p1_p0: u8, pub p1_p1: u8, pub p1_p2: u8,
+    pub p1_g0: u8, pub p1_g1: u8, pub p1_g2: u8,
+    // Preset 2
+    pub p2_p0: u8, pub p2_p1: u8, pub p2_p2: u8,
+    pub p2_g0: u8, pub p2_g1: u8, pub p2_g2: u8,
+    pub preset_count: u8, // how many presets are set (0-3)
 }
 ```
 
@@ -1643,11 +1648,12 @@ Implement the conquest system: players set a preset defense for their territory,
 **Dependencies:** Tasks 1-4
 
 **Key mechanics:**
-- Defender sets preset defense (budget 15, stored on-chain).
-- Attacker initiates conquest targeting a specific neighbor parcel.
-- Single-round resolution: attacker blind, defender static.
-- Defender has 15 budget and 75 vault HP. Attacker has 10 budget and 50 vault HP.
-- Attacker wins → takes the parcel. Attacker loses → loses their closest parcel to defender (goes to defender). Draw → no changes.
+- Defender sets 3 preset defense configurations (budget 12 each, stored on-chain).
+- VRF selects which preset is used at attack time.
+- Attacker initiates conquest targeting a specific neighbor parcel (budget 10).
+- Both allocate across p0, p1, p2 (attack) and g0, g1, g2 (defense) only. No nodes, no repair.
+- Both start at 10 vault HP. Mutual damage. Highest remaining HP wins. Tie → defender wins.
+- Attacker wins → takes the parcel. Attacker loses → loses their closest parcel to defender. Draw → no changes.
 - Last stand: attackers with only home parcels risk nothing.
 
 - [ ] **Step 1: Write conquest tests**
@@ -1855,30 +1861,33 @@ mod tests {
         let (mut world, conquest_sys, _, _, player_b) = conquest_setup();
 
         starknet::testing::set_contract_address(player_b);
-        conquest_sys.set_preset_defense(5, 4, 3, 2, 1, 0, 0);
+        // Preset index 0: attack 2/2/2, defense 2/2/2 (total 12)
+        conquest_sys.set_preset_defense(0, 2, 2, 2, 2, 2, 2);
 
         let defense: PresetDefense = world.read_model(player_b);
-        assert(defense.g0 == 5, 'g0 should be 5');
-        assert(defense.g1 == 4, 'g1 should be 4');
-        assert(defense.repair == 2, 'repair should be 2');
+        assert(defense.p0_p0 == 2, 'p0 atk should be 2');
+        assert(defense.p0_g0 == 2, 'p0 def should be 2');
+        assert(defense.preset_count == 1, 'should have 1 preset');
     }
 
     #[test]
-    #[should_panic(expected: ('Budget exceeds 15',))]
+    #[should_panic(expected: ('Budget exceeds 12',))]
     fn test_preset_defense_over_budget() {
         let (_, conquest_sys, _, _, player_b) = conquest_setup();
 
         starknet::testing::set_contract_address(player_b);
-        conquest_sys.set_preset_defense(5, 5, 5, 3, 0, 0, 0); // total = 18 > 15
+        conquest_sys.set_preset_defense(0, 3, 3, 3, 3, 3, 3); // total = 18 > 12
     }
 
     #[test]
     fn test_conquest_attacker_wins() {
         let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
 
-        // Defender sets weak defense
+        // Defender sets weak defense (all 3 presets same — weak)
         starknet::testing::set_contract_address(player_b);
-        conquest_sys.set_preset_defense(1, 1, 1, 0, 0, 0, 0);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1); // 3 on defense, 0 attack
+        conquest_sys.set_preset_defense(1, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(2, 0, 0, 0, 1, 1, 1);
 
         // Find a defender parcel to target (non-home, owned by player_b)
         let mut target_id: u32 = 0;
@@ -1906,14 +1915,12 @@ mod tests {
             world.write_model_test(@kb);
         }
 
-        // Attacker launches conquest with overwhelming attack
+        // Attacker launches conquest with overwhelming attack on gate 0
         starknet::testing::set_contract_address(player_a);
         conquest_sys.initiate_conquest(
             target_id,
             10, 0, 0, // attack: all on gate 0
             0, 0, 0,  // defense: none
-            0,         // repair: 0
-            0, 0, 0,   // nodes: none
         );
 
         // Verify target parcel is now owned by attacker
@@ -1925,9 +1932,11 @@ mod tests {
     fn test_conquest_attacker_loses_parcel_to_defender() {
         let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
 
-        // Defender sets strong defense (budget 15)
+        // Defender sets strong defense (all 3 presets — heavy defense + counterattack)
         starknet::testing::set_contract_address(player_b);
-        conquest_sys.set_preset_defense(5, 5, 5, 0, 0, 0, 0);
+        conquest_sys.set_preset_defense(0, 4, 4, 4, 0, 0, 0); // all attack, no defense
+        conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
 
         // Give B a non-home parcel to target
         let mut tp: Parcel = world.read_model(9_u32);
@@ -1939,13 +1948,12 @@ mod tests {
 
         let ka_before: PlayerKingdom = world.read_model(player_a);
 
-        // Attacker launches weak attack
+        // Attacker launches weak attack with no defense
         starknet::testing::set_contract_address(player_a);
         conquest_sys.initiate_conquest(
             9,          // target
             1, 1, 1,    // weak attack
-            0, 0, 0,    // no defense
-            0, 0, 0, 0, // no repair/nodes
+            0, 0, 0,    // no defense — will take 12 damage from defender's counterattack
         );
 
         // Attacker should lose a parcel (goes to defender)
@@ -1976,7 +1984,9 @@ mod tests {
 
         // Defender sets strong defense
         starknet::testing::set_contract_address(player_b);
-        conquest_sys.set_preset_defense(5, 5, 5, 0, 0, 0, 0);
+        conquest_sys.set_preset_defense(0, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
 
         // Give B a non-home parcel to target
         let mut tp: Parcel = world.read_model(9_u32);
@@ -1988,7 +1998,7 @@ mod tests {
 
         // Attacker (home-only) launches weak attack and loses
         starknet::testing::set_contract_address(player_a);
-        conquest_sys.initiate_conquest(9, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0);
+        conquest_sys.initiate_conquest(9, 1, 1, 1, 0, 0, 0);
 
         // Player A should still have 3 parcels (last stand — no loss)
         let ka_after: PlayerKingdom = world.read_model(player_a);
@@ -2010,14 +2020,12 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IConquest<T> {
-    fn set_preset_defense(ref self: T, g0: u8, g1: u8, g2: u8, repair: u8, nc0: u8, nc1: u8, nc2: u8);
+    fn set_preset_defense(ref self: T, index: u8, p0: u8, p1: u8, p2: u8, g0: u8, g1: u8, g2: u8);
     fn initiate_conquest(
         ref self: T,
         target_parcel: u32,
         p0: u8, p1: u8, p2: u8,
         g0: u8, g1: u8, g2: u8,
-        repair: u8,
-        nc0: u8, nc1: u8, nc2: u8,
     );
 }
 
@@ -2032,10 +2040,21 @@ pub mod conquest {
     use siege_dojo::models::preset_defense::PresetDefense;
     use siege_dojo::utils::hex;
 
-    const DEFENDER_BUDGET: u8 = 15;
+    // VRF dispatcher (same pattern as actions_1v1)
+    #[starknet::interface]
+    trait IVrfProvider<T> {
+        fn consume_random(ref self: T, source: Source) -> felt252;
+    }
+
+    #[derive(Drop, Copy, Clone, Serde)]
+    enum Source {
+        Nonce: ContractAddress,
+        Salt: felt252,
+    }
+
+    const DEFENDER_BUDGET: u8 = 12;
     const ATTACKER_BUDGET: u8 = 10;
-    const DEFENDER_HP: u8 = 75;
-    const ATTACKER_HP: u8 = 50;
+    const CONQUEST_HP: u8 = 10; // both sides start at 10 HP
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
@@ -2052,18 +2071,35 @@ pub mod conquest {
     impl ConquestImpl of super::IConquest<ContractState> {
         fn set_preset_defense(
             ref self: ContractState,
-            g0: u8, g1: u8, g2: u8, repair: u8, nc0: u8, nc1: u8, nc2: u8,
+            index: u8, p0: u8, p1: u8, p2: u8, g0: u8, g1: u8, g2: u8,
         ) {
             let mut world = self.world_default();
             let caller = get_caller_address();
+            assert(index <= 2, 'Index must be 0-2');
 
-            let total = g0 + g1 + g2 + repair + nc0 + nc1 + nc2;
-            assert(total <= DEFENDER_BUDGET, 'Budget exceeds 15');
+            let total = p0 + p1 + p2 + g0 + g1 + g2;
+            assert(total <= DEFENDER_BUDGET, 'Budget exceeds 12');
 
-            world.write_model(@PresetDefense {
-                player: caller,
-                g0, g1, g2, repair, nc0, nc1, nc2,
-            });
+            let mut defense: PresetDefense = world.read_model(caller);
+
+            // Store into the correct preset slot
+            if index == 0 {
+                defense.p0_p0 = p0; defense.p0_p1 = p1; defense.p0_p2 = p2;
+                defense.p0_g0 = g0; defense.p0_g1 = g1; defense.p0_g2 = g2;
+            } else if index == 1 {
+                defense.p1_p0 = p0; defense.p1_p1 = p1; defense.p1_p2 = p2;
+                defense.p1_g0 = g0; defense.p1_g1 = g1; defense.p1_g2 = g2;
+            } else {
+                defense.p2_p0 = p0; defense.p2_p1 = p1; defense.p2_p2 = p2;
+                defense.p2_g0 = g0; defense.p2_g1 = g1; defense.p2_g2 = g2;
+            }
+
+            // Track how many presets have been set
+            if index >= defense.preset_count {
+                defense.preset_count = index + 1;
+            }
+
+            world.write_model(@defense);
         }
 
         fn initiate_conquest(
@@ -2071,14 +2107,12 @@ pub mod conquest {
             target_parcel: u32,
             p0: u8, p1: u8, p2: u8,
             g0: u8, g1: u8, g2: u8,
-            repair: u8,
-            nc0: u8, nc1: u8, nc2: u8,
         ) {
             let mut world = self.world_default();
             let attacker = get_caller_address();
 
-            // Validate attacker budget
-            let atk_total = p0 + p1 + p2 + g0 + g1 + g2 + repair + nc0 + nc1 + nc2;
+            // Validate attacker budget (10)
+            let atk_total = p0 + p1 + p2 + g0 + g1 + g2;
             assert(atk_total <= ATTACKER_BUDGET, 'Budget exceeds 10');
 
             // Validate target parcel
@@ -2093,52 +2127,66 @@ pub mod conquest {
             assert(atk_kingdom.registered, 'Not registered');
             let config: WorldConfig = world.read_model(0_u8);
             let mut has_adjacent = false;
-            let mut p: u32 = 0;
-            while p < config.total_parcels {
+            let mut pi: u32 = 0;
+            while pi < config.total_parcels {
                 if !has_adjacent {
-                    let parcel: Parcel = world.read_model(p);
+                    let parcel: Parcel = world.read_model(pi);
                     if parcel.owner == attacker {
                         if hex::is_neighbor(parcel.col, parcel.row, target.col, target.row) {
                             has_adjacent = true;
                         }
                     }
                 }
-                p += 1;
+                pi += 1;
             };
             assert(has_adjacent, 'No adjacent parcel');
 
-            // Get defender's preset defense
+            // Get defender's preset defense and select via VRF
             let defense: PresetDefense = world.read_model(defender);
+            assert(defense.preset_count > 0, 'No defense set');
 
-            // Single-round resolution (no modifiers — conquest is pure allocation)
-            // Damage to defender vault (attacker's attack vs defender's defense)
-            let dmg_g0 = if p0 > defense.g0 { p0 - defense.g0 } else { 0 };
-            let dmg_g1 = if p1 > defense.g1 { p1 - defense.g1 } else { 0 };
-            let dmg_g2 = if p2 > defense.g2 { p2 - defense.g2 } else { 0 };
-            let total_dmg_to_defender: u16 = dmg_g0.into() + dmg_g1.into() + dmg_g2.into();
-
-            // For the defender's "attack" in conquest, we don't have an explicit
-            // defender attack phase. The defender only defends.
-            // The attacker's vault HP is only relevant if we add defender counterattack.
-            // For now: attacker wins if they deal enough damage to breach the defender's vault.
-
-            // Apply defender repair
-            let def_repair = min_u8(defense.repair, 3);
-            let mut def_hp: u16 = DEFENDER_HP.into();
-            def_hp = if def_hp + def_repair.into() > DEFENDER_HP.into() {
-                DEFENDER_HP.into()
+            // VRF selects preset index (0, 1, or 2)
+            // Read VRF from ResourceConfig (same pattern as actions_1v1)
+            let rc: siege_dojo::models::resource_config::ResourceConfig = world.read_model(0_u8);
+            let vrf_addr = if rc.vrf_provider.is_non_zero() {
+                rc.vrf_provider
             } else {
-                def_hp + def_repair.into()
+                let addr: starknet::ContractAddress = 0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f.try_into().unwrap();
+                addr
+            };
+            let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
+            let random_value: u256 = vrf.consume_random(Source::Nonce(starknet::get_contract_address())).into();
+            let preset_idx: u8 = (random_value % defense.preset_count.into()).try_into().unwrap();
+
+            // Read selected preset
+            let (def_p0, def_p1, def_p2, def_g0, def_g1, def_g2) = if preset_idx == 0 {
+                (defense.p0_p0, defense.p0_p1, defense.p0_p2, defense.p0_g0, defense.p0_g1, defense.p0_g2)
+            } else if preset_idx == 1 {
+                (defense.p1_p0, defense.p1_p1, defense.p1_p2, defense.p1_g0, defense.p1_g1, defense.p1_g2)
+            } else {
+                (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
             };
 
-            // Apply damage
-            if total_dmg_to_defender >= def_hp {
-                def_hp = 0;
-            } else {
-                def_hp = def_hp - total_dmg_to_defender;
-            }
+            // Mutual damage resolution — both sides attack and defend simultaneously
+            // Damage to defender = attacker's attack - defender's defense (per gate)
+            let dmg_to_def_0: u8 = if p0 > def_g0 { p0 - def_g0 } else { 0 };
+            let dmg_to_def_1: u8 = if p1 > def_g1 { p1 - def_g1 } else { 0 };
+            let dmg_to_def_2: u8 = if p2 > def_g2 { p2 - def_g2 } else { 0 };
+            let total_dmg_to_def: u8 = dmg_to_def_0 + dmg_to_def_1 + dmg_to_def_2;
 
-            let attacker_wins = def_hp == 0;
+            // Damage to attacker = defender's attack - attacker's defense (per gate)
+            let dmg_to_atk_0: u8 = if def_p0 > g0 { def_p0 - g0 } else { 0 };
+            let dmg_to_atk_1: u8 = if def_p1 > g1 { def_p1 - g1 } else { 0 };
+            let dmg_to_atk_2: u8 = if def_p2 > g2 { def_p2 - g2 } else { 0 };
+            let total_dmg_to_atk: u8 = dmg_to_atk_0 + dmg_to_atk_1 + dmg_to_atk_2;
+
+            // Apply damage to both vaults (starting at 10 HP each)
+            let atk_hp: u8 = if total_dmg_to_atk >= CONQUEST_HP { 0 } else { CONQUEST_HP - total_dmg_to_atk };
+            let def_hp: u8 = if total_dmg_to_def >= CONQUEST_HP { 0 } else { CONQUEST_HP - total_dmg_to_def };
+
+            // Determine winner: highest HP wins. Tie goes to defender.
+            let attacker_wins = atk_hp > def_hp;
+            // Note: if atk_hp == def_hp (including both 0), defender wins (tie/draw).
 
             if attacker_wins {
                 // Transfer target parcel to attacker
