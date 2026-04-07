@@ -86,6 +86,12 @@ pub mod resolution_1v1 {
             let mods: RoundModifiers1v1 = world.read_model((match_id, round));
             let gate_mods: [u8; 3] = [mods.gate_0, mods.gate_1, mods.gate_2];
 
+            // Read ability activations
+            let a_ability = rm.a_ability_id;
+            let a_target = rm.a_ability_target;
+            let b_ability = rm.b_ability_id;
+            let b_target = rm.b_ability_target;
+
             // Raw attack/defense values from moves
             let a_atk: [u8; 3] = [rm.a_p0, rm.a_p1, rm.a_p2];
             let a_def: [u8; 3] = [rm.a_g0, rm.a_g1, rm.a_g2];
@@ -127,6 +133,22 @@ pub mod resolution_1v1 {
                     let tmp_ba = ba;
                     ba = bd;
                     bd = tmp_ba;
+                }
+
+                // --- ABILITY: Fortify (ID 5) — double defense after modifiers ---
+                if a_ability == 5 {
+                    ad = ad * 2;
+                }
+                if b_ability == 5 {
+                    bd = bd * 2;
+                }
+
+                // --- ABILITY: Siege Sword (ID 1) — override attack on target gate ---
+                if a_ability == 1 && g == a_target.into() {
+                    aa = 10;
+                }
+                if b_ability == 1 && g == b_target.into() {
+                    ba = 10;
                 }
 
                 if modifier == MOD_DEADLOCK {
@@ -182,6 +204,16 @@ pub mod resolution_1v1 {
                 g += 1;
             };
 
+            // --- ABILITY: Stone Cloak (ID 2) — zero all gate/overflow damage to this player ---
+            if a_ability == 2 {
+                damage_to_a = [0, 0, 0];
+                overflow_to_a = [0, 0, 0];
+            }
+            if b_ability == 2 {
+                damage_to_b = [0, 0, 0];
+                overflow_to_b = [0, 0, 0];
+            }
+
             // Distribute reflection: each reflection gate splits damage to other gates,
             // but reflected damage is reduced by the target's unused defense at the receiving gate
             let mut g2: u32 = 0;
@@ -228,8 +260,18 @@ pub mod resolution_1v1 {
             };
 
             // Total damage
-            let total_dmg_to_b: u8 = *damage_to_b.span()[0] + *damage_to_b.span()[1] + *damage_to_b.span()[2];
-            let total_dmg_to_a: u8 = *damage_to_a.span()[0] + *damage_to_a.span()[1] + *damage_to_a.span()[2];
+            let mut total_dmg_to_b: u8 = *damage_to_b.span()[0] + *damage_to_b.span()[1] + *damage_to_b.span()[2];
+            let mut total_dmg_to_a: u8 = *damage_to_a.span()[0] + *damage_to_a.span()[1] + *damage_to_a.span()[2];
+
+            // --- ABILITY: Hex (ID 4) — reduce opponent's total damage by 7 ---
+            if a_ability == 4 {
+                // Player A uses Hex → reduce damage dealt TO A (by B)
+                if total_dmg_to_a > 7 { total_dmg_to_a = total_dmg_to_a - 7; } else { total_dmg_to_a = 0; }
+            }
+            if b_ability == 4 {
+                // Player B uses Hex → reduce damage dealt TO B (by A)
+                if total_dmg_to_b > 7 { total_dmg_to_b = total_dmg_to_b - 7; } else { total_dmg_to_b = 0; }
+            }
 
             // Repairs (capped at 3)
             let repair_a = if rm.a_repair > 3 { 3_u8 } else { rm.a_repair };
@@ -245,6 +287,14 @@ pub mod resolution_1v1 {
             // Then damage
             if total_dmg_to_a >= hp_a { hp_a = 0; } else { hp_a = hp_a - total_dmg_to_a; }
             if total_dmg_to_b >= hp_b { hp_b = 0; } else { hp_b = hp_b - total_dmg_to_b; }
+
+            // --- ABILITY: Ember Blast (ID 3) — 5 direct vault damage, post-repair ---
+            if a_ability == 3 {
+                if hp_b > 5 { hp_b = hp_b - 5; } else { hp_b = 0; }
+            }
+            if b_ability == 3 {
+                if hp_a > 5 { hp_a = hp_a - 5; } else { hp_a = 0; }
+            }
 
             // Snapshot node owners before contest resolution (for trap detection)
             let pre_n0: NodeState = world.read_model((match_id, 0_u8));

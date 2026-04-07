@@ -35,6 +35,7 @@ pub mod tests {
     pub mod test_resolution_1v1;
     pub mod test_modifiers_1v1;
     pub mod test_traps_1v1;
+    pub mod test_abilities_1v1;
     pub mod test_events;
     pub mod test_ability_token;
 }
