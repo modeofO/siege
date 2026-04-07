@@ -66,7 +66,7 @@ A single-round siege for direct territorial warfare. The attacker challenges a s
 - Every player sets **3 preset defense configurations** for their territory.
 - Each preset allocates across **6 slots only**: p0, p1, p2 (attack) and g0, g1, g2 (defense). No nodes, no repair — single round makes them meaningless.
 - Defender budget: **12** per preset. Attacker budget: **10**.
-- Both sides start with **10 vault HP**. Whoever has the highest remaining HP wins. **Tie goes to defender** (home advantage).
+- Both sides start with **15 vault HP**. Whoever has the highest remaining HP wins. **Tie goes to defender** (home advantage).
 - All 3 presets are stored on-chain (publicly readable). When a conquest occurs, **VRF randomly selects which preset is used**. The attacker can see all 3 but doesn't know which will be active.
 - Abilities cannot be part of the preset — defense is budget-only.
 - Defenders can update their presets at any time. Active players optimize; inactive players have stale, potentially weak defenses.

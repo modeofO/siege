@@ -1652,7 +1652,7 @@ Implement the conquest system: players set a preset defense for their territory,
 - VRF selects which preset is used at attack time.
 - Attacker initiates conquest targeting a specific neighbor parcel (budget 10).
 - Both allocate across p0, p1, p2 (attack) and g0, g1, g2 (defense) only. No nodes, no repair.
-- Both start at 10 vault HP. Mutual damage. Highest remaining HP wins. Tie → defender wins.
+- Both start at 15 vault HP. Mutual damage. Highest remaining HP wins. Tie → defender wins.
 - Attacker wins → takes the parcel. Attacker loses → loses their closest parcel to defender. Draw → no changes.
 - Last stand: attackers with only home parcels risk nothing.
 
@@ -2054,7 +2054,7 @@ pub mod conquest {
 
     const DEFENDER_BUDGET: u8 = 12;
     const ATTACKER_BUDGET: u8 = 10;
-    const CONQUEST_HP: u8 = 10; // both sides start at 10 HP
+    const CONQUEST_HP: u8 = 15; // both sides start at 15 HP
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
