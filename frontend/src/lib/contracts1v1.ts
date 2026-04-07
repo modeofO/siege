@@ -73,12 +73,13 @@ export async function revealMove1v1(
   repair: string,
   nc0: string, nc1: string, nc2: string,
   trap0: string, trap1: string, trap2: string,
+  abilityId: string, abilityTarget: string,
   includeVrf: boolean,
 ) {
   const revealCall = {
     contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
     entrypoint: "reveal",
-    calldata: [matchId, salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2],
+    calldata: [matchId, salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, abilityId, abilityTarget],
   };
 
   if (includeVrf) {
