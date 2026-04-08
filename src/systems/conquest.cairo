@@ -8,6 +8,7 @@ pub trait IConquest<T> {
         target_parcel: u32,
         p0: u8, p1: u8, p2: u8,
         g0: u8, g1: u8, g2: u8,
+        ability_id: u8, ability_target: u8,
     );
 }
 
@@ -86,6 +87,7 @@ pub mod conquest {
             target_parcel: u32,
             p0: u8, p1: u8, p2: u8,
             g0: u8, g1: u8, g2: u8,
+            ability_id: u8, ability_target: u8,
         ) {
             let mut world = self.world_default();
             let attacker = get_caller_address();
@@ -93,6 +95,12 @@ pub mod conquest {
             // Validate attacker budget (10)
             let atk_total = p0 + p1 + p2 + g0 + g1 + g2;
             assert(atk_total <= ATTACKER_BUDGET, 'Budget exceeds 10');
+
+            // Validate ability (0 = none, 1-5 = valid)
+            if ability_id > 0 {
+                assert(ability_id <= 5, 'Invalid ability ID');
+                assert(ability_target <= 2, 'Invalid ability target');
+            }
 
             // Validate target parcel
             let target: Parcel = world.read_model(target_parcel);
@@ -146,22 +154,59 @@ pub mod conquest {
                 (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
             };
 
-            // Mutual damage resolution — both sides attack and defend simultaneously
-            // Damage to defender = attacker's attack - defender's defense (per gate)
-            let dmg_to_def_0: u8 = if p0 > def_g0 { p0 - def_g0 } else { 0 };
-            let dmg_to_def_1: u8 = if p1 > def_g1 { p1 - def_g1 } else { 0 };
-            let dmg_to_def_2: u8 = if p2 > def_g2 { p2 - def_g2 } else { 0 };
-            let total_dmg_to_def: u8 = dmg_to_def_0 + dmg_to_def_1 + dmg_to_def_2;
+            // --- Apply attacker ability effects ---
+            // Mutable copies of attacker values
+            let mut atk_p0 = p0;
+            let mut atk_p1 = p1;
+            let mut atk_p2 = p2;
+            let mut atk_g0 = g0;
+            let mut atk_g1 = g1;
+            let mut atk_g2 = g2;
 
-            // Damage to attacker = defender's attack - attacker's defense (per gate)
-            let dmg_to_atk_0: u8 = if def_p0 > g0 { def_p0 - g0 } else { 0 };
-            let dmg_to_atk_1: u8 = if def_p1 > g1 { def_p1 - g1 } else { 0 };
-            let dmg_to_atk_2: u8 = if def_p2 > g2 { def_p2 - g2 } else { 0 };
-            let total_dmg_to_atk: u8 = dmg_to_atk_0 + dmg_to_atk_1 + dmg_to_atk_2;
+            // Fortify (ID 5): double attacker defense
+            if ability_id == 5 {
+                atk_g0 = atk_g0 * 2;
+                atk_g1 = atk_g1 * 2;
+                atk_g2 = atk_g2 * 2;
+            }
 
-            // Apply damage to both vaults (starting at 15 HP each)
-            let atk_hp: u8 = if total_dmg_to_atk >= ATTACKER_HP { 0 } else { ATTACKER_HP - total_dmg_to_atk };
-            let def_hp: u8 = if total_dmg_to_def >= DEFENDER_HP { 0 } else { DEFENDER_HP - total_dmg_to_def };
+            // Siege Sword (ID 1): override attack on target gate to 10
+            if ability_id == 1 {
+                if ability_target == 0 { atk_p0 = 10; }
+                else if ability_target == 1 { atk_p1 = 10; }
+                else { atk_p2 = 10; }
+            }
+
+            // Per-gate damage calculation
+            let dmg_to_def_0: u8 = if atk_p0 > def_g0 { atk_p0 - def_g0 } else { 0 };
+            let dmg_to_def_1: u8 = if atk_p1 > def_g1 { atk_p1 - def_g1 } else { 0 };
+            let dmg_to_def_2: u8 = if atk_p2 > def_g2 { atk_p2 - def_g2 } else { 0 };
+            let mut total_dmg_to_def: u8 = dmg_to_def_0 + dmg_to_def_1 + dmg_to_def_2;
+
+            let dmg_to_atk_0: u8 = if def_p0 > atk_g0 { def_p0 - atk_g0 } else { 0 };
+            let dmg_to_atk_1: u8 = if def_p1 > atk_g1 { def_p1 - atk_g1 } else { 0 };
+            let dmg_to_atk_2: u8 = if def_p2 > atk_g2 { def_p2 - atk_g2 } else { 0 };
+            let mut total_dmg_to_atk: u8 = dmg_to_atk_0 + dmg_to_atk_1 + dmg_to_atk_2;
+
+            // Stone Cloak (ID 2): zero all gate damage to attacker
+            if ability_id == 2 {
+                total_dmg_to_atk = 0;
+            }
+
+            // Hex (ID 4): reduce damage to attacker by 7
+            if ability_id == 4 {
+                if total_dmg_to_atk > 7 { total_dmg_to_atk = total_dmg_to_atk - 7; }
+                else { total_dmg_to_atk = 0; }
+            }
+
+            // Apply damage to vaults
+            let mut atk_hp: u8 = if total_dmg_to_atk >= ATTACKER_HP { 0 } else { ATTACKER_HP - total_dmg_to_atk };
+            let mut def_hp: u8 = if total_dmg_to_def >= DEFENDER_HP { 0 } else { DEFENDER_HP - total_dmg_to_def };
+
+            // Ember Blast (ID 3): 5 direct damage to defender vault
+            if ability_id == 3 {
+                if def_hp > 5 { def_hp = def_hp - 5; } else { def_hp = 0; }
+            }
 
             // Determine winner: highest HP wins. Tie goes to defender.
             let attacker_wins = atk_hp > def_hp;
