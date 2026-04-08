@@ -36,7 +36,8 @@ pub mod conquest {
 
     const DEFENDER_BUDGET: u8 = 12;
     const ATTACKER_BUDGET: u8 = 10;
-    const CONQUEST_HP: u8 = 15; // both sides start at 15 HP
+    const DEFENDER_HP: u8 = 15;
+    const ATTACKER_HP: u8 = 10;
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
@@ -159,8 +160,8 @@ pub mod conquest {
             let total_dmg_to_atk: u8 = dmg_to_atk_0 + dmg_to_atk_1 + dmg_to_atk_2;
 
             // Apply damage to both vaults (starting at 15 HP each)
-            let atk_hp: u8 = if total_dmg_to_atk >= CONQUEST_HP { 0 } else { CONQUEST_HP - total_dmg_to_atk };
-            let def_hp: u8 = if total_dmg_to_def >= CONQUEST_HP { 0 } else { CONQUEST_HP - total_dmg_to_def };
+            let atk_hp: u8 = if total_dmg_to_atk >= ATTACKER_HP { 0 } else { ATTACKER_HP - total_dmg_to_atk };
+            let def_hp: u8 = if total_dmg_to_def >= DEFENDER_HP { 0 } else { DEFENDER_HP - total_dmg_to_def };
 
             // Determine winner: highest HP wins. Tie goes to defender.
             let attacker_wins = atk_hp > def_hp;
