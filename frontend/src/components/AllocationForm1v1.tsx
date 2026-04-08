@@ -3,6 +3,7 @@
 
 import React from "react";
 import type { NodeOwner } from "@/lib/gameState1v1";
+import { AbilitySelector } from "./AbilitySelector";
 
 interface AllocationForm1v1Props {
   budget: number;
@@ -13,6 +14,12 @@ interface AllocationForm1v1Props {
   error: string;
   nodes: [NodeOwner, NodeOwner, NodeOwner];
   isPlayerA: boolean;
+  // Ability selection (Phase 2B)
+  abilities: [number, number, number];
+  abilitiesUsed: [boolean, boolean, boolean];
+  selectedAbility: number;
+  selectedTarget: number;
+  onAbilitySelect: (abilityId: number, abilityTarget: number) => void;
 }
 
 const GATE_NAMES = ["East", "West", "Under."];
@@ -20,7 +27,10 @@ const NODE_NAMES = ["Forge", "Quarry", "Grove"];
 const NODE_RESOURCES = ["Iron + Linen", "Stone + Wood", "Ember + Seeds"];
 const NODE_SPRITES = ["/sprites/node-forge.png", "/sprites/node-quarry.png", "/sprites/node-grove.png"];
 
-export function AllocationForm1v1({ budget, allocations, onChange, onCommit, submitting, error, nodes, isPlayerA }: AllocationForm1v1Props) {
+export function AllocationForm1v1({
+  budget, allocations, onChange, onCommit, submitting, error, nodes, isPlayerA,
+  abilities, abilitiesUsed, selectedAbility, selectedTarget, onAbilitySelect,
+}: AllocationForm1v1Props) {
   const trapCost = ((allocations[10] || 0) + (allocations[11] || 0) + (allocations[12] || 0)) * 2;
   const allocationTotal = allocations.slice(0, 10).reduce((a, b) => a + b, 0);
   const total = allocationTotal + trapCost;
@@ -65,6 +75,15 @@ export function AllocationForm1v1({ budget, allocations, onChange, onCommit, sub
           {remaining === 0 ? "BUDGET SPENT" : `${remaining} pts left`}
         </span>
       </div>
+
+      {/* Ability selector — Phase 2B */}
+      <AbilitySelector
+        abilities={abilities}
+        used={abilitiesUsed}
+        selectedAbility={selectedAbility}
+        selectedTarget={selectedTarget}
+        onSelect={onAbilitySelect}
+      />
 
       {/* 2-column grid: Attack | Defense */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
