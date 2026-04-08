@@ -454,6 +454,71 @@ export const MODIFIER_DESCRIPTIONS: Record<number, string> = {
   4: "Damage reflects to other gates",
 };
 
+export interface MatchAbilitiesData {
+  abilities: [number, number, number];
+  used: [boolean, boolean, boolean];
+}
+
+export function useMatchAbilities1v1(
+  matchId: string | null,
+  playerAddress: string | null,
+  playerA: string | null,
+  refreshKey?: number,
+) {
+  const [data, setData] = useState<MatchAbilitiesData>({
+    abilities: [0, 0, 0],
+    used: [false, false, false],
+  });
+
+  useEffect(() => {
+    if (!matchId || !playerAddress || !playerA) return;
+    const id = Number(matchId);
+    const isA = playerAddress.toLowerCase() === playerA.toLowerCase();
+
+    const fetch = async () => {
+      const result = await toriiQuery<{
+        siegeDojoMatchAbilities1V1Models: GraphEdges<{
+          a_ability_1: string; a_ability_2: string; a_ability_3: string;
+          b_ability_1: string; b_ability_2: string; b_ability_3: string;
+          a_used_1: boolean; a_used_2: boolean; a_used_3: boolean;
+          b_used_1: boolean; b_used_2: boolean; b_used_3: boolean;
+        }>;
+      }>(`
+        query {
+          siegeDojoMatchAbilities1V1Models(where: { match_id: "${id}" }) {
+            edges { node {
+              a_ability_1 a_ability_2 a_ability_3
+              b_ability_1 b_ability_2 b_ability_3
+              a_used_1 a_used_2 a_used_3
+              b_used_1 b_used_2 b_used_3
+            } }
+          }
+        }
+      `);
+      const node = result?.siegeDojoMatchAbilities1V1Models?.edges?.[0]?.node;
+      if (node) {
+        if (isA) {
+          setData({
+            abilities: [toNum(node.a_ability_1), toNum(node.a_ability_2), toNum(node.a_ability_3)],
+            used: [!!node.a_used_1, !!node.a_used_2, !!node.a_used_3],
+          });
+        } else {
+          setData({
+            abilities: [toNum(node.b_ability_1), toNum(node.b_ability_2), toNum(node.b_ability_3)],
+            used: [!!node.b_used_1, !!node.b_used_2, !!node.b_used_3],
+          });
+        }
+      }
+    };
+
+    const t = setTimeout(() => { void fetch(); }, 0);
+    const i = setInterval(() => { void fetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [matchId, playerAddress, playerA, refreshKey]);
+
+  return data;
+}
+
 export function useRoundModifiers1v1(matchId: string | null, round: number) {
   const [modifiers, setModifiers] = useState<[number, number, number]>([0, 0, 0]);
 

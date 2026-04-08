@@ -10,6 +10,7 @@ import {
   useRoundHistory1v1,
   useCommitmentStatus1v1,
   useRoundModifiers1v1,
+  useMatchAbilities1v1,
   MODIFIER_NAMES,
   MODIFIER_DESCRIPTIONS,
 } from "@/lib/gameState1v1";
@@ -70,6 +71,28 @@ export default function Match1v1Page() {
   // Gate modifiers for current round
   const modifiers = useRoundModifiers1v1(matchId, state?.round ?? 1);
 
+  // Ability selection state
+  const [selectedAbility, setSelectedAbility] = useState(0);
+  const [selectedTarget, setSelectedTarget] = useState(0);
+
+  const matchAbilities = useMatchAbilities1v1(
+    matchId,
+    address || null,
+    state?.playerA || null,
+    refreshKey,
+  );
+
+  const handleAbilitySelect = useCallback((abilityId: number, target: number) => {
+    setSelectedAbility(abilityId);
+    setSelectedTarget(target);
+  }, []);
+
+  // Reset ability selection when round changes
+  useEffect(() => {
+    setSelectedAbility(0);
+    setSelectedTarget(0);
+  }, [state?.round]);
+
   // Allocations: [p0,p1,p2, g0,g1,g2, repair, nc0,nc1,nc2]
   const [allocations, setAllocations] = useState<number[]>(new Array(13).fill(0));
   const [submitting, setSubmitting] = useState(false);
@@ -125,6 +148,11 @@ export default function Match1v1Page() {
     autoRevealLock.current = true;
     setAutoRevealStatus("pending");
 
+    const abilityData = localStorage.getItem(`siege_1v1_ability_${matchId}_${state.round}`);
+    const parsedAbility = abilityData
+      ? JSON.parse(abilityData)
+      : { abilityId: 0, abilityTarget: 0 };
+
     const attemptReveal = async (includeVrf: boolean): Promise<void> => {
       try {
         await revealMove1v1(
@@ -134,7 +162,7 @@ export default function Match1v1Page() {
           move[6].toString(),
           move[7].toString(), move[8].toString(), move[9].toString(),
           move[10].toString(), move[11].toString(), move[12].toString(),
-          "0", "0",
+          parsedAbility.abilityId.toString(), parsedAbility.abilityTarget.toString(),
           includeVrf,
         );
       } catch (e) {
@@ -195,10 +223,14 @@ export default function Match1v1Page() {
         allocations[6],
         allocations[7], allocations[8], allocations[9],
         allocations[10], allocations[11], allocations[12],
-        0, 0,
+        selectedAbility, selectedTarget,
       );
 
       await commitMove1v1(account, matchId, commitment);
+      localStorage.setItem(
+        `siege_1v1_ability_${matchId}_${state.round}`,
+        JSON.stringify({ abilityId: selectedAbility, abilityTarget: selectedTarget }),
+      );
       // Single refresh — refreshKey propagates to all hooks
       void refresh();
     } catch (e) {
@@ -207,7 +239,7 @@ export default function Match1v1Page() {
     } finally {
       setSubmitting(false);
     }
-  }, [account, state, allocations, budget, matchId, refresh]);
+  }, [account, state, allocations, budget, matchId, refresh, selectedAbility, selectedTarget]);
 
   // Loading
   if (loading || !state) {
@@ -431,6 +463,11 @@ export default function Match1v1Page() {
             error={error}
             nodes={state.nodes}
             isPlayerA={isPlayerA}
+            abilities={matchAbilities.abilities}
+            abilitiesUsed={matchAbilities.used}
+            selectedAbility={selectedAbility}
+            selectedTarget={selectedTarget}
+            onAbilitySelect={handleAbilitySelect}
           />
         ) : (
           <div className="p-3 flex items-center justify-center">
