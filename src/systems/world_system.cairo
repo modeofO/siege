@@ -9,6 +9,7 @@ pub trait IWorldSystem<T> {
     fn join_staked_match(ref self: T, match_id: u64, abilities: Array<u8>);
     fn settle_match(ref self: T, match_id: u64);
     fn claim_parcel(ref self: T, match_id: u64, parcel_id: u32);
+    fn claim_drip(ref self: T);
 }
 
 #[dojo::contract]
@@ -27,6 +28,8 @@ pub mod world_system {
     use siege_dojo::models::match_state_1v1::MatchState1v1;
     use siege_dojo::models::match_stakes_1v1::MatchStakes1v1;
 
+    const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
+
     // ERC-1155 dispatcher for safe_transfer_from calls
     #[starknet::interface]
     trait IERC1155<T> {
@@ -44,6 +47,12 @@ pub mod world_system {
             owner: starknet::ContractAddress,
             operator: starknet::ContractAddress,
         ) -> bool;
+    }
+
+    // Resource token mint interface
+    #[starknet::interface]
+    trait IResourceMint<T> {
+        fn mint(ref self: T, to: starknet::ContractAddress, amount: u256);
     }
 
     #[generate_trait]
@@ -434,6 +443,21 @@ pub mod world_system {
                 self.release_furthest_parcel(loser);
             }
 
+            // Mint resources for all parcels owned by each player
+            if rc.iron.is_non_zero() {
+                let world_config: WorldConfig = world.read_model(0_u8);
+                let mut p: u32 = 0;
+                while p < world_config.total_parcels {
+                    let parcel: Parcel = world.read_model(p);
+                    if parcel.owner == state.player_a {
+                        self.mint_parcel_resources(@rc, parcel.parcel_type, state.player_a, 1_u256);
+                    } else if parcel.owner == state.player_b {
+                        self.mint_parcel_resources(@rc, parcel.parcel_type, state.player_b, 1_u256);
+                    }
+                    p += 1;
+                };
+            }
+
             world.write_model(@stakes);
         }
 
@@ -474,10 +498,60 @@ pub mod world_system {
             kingdom.parcel_count += 1;
             world.write_model(@kingdom);
         }
+
+        fn claim_drip(ref self: ContractState) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            let mut kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
+
+            let now = get_block_timestamp();
+            let elapsed = now - kingdom.last_drip_time;
+            let intervals: u64 = elapsed / DRIP_INTERVAL;
+            if intervals == 0 {
+                return;
+            }
+
+            let rc: ResourceConfig = world.read_model(0_u8);
+            let amount: u256 = intervals.into();
+
+            // Mint for each home parcel based on its type
+            let home_parcels: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
+            let mut i: u32 = 0;
+            while i < 3 {
+                let parcel: Parcel = world.read_model(*home_parcels.at(i));
+                self.mint_parcel_resources(@rc, parcel.parcel_type, caller, amount);
+                i += 1;
+            };
+
+            kingdom.last_drip_time = kingdom.last_drip_time + (intervals * DRIP_INTERVAL);
+            world.write_model(@kingdom);
+        }
     }
 
     #[generate_trait]
     impl SettlementHelpers of SettlementHelpersTrait {
+        fn mint_parcel_resources(
+            self: @ContractState,
+            rc: @ResourceConfig,
+            parcel_type: u8,
+            to: ContractAddress,
+            amount: u256,
+        ) {
+            let (token_a_addr, token_b_addr) = if parcel_type == 0 {
+                (*rc.iron, *rc.linen)     // Forge
+            } else if parcel_type == 1 {
+                (*rc.stone, *rc.wood)     // Quarry
+            } else {
+                (*rc.ember, *rc.seeds)    // Grove
+            };
+
+            if token_a_addr.is_non_zero() {
+                IResourceMintDispatcher { contract_address: token_a_addr }.mint(to, amount);
+                IResourceMintDispatcher { contract_address: token_b_addr }.mint(to, amount);
+            }
+        }
+
         /// Find and release the loser's furthest-from-home parcel (becomes unclaimed).
         /// If the player only has home parcels, no parcel is released.
         fn release_furthest_parcel(ref self: ContractState, player: ContractAddress) {
