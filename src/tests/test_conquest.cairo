@@ -287,6 +287,7 @@ mod tests {
             9,
             10, 0, 0, // attack: all on gate 0
             0, 0, 0,  // defense: none
+            0, 0,     // no ability
         );
 
         // Verify target parcel is now owned by attacker
@@ -325,6 +326,7 @@ mod tests {
             9,          // target
             1, 1, 1,    // weak attack
             0, 0, 0,    // no defense — will take 12 damage from defender's counterattack
+            0, 0,       // no ability
         );
 
         // Attacker should lose a parcel (goes to defender)
@@ -382,10 +384,72 @@ mod tests {
         // Attacker (home-only) launches weak attack and loses
         // Player_a's home parcel 1 at (1,0) is adjacent to target parcel 6 at (1,1)
         starknet::testing::set_contract_address(player_a);
-        conquest_sys.initiate_conquest(6, 1, 1, 1, 0, 0, 0);
+        conquest_sys.initiate_conquest(6, 1, 1, 1, 0, 0, 0, 0, 0);
 
         // Player A should still have 3 parcels (last stand — no loss)
         let ka_after: PlayerKingdom = world.read_model(player_a);
         assert(ka_after.parcel_count == 3, 'last stand: no parcel loss');
+    }
+
+    #[test]
+    fn test_conquest_with_ember_blast() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Defender: no attack, moderate defense
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 4, 4, 4);
+        conquest_sys.set_preset_defense(1, 0, 0, 0, 4, 4, 4);
+        conquest_sys.set_preset_defense(2, 0, 0, 0, 4, 4, 4);
+
+        // Give B parcel 9 (col=4,row=1) as a non-home parcel
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        // Attacker: 5/5/0 attack, no defense, Ember Blast (ID 3)
+        // Gate damage to defender: (5-4)+(5-4)+(0-4)=0 = 2
+        // Defender HP: 15 - 2 = 13, then Ember Blast -5 = 8
+        // Defender attack = 0, so damage to attacker = 0
+        // Attacker HP: 10 - 0 = 10
+        // 10 > 8 → attacker wins!
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 5, 5, 0, 0, 0, 0, 3, 0);
+
+        let target: Parcel = world.read_model(9_u32);
+        assert(target.owner == player_a, 'ember blast should win');
+    }
+
+    #[test]
+    fn test_conquest_with_stone_cloak() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Defender: heavy counterattack (4/4/4 attack, 0 defense)
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
+
+        // Give B parcel 9 (col=4,row=1) as a non-home parcel
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        // Attacker: 10/0/0 attack, no defense, Stone Cloak (ID 2)
+        // Gate damage to defender: 10+0+0 = 10. Def HP: 15-10 = 5
+        // Gate damage to attacker: 4+4+4 = 12. BUT Stone Cloak → 0
+        // Attacker HP: 10 - 0 = 10
+        // 10 > 5 → attacker wins!
+        // Without Stone Cloak: atk takes 12 damage → HP 0. Would lose.
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 2, 0);
+
+        let target: Parcel = world.read_model(9_u32);
+        assert(target.owner == player_a, 'stone cloak should win');
     }
 }
