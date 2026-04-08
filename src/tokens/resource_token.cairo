@@ -2,6 +2,8 @@
 pub trait IResourceToken<TContractState> {
     fn mint(ref self: TContractState, to: starknet::ContractAddress, amount: u256);
     fn minter(self: @TContractState) -> starknet::ContractAddress;
+    fn set_minter2(ref self: TContractState, new_minter2: starknet::ContractAddress);
+    fn minter2(self: @TContractState) -> starknet::ContractAddress;
 }
 
 #[starknet::contract]
@@ -27,6 +29,7 @@ pub mod ResourceToken {
         #[substorage(v0)]
         erc20: ERC20Component::Storage,
         minter_address: ContractAddress,
+        minter2_address: ContractAddress,
     }
 
     #[event]
@@ -50,12 +53,25 @@ pub mod ResourceToken {
     #[abi(embed_v0)]
     impl ResourceTokenImpl of super::IResourceToken<ContractState> {
         fn mint(ref self: ContractState, to: ContractAddress, amount: u256) {
-            assert(get_caller_address() == self.minter_address.read(), 'Only minter can mint');
+            let caller = get_caller_address();
+            assert(
+                caller == self.minter_address.read() || caller == self.minter2_address.read(),
+                'Only minter can mint',
+            );
             self.erc20.mint(to, amount);
         }
 
         fn minter(self: @ContractState) -> ContractAddress {
             self.minter_address.read()
+        }
+
+        fn set_minter2(ref self: ContractState, new_minter2: ContractAddress) {
+            assert(get_caller_address() == self.minter_address.read(), 'Only minter can set minter2');
+            self.minter2_address.write(new_minter2);
+        }
+
+        fn minter2(self: @ContractState) -> ContractAddress {
+            self.minter2_address.read()
         }
     }
 }
