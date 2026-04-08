@@ -11,9 +11,18 @@ pub mod models {
     pub mod match_counter;
     pub mod events;
     pub mod resource_config;
+    pub mod parcel;
+    pub mod player_kingdom;
+    pub mod world_config;
+    pub mod match_stakes_1v1;
+    pub mod preset_defense;
 }
 
 pub mod tokens;
+
+pub mod utils {
+    pub mod hex;
+}
 
 pub mod systems {
     pub mod actions;
@@ -23,6 +32,8 @@ pub mod systems {
     pub mod resolution;
     pub mod resolution_1v1;
     pub mod crafting_1v1;
+    pub mod world_system;
+    pub mod conquest;
 }
 
 #[cfg(test)]
@@ -38,4 +49,8 @@ pub mod tests {
     pub mod test_abilities_1v1;
     pub mod test_events;
     pub mod test_ability_token;
+    pub mod test_hex;
+    pub mod test_world;
+    pub mod test_staked_match;
+    pub mod test_conquest;
 }
