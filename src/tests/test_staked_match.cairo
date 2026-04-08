@@ -69,7 +69,7 @@ mod tests {
     use siege_dojo::models::preset_defense::m_PresetDefense;
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::{MatchState1v1, m_MatchState1v1};
-    use siege_dojo::models::match_abilities_1v1::m_MatchAbilities1v1;
+    use siege_dojo::models::match_abilities_1v1::{MatchAbilities1v1, m_MatchAbilities1v1};
     use siege_dojo::models::node_state::m_NodeState;
     use siege_dojo::models::commitment::m_Commitment;
     use siege_dojo::models::round_moves_1v1::m_RoundMoves1v1;
@@ -419,5 +419,47 @@ mod tests {
 
         let kingdom_a_after: PlayerKingdom = world.read_model(player_a);
         assert(kingdom_a_after.parcel_count == before_count + 1, 'a should gain a parcel');
+    }
+
+    #[test]
+    fn test_join_staked_match_wires_abilities() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1, 2, 3]);
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![1, 2, 3]);
+
+        // Verify MatchAbilities1v1 is populated
+        let abilities: MatchAbilities1v1 = world.read_model(match_id);
+        assert(abilities.a_ability_1 == 1, 'a should have ability 1');
+        assert(abilities.a_ability_2 == 2, 'a should have ability 2');
+        assert(abilities.a_ability_3 == 3, 'a should have ability 3');
+        assert(abilities.b_ability_1 == 1, 'b should have ability 1');
+        assert(abilities.b_ability_2 == 2, 'b should have ability 2');
+        assert(abilities.b_ability_3 == 3, 'b should have ability 3');
+        assert(!abilities.a_used_1, 'a_used_1 should be false');
+        assert(!abilities.b_used_1, 'b_used_1 should be false');
+    }
+
+    #[test]
+    fn test_matched_wager_abilities_reflect_in_match_abilities() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        // A stakes 3, B stakes 1 → matched wager = 1
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1, 2, 3]);
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![1]);
+
+        let abilities: MatchAbilities1v1 = world.read_model(match_id);
+        // A should only have 1 ability (excess refunded)
+        assert(abilities.a_ability_1 == 1, 'a should have ability 1');
+        assert(abilities.a_ability_2 == 0, 'a slot 2 should be empty');
+        assert(abilities.a_ability_3 == 0, 'a slot 3 should be empty');
+        // B has 1 ability
+        assert(abilities.b_ability_1 == 1, 'b should have ability 1');
     }
 }

@@ -27,6 +27,7 @@ pub mod world_system {
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::MatchState1v1;
     use siege_dojo::models::match_stakes_1v1::MatchStakes1v1;
+    use siege_dojo::models::match_abilities_1v1::MatchAbilities1v1;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
 
@@ -358,6 +359,23 @@ pub mod world_system {
             }
 
             world.write_model(@stakes);
+
+            // Wire abilities for battle activation (Phase 2B)
+            world.write_model(@MatchAbilities1v1 {
+                match_id,
+                a_ability_1: stakes.a_stake_1,
+                a_ability_2: stakes.a_stake_2,
+                a_ability_3: stakes.a_stake_3,
+                b_ability_1: stakes.b_stake_1,
+                b_ability_2: stakes.b_stake_2,
+                b_ability_3: stakes.b_stake_3,
+                a_used_1: false,
+                a_used_2: false,
+                a_used_3: false,
+                b_used_1: false,
+                b_used_2: false,
+                b_used_3: false,
+            });
 
             // Activate the match
             let mut state_mut: MatchState1v1 = world.read_model(match_id);
