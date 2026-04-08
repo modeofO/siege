@@ -42,6 +42,9 @@ export function Navbar() {
           <Link href="/craft" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
             FORGE
           </Link>
+          <Link href="/world" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
+            WORLD
+          </Link>
         </div>
         {isDevMode() ? <AccountSelector /> : <ConnectWallet />}
       </div>
