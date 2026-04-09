@@ -90,6 +90,8 @@ pub mod world_system {
     use siege_dojo::models::match_state_1v1::MatchState1v1;
     use siege_dojo::models::match_stakes_1v1::MatchStakes1v1;
     use siege_dojo::models::match_abilities_1v1::MatchAbilities1v1;
+    use siege_dojo::models::player_reputation::PlayerReputation;
+    use siege_dojo::models::match_record::MatchRecord;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
 
@@ -531,6 +533,48 @@ pub mod world_system {
                 let mut winner_kingdom: PlayerKingdom = world.read_model(winner);
                 winner_kingdom.total_wins += 1;
                 world.write_model(@winner_kingdom);
+
+                // Update reputation
+                let mut rep_winner: PlayerReputation = world.read_model(winner);
+                let mut rep_loser: PlayerReputation = world.read_model(loser);
+
+                // Loser stats
+                rep_loser.total_losses += 1;
+                if rep_loser.current_streak < 0 {
+                    rep_loser.current_streak -= 1;
+                } else {
+                    rep_loser.current_streak = -1;
+                }
+
+                // Winner stats
+                if rep_winner.current_streak > 0 {
+                    rep_winner.current_streak += 1;
+                } else {
+                    rep_winner.current_streak = 1;
+                }
+                let streak_u32: u32 = rep_winner.current_streak.try_into().unwrap();
+                if streak_u32 > rep_winner.best_streak {
+                    rep_winner.best_streak = streak_u32;
+                }
+
+                // Recalculate brackets
+                rep_winner.bracket = super::calculate_bracket(winner_kingdom.total_wins, rep_winner.total_losses);
+                let loser_kingdom: PlayerKingdom = world.read_model(loser);
+                rep_loser.bracket = super::calculate_bracket(loser_kingdom.total_wins, rep_loser.total_losses);
+
+                world.write_model(@rep_winner);
+                world.write_model(@rep_loser);
+
+                // Update match records (bidirectional)
+                let mut record_wl: MatchRecord = world.read_model((winner, loser));
+                record_wl.wins += 1;
+                record_wl.last_match_id = match_id;
+                world.write_model(@record_wl);
+
+                let mut record_lw: MatchRecord = world.read_model((loser, winner));
+                record_lw.losses += 1;
+                record_lw.last_match_id = match_id;
+                world.write_model(@record_lw);
             }
 
             // Mint resources for all parcels owned by each player
