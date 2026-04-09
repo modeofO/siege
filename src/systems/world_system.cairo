@@ -210,6 +210,8 @@ pub mod world_system {
                 registered: true,
                 free_craft_used: false,
                 last_drip_time: get_block_timestamp(),
+                tier: 0,
+                total_wins: 0,
             });
         }
 

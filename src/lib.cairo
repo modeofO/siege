@@ -53,4 +53,5 @@ pub mod tests {
     pub mod test_world;
     pub mod test_staked_match;
     pub mod test_conquest;
+    pub mod test_kingdom_tiers;
 }

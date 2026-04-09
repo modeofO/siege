@@ -12,4 +12,6 @@ pub struct PlayerKingdom {
     pub registered: bool,
     pub free_craft_used: bool,
     pub last_drip_time: u64,
+    pub tier: u8,
+    pub total_wins: u32,
 }
