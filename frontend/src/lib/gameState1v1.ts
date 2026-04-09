@@ -438,6 +438,51 @@ export function useRoundHistory1v1(matchId: string | null) {
   return history;
 }
 
+export function usePlayerKingdom(playerAddress: string | null) {
+  const [kingdom, setKingdom] = useState<{
+    tier: number;
+    totalWins: number;
+    parcelCount: number;
+    registered: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!playerAddress) return;
+
+    const fetch = async () => {
+      const data = await toriiQuery<{
+        siegeDojoPlayerKingdomModels: GraphEdges<{
+          tier: string;
+          total_wins: string;
+          parcel_count: string;
+          registered: boolean;
+        }>;
+      }>(`
+        query {
+          siegeDojoPlayerKingdomModels(where: { player: "${playerAddress}" }) {
+            edges { node { tier total_wins parcel_count registered } }
+          }
+        }
+      `);
+      const node = data?.siegeDojoPlayerKingdomModels?.edges?.[0]?.node;
+      if (node) {
+        setKingdom({
+          tier: toNum(node.tier),
+          totalWins: toNum(node.total_wins),
+          parcelCount: toNum(node.parcel_count),
+          registered: node.registered,
+        });
+      }
+    };
+
+    const t = setTimeout(() => { void fetch(); }, 0);
+    const i = setInterval(() => { void fetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [playerAddress]);
+
+  return kingdom;
+}
+
 export const MODIFIER_NAMES: Record<number, string> = {
   0: "Normal",
   1: "Narrow Pass",

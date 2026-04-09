@@ -93,3 +93,18 @@ export async function revealMove1v1(
   // 1st reveal — no vRNG needed
   return account.execute(revealCall, TX_OPTS);
 }
+
+export const CONTRACTS_WORLD = {
+  WORLD_SYSTEM: process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "",
+};
+
+export async function upgradeKingdom(account: AccountInterface) {
+  return account.execute(
+    {
+      contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
+      entrypoint: "upgrade_kingdom",
+      calldata: [],
+    },
+    TX_OPTS,
+  );
+}
