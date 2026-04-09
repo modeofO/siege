@@ -42,6 +42,24 @@ pub fn tier_wins_required(tier: u8) -> u32 {
     }
 }
 
+pub fn calculate_bracket(total_wins: u32, total_losses: u32) -> u8 {
+    let total = total_wins + total_losses;
+    if total < 10 {
+        return 0;
+    }
+    let win_rate_pct = (total_wins * 100) / total;
+    if total >= 100 && win_rate_pct > 55 {
+        return 4;
+    }
+    if total >= 60 && win_rate_pct > 50 {
+        return 3;
+    }
+    if total >= 30 && win_rate_pct > 40 {
+        return 2;
+    }
+    1
+}
+
 #[starknet::interface]
 pub trait IERC20Burn<T> {
     fn transfer_from(ref self: T, sender: starknet::ContractAddress, recipient: starknet::ContractAddress, amount: u256) -> bool;
