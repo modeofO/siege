@@ -16,6 +16,8 @@ pub mod models {
     pub mod world_config;
     pub mod match_stakes_1v1;
     pub mod preset_defense;
+    pub mod player_reputation;
+    pub mod match_record;
 }
 
 pub mod tokens;
@@ -54,4 +56,5 @@ pub mod tests {
     pub mod test_staked_match;
     pub mod test_conquest;
     pub mod test_kingdom_tiers;
+    pub mod test_reputation;
 }
