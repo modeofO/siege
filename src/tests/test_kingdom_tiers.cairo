@@ -64,6 +64,13 @@ mod tests {
         fn approve(ref self: T, spender: starknet::ContractAddress, amount: u256) -> bool;
     }
 
+    // ERC-1155 interface for ability token approval and balance checks
+    #[starknet::interface]
+    trait IERC1155Like<T> {
+        fn balance_of(self: @T, account: starknet::ContractAddress, token_id: u256) -> u256;
+        fn set_approval_for_all(ref self: T, operator: starknet::ContractAddress, approved: bool);
+    }
+
     // Mock VRF
     #[starknet::contract]
     pub mod MockVrfProvider {
@@ -342,6 +349,60 @@ mod tests {
         assert(siege_dojo::systems::world_system::tier_parcel_cap(3) == 12, 'basileia: 12 parcels');
     }
 
+    // Full setup with two players and ability token for staking tests.
+    fn full_setup_for_staking() -> (
+        dojo::world::WorldStorage,
+        IWorldSystemDispatcher,
+        starknet::ContractAddress, // player_a
+        starknet::ContractAddress, // player_b
+        IERC1155LikeDispatcher,    // erc1155 reader/approver
+    ) {
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+        let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+        let world_sys = IWorldSystemDispatcher { contract_address: world_sys_addr };
+
+        // VRF
+        let mock_vrf_addr = deploy_mock_vrf();
+        let (actions_addr, _) = world.dns(@"actions_1v1").unwrap();
+        IActions1v1Dispatcher { contract_address: actions_addr }.set_vrf_provider(mock_vrf_addr);
+
+        // AbilityToken
+        let admin = contract_address_const::<0xADAD>();
+        let (ability_token, ability_token_addr) = deploy_ability_token(admin);
+        starknet::testing::set_contract_address(admin);
+        ability_token.set_minter(world_sys_addr);
+
+        let erc1155 = IERC1155LikeDispatcher { contract_address: ability_token_addr };
+
+        // Wire resource config
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.ability_token = ability_token_addr;
+        world.write_model_test(@rc);
+
+        // Init world with 10 parcels
+        starknet::testing::set_contract_address(contract_address_const::<0>());
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
+        world_sys.initialize_world(cols, rows, types);
+
+        // Register player A (tier 0 by default)
+        let player_a = deploy_user();
+        starknet::testing::set_contract_address(player_a);
+        world_sys.register_player(array![0, 1, 2]);
+        erc1155.set_approval_for_all(world_sys_addr, true);
+
+        // Register player B (tier 0 by default)
+        let player_b = deploy_user();
+        starknet::testing::set_contract_address(player_b);
+        world_sys.register_player(array![0, 1, 2]);
+        erc1155.set_approval_for_all(world_sys_addr, true);
+
+        (world, world_sys, player_a, player_b, erc1155)
+    }
+
     // ── upgrade_kingdom tests ─────────────────────────────────────────────────
 
     #[test]
@@ -459,5 +520,54 @@ mod tests {
         // Should panic: already max tier
         starknet::testing::set_contract_address(player);
         world_sys.upgrade_kingdom();
+    }
+
+    // ── Tier enforcement tests ─────────────────────────────────────────────────
+
+    #[test]
+    #[should_panic(expected: ('Too many abilities for tier', 'ENTRYPOINT_FAILED'))]
+    fn test_outpost_cannot_stake_2_abilities() {
+        let (_world, world_sys, player_a, player_b, _erc1155) = full_setup_for_staking();
+
+        // player_a is tier 0 (Polis) — can only stake 1 ability
+        starknet::testing::set_contract_address(player_a);
+        // Staking 2 abilities should panic
+        world_sys.create_staked_match(player_b, array![1, 2]);
+    }
+
+    #[test]
+    fn test_settle_increments_winner_wins() {
+        use siege_dojo::models::match_state_1v1::MatchState1v1;
+        use siege_dojo::models::match_state::MatchStatus;
+
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup_for_staking();
+
+        // Both players are tier 0, can only stake 1 ability
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        // Simulate player A winning
+        world.write_model_test(@MatchState1v1 {
+            match_id,
+            player_a,
+            player_b,
+            vault_a_hp: 30,
+            vault_b_hp: 0,
+            current_round: 5,
+            status: MatchStatus::Finished,
+        });
+
+        world_sys.settle_match(match_id);
+
+        // Player A's total_wins should be 1
+        let kingdom_a: PlayerKingdom = world.read_model(player_a);
+        assert(kingdom_a.total_wins == 1, 'winner should have 1 win');
+
+        // Player B's total_wins should still be 0
+        let kingdom_b: PlayerKingdom = world.read_model(player_b);
+        assert(kingdom_b.total_wins == 0, 'loser should have 0 wins');
     }
 }

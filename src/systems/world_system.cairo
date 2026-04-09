@@ -283,6 +283,8 @@ pub mod world_system {
             // Verify abilities are valid (1-5) and count is 1-3
             let count = abilities.len();
             assert(count >= 1 && count <= 3, 'Must stake 1-3 abilities');
+            let max_slots: u32 = super::tier_ability_slots(kingdom.tier).into();
+            assert(count <= max_slots, 'Too many abilities for tier');
 
             // Read ability token address
             let rc: ResourceConfig = world.read_model(0_u8);
@@ -345,6 +347,8 @@ pub mod world_system {
 
             let b_count = abilities.len();
             assert(b_count >= 1 && b_count <= 3, 'Must stake 1-3 abilities');
+            let max_slots: u32 = super::tier_ability_slots(kingdom.tier).into();
+            assert(b_count <= max_slots, 'Too many abilities for tier');
 
             let mut stakes: MatchStakes1v1 = world.read_model(match_id);
 
@@ -505,6 +509,10 @@ pub mod world_system {
 
                 // Loser loses their furthest-from-home parcel
                 self.release_furthest_parcel(loser);
+
+                let mut winner_kingdom: PlayerKingdom = world.read_model(winner);
+                winner_kingdom.total_wins += 1;
+                world.write_model(@winner_kingdom);
             }
 
             // Mint resources for all parcels owned by each player
@@ -544,6 +552,11 @@ pub mod world_system {
                 panic!("Draw: no parcel to claim")
             };
             assert(caller == winner, 'Not the winner');
+
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            let non_home_parcels = if kingdom.parcel_count > 3 { kingdom.parcel_count - 3 } else { 0 };
+            let cap = super::tier_parcel_cap(kingdom.tier);
+            assert(non_home_parcels < cap, 'Parcel cap reached');
 
             // Verify target parcel is unclaimed and adjacent to winner's territory
             let zero_addr: ContractAddress = 0.try_into().unwrap();

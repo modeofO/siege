@@ -159,6 +159,9 @@ mod tests {
         let player_a = deploy_user();
         starknet::testing::set_contract_address(player_a);
         world_sys.register_player(array![0, 1, 2]);
+        let mut ka: PlayerKingdom = world.read_model(player_a);
+        ka.tier = 2;
+        world.write_model_test(@ka);
         // Approve world_system to transfer abilities
         erc1155.set_approval_for_all(world_sys_addr, true);
 
@@ -166,6 +169,9 @@ mod tests {
         let player_b = deploy_user();
         starknet::testing::set_contract_address(player_b);
         world_sys.register_player(array![0, 1, 2]);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.tier = 2;
+        world.write_model_test(@kb);
         erc1155.set_approval_for_all(world_sys_addr, true);
 
         (world, world_sys, player_a, player_b, erc1155)
