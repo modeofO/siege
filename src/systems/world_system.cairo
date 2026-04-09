@@ -10,6 +10,50 @@ pub trait IWorldSystem<T> {
     fn settle_match(ref self: T, match_id: u64);
     fn claim_parcel(ref self: T, match_id: u64, parcel_id: u32);
     fn claim_drip(ref self: T);
+    fn upgrade_kingdom(ref self: T);
+}
+
+pub fn tier_ability_slots(tier: u8) -> u8 {
+    match tier {
+        0 => 1,
+        1 => 2,
+        2 => 3,
+        3 => 4,
+        _ => 1,
+    }
+}
+
+pub fn tier_parcel_cap(tier: u8) -> u32 {
+    match tier {
+        0 => 2,
+        1 => 5,
+        2 => 8,
+        3 => 12,
+        _ => 2,
+    }
+}
+
+pub fn tier_wins_required(tier: u8) -> u32 {
+    match tier {
+        1 => 10,
+        2 => 30,
+        3 => 60,
+        _ => 0,
+    }
+}
+
+#[starknet::interface]
+pub trait IERC20Burn<T> {
+    fn transfer_from(ref self: T, sender: starknet::ContractAddress, recipient: starknet::ContractAddress, amount: u256) -> bool;
+    fn balance_of(self: @T, account: starknet::ContractAddress) -> u256;
+}
+
+pub fn burn_upgrade_resources(token_addr: starknet::ContractAddress, from: starknet::ContractAddress, amount: u256) {
+    let token = IERC20BurnDispatcher { contract_address: token_addr };
+    let balance = token.balance_of(from);
+    assert(balance >= amount, 'Insufficient resources');
+    let burn_addr: starknet::ContractAddress = 0x1.try_into().unwrap();
+    token.transfer_from(from, burn_addr, amount);
 }
 
 #[dojo::contract]
@@ -545,6 +589,46 @@ pub mod world_system {
             };
 
             kingdom.last_drip_time = kingdom.last_drip_time + (intervals * DRIP_INTERVAL);
+            world.write_model(@kingdom);
+        }
+
+        fn upgrade_kingdom(ref self: ContractState) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            let mut kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
+
+            let current = kingdom.tier;
+            let next = current + 1;
+            assert(next <= 3, 'Already max tier');
+
+            // Check win requirement
+            let wins_needed = super::tier_wins_required(next);
+            assert(kingdom.total_wins >= wins_needed, 'Not enough wins');
+
+            // Burn resources based on target tier
+            let rc: ResourceConfig = world.read_model(0_u8);
+            if next == 1 {
+                // Strategos: 20 Iron + 20 Stone + 10 Wood
+                super::burn_upgrade_resources(rc.iron, caller, 20);
+                super::burn_upgrade_resources(rc.stone, caller, 20);
+                super::burn_upgrade_resources(rc.wood, caller, 10);
+            } else if next == 2 {
+                // Hegemonia: 50 Iron + 50 Stone + 30 Wood + 20 Ember
+                super::burn_upgrade_resources(rc.iron, caller, 50);
+                super::burn_upgrade_resources(rc.stone, caller, 50);
+                super::burn_upgrade_resources(rc.wood, caller, 30);
+                super::burn_upgrade_resources(rc.ember, caller, 20);
+            } else {
+                // Basileia: 100 Iron + 100 Stone + 60 Wood + 40 Ember + 20 Seeds
+                super::burn_upgrade_resources(rc.iron, caller, 100);
+                super::burn_upgrade_resources(rc.stone, caller, 100);
+                super::burn_upgrade_resources(rc.wood, caller, 60);
+                super::burn_upgrade_resources(rc.ember, caller, 40);
+                super::burn_upgrade_resources(rc.seeds, caller, 20);
+            }
+
+            kingdom.tier = next;
             world.write_model(@kingdom);
         }
     }
