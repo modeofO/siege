@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import { useState } from "react";
 import { TIER_INFO, UPGRADE_COSTS, tierName } from "@/lib/tiers";
 import { upgradeKingdom } from "@/lib/contracts1v1";
 import { useAccount } from "@/app/providers";
