@@ -3,6 +3,7 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait ICrafting1v1<T> {
     fn craft_ability(ref self: T, ability_id: u8);
+    fn craft_ability_tier2(ref self: T, ability_type: u8);
 }
 
 #[starknet::interface]
@@ -19,6 +20,7 @@ pub trait IERC20Transfer<T> {
 #[starknet::interface]
 pub trait IAbilityTokenMint<T> {
     fn mint(ref self: T, to: ContractAddress, token_id: u256, amount: u256);
+    fn burn(ref self: T, from: ContractAddress, token_id: u256, amount: u256);
 }
 
 #[dojo::contract]
@@ -103,6 +105,51 @@ pub mod crafting_1v1 {
                 contract_address: config.ability_token,
             };
             ability_token.mint(caller, ability_id.into(), 1_u256);
+        }
+
+        fn craft_ability_tier2(ref self: ContractState, ability_type: u8) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            assert(ability_type >= 1 && ability_type <= 5, 'Invalid ability type');
+
+            let config: ResourceConfig = world.read_model(0_u8);
+
+            // Burn T2 recipe resources (the T1 ability is burned separately below)
+            if ability_type == 1 {
+                // T2 Siege Sword: 30 Iron + 20 Wood + 10 Ember
+                burn_tokens(config.iron, caller, 30);
+                burn_tokens(config.wood, caller, 20);
+                burn_tokens(config.ember, caller, 10);
+            } else if ability_type == 2 {
+                // T2 Stone Cloak: 30 Stone + 20 Linen + 10 Seeds
+                burn_tokens(config.stone, caller, 30);
+                burn_tokens(config.linen, caller, 20);
+                burn_tokens(config.seeds, caller, 10);
+            } else if ability_type == 3 {
+                // T2 Ember Blast: 30 Ember + 20 Seeds + 10 Iron
+                burn_tokens(config.ember, caller, 30);
+                burn_tokens(config.seeds, caller, 20);
+                burn_tokens(config.iron, caller, 10);
+            } else if ability_type == 4 {
+                // T2 Hex: 20 Iron + 20 Stone + 10 Ember + 10 Wood
+                burn_tokens(config.iron, caller, 20);
+                burn_tokens(config.stone, caller, 20);
+                burn_tokens(config.ember, caller, 10);
+                burn_tokens(config.wood, caller, 10);
+            } else {
+                // T2 Fortify: 20 Stone + 20 Linen + 10 Wood
+                burn_tokens(config.stone, caller, 20);
+                burn_tokens(config.linen, caller, 20);
+                burn_tokens(config.wood, caller, 10);
+            }
+
+            // Burn the T1 ability token (token ID == ability_type) and mint the T2 token
+            // (T2 token ID == ability_type + 5)
+            let ability_token = IAbilityTokenMintDispatcher {
+                contract_address: config.ability_token,
+            };
+            ability_token.burn(caller, ability_type.into(), 1_u256);
+            ability_token.mint(caller, (ability_type + 5).into(), 1_u256);
         }
     }
 }
