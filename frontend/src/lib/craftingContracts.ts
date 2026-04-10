@@ -7,41 +7,56 @@ export const CRAFTING_1V1_ADDRESS =
   process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS ||
   "0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235";
 
-// Ability definitions — must stay in sync with src/systems/crafting_1v1.cairo
-export const ABILITIES = [
-  {
-    id: 1,
-    name: "Siege Sword",
-    effect: "Max damage (10) to one gate for 1 round",
-    cost: { iron: 3, wood: 2 },
-  },
-  {
-    id: 2,
-    name: "Stone Cloak",
-    effect: "Block all gate damage for 1 round",
-    cost: { stone: 3, linen: 2 },
-  },
-  {
-    id: 3,
-    name: "Ember Blast",
-    effect: "Deal 5 direct damage bypassing gates",
-    cost: { ember: 3, seeds: 2 },
-  },
-  {
-    id: 4,
-    name: "Hex",
-    effect: "Opponent's budget reduced by 7 for 1 round",
-    cost: { iron: 2, stone: 2, ember: 1 },
-  },
-  {
-    id: 5,
-    name: "Fortify",
-    effect: "Double defense on all gates for 1 round",
-    cost: { stone: 2, linen: 2, wood: 1 },
-  },
+export type AbilityCost = Record<string, number>;
+
+export interface AbilityDef {
+  id: number;
+  type: number; // 1-5
+  tier: number; // 1 or 2
+  name: string;
+  effect: string;
+  cost: AbilityCost;
+  requiresT1?: boolean;
+}
+
+// 10 abilities: IDs 1-5 are T1, 6-10 are T2
+export const ABILITIES: readonly AbilityDef[] = [
+  // T1
+  { id: 1, type: 1, tier: 1, name: "Siege Sword", effect: "Set attack on target gate to 5",
+    cost: { iron: 3, wood: 2 } },
+  { id: 2, type: 2, tier: 1, name: "Stone Cloak", effect: "Halve all gate damage taken",
+    cost: { stone: 3, linen: 2 } },
+  { id: 3, type: 3, tier: 1, name: "Ember Blast", effect: "Deal 2 direct damage bypassing gates",
+    cost: { ember: 3, seeds: 2 } },
+  { id: 4, type: 4, tier: 1, name: "Hex", effect: "Reduce opponent total damage by 3",
+    cost: { iron: 2, stone: 2, ember: 1 } },
+  { id: 5, type: 5, tier: 1, name: "Fortify", effect: "Add 1 to defense at all gates",
+    cost: { stone: 2, linen: 2, wood: 1 } },
+  // T2
+  { id: 6, type: 1, tier: 2, name: "Siege Sword (T2)", effect: "Set attack on target gate to 10",
+    cost: { iron: 30, wood: 20, ember: 10 }, requiresT1: true },
+  { id: 7, type: 2, tier: 2, name: "Stone Cloak (T2)", effect: "Zero all gate damage taken",
+    cost: { stone: 30, linen: 20, seeds: 10 }, requiresT1: true },
+  { id: 8, type: 3, tier: 2, name: "Ember Blast (T2)", effect: "Deal 6 direct damage bypassing gates",
+    cost: { ember: 30, seeds: 20, iron: 10 }, requiresT1: true },
+  { id: 9, type: 4, tier: 2, name: "Hex (T2)", effect: "Reduce opponent total damage by 8",
+    cost: { iron: 20, stone: 20, ember: 10, wood: 10 }, requiresT1: true },
+  { id: 10, type: 5, tier: 2, name: "Fortify (T2)", effect: "Double defense at all gates",
+    cost: { stone: 20, linen: 20, wood: 10 }, requiresT1: true },
 ] as const;
 
-export type AbilityCost = Record<string, number>;
+// Helpers matching the Cairo versions
+export function abilityType(id: number): number {
+  return ((id - 1) % 5) + 1;
+}
+
+export function abilityTier(id: number): number {
+  return Math.floor((id - 1) / 5) + 1;
+}
+
+export function tokenIdFrom(type: number, tier: number): number {
+  return (tier - 1) * 5 + type;
+}
 
 export function canAfford(cost: AbilityCost, balances: Record<string, number>): boolean {
   return Object.entries(cost).every(
@@ -49,7 +64,7 @@ export function canAfford(cost: AbilityCost, balances: Record<string, number>): 
   );
 }
 
-// Approve each required token for the crafting contract, then craft the ability in a single multicall.
+// Approve required tokens then craft a T1 ability in one multicall.
 export async function craftAbility(
   account: AccountInterface,
   abilityId: number,
@@ -63,7 +78,7 @@ export async function craftAbility(
     calls.push({
       contractAddress: tokenAddr,
       entrypoint: "approve",
-      calldata: [CRAFTING_1V1_ADDRESS, amount.toString(), "0"], // u256 (low, high)
+      calldata: [CRAFTING_1V1_ADDRESS, amount.toString(), "0"],
     });
   }
 
@@ -71,6 +86,34 @@ export async function craftAbility(
     contractAddress: CRAFTING_1V1_ADDRESS,
     entrypoint: "craft_ability",
     calldata: [abilityId.toString()],
+  });
+
+  const result = await account.execute(calls);
+  return result.transaction_hash;
+}
+
+// Approve required tokens then craft a T2 ability (burns T1 + resources).
+export async function craftAbilityTier2(
+  account: AccountInterface,
+  abilityTypeId: number,
+  cost: AbilityCost,
+): Promise<string> {
+  const calls: Call[] = [];
+
+  for (const [resource, amount] of Object.entries(cost)) {
+    const tokenAddr = RESOURCE_TOKENS[resource as keyof typeof RESOURCE_TOKENS];
+    if (!tokenAddr) continue;
+    calls.push({
+      contractAddress: tokenAddr,
+      entrypoint: "approve",
+      calldata: [CRAFTING_1V1_ADDRESS, amount.toString(), "0"],
+    });
+  }
+
+  calls.push({
+    contractAddress: CRAFTING_1V1_ADDRESS,
+    entrypoint: "craft_ability_tier2",
+    calldata: [abilityTypeId.toString()],
   });
 
   const result = await account.execute(calls);

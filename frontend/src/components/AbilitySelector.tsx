@@ -64,10 +64,19 @@ export function AbilitySelector({
                   ? "opacity-30 cursor-not-allowed border-[#3d3428] bg-[#252019]"
                   : isSelected
                     ? "border-[#daa520] bg-[#daa520]/10 shadow-[0_0_8px_rgba(218,165,32,0.3)]"
-                    : "border-[#3d3428] bg-[#252019] hover:border-[#7a7060]"
+                    : ability.tier === 2
+                      ? "border-[#8a6a1f] bg-[#252019] hover:border-[#daa520]"
+                      : "border-[#3d3428] bg-[#252019] hover:border-[#7a7060]"
               }`}
             >
-              <div className="text-xs font-bold text-[#d4cfc6] font-serif">{ability.name}</div>
+              <div className="flex items-center gap-1">
+                <div className="text-xs font-bold text-[#d4cfc6] font-serif">{ability.name}</div>
+                {ability.tier === 2 && (
+                  <span className="text-[8px] px-1 py-0.5 rounded border border-[#daa520] text-[#daa520] font-bold tracking-wider">
+                    T2
+                  </span>
+                )}
+              </div>
               <div className="text-[9px] text-[#7a7060] mt-0.5 leading-tight">{ability.effect}</div>
               {isUsed && (
                 <div className="absolute inset-0 flex items-center justify-center bg-[#0d0b0a]/60 rounded-lg">
