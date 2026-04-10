@@ -71,6 +71,14 @@ pub mod resolution_1v1 {
         if a < b { a } else { b }
     }
 
+    fn ability_type_from_token(token_id: u8) -> u8 {
+        if token_id == 0 { 0 } else { ((token_id - 1) % 5) + 1 }
+    }
+
+    fn ability_tier_from_token(token_id: u8) -> u8 {
+        if token_id == 0 { 0 } else { ((token_id - 1) / 5) + 1 }
+    }
+
     #[abi(embed_v0)]
     impl Resolution1v1Impl of super::IResolution1v1<ContractState> {
         fn resolve_round(ref self: ContractState, match_id: u64) {
@@ -135,20 +143,41 @@ pub mod resolution_1v1 {
                     bd = tmp_ba;
                 }
 
-                // --- ABILITY: Fortify (ID 5) — double defense after modifiers ---
-                if a_ability == 5 {
-                    ad = ad * 2;
+                // --- ABILITY: Fortify — tier-aware defense boost ---
+                let a_type = ability_type_from_token(a_ability);
+                let a_tier = ability_tier_from_token(a_ability);
+                let b_type = ability_type_from_token(b_ability);
+                let b_tier = ability_tier_from_token(b_ability);
+
+                if a_type == 5 {
+                    if a_tier == 1 {
+                        ad = ad + 1;
+                    } else {
+                        ad = ad * 2;
+                    }
                 }
-                if b_ability == 5 {
-                    bd = bd * 2;
+                if b_type == 5 {
+                    if b_tier == 1 {
+                        bd = bd + 1;
+                    } else {
+                        bd = bd * 2;
+                    }
                 }
 
-                // --- ABILITY: Siege Sword (ID 1) — override attack on target gate ---
-                if a_ability == 1 && g == a_target.into() {
-                    aa = 10;
+                // --- ABILITY: Siege Sword — tier-aware attack override ---
+                if a_type == 1 && g == a_target.into() {
+                    if a_tier == 1 {
+                        aa = 5;
+                    } else {
+                        aa = 10;
+                    }
                 }
-                if b_ability == 1 && g == b_target.into() {
-                    ba = 10;
+                if b_type == 1 && g == b_target.into() {
+                    if b_tier == 1 {
+                        ba = 5;
+                    } else {
+                        ba = 10;
+                    }
                 }
 
                 if modifier == MOD_DEADLOCK {
@@ -204,14 +233,47 @@ pub mod resolution_1v1 {
                 g += 1;
             };
 
-            // --- ABILITY: Stone Cloak (ID 2) — zero all gate/overflow damage to this player ---
-            if a_ability == 2 {
-                damage_to_a = [0, 0, 0];
-                overflow_to_a = [0, 0, 0];
+            // --- ABILITY: Stone Cloak — tier-aware gate damage reduction ---
+            let a_type_cloak = ability_type_from_token(a_ability);
+            let a_tier_cloak = ability_tier_from_token(a_ability);
+            let b_type_cloak = ability_type_from_token(b_ability);
+            let b_tier_cloak = ability_tier_from_token(b_ability);
+
+            if a_type_cloak == 2 {
+                if a_tier_cloak == 1 {
+                    // T1: halve (integer division, floor)
+                    damage_to_a = [
+                        *damage_to_a.span()[0] / 2,
+                        *damage_to_a.span()[1] / 2,
+                        *damage_to_a.span()[2] / 2,
+                    ];
+                    overflow_to_a = [
+                        *overflow_to_a.span()[0] / 2,
+                        *overflow_to_a.span()[1] / 2,
+                        *overflow_to_a.span()[2] / 2,
+                    ];
+                } else {
+                    // T2: zero
+                    damage_to_a = [0, 0, 0];
+                    overflow_to_a = [0, 0, 0];
+                }
             }
-            if b_ability == 2 {
-                damage_to_b = [0, 0, 0];
-                overflow_to_b = [0, 0, 0];
+            if b_type_cloak == 2 {
+                if b_tier_cloak == 1 {
+                    damage_to_b = [
+                        *damage_to_b.span()[0] / 2,
+                        *damage_to_b.span()[1] / 2,
+                        *damage_to_b.span()[2] / 2,
+                    ];
+                    overflow_to_b = [
+                        *overflow_to_b.span()[0] / 2,
+                        *overflow_to_b.span()[1] / 2,
+                        *overflow_to_b.span()[2] / 2,
+                    ];
+                } else {
+                    damage_to_b = [0, 0, 0];
+                    overflow_to_b = [0, 0, 0];
+                }
             }
 
             // Distribute reflection: each reflection gate splits damage to other gates,
@@ -263,14 +325,27 @@ pub mod resolution_1v1 {
             let mut total_dmg_to_b: u8 = *damage_to_b.span()[0] + *damage_to_b.span()[1] + *damage_to_b.span()[2];
             let mut total_dmg_to_a: u8 = *damage_to_a.span()[0] + *damage_to_a.span()[1] + *damage_to_a.span()[2];
 
-            // --- ABILITY: Hex (ID 4) — reduce opponent's total damage by 7 ---
-            if a_ability == 4 {
-                // Player A uses Hex → reduce damage dealt TO A (by B)
-                if total_dmg_to_a > 7 { total_dmg_to_a = total_dmg_to_a - 7; } else { total_dmg_to_a = 0; }
+            // --- ABILITY: Hex — tier-aware total damage reduction ---
+            let a_type_hex = ability_type_from_token(a_ability);
+            let a_tier_hex = ability_tier_from_token(a_ability);
+            let b_type_hex = ability_type_from_token(b_ability);
+            let b_tier_hex = ability_tier_from_token(b_ability);
+
+            if a_type_hex == 4 {
+                let reduction: u8 = if a_tier_hex == 1 { 3 } else { 8 };
+                if total_dmg_to_a > reduction {
+                    total_dmg_to_a = total_dmg_to_a - reduction;
+                } else {
+                    total_dmg_to_a = 0;
+                }
             }
-            if b_ability == 4 {
-                // Player B uses Hex → reduce damage dealt TO B (by A)
-                if total_dmg_to_b > 7 { total_dmg_to_b = total_dmg_to_b - 7; } else { total_dmg_to_b = 0; }
+            if b_type_hex == 4 {
+                let reduction: u8 = if b_tier_hex == 1 { 3 } else { 8 };
+                if total_dmg_to_b > reduction {
+                    total_dmg_to_b = total_dmg_to_b - reduction;
+                } else {
+                    total_dmg_to_b = 0;
+                }
             }
 
             // Repairs (capped at 3)
@@ -288,12 +363,19 @@ pub mod resolution_1v1 {
             if total_dmg_to_a >= hp_a { hp_a = 0; } else { hp_a = hp_a - total_dmg_to_a; }
             if total_dmg_to_b >= hp_b { hp_b = 0; } else { hp_b = hp_b - total_dmg_to_b; }
 
-            // --- ABILITY: Ember Blast (ID 3) — 5 direct vault damage, post-repair ---
-            if a_ability == 3 {
-                if hp_b > 5 { hp_b = hp_b - 5; } else { hp_b = 0; }
+            // --- ABILITY: Ember Blast — tier-aware direct vault damage ---
+            let a_type_ember = ability_type_from_token(a_ability);
+            let a_tier_ember = ability_tier_from_token(a_ability);
+            let b_type_ember = ability_type_from_token(b_ability);
+            let b_tier_ember = ability_tier_from_token(b_ability);
+
+            if a_type_ember == 3 {
+                let dmg: u8 = if a_tier_ember == 1 { 2 } else { 6 };
+                if hp_b > dmg { hp_b = hp_b - dmg; } else { hp_b = 0; }
             }
-            if b_ability == 3 {
-                if hp_a > 5 { hp_a = hp_a - 5; } else { hp_a = 0; }
+            if b_type_ember == 3 {
+                let dmg: u8 = if b_tier_ember == 1 { 2 } else { 6 };
+                if hp_a > dmg { hp_a = hp_a - dmg; } else { hp_a = 0; }
             }
 
             // Snapshot node owners before contest resolution (for trap detection)
