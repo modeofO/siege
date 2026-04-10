@@ -182,7 +182,7 @@ pub mod commit_reveal_1v1 {
 
             // Ability validation
             if ability_id > 0 {
-                assert(ability_id <= 5, 'Invalid ability ID');
+                assert(ability_id <= 10, 'Invalid ability ID');
                 assert(ability_target <= 2, 'Invalid ability target');
 
                 let mut abilities: MatchAbilities1v1 = world.read_model(match_id);

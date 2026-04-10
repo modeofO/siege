@@ -319,7 +319,7 @@ pub mod world_system {
             let mut i: u32 = 0;
             while i < count {
                 let ability_id: u8 = *abilities.at(i);
-                assert(ability_id >= 1 && ability_id <= 5, 'Invalid ability ID');
+                assert(ability_id >= 1 && ability_id <= 10, 'Invalid ability ID');
                 erc1155.safe_transfer_from(
                     caller, world_sys_addr,
                     ability_id.into(), 1_u256,
@@ -389,7 +389,7 @@ pub mod world_system {
             let mut i: u32 = 0;
             while i < wager {
                 let ability_id: u8 = *abilities.at(i);
-                assert(ability_id >= 1 && ability_id <= 5, 'Invalid ability ID');
+                assert(ability_id >= 1 && ability_id <= 10, 'Invalid ability ID');
                 erc1155.safe_transfer_from(
                     caller, world_sys_addr,
                     ability_id.into(), 1_u256,
