@@ -797,5 +797,29 @@ pub mod world_system {
             };
             adjacent
         }
+
+        fn has_adjacent_to_any_home(
+            self: @ContractState, pillager: ContractAddress, target: ContractAddress,
+        ) -> bool {
+            let world = self.world_default();
+            let kingdom: PlayerKingdom = world.read_model(target);
+            if !kingdom.registered {
+                return false;
+            }
+
+            let home_ids: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
+            let mut i: u32 = 0;
+            let mut found = false;
+            while i < 3 {
+                if !found {
+                    let home: Parcel = world.read_model(*home_ids.at(i));
+                    if self.is_adjacent_to_territory(pillager, home.col, home.row) {
+                        found = true;
+                    }
+                }
+                i += 1;
+            };
+            found
+        }
     }
 }
