@@ -593,6 +593,24 @@ pub mod world_system {
                         used: false,
                     });
                 }
+
+                // If the winner is currently being pillaged by the loser, break those pillages
+                let winner_kingdom_read: PlayerKingdom = world.read_model(winner);
+                let winner_homes: Array<u32> = array![
+                    winner_kingdom_read.home_0,
+                    winner_kingdom_read.home_1,
+                    winner_kingdom_read.home_2,
+                ];
+                let mut pi: u32 = 0;
+                while pi < 3 {
+                    let home_id = *winner_homes.at(pi);
+                    let mut existing: Pillage = world.read_model(home_id);
+                    if existing.active && existing.pillager == loser {
+                        existing.active = false;
+                        world.write_model(@existing);
+                    }
+                    pi += 1;
+                };
             }
 
             // Mint resources for all parcels owned by each player
@@ -672,12 +690,17 @@ pub mod world_system {
             let rc: ResourceConfig = world.read_model(0_u8);
             let amount: u256 = intervals.into();
 
-            // Mint for each home parcel based on its type
+            // Mint for each home parcel based on its type, skipping actively pillaged ones
             let home_parcels: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
             let mut i: u32 = 0;
             while i < 3 {
-                let parcel: Parcel = world.read_model(*home_parcels.at(i));
-                self.mint_parcel_resources(@rc, parcel.parcel_type, caller, amount);
+                let home_id = *home_parcels.at(i);
+                let pillage: Pillage = world.read_model(home_id);
+                let is_pillaged = pillage.active && pillage.expires_at > now;
+                if !is_pillaged {
+                    let parcel: Parcel = world.read_model(home_id);
+                    self.mint_parcel_resources(@rc, parcel.parcel_type, caller, amount);
+                }
                 i += 1;
             };
 

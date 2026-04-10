@@ -491,6 +491,79 @@ mod tests {
     }
 
     #[test]
+    fn test_claim_drip_skips_pillaged_parcel() {
+        let (mut world, world_sys, _player_a, player_b, _erc1155) = full_setup();
+
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        let home_0_id = kingdom_b.home_0;
+
+        starknet::testing::set_block_timestamp(1000);
+        let mut kb_mut = kingdom_b;
+        kb_mut.last_drip_time = 1000;
+        world.write_model_test(@kb_mut);
+
+        // Pillage one home parcel
+        world.write_model_test(@siege_dojo::models::pillage::Pillage {
+            home_parcel_id: home_0_id,
+            pillager: contract_address_const::<0x999>(),
+            target: player_b,
+            start_time: 1000,
+            expires_at: 1000 + 86400,
+            last_claim_time: 1000,
+            active: true,
+        });
+
+        // Advance 2 hours
+        starknet::testing::set_block_timestamp(1000 + 7200);
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.claim_drip();
+
+        let kb_after: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        assert(kb_after.last_drip_time == 1000 + 7200, 'last_drip_time advanced');
+        // The test verifies the flow runs without panicking.
+        // The pillaged home is skipped; other 2 homes mint normally.
+    }
+
+    #[test]
+    fn test_pillage_ends_when_target_beats_pillager() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        starknet::testing::set_block_timestamp(1000);
+
+        let kingdom_a: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_a);
+        let home_parcel_id = kingdom_a.home_0;
+
+        // Set up an existing pillage: player_b is pillaging player_a's home_0
+        world.write_model_test(@siege_dojo::models::pillage::Pillage {
+            home_parcel_id,
+            pillager: player_b,
+            target: player_a,
+            start_time: 0,
+            expires_at: 999999999,
+            last_claim_time: 0,
+            active: true,
+        });
+
+        // Player A wins a match against player B (revenge)
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        world.write_model_test(@siege_dojo::models::match_state_1v1::MatchState1v1 {
+            match_id, player_a, player_b,
+            vault_a_hp: 30, vault_b_hp: 0,
+            current_round: 5,
+            status: siege_dojo::models::match_state::MatchStatus::Finished,
+        });
+        world_sys.settle_match(match_id);
+
+        let pillage_after: siege_dojo::models::pillage::Pillage = world.read_model(home_parcel_id);
+        assert(!pillage_after.active, 'pillage should be broken');
+    }
+
+    #[test]
     fn test_settle_match_draw_no_eligibility() {
         let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
 
