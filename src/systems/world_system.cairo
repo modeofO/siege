@@ -12,6 +12,7 @@ pub trait IWorldSystem<T> {
     fn claim_drip(ref self: T);
     fn upgrade_kingdom(ref self: T);
     fn initiate_pillage(ref self: T, match_id: u64, home_parcel_id: u32);
+    fn claim_pillage_drip(ref self: T, home_parcel_id: u32);
 }
 
 pub fn tier_ability_slots(tier: u8) -> u8 {
@@ -724,6 +725,51 @@ pub mod world_system {
             // Mark eligibility as used
             eligibility.used = true;
             world.write_model(@eligibility);
+        }
+
+        fn claim_pillage_drip(ref self: ContractState, home_parcel_id: u32) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let mut pillage: Pillage = world.read_model(home_parcel_id);
+            assert(pillage.active, 'Pillage not active');
+            assert(pillage.pillager == caller, 'Not the pillager');
+
+            let now = get_block_timestamp();
+
+            // Lazy adjacency check
+            let parcel: Parcel = world.read_model(home_parcel_id);
+            if !self.is_adjacent_to_territory(caller, parcel.col, parcel.row) {
+                pillage.active = false;
+                world.write_model(@pillage);
+                return;
+            }
+
+            // Cap end time at expires_at
+            let end_time = if now > pillage.expires_at { pillage.expires_at } else { now };
+
+            // Calculate intervals
+            let elapsed = if end_time > pillage.last_claim_time {
+                end_time - pillage.last_claim_time
+            } else {
+                0
+            };
+            let intervals: u64 = elapsed / DRIP_INTERVAL;
+
+            if intervals > 0 {
+                let rc: ResourceConfig = world.read_model(0_u8);
+                if rc.iron.is_non_zero() {
+                    self.mint_parcel_resources(@rc, parcel.parcel_type, caller, intervals.into());
+                }
+                pillage.last_claim_time = pillage.last_claim_time + (intervals * DRIP_INTERVAL);
+            }
+
+            // Natural expiration
+            if now >= pillage.expires_at {
+                pillage.active = false;
+            }
+
+            world.write_model(@pillage);
         }
 
         fn upgrade_kingdom(ref self: ContractState) {

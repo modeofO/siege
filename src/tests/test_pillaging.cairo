@@ -409,6 +409,88 @@ mod tests {
     }
 
     #[test]
+    fn test_claim_pillage_drip_mints_resources() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        let home_parcel_id = kingdom_b.home_0;
+
+        starknet::testing::set_block_timestamp(1000);
+
+        world.write_model_test(@siege_dojo::models::pillage::Pillage {
+            home_parcel_id,
+            pillager: player_a,
+            target: player_b,
+            start_time: 1000,
+            expires_at: 1000 + 86400,
+            last_claim_time: 1000,
+            active: true,
+        });
+
+        // Advance 2 hours
+        starknet::testing::set_block_timestamp(1000 + 7200);
+
+        starknet::testing::set_contract_address(player_a);
+        world_sys.claim_pillage_drip(home_parcel_id);
+
+        let pillage: siege_dojo::models::pillage::Pillage = world.read_model(home_parcel_id);
+        assert(pillage.last_claim_time == 1000 + 7200, 'last_claim_time advanced');
+        assert(pillage.active, 'still active');
+    }
+
+    #[test]
+    fn test_claim_pillage_drip_expires_naturally() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        let home_parcel_id = kingdom_b.home_0;
+
+        starknet::testing::set_block_timestamp(1000);
+
+        world.write_model_test(@siege_dojo::models::pillage::Pillage {
+            home_parcel_id,
+            pillager: player_a,
+            target: player_b,
+            start_time: 1000,
+            expires_at: 1000 + 86400,
+            last_claim_time: 1000,
+            active: true,
+        });
+
+        // Advance past expiration
+        starknet::testing::set_block_timestamp(1000 + 86400 + 3600);
+
+        starknet::testing::set_contract_address(player_a);
+        world_sys.claim_pillage_drip(home_parcel_id);
+
+        let pillage: siege_dojo::models::pillage::Pillage = world.read_model(home_parcel_id);
+        assert(!pillage.active, 'should be inactive');
+        assert(pillage.last_claim_time <= 1000 + 86400, 'capped at expires');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Not the pillager', 'ENTRYPOINT_FAILED'))]
+    fn test_claim_pillage_drip_rejects_non_pillager() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        let home_parcel_id = kingdom_b.home_0;
+
+        world.write_model_test(@siege_dojo::models::pillage::Pillage {
+            home_parcel_id,
+            pillager: player_a,
+            target: player_b,
+            start_time: 0,
+            expires_at: 999999999,
+            last_claim_time: 0,
+            active: true,
+        });
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.claim_pillage_drip(home_parcel_id);
+    }
+
+    #[test]
     fn test_settle_match_draw_no_eligibility() {
         let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
 
