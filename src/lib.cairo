@@ -57,4 +57,5 @@ pub mod tests {
     pub mod test_conquest;
     pub mod test_kingdom_tiers;
     pub mod test_reputation;
+    pub mod test_ability_tiers;
 }
