@@ -1,0 +1,6 @@
+ID_T1,ID_T2,Ability,T1_Effect,T2_Effect
+1,6,Siege Sword,Set attack on target gate to 5,Set attack on target gate to 10
+2,7,Stone Cloak,Half all gate damage taken this round,Zero all gate damage
+3,8,Ember Blast,2 direct vault damage,6 direct vault damage
+4,9,Hex,Reduce opponent total damage by 3,Reduce opponent total damage by 8
+5,10,Fortify,Add 1 to defense at all gates,Double defense at all gates
