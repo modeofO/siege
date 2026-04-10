@@ -18,6 +18,8 @@ pub mod models {
     pub mod preset_defense;
     pub mod player_reputation;
     pub mod match_record;
+    pub mod pillage_eligibility;
+    pub mod pillage;
 }
 
 pub mod tokens;
@@ -58,4 +60,5 @@ pub mod tests {
     pub mod test_kingdom_tiers;
     pub mod test_reputation;
     pub mod test_ability_tiers;
+    pub mod test_pillaging;
 }
