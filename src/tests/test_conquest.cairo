@@ -484,6 +484,54 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected: ('Parcel cap reached', 'ENTRYPOINT_FAILED'))]
+    fn test_conquest_rejects_at_parcel_cap() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // player_a starts with 3 home parcels + 1 non-home (parcel 8) = 4 total
+        // Polis cap is 2 non-home parcels. Give player_a one more non-home parcel
+        // to reach cap (3 home + 2 non-home = 5 parcels).
+        let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
+        let config: WorldConfig = world.read_model(0_u8);
+        let mut extra_id: u32 = 999;
+        let mut p: u32 = 0;
+        while p < config.total_parcels {
+            let parcel: Parcel = world.read_model(p);
+            if parcel.owner == zero_addr {
+                extra_id = p;
+                break;
+            }
+            p += 1;
+        };
+        assert(extra_id != 999, 'need an unclaimed parcel');
+        let mut extra: Parcel = world.read_model(extra_id);
+        extra.owner = player_a;
+        extra.is_home = false;
+        world.write_model_test(@extra);
+        let mut ka: PlayerKingdom = world.read_model(player_a);
+        ka.parcel_count = 5; // 3 home + 2 non-home, at Polis cap
+        world.write_model_test(@ka);
+
+        // Set up defender presets (player_b is tier 2 from conquest_setup)
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(1, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(2, 0, 0, 0, 1, 1, 1);
+
+        // Give B parcel 9 as a non-home parcel to target
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        // Attacker at cap tries to conquest — should panic
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    #[test]
     fn test_basileia_can_set_all_four_presets() {
         let (mut world, conquest_sys, _, _, _) = conquest_setup();
 
