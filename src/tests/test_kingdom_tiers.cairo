@@ -47,6 +47,8 @@ mod tests {
     use siege_dojo::models::match_counter::m_MatchCounter;
     use siege_dojo::models::player_reputation::m_PlayerReputation;
     use siege_dojo::models::match_record::m_MatchRecord;
+    use siege_dojo::models::pillage_eligibility::m_PillageEligibility;
+    use siege_dojo::models::pillage::m_Pillage;
     use siege_dojo::models::events::{
         e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished,
     };
@@ -162,6 +164,8 @@ mod tests {
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerReputation::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchRecord::TEST_CLASS_HASH),
+                TestResource::Model(m_PillageEligibility::TEST_CLASS_HASH),
+                TestResource::Model(m_Pillage::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),

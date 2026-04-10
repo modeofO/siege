@@ -83,6 +83,8 @@ mod tests {
     use siege_dojo::models::resource_config::ResourceConfig;
     use siege_dojo::models::player_reputation::{PlayerReputation, m_PlayerReputation};
     use siege_dojo::models::match_record::{MatchRecord, m_MatchRecord};
+    use siege_dojo::models::pillage_eligibility::m_PillageEligibility;
+    use siege_dojo::models::pillage::m_Pillage;
     use siege_dojo::systems::world_system::calculate_bracket;
     use siege_dojo::tokens::ability_token::{AbilityToken, IAbilityTokenDispatcher, IAbilityTokenDispatcherTrait};
     use super::{MockVrfProvider, MockAccount};
@@ -141,6 +143,8 @@ mod tests {
                 TestResource::Model(m_ResourceConfig::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerReputation::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchRecord::TEST_CLASS_HASH),
+                TestResource::Model(m_PillageEligibility::TEST_CLASS_HASH),
+                TestResource::Model(m_Pillage::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),

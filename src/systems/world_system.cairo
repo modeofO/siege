@@ -92,8 +92,10 @@ pub mod world_system {
     use siege_dojo::models::match_abilities_1v1::MatchAbilities1v1;
     use siege_dojo::models::player_reputation::PlayerReputation;
     use siege_dojo::models::match_record::MatchRecord;
+    use siege_dojo::models::pillage_eligibility::PillageEligibility;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
+    const PILLAGE_WINDOW: u64 = 86400; // 24 hours in seconds
 
     // ERC-1155 dispatcher for safe_transfer_from calls
     #[starknet::interface]
@@ -575,6 +577,19 @@ pub mod world_system {
                 record_lw.losses += 1;
                 record_lw.last_match_id = match_id;
                 world.write_model(@record_lw);
+
+                // Grant pillage eligibility if the winner borders any of the loser's home parcels
+                if self.has_adjacent_to_any_home(winner, loser) {
+                    let now = get_block_timestamp();
+                    world.write_model(@PillageEligibility {
+                        winner,
+                        match_id,
+                        loser,
+                        granted_at: now,
+                        expires_at: now + PILLAGE_WINDOW,
+                        used: false,
+                    });
+                }
             }
 
             // Mint resources for all parcels owned by each player
