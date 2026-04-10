@@ -404,8 +404,15 @@ mod tests {
     }
 
     #[test]
-    fn test_conquest_with_ember_blast() {
+    fn test_conquest_with_ember_blast_t2() {
         let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Give player_a a T2 Ember Blast (token ID 8)
+        let rc: ResourceConfig = world.read_model(0_u8);
+        let ability_token = IAbilityTokenDispatcher { contract_address: rc.ability_token };
+        let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(world_sys_addr);
+        ability_token.mint(player_a, 8_u256, 1_u256);
 
         // Defender: no attack, moderate defense
         starknet::testing::set_contract_address(player_b);
@@ -413,7 +420,7 @@ mod tests {
         conquest_sys.set_preset_defense(1, 0, 0, 0, 4, 4, 4);
         conquest_sys.set_preset_defense(2, 0, 0, 0, 4, 4, 4);
 
-        // Give B parcel 9 (col=4,row=1) as a non-home parcel
+        // Give B parcel 9 as a non-home parcel
         let mut tp: Parcel = world.read_model(9_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
@@ -421,30 +428,35 @@ mod tests {
         kb.parcel_count += 1;
         world.write_model_test(@kb);
 
-        // Attacker: 5/5/0 attack, no defense, Ember Blast (ID 3)
+        // Attacker: 5/5/0 attack, no defense, T2 Ember Blast (token ID 8 = 6 damage)
         // Gate damage to defender: (5-4)+(5-4)+(0-4)=0 = 2
-        // Defender HP: 15 - 2 = 13, then Ember Blast -5 = 8
-        // Defender attack = 0, so damage to attacker = 0
-        // Attacker HP: 10 - 0 = 10
-        // 10 > 8 → attacker wins!
+        // Defender HP: 15 - 2 = 13, then T2 Ember Blast -6 = 7
+        // Attacker HP: 10
+        // 10 > 7 → attacker wins
         starknet::testing::set_contract_address(player_a);
-        conquest_sys.initiate_conquest(9, 5, 5, 0, 0, 0, 0, 3, 0);
+        conquest_sys.initiate_conquest(9, 5, 5, 0, 0, 0, 0, 8, 0);
 
         let target: Parcel = world.read_model(9_u32);
-        assert(target.owner == player_a, 'ember blast should win');
+        assert(target.owner == player_a, 'ember blast t2 should win');
     }
 
     #[test]
-    fn test_conquest_with_stone_cloak() {
+    fn test_conquest_with_stone_cloak_t2() {
         let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
 
-        // Defender: heavy counterattack (4/4/4 attack, 0 defense)
+        // Give player_a a T2 Stone Cloak (token ID 7)
+        let rc: ResourceConfig = world.read_model(0_u8);
+        let ability_token = IAbilityTokenDispatcher { contract_address: rc.ability_token };
+        let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(world_sys_addr);
+        ability_token.mint(player_a, 7_u256, 1_u256);
+
+        // Defender: heavy counterattack
         starknet::testing::set_contract_address(player_b);
         conquest_sys.set_preset_defense(0, 4, 4, 4, 0, 0, 0);
         conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
         conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
 
-        // Give B parcel 9 (col=4,row=1) as a non-home parcel
         let mut tp: Parcel = world.read_model(9_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
@@ -452,17 +464,39 @@ mod tests {
         kb.parcel_count += 1;
         world.write_model_test(@kb);
 
-        // Attacker: 10/0/0 attack, no defense, Stone Cloak (ID 2)
-        // Gate damage to defender: 10+0+0 = 10. Def HP: 15-10 = 5
-        // Gate damage to attacker: 4+4+4 = 12. BUT Stone Cloak → 0
-        // Attacker HP: 10 - 0 = 10
-        // 10 > 5 → attacker wins!
-        // Without Stone Cloak: atk takes 12 damage → HP 0. Would lose.
+        // Attacker: 10/0/0 attack, no defense, T2 Stone Cloak (token ID 7 = zeros damage)
+        // Gate damage to defender: (10-0)+(0-0)+(0-0) = 10. Def HP: 15-10 = 5
+        // Gate damage to attacker: 4+4+4 = 12. T2 Stone Cloak → 0
+        // Attacker HP: 10. 10 > 5 → attacker wins
         starknet::testing::set_contract_address(player_a);
-        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 2, 0);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 7, 0);
 
         let target: Parcel = world.read_model(9_u32);
-        assert(target.owner == player_a, 'stone cloak should win');
+        assert(target.owner == player_a, 'stone cloak t2 should win');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Ability not owned', 'ENTRYPOINT_FAILED'))]
+    fn test_conquest_rejects_unowned_ability() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Defender setup
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(1, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(2, 0, 0, 0, 1, 1, 1);
+
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        // Attacker tries to use ability 4 (T1 Hex) without owning it
+        // (player_a gets starter IDs 1,2,3 on register — ID 4 is not a starter)
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 5, 0, 0, 0, 0, 0, 4, 0);
     }
 
     #[test]

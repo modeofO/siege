@@ -12,6 +12,20 @@ pub trait IConquest<T> {
     );
 }
 
+// ERC-1155 interface for ability ownership check
+#[starknet::interface]
+pub trait IERC1155<T> {
+    fn balance_of(self: @T, account: ContractAddress, token_id: u256) -> u256;
+}
+
+pub fn ability_type_from_token(token_id: u8) -> u8 {
+    if token_id == 0 { 0 } else { ((token_id - 1) % 5) + 1 }
+}
+
+pub fn ability_tier_from_token(token_id: u8) -> u8 {
+    if token_id == 0 { 0 } else { ((token_id - 1) / 5) + 1 }
+}
+
 #[dojo::contract]
 pub mod conquest {
     use core::num::traits::Zero;
@@ -22,6 +36,8 @@ pub mod conquest {
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::preset_defense::PresetDefense;
     use siege_dojo::utils::hex;
+    use super::{IERC1155Dispatcher, IERC1155DispatcherTrait};
+    use super::{ability_type_from_token, ability_tier_from_token};
 
     // VRF dispatcher (same pattern as actions_1v1)
     #[starknet::interface]
@@ -102,10 +118,15 @@ pub mod conquest {
             let atk_total = p0 + p1 + p2 + g0 + g1 + g2;
             assert(atk_total <= ATTACKER_BUDGET, 'Budget exceeds 10');
 
-            // Validate ability (0 = none, 1-5 = valid)
+            // Validate ability (0 = none, 1-10 = valid) and verify ownership
             if ability_id > 0 {
-                assert(ability_id <= 5, 'Invalid ability ID');
+                assert(ability_id <= 10, 'Invalid ability ID');
                 assert(ability_target <= 2, 'Invalid ability target');
+
+                let rc: siege_dojo::models::resource_config::ResourceConfig = world.read_model(0_u8);
+                let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
+                let balance = erc1155.balance_of(attacker, ability_id.into());
+                assert(balance >= 1_u256, 'Ability not owned');
             }
 
             // Validate target parcel
@@ -176,18 +197,27 @@ pub mod conquest {
             let mut atk_g1 = g1;
             let mut atk_g2 = g2;
 
-            // Fortify (ID 5): double attacker defense
-            if ability_id == 5 {
-                atk_g0 = atk_g0 * 2;
-                atk_g1 = atk_g1 * 2;
-                atk_g2 = atk_g2 * 2;
+            // Fortify — tier-aware defense boost
+            let a_type = ability_type_from_token(ability_id);
+            let a_tier = ability_tier_from_token(ability_id);
+            if a_type == 5 {
+                if a_tier == 1 {
+                    atk_g0 = atk_g0 + 1;
+                    atk_g1 = atk_g1 + 1;
+                    atk_g2 = atk_g2 + 1;
+                } else {
+                    atk_g0 = atk_g0 * 2;
+                    atk_g1 = atk_g1 * 2;
+                    atk_g2 = atk_g2 * 2;
+                }
             }
 
-            // Siege Sword (ID 1): override attack on target gate to 10
-            if ability_id == 1 {
-                if ability_target == 0 { atk_p0 = 10; }
-                else if ability_target == 1 { atk_p1 = 10; }
-                else { atk_p2 = 10; }
+            // Siege Sword — tier-aware attack override
+            if a_type == 1 {
+                let new_attack: u8 = if a_tier == 1 { 5 } else { 10 };
+                if ability_target == 0 { atk_p0 = new_attack; }
+                else if ability_target == 1 { atk_p1 = new_attack; }
+                else { atk_p2 = new_attack; }
             }
 
             // Per-gate damage calculation
@@ -201,24 +231,33 @@ pub mod conquest {
             let dmg_to_atk_2: u8 = if def_p2 > atk_g2 { def_p2 - atk_g2 } else { 0 };
             let mut total_dmg_to_atk: u8 = dmg_to_atk_0 + dmg_to_atk_1 + dmg_to_atk_2;
 
-            // Stone Cloak (ID 2): zero all gate damage to attacker
-            if ability_id == 2 {
-                total_dmg_to_atk = 0;
+            // Stone Cloak — tier-aware gate damage reduction
+            if a_type == 2 {
+                if a_tier == 1 {
+                    total_dmg_to_atk = total_dmg_to_atk / 2;
+                } else {
+                    total_dmg_to_atk = 0;
+                }
             }
 
-            // Hex (ID 4): reduce damage to attacker by 7
-            if ability_id == 4 {
-                if total_dmg_to_atk > 7 { total_dmg_to_atk = total_dmg_to_atk - 7; }
-                else { total_dmg_to_atk = 0; }
+            // Hex — tier-aware total damage reduction
+            if a_type == 4 {
+                let reduction: u8 = if a_tier == 1 { 3 } else { 8 };
+                if total_dmg_to_atk > reduction {
+                    total_dmg_to_atk = total_dmg_to_atk - reduction;
+                } else {
+                    total_dmg_to_atk = 0;
+                }
             }
 
             // Apply damage to vaults
             let mut atk_hp: u8 = if total_dmg_to_atk >= ATTACKER_HP { 0 } else { ATTACKER_HP - total_dmg_to_atk };
             let mut def_hp: u8 = if total_dmg_to_def >= DEFENDER_HP { 0 } else { DEFENDER_HP - total_dmg_to_def };
 
-            // Ember Blast (ID 3): 5 direct damage to defender vault
-            if ability_id == 3 {
-                if def_hp > 5 { def_hp = def_hp - 5; } else { def_hp = 0; }
+            // Ember Blast — tier-aware direct vault damage
+            if a_type == 3 {
+                let ember_dmg: u8 = if a_tier == 1 { 2 } else { 6 };
+                if def_hp > ember_dmg { def_hp = def_hp - ember_dmg; } else { def_hp = 0; }
             }
 
             // Determine winner: highest HP wins. Tie goes to defender.
