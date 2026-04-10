@@ -11,6 +11,7 @@ pub trait IWorldSystem<T> {
     fn claim_parcel(ref self: T, match_id: u64, parcel_id: u32);
     fn claim_drip(ref self: T);
     fn upgrade_kingdom(ref self: T);
+    fn initiate_pillage(ref self: T, match_id: u64, home_parcel_id: u32);
 }
 
 pub fn tier_ability_slots(tier: u8) -> u8 {
@@ -93,6 +94,7 @@ pub mod world_system {
     use siege_dojo::models::player_reputation::PlayerReputation;
     use siege_dojo::models::match_record::MatchRecord;
     use siege_dojo::models::pillage_eligibility::PillageEligibility;
+    use siege_dojo::models::pillage::Pillage;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
     const PILLAGE_WINDOW: u64 = 86400; // 24 hours in seconds
@@ -680,6 +682,48 @@ pub mod world_system {
 
             kingdom.last_drip_time = kingdom.last_drip_time + (intervals * DRIP_INTERVAL);
             world.write_model(@kingdom);
+        }
+
+        fn initiate_pillage(ref self: ContractState, match_id: u64, home_parcel_id: u32) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            // Read eligibility
+            let mut eligibility: PillageEligibility = world.read_model((caller, match_id));
+            let now = get_block_timestamp();
+            assert(eligibility.expires_at > now, 'Eligibility expired');
+            assert(!eligibility.used, 'Eligibility already used');
+            assert(eligibility.granted_at > 0, 'No eligibility');
+
+            // Verify the target home parcel belongs to the loser and is a home parcel
+            let parcel: Parcel = world.read_model(home_parcel_id);
+            assert(parcel.owner == eligibility.loser, 'Not loser home parcel');
+            assert(parcel.is_home, 'Not a home parcel');
+
+            // Verify caller still has adjacency to THIS specific home parcel
+            assert(
+                self.is_adjacent_to_territory(caller, parcel.col, parcel.row),
+                'No adjacency to parcel',
+            );
+
+            // Assert no active pillage on this home parcel
+            let existing: Pillage = world.read_model(home_parcel_id);
+            assert(!existing.active, 'Already being pillaged');
+
+            // Create the pillage
+            world.write_model(@Pillage {
+                home_parcel_id,
+                pillager: caller,
+                target: eligibility.loser,
+                start_time: now,
+                expires_at: now + PILLAGE_WINDOW,
+                last_claim_time: now,
+                active: true,
+            });
+
+            // Mark eligibility as used
+            eligibility.used = true;
+            world.write_model(@eligibility);
         }
 
         fn upgrade_kingdom(ref self: ContractState) {

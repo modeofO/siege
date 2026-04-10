@@ -333,6 +333,82 @@ mod tests {
     }
 
     #[test]
+    fn test_initiate_pillage_happy_path() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        starknet::testing::set_block_timestamp(1000);
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        world.write_model_test(@siege_dojo::models::match_state_1v1::MatchState1v1 {
+            match_id, player_a, player_b,
+            vault_a_hp: 30, vault_b_hp: 0,
+            current_round: 5,
+            status: siege_dojo::models::match_state::MatchStatus::Finished,
+        });
+        world_sys.settle_match(match_id);
+
+        // Find one of B's home parcels that A borders
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        // Iterate B's homes and find one A is adjacent to via is_adjacent_to_territory check.
+        // In the default test grid, parcel 2 (A) borders parcel 3 (B.home_0).
+        let home_parcel_id = kingdom_b.home_0;
+
+        starknet::testing::set_contract_address(player_a);
+        world_sys.initiate_pillage(match_id, home_parcel_id);
+
+        let pillage: siege_dojo::models::pillage::Pillage = world.read_model(home_parcel_id);
+        assert(pillage.active, 'pillage should be active');
+        assert(pillage.pillager == player_a, 'pillager should be A');
+        assert(pillage.target == player_b, 'target should be B');
+
+        let eligibility: siege_dojo::models::pillage_eligibility::PillageEligibility =
+            world.read_model((player_a, match_id));
+        assert(eligibility.used, 'eligibility should be used');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Already being pillaged', 'ENTRYPOINT_FAILED'))]
+    fn test_initiate_pillage_rejects_already_pillaged() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        starknet::testing::set_block_timestamp(1000);
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        world.write_model_test(@siege_dojo::models::match_state_1v1::MatchState1v1 {
+            match_id, player_a, player_b,
+            vault_a_hp: 30, vault_b_hp: 0,
+            current_round: 5,
+            status: siege_dojo::models::match_state::MatchStatus::Finished,
+        });
+        world_sys.settle_match(match_id);
+
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        let home_parcel_id = kingdom_b.home_0;
+
+        // Pre-populate an active pillage from a third party
+        world.write_model_test(@siege_dojo::models::pillage::Pillage {
+            home_parcel_id,
+            pillager: contract_address_const::<0x999>(),
+            target: player_b,
+            start_time: 0,
+            expires_at: 999999999,
+            last_claim_time: 0,
+            active: true,
+        });
+
+        starknet::testing::set_contract_address(player_a);
+        world_sys.initiate_pillage(match_id, home_parcel_id);
+    }
+
+    #[test]
     fn test_settle_match_draw_no_eligibility() {
         let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
 
