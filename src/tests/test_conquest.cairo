@@ -532,6 +532,57 @@ mod tests {
     }
 
     #[test]
+    fn test_conquest_win_increments_total_wins() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(1, 0, 0, 0, 1, 1, 1);
+        conquest_sys.set_preset_defense(2, 0, 0, 0, 1, 1, 1);
+
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        let ka_before: PlayerKingdom = world.read_model(player_a);
+        assert(ka_before.total_wins == 0, 'should start at 0 wins');
+
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 0, 0);
+
+        let ka_after: PlayerKingdom = world.read_model(player_a);
+        assert(ka_after.total_wins == 1, 'total_wins should be 1');
+    }
+
+    #[test]
+    fn test_conquest_loss_no_total_wins() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
+        conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
+
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 1, 1, 1, 0, 0, 0, 0, 0);
+
+        let ka_after: PlayerKingdom = world.read_model(player_a);
+        assert(ka_after.total_wins == 0, 'no wins on loss');
+        let kb_after: PlayerKingdom = world.read_model(player_b);
+        assert(kb_after.total_wins == 0, 'defender gets no win');
+    }
+
+    #[test]
     fn test_basileia_can_set_all_four_presets() {
         let (mut world, conquest_sys, _, _, _) = conquest_setup();
 

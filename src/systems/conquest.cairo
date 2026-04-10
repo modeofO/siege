@@ -233,6 +233,7 @@ pub mod conquest {
 
                 let mut ak: PlayerKingdom = world.read_model(attacker);
                 ak.parcel_count += 1;
+                ak.total_wins += 1;
                 world.write_model(@ak);
 
                 let mut dk: PlayerKingdom = world.read_model(defender);
