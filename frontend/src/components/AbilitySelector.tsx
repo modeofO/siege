@@ -1,6 +1,5 @@
 "use client";
 
-import React from "react";
 import { ABILITIES } from "@/lib/craftingContracts";
 
 interface AbilitySelectorProps {
