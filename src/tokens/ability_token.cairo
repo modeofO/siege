@@ -89,13 +89,15 @@ pub mod AbilityToken {
     #[abi(embed_v0)]
     impl AbilityMetadataURI of IERC1155MetadataURI<ContractState> {
         fn uri(self: @ContractState, token_id: u256) -> ByteArray {
-            // Token IDs are 1-5. Anything outside that range returns empty.
-            if token_id.high != 0 || token_id.low == 0 || token_id.low > 5 {
+            // Token IDs 1-10: IDs 1-5 are T1, 6-10 are T2. Anything outside returns empty.
+            if token_id.high != 0 || token_id.low == 0 || token_id.low > 10 {
                 return "";
             }
-            let ability_type: u8 = token_id.low.try_into().unwrap();
+            let tid: u8 = token_id.low.try_into().unwrap();
+            // SVG is keyed by ability type (1-5), shared across tiers
+            let ability_type: u8 = ((tid - 1) % 5) + 1;
             let svg = self.ability_svgs.entry(ability_type).read();
-            ability_metadata::build_ability_data_uri(ability_type, svg)
+            ability_metadata::build_ability_data_uri(tid, svg)
         }
     }
 
