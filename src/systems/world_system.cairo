@@ -44,6 +44,16 @@ pub fn tier_wins_required(tier: u8) -> u32 {
     }
 }
 
+pub fn tier_preset_count(tier: u8) -> u8 {
+    match tier {
+        0 => 1,  // Polis
+        1 => 2,  // Strategos
+        2 => 3,  // Hegemonia
+        3 => 4,  // Basileia
+        _ => 1,
+    }
+}
+
 pub fn calculate_bracket(total_wins: u32, total_losses: u32) -> u8 {
     let total = total_wins + total_losses;
     if total < 10 {
