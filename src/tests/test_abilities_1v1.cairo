@@ -156,100 +156,99 @@ mod tests {
     }
 
     #[test]
-    fn test_siege_sword_overrides_attack() {
-        // Player A has Siege Sword (ID 1), targets gate 0
+    fn test_siege_sword_t1_overrides_attack() {
+        // Player A has T1 Siege Sword (ID 1), targets gate 0
         // A allocations: atk [1,0,0], def [0,0,0], repair 0, nodes [0,0,0], ability=1 target=0, budget=1
-        // B allocations: atk [0,0,0], def [5,5,0], repair 0, nodes [0,0,0], budget=10
-        // Siege Sword overrides A's p0 from 1 to 10
-        // Damage to B: max(0, 10-5) + 0 + 0 = 5
-        // B HP: 50 - 5 = 45, A HP: 50
+        // B allocations: atk [0,0,0], def [2,5,0], repair 0, nodes [0,0,0], budget=7
+        // T1 Siege Sword overrides A's p0 from 1 to 5
+        // Damage to B: max(0, 5-2) + 0 + 0 = 3
+        // B HP: 50 - 3 = 47, A HP: 50
         let (mut world, match_id) = setup(
-            (1, 0, 0), // A has Siege Sword (ability ID 1)
+            (1, 0, 0), // A has T1 Siege Sword
             (0, 0, 0), // B has no abilities
             (1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0), // A: atk [1,0,0], ability=1 target=0
-            (0, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), // B: def [5,5,0]
+            (0, 0, 0, 2, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), // B: def [2,5,0]
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
-        assert(state.vault_b_hp == 45, 'siege sword: B should be 45');
-        assert(state.vault_a_hp == 50, 'siege sword: A should be 50');
+        assert(state.vault_b_hp == 47, 'T1 siege: B should be 47');
+        assert(state.vault_a_hp == 50, 'T1 siege: A should be 50');
     }
 
     #[test]
-    fn test_stone_cloak_blocks_gate_damage() {
-        // Player B has Stone Cloak (ID 2)
+    fn test_stone_cloak_t1_halves_damage() {
+        // Player B has T1 Stone Cloak (ID 2)
         // A: atk [5,3,2], def [0,0,0], budget=10
         // B: atk [0,0,0], def [0,0,0], Stone Cloak, budget=0
-        // Without cloak B would take 10 damage. With cloak: 0.
-        // B HP: 50, A HP: 50
+        // T1 cloak halves: damage 5→2, 3→1, 2→1. Total = 4.
+        // B HP: 50 - 4 = 46
         let (mut world, match_id) = setup(
             (0, 0, 0), // A has no abilities
-            (2, 0, 0), // B has Stone Cloak (ability ID 2)
+            (2, 0, 0), // B has T1 Stone Cloak (ability ID 2)
             (5, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), // A: atk [5,3,2]
             (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0), // B: ability=2
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
-        assert(state.vault_b_hp == 50, 'stone cloak: B should be 50');
-        assert(state.vault_a_hp == 50, 'stone cloak: A should be 50');
+        assert(state.vault_b_hp == 46, 'T1 cloak: B should be 46');
+        assert(state.vault_a_hp == 50, 'T1 cloak: A should be 50');
     }
 
     #[test]
-    fn test_ember_blast_bypasses_gates() {
-        // Player A has Ember Blast (ID 3), Player B has Stone Cloak (ID 2)
+    fn test_ember_blast_t1_bypasses_gates() {
+        // Player A has T1 Ember Blast (ID 3), Player B has T1 Stone Cloak (ID 2)
         // A: all zeros except ability=3
         // B: def [5,5,0] + ability=2
-        // Stone Cloak blocks gate damage but NOT Ember Blast
-        // B takes 5 direct damage -> HP 45
+        // T1 cloak halves gate damage but does NOT block Ember Blast
+        // T1 Ember Blast deals 2 direct damage -> B HP = 48
         let (mut world, match_id) = setup(
-            (3, 0, 0), // A has Ember Blast (ability ID 3)
-            (2, 0, 0), // B has Stone Cloak (ability ID 2)
+            (3, 0, 0), // A has T1 Ember Blast
+            (2, 0, 0), // B has T1 Stone Cloak
             (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0), // A: ability=3
             (0, 0, 0, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0), // B: def [5,5,0], ability=2
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
-        // Stone Cloak blocks A's gate attacks, but Ember Blast bypasses it
-        assert(state.vault_b_hp == 45, 'ember blast: B should be 45');
-        assert(state.vault_a_hp == 50, 'ember blast: A should be 50');
+        assert(state.vault_b_hp == 48, 'T1 ember: B should be 48');
+        assert(state.vault_a_hp == 50, 'T1 ember: A should be 50');
     }
 
     #[test]
-    fn test_hex_reduces_damage() {
-        // Player B has Hex (ID 4)
+    fn test_hex_t1_reduces_damage() {
+        // Player B has T1 Hex (ID 4)
         // A: atk [5,3,2], def [0,0,0], budget=10
         // B: atk [0,0,0], def [0,0,0], Hex, budget=0
-        // Without Hex: B takes 10 damage. With Hex: max(0, 10-7) = 3
-        // B HP: 47
+        // Without Hex: B takes 10 damage. With T1 Hex (-3): 10 - 3 = 7
+        // B HP: 43
         let (mut world, match_id) = setup(
             (0, 0, 0), // A has no abilities
-            (4, 0, 0), // B has Hex (ability ID 4)
+            (4, 0, 0), // B has T1 Hex (ability ID 4)
             (5, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), // A: atk [5,3,2]
             (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0), // B: ability=4
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
-        assert(state.vault_b_hp == 47, 'hex: B should be 47');
-        assert(state.vault_a_hp == 50, 'hex: A should be 50');
+        assert(state.vault_b_hp == 43, 'T1 hex: B should be 43');
+        assert(state.vault_a_hp == 50, 'T1 hex: A should be 50');
     }
 
     #[test]
-    fn test_fortify_doubles_defense() {
-        // Player B has Fortify (ID 5)
+    fn test_fortify_t1_adds_one_defense() {
+        // Player B has T1 Fortify (ID 5)
         // A: atk [4,3,3], def [0,0,0], budget=10
         // B: atk [0,0,0], def [3,3,4], Fortify, budget=10
-        // Fortify doubles B's defense: [6,6,8]
-        // Damage to B: max(0,4-6) + max(0,3-6) + max(0,3-8) = 0
+        // T1 Fortify adds 1 to B's defense: [4,4,5]
+        // Damage to B: max(0,4-4)+max(0,3-4)+max(0,3-5) = 0
         // B HP: 50
         let (mut world, match_id) = setup(
             (0, 0, 0), // A has no abilities
-            (5, 0, 0), // B has Fortify (ability ID 5)
+            (5, 0, 0), // B has T1 Fortify (ability ID 5)
             (4, 3, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), // A: atk [4,3,3]
             (0, 0, 0, 3, 3, 4, 0, 0, 0, 0, 0, 0, 0, 5, 0), // B: def [3,3,4], ability=5
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
-        assert(state.vault_b_hp == 50, 'fortify: B should be 50');
-        assert(state.vault_a_hp == 50, 'fortify: A should be 50');
+        assert(state.vault_b_hp == 50, 'T1 fortify: B should be 50');
+        assert(state.vault_a_hp == 50, 'T1 fortify: A should be 50');
     }
 }
