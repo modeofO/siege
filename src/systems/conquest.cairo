@@ -55,26 +55,32 @@ pub mod conquest {
         ) {
             let mut world = self.world_default();
             let caller = get_caller_address();
-            assert(index <= 2, 'Index must be 0-2');
+
+            // Tier-based slot limit
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
+            let max_presets = siege_dojo::systems::world_system::tier_preset_count(kingdom.tier);
+            assert(index < max_presets, 'Index exceeds tier limit');
 
             let total = p0 + p1 + p2 + g0 + g1 + g2;
             assert(total <= DEFENDER_BUDGET, 'Budget exceeds 12');
 
             let mut defense: PresetDefense = world.read_model(caller);
 
-            // Store into the correct preset slot
             if index == 0 {
                 defense.p0_p0 = p0; defense.p0_p1 = p1; defense.p0_p2 = p2;
                 defense.p0_g0 = g0; defense.p0_g1 = g1; defense.p0_g2 = g2;
             } else if index == 1 {
                 defense.p1_p0 = p0; defense.p1_p1 = p1; defense.p1_p2 = p2;
                 defense.p1_g0 = g0; defense.p1_g1 = g1; defense.p1_g2 = g2;
-            } else {
+            } else if index == 2 {
                 defense.p2_p0 = p0; defense.p2_p1 = p1; defense.p2_p2 = p2;
                 defense.p2_g0 = g0; defense.p2_g1 = g1; defense.p2_g2 = g2;
+            } else {
+                defense.p3_p0 = p0; defense.p3_p1 = p1; defense.p3_p2 = p2;
+                defense.p3_g0 = g0; defense.p3_g1 = g1; defense.p3_g2 = g2;
             }
 
-            // Track how many presets have been set
             if index >= defense.preset_count {
                 defense.preset_count = index + 1;
             }
@@ -150,8 +156,10 @@ pub mod conquest {
                 (defense.p0_p0, defense.p0_p1, defense.p0_p2, defense.p0_g0, defense.p0_g1, defense.p0_g2)
             } else if preset_idx == 1 {
                 (defense.p1_p0, defense.p1_p1, defense.p1_p2, defense.p1_g0, defense.p1_g1, defense.p1_g2)
-            } else {
+            } else if preset_idx == 2 {
                 (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
+            } else {
+                (defense.p3_p0, defense.p3_p1, defense.p3_p2, defense.p3_g0, defense.p3_g1, defense.p3_g2)
             };
 
             // --- Apply attacker ability effects ---

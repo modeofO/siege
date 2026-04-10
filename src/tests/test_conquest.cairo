@@ -112,6 +112,13 @@ mod tests {
         addr
     }
 
+    fn deploy_user_salted(salt: felt252) -> starknet::ContractAddress {
+        let (addr, _) = starknet::syscalls::deploy_syscall(
+            MockAccount::TEST_CLASS_HASH.try_into().unwrap(), salt, array![].span(), false,
+        ).unwrap_syscall();
+        addr
+    }
+
     fn namespace_def() -> NamespaceDef {
         NamespaceDef {
             namespace: "siege_dojo",
@@ -210,6 +217,11 @@ mod tests {
         let player_b = deploy_user();
         starknet::testing::set_contract_address(player_b);
         world_sys.register_player(array![0, 1, 2]);
+
+        // Upgrade player_b to Hegemonia (tier 2) so they can set 3 preset defense slots
+        let mut kb_tier: PlayerKingdom = world.read_model(player_b);
+        kb_tier.tier = 2;
+        world.write_model_test(@kb_tier);
 
         // Give player_a parcel 6 (col=1,row=1) as a non-home parcel.
         // Parcel 6 at (1,1) is adjacent to parcel 9 (4,1)? No.
@@ -451,5 +463,45 @@ mod tests {
 
         let target: Parcel = world.read_model(9_u32);
         assert(target.owner == player_a, 'stone cloak should win');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Index exceeds tier limit', 'ENTRYPOINT_FAILED'))]
+    fn test_polis_cannot_set_preset_1() {
+        let (mut world, conquest_sys, _, _, _) = conquest_setup();
+
+        // Create a fresh Polis player (tier 0) via write_model_test (no parcels needed)
+        let polis_player = deploy_user_salted(99);
+        let mut kp: PlayerKingdom = world.read_model(polis_player);
+        kp.registered = true;
+        kp.tier = 0;
+        world.write_model_test(@kp);
+
+        // Polis tier = 0, max 1 preset. Setting index 0 is ok, index 1 should fail.
+        starknet::testing::set_contract_address(polis_player);
+        conquest_sys.set_preset_defense(0, 2, 2, 2, 2, 2, 2);
+        conquest_sys.set_preset_defense(1, 2, 2, 2, 2, 2, 2); // should panic
+    }
+
+    #[test]
+    fn test_basileia_can_set_all_four_presets() {
+        let (mut world, conquest_sys, _, _, _) = conquest_setup();
+
+        // Create a Basileia player (tier 3) via write_model_test (no parcels needed)
+        let basileia_player = deploy_user_salted(100);
+        let mut kb: PlayerKingdom = world.read_model(basileia_player);
+        kb.registered = true;
+        kb.tier = 3;
+        world.write_model_test(@kb);
+
+        starknet::testing::set_contract_address(basileia_player);
+        conquest_sys.set_preset_defense(0, 2, 2, 2, 2, 2, 2);
+        conquest_sys.set_preset_defense(1, 2, 2, 2, 2, 2, 2);
+        conquest_sys.set_preset_defense(2, 2, 2, 2, 2, 2, 2);
+        conquest_sys.set_preset_defense(3, 2, 2, 2, 2, 2, 2);
+
+        let defense: PresetDefense = world.read_model(basileia_player);
+        assert(defense.preset_count == 4, 'should have 4 presets');
+        assert(defense.p3_p0 == 2, 'p3 slot 0 should be 2');
     }
 }
