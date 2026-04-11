@@ -5,4 +5,32 @@ description: The two-phase turn system.
 
 # Commit & reveal
 
-_Coming soon._
+_Swords drawn in secret. Plans revealed together. No one moves last._
+
+## Why commit-reveal?
+
+Both players must decide their moves without seeing the other's. If one player could watch the opponent's allocation land on-chain first, they would simply counter it and win every round. Commit-reveal makes the two moves **simultaneous in effect**: both sides lock in their choices before either one is revealed.
+
+## Commit phase
+
+Each player, locally:
+
+1. Picks a random **salt**.
+2. Computes `poseidon_hash([salt, ...allocation])` — the 14-element hash described in [Budget allocation](/rules/budget).
+3. Submits only the **hash** to the contract.
+
+The opponent can see that you committed, and can see the hash itself, but cannot see the underlying allocation. The salt keeps the hash preimage unguessable even for small allocation spaces.
+
+## Reveal phase
+
+Once both players have committed, each player reveals their full allocation plus their salt. The contract:
+
+1. Recomputes `poseidon_hash([salt, ...allocation])` from the revealed values.
+2. Checks that it equals the hash you submitted during commit.
+3. Proceeds with resolution only if both reveals verify.
+
+If you try to change your allocation between commit and reveal, the hash will not match and the reveal will fail.
+
+## Missed reveals
+
+If you commit but fail to reveal within the round's time window, you forfeit that round's actions — your allocation is treated as empty, your opponent's moves resolve against zero defense, and the match continues from there. Commit only when you are ready to see it through.
