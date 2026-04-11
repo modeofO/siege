@@ -40,7 +40,7 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  background: rgba(13, 11, 10, 0.55);
+  background: rgba(13, 11, 10, 0.32);
   pointer-events: none;
   z-index: 0;
 }
@@ -48,6 +48,40 @@ body::before {
 body > * {
   position: relative;
   z-index: 1;
+}
+
+/* --- Layout containers: let the desk background bleed through ---
+ * Vocs wraps its main layout in containers with solid `--vocs-color_background`
+ * and `--vocs-color_backgroundDark` fills that fully occlude the body's desk
+ * image. We can't flip the variables to transparent because code blocks, the
+ * search dialog, twoslash popups, callouts, and tabs all need the solid color
+ * for readability. So we target the layout wrappers specifically.
+ *
+ * Selectors verified by grepping site/docs/dist/assets/style-*.css after a build.
+ */
+
+/* Outer flex wrapper — no background, just a layout box */
+.vocs_DocsLayout_content {
+  background-color: transparent;
+}
+
+/* Left gutter strip — empty space next to the sidebar, let the desk show */
+.vocs_DocsLayout_gutterLeft {
+  background-color: transparent;
+}
+
+/* Top nav gutter — subtle frosted plate so the nav stays legible */
+.vocs_DocsLayout_gutterTop {
+  background-color: color-mix(in srgb, var(--vocs-color_background) 60%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+}
+
+/* Inner prose column — semi-transparent "plate" over the desk for readability */
+.vocs_Content {
+  background-color: rgba(13, 11, 10, 0.78);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
 }
 
 /* Shared panel utility — used by AbilityCard and ModifierCard */
