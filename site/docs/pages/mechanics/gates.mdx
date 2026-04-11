@@ -5,4 +5,28 @@ description: The three gates that defend your vault.
 
 # Gates
 
-_Coming soon._
+*Three gates stand between the enemy and your vault. Hold them, and the walls hold with them.*
+
+Three gates stand between you and the vault: **g0**, **g1**, and **g2** (west, center, east — pick a convention and stick with it). Each gate resolves its own attack and defense math independently every round. What happens at g0 has nothing to do with what happens at g1 unless a modifier or ability says otherwise.
+
+## How damage works
+
+Your attack at gate N is compared against the opponent's defense at gate N. Whatever attack isn't blocked by defense leaks through and becomes vault damage. That's the whole idea — each gate is a little tug-of-war, and the vault pays the difference.
+
+For the exact formula, see [Scoring & damage](/rules/scoring).
+
+## Defense isn't wasted
+
+Over-defending a gate doesn't deal damage back to the attacker. It doesn't earn you anything directly. But it does guarantee that no attack gets through at that gate, which is exactly what you want if you expect heavy pressure there. Stacking defense is a bet that the opponent is coming — a bet you'd rather make than lose.
+
+## Gates don't "break"
+
+Gates don't have HP. They aren't destroyed, they don't degrade between rounds, and you don't need to rebuild them. Damage that gets past a gate's defense passes straight through to the vault, round after round, as long as the attacker keeps pushing.
+
+## Modifiers and abilities change the math
+
+Every round, each gate rolls a modifier that can cap values, swap attack and defense, cancel damage entirely, or reflect it elsewhere. Abilities can push damage to its max, block it outright, or bypass gates altogether. Read the gates in context — the number you see isn't always the number that lands.
+
+- [Gate modifiers](/mechanics/modifiers) — what can happen at a gate this round
+- [Abilities](/mechanics/abilities) — cards that bend gate math
+- [Scoring & damage](/rules/scoring) — the formula that ties it all together

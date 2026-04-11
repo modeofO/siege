@@ -3,6 +3,15 @@ title: Gate modifiers
 description: Random modifiers that shape each round.
 ---
 
+import { ModifierCard } from '@/components/ModifierCard'
+import { MODIFIERS } from '@/data/modifiers'
+
 # Gate modifiers
 
-_Coming soon._
+*Some nights the stones remember. The gates are never quite the same twice.*
+
+Every round, each of the three gates independently rolls a single modifier via Cartridge's vRNG. Both players see all three modifiers before they allocate their budget — these are public information, and planning around them is most of the game. A modifier applies for that round only; when the next round begins, the gates roll again from scratch. Normal is by far the most common result, so most gates resolve exactly as you'd expect. The four "interesting" modifiers are what keep every round honest.
+
+## The five modifiers
+
+{MODIFIERS.map(m => <ModifierCard key={m.slug} modifier={m} />)}
