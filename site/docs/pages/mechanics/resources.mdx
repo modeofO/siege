@@ -5,4 +5,35 @@ description: The six resource tokens and what they do.
 
 # Resources
 
-_Coming soon._
+*Iron from the forge, stone from the quarry, ember from the grove. The same six bundles keep changing hands, round after round.*
+
+Siege has **six resource tokens**, all implemented as standard **ERC-20** with **0 decimals**. They live in your Cartridge wallet like any other on-chain token — they persist across matches, they're transferable between addresses, and you can trade them however you like outside the game.
+
+## How you earn them
+
+Resources are minted by the **resource nodes** on the map. At the end of each round, if you control a node, the contract mints **1 of each of that node's paired tokens** directly to your address. Controlling a node is the only way to earn resources — there is no faucet, no passive drip, no alternate source. See [Resource nodes](/mechanics/nodes) for how ownership and contests work.
+
+## The three node pairs
+
+Each node mints a specific pair of tokens:
+
+| Node   | Token 1 | Token 2 |
+| ------ | ------- | ------- |
+| Forge  | IRON    | LINEN   |
+| Quarry | STONE   | WOOD    |
+| Grove  | EMBER   | SEEDS   |
+
+A round where you own all three nodes mints you one of each of all six resources. A round where you hold nothing on the map mints you nothing.
+
+## What you spend them on
+
+Resources are the **crafting currency for abilities**. From the crafting interface you approve the exact tokens a recipe calls for, the contract burns them, and an [ability](/mechanics/abilities) token is minted to your wallet. Different recipes want different pairings — Iron and Wood for one ability type, Stone and Linen for another — so which nodes you contest shapes which abilities you can actually build.
+
+That's the whole loop, in both directions: you fight over nodes to earn resources, and you burn resources to craft abilities that help you fight more effectively.
+
+## The long game
+
+Because resources are real ERC-20 tokens in your wallet, they are the bridge between individual match outcomes and a **persistent inventory**. You don't lose them when a match ends — not the ones you won, not the ones you stockpiled. A bad round costs you the momentum of that round, but it doesn't erase the resources you've accumulated across every match before it. Over time, the tokens in your wallet are a record of every node you ever held.
+
+- [Resource nodes](/mechanics/nodes) — how nodes mint these tokens
+- [Abilities](/mechanics/abilities) — what you actually spend them on
