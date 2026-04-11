@@ -571,6 +571,81 @@ mod tests {
     }
 
     #[test]
+    #[should_panic(expected: ('Home protected by ally', 'ENTRYPOINT_FAILED'))]
+    fn test_pillage_blocked_by_ally_adjacency() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        starknet::testing::set_block_timestamp(1000);
+
+        world.write_model_test(@siege_dojo::models::match_state_1v1::MatchState1v1 {
+            match_id, player_a, player_b,
+            vault_a_hp: 30, vault_b_hp: 0,
+            current_round: 5,
+            status: siege_dojo::models::match_state::MatchStatus::Finished,
+        });
+        world_sys.settle_match(match_id);
+
+        // Put player_b in a faction with a third player (the ally)
+        let ally = contract_address_const::<0x999>();
+        world.write_model_test(@siege_dojo::models::faction::Faction {
+            faction_id: 1,
+            leader: player_b,
+            name: 'Guardians',
+            tag: 'GD',
+            member_count: 2,
+            created_at: 0,
+            dissolved: false,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: player_b,
+            faction_id: 1,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: ally,
+            faction_id: 1,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+
+        let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        let home_0: siege_dojo::models::parcel::Parcel = world.read_model(kingdom_b.home_0);
+
+        // Find an unclaimed parcel adjacent to home_0 and assign it to ally
+        let config: siege_dojo::models::world_config::WorldConfig = world.read_model(0_u8);
+        let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
+        let mut ally_parcel_id: u32 = 999999;
+        let mut p_search: u32 = 0;
+        while p_search < config.total_parcels {
+            if ally_parcel_id == 999999 {
+                let parcel: siege_dojo::models::parcel::Parcel = world.read_model(p_search);
+                if parcel.owner == zero_addr
+                    && siege_dojo::utils::hex::is_neighbor(
+                        parcel.col, parcel.row, home_0.col, home_0.row
+                    )
+                {
+                    ally_parcel_id = p_search;
+                }
+            }
+            p_search += 1;
+        };
+        assert(ally_parcel_id != 999999, 'no adjacent parcel to home');
+
+        let mut ally_parcel: siege_dojo::models::parcel::Parcel = world.read_model(ally_parcel_id);
+        ally_parcel.owner = ally;
+        world.write_model_test(@ally_parcel);
+
+        starknet::testing::set_contract_address(player_a);
+        world_sys.initiate_pillage(match_id, kingdom_b.home_0);
+    }
+
+    #[test]
     fn test_settle_match_draw_no_eligibility() {
         let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
 

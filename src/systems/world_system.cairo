@@ -750,6 +750,31 @@ pub mod world_system {
                 'No adjacency to parcel',
             );
 
+            // Faction pillage protection — if any faction ally borders the target home parcel, block
+            let target_member: FactionMember = world.read_model(parcel.owner);
+            if target_member.faction_id != 0 {
+                let config: WorldConfig = world.read_model(0_u8);
+                let mut p_iter: u32 = 0;
+                let mut protected = false;
+                while p_iter < config.total_parcels {
+                    if !protected {
+                        let ally_parcel: Parcel = world.read_model(p_iter);
+                        if ally_parcel.owner.is_non_zero() && ally_parcel.owner != parcel.owner {
+                            let ally_member: FactionMember = world.read_model(ally_parcel.owner);
+                            if ally_member.faction_id == target_member.faction_id {
+                                if siege_dojo::utils::hex::is_neighbor(
+                                    ally_parcel.col, ally_parcel.row, parcel.col, parcel.row
+                                ) {
+                                    protected = true;
+                                }
+                            }
+                        }
+                    }
+                    p_iter += 1;
+                };
+                assert(!protected, 'Home protected by ally');
+            }
+
             // Assert no active pillage on this home parcel
             let existing: Pillage = world.read_model(home_parcel_id);
             assert(!existing.active, 'Already being pillaged');
