@@ -1,0 +1,36 @@
+---
+title: Traps
+description: Setting traps on your nodes.
+---
+
+# Traps
+
+*The forge is quiet. Too quiet. Whoever picks up the hammer first leaves something behind.*
+
+Traps let you punish an opponent for taking a node away from you — but only at a node you already control, and only if you're willing to step back from the contest.
+
+## Cost and placement
+
+Trapping a node costs **2 budget points**, spent through the `trap0`, `trap1`, and `trap2` slots in your allocation array. Each slot corresponds to a node: `trap0` traps the Forge, `trap1` the Quarry, `trap2` the Grove.
+
+You can only trap a node you currently control. A trap slot spent on a node you don't own is wasted — the action does nothing.
+
+## The trade-off
+
+Trapping a node means you are **not contesting** that node this round. Your `nc` spend at that index is treated as zero regardless of what you wrote there, because you can't simultaneously defend your ownership and rig it to blow. Setting a trap is giving up the chance to re-contest — a bet that the opponent is coming to take the node from you.
+
+## Trigger
+
+If your opponent successfully takes the trapped node (wins the contest for that node this round), they take **5 direct vault damage** when the trap triggers. That damage bypasses their repair action entirely — it lands after repair resolves and isn't affected by any defense or healing for that round. See [Vault & repair](/mechanics/vault) for how repair normally absorbs damage.
+
+## One round only
+
+Traps are consumed at the end of the round whether they trigger or not. If you want continuous trap coverage, you have to re-place the trap every round — and pay the 2 points every round. There is no such thing as a standing trap.
+
+## Hidden until they fire
+
+Traps are part of the commit-reveal hash. Your opponent has no way to know a node is trapped until they take it and the trap goes off. The 14-element Poseidon hash commits to your full allocation, traps included. See [Commit & reveal](/rules/commit-reveal) for how hiding and revealing work.
+
+- [Resource nodes](/mechanics/nodes) — owning and contesting the nodes you trap
+- [Vault & repair](/mechanics/vault) — why trap damage bypasses repair
+- [Commit & reveal](/rules/commit-reveal) — how traps stay hidden

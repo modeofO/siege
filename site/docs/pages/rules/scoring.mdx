@@ -1,0 +1,45 @@
+---
+title: Scoring & damage
+description: How damage is calculated and applied.
+---
+
+# Scoring & damage
+
+_The gate holds, or it doesn't. The vault remembers either way._
+
+## Gate-by-gate resolution
+
+The 3 gates resolve independently. For each gate, your **pressure** (attack) is compared to your opponent's **defense** at the matching gate:
+
+- Base damage at a gate = `max(0, attack − defense)`.
+- Any excess attack beyond the defense becomes **vault damage**.
+
+A gate with attack less than or equal to defense deals nothing. A gate with far more attack than defense punches directly into the vault.
+
+## Modifiers transform the math
+
+Before damage is computed, each gate's modifier changes how the numbers behave. See [Modifiers](/mechanics/modifiers) for the full list.
+
+- **Normal** — no change.
+- **Narrow Pass** — both attack and defense at the gate are capped to 3.
+- **Mirror Gate** — attack and defense values are swapped.
+- **Deadlock** — the gate deals no damage, no matter what.
+- **Reflection** — damage that would land at this gate is redirected to the other gates.
+
+Modifiers are rolled at the start of the round and visible to both players before allocation, so your plan should already account for them.
+
+## Repair applies after damage
+
+You can put up to **3 points** into repair each round. Repair resolves **after** damage is applied, heals your vault, and is capped by the vault's maximum HP (50). Repair cannot save a vault that already hit 0 this round.
+
+## Traps bypass repair
+
+If you contest a node your opponent secretly trapped, you take **direct vault damage** that is not reduced by repair. Traps are resolved alongside the rest of the round but the damage they deal is post-repair and cannot be healed back in the same round. See [Traps](/mechanics/traps).
+
+## Abilities change the math
+
+Abilities spent during the round modify resolution in various ways — increasing damage, blocking it, bypassing gates, weakening the opponent, and more. See [Abilities](/mechanics/abilities) for the full catalog. Abilities apply during the resolution step alongside everything else.
+
+## Match end
+
+The moment a vault hits 0, the match ends and the surviving player wins. See [Goal & win condition](/rules/goal).

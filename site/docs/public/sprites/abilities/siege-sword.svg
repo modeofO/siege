@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<rect width="200" height="200" fill="#1a1714" rx="16"/>
+<defs><pattern id="d" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(18)"><circle cx=".75" cy=".75" r=".45" fill="white"/></pattern><mask id="m"><rect width="200" height="200" fill="url(#d)"/></mask></defs>
+<style>circle{fill:#dab85e}.g{fill:#9a9088}.r{fill:#b83030}</style>
+<path d="M100 18L110 120 100 132 90 120Z" fill="#dab85e" mask="url(#m)"/>
+<rect x="68" y="122" width="64" height="10" rx="3" class="g" mask="url(#m)"/>
+<rect x="94" y="132" width="12" height="30" rx="2" class="g" mask="url(#m)"/>
+<circle cx="100" cy="170" r="8" class="g" mask="url(#m)"/>
+<circle cx="100" cy="170" r="4" class="r" mask="url(#m)"/>
+<circle cx="86" cy="28" r="2" opacity=".7"/>
+<circle cx="114" cy="36" r="1.8" opacity=".6"/>
+<circle cx="84" cy="50" r="2" opacity=".5"/>
+<circle cx="116" cy="60" r="1.5" opacity=".5"/>
+<circle cx="82" cy="74" r="2.5" opacity=".4"/>
+<circle cx="118" cy="82" r="2" opacity=".45"/>
+<circle cx="80" cy="96" r="1.8" opacity=".35"/>
+<circle cx="120" cy="102" r="2" opacity=".35"/>
+<circle cx="78" cy="114" r="1.5" opacity=".25"/>
+<circle cx="122" cy="112" r="1.8" opacity=".28"/>
+<circle cx="76" cy="24" r="1" opacity=".2"/>
+<circle cx="124" cy="44" r="1.2" opacity=".18"/>
+<circle cx="74" cy="68" r="1" opacity=".15"/>
+<circle cx="126" cy="90" r="1" opacity=".15"/>
+<circle cx="60" cy="126" r="1.8" fill="#9a9088" opacity=".5"/>
+<circle cx="140" cy="124" r="1.5" fill="#9a9088" opacity=".4"/>
+<circle cx="56" cy="130" r="1.2" fill="#9a9088" opacity=".3"/>
+<circle cx="144" cy="128" r="1" fill="#9a9088" opacity=".25"/>
+<circle cx="108" cy="178" r="1.5" fill="#b83030" opacity=".5"/>
+<circle cx="92" cy="176" r="1.5" fill="#b83030" opacity=".4"/>
+<circle cx="112" cy="184" r="1" fill="#b83030" opacity=".3"/>
+</svg>

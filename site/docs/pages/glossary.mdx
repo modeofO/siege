@@ -1,0 +1,144 @@
+---
+title: Glossary
+description: Terms used throughout Siege.
+---
+
+# Glossary
+
+*A quartermaster's ledger of every word a commander must know.*
+
+Terms are listed alphabetically. If you arrived here from another page, click through the cross-links; most terms are explained in depth elsewhere.
+
+## A
+
+### Ability
+A single-use ERC-1155 token crafted from resources that applies a one-round mechanical effect during resolution. See: [Abilities](/mechanics/abilities).
+
+### Ability tier
+T1 and T2. Each of the 5 ability types has both a T1 (cheaper, weaker) and a T2 (costlier, stronger) variant. T2 crafting requires burning a T1 of the same type. See: [Abilities](/mechanics/abilities).
+
+### Allocation
+The 13-slot array a player fills each round: 3 attack (p0–p2), 3 defense (g0–g2), 1 repair, 3 node contests (nc0–nc2), 3 traps (trap0–trap2). See: [Budget allocation](/rules/budget).
+
+### Attack
+Budget committed to a specific gate (p0, p1, or p2) to deal damage through it. See: [Gates](/mechanics/gates).
+
+## B
+
+### Budget
+The shared pool of points each player spends every round across attack, defense, repair, node contests, and traps. It refreshes each round and grows with controlled nodes. See: [Budget allocation](/rules/budget).
+
+## C
+
+### Cartridge Controller
+A browser-based gasless Starknet wallet that uses passkeys and session keys to pre-approve gameplay actions. See: [Connect your wallet](/getting-started/connect-wallet).
+
+### Commit phase
+The first phase of each round. Each player submits a Poseidon hash of their allocation plus a random salt, keeping the allocation hidden. See: [Commit & reveal](/rules/commit-reveal).
+
+### Commitment
+The on-chain Poseidon hash submitted during the commit phase. See: [Commit & reveal](/rules/commit-reveal).
+
+### Contest
+Allocating budget to a node (nc0–nc2) to fight for control. Winner of the contest owns the node next round. See: [Resource nodes](/mechanics/nodes).
+
+## D
+
+### Deadlock
+A gate modifier in which neither side yields: no damage is dealt at that gate this round. See: [Gate modifiers](/mechanics/modifiers).
+
+### Defense
+Budget committed to a specific gate (g0, g1, or g2) to absorb incoming attack. See: [Gates](/mechanics/gates).
+
+## E
+
+### Ember Blast
+A vault-focused ability that deals direct damage to the enemy, bypassing their gates entirely. Costs ember and seeds. See: [Abilities](/mechanics/abilities).
+
+## F
+
+### Forge
+One of the three resource nodes. When controlled, it mints IRON and LINEN each round. See: [Resource nodes](/mechanics/nodes).
+
+### Fortify
+A defender-focused ability that strengthens every gate for a single round. Costs stone, linen, and wood. See: [Abilities](/mechanics/abilities).
+
+## G
+
+### Gate
+One of three chokepoints between the attacker and the vault (g0, g1, g2). Attack resolves against defense at each gate, with any overflow damaging the vault. See: [Gates](/mechanics/gates).
+
+### Gate modifier
+A random effect rolled by vRNG at the start of each round for each gate independently, changing how that gate resolves. See: [Gate modifiers](/mechanics/modifiers).
+
+### Grove
+One of the three resource nodes. When controlled, it mints EMBER and SEEDS each round. See: [Resource nodes](/mechanics/nodes).
+
+## H
+
+### Hex
+A disruption ability that reduces the opponent's total outgoing damage for a round. Costs iron, stone, and ember. See: [Abilities](/mechanics/abilities).
+
+## M
+
+### Mirror Gate
+A gate modifier that swaps the attack and defense values at that gate, turning aggression into defense and vice versa. See: [Gate modifiers](/mechanics/modifiers).
+
+## N
+
+### Narrow Pass
+A gate modifier that caps both attack and defense at 3, squeezing the fight at that chokepoint. See: [Gate modifiers](/mechanics/modifiers).
+
+### Node
+A contested resource site on the map — Forge, Quarry, or Grove. Controlling a node mints its paired resource tokens each round. See: [Resource nodes](/mechanics/nodes).
+
+### Normal
+The default gate modifier. Attack and defense resolve without alteration. See: [Gate modifiers](/mechanics/modifiers).
+
+## P
+
+### Poseidon hash
+A Starknet-native cryptographic hash function. Allocations are hashed as `poseidon([salt, ...allocation])` for commit-reveal. See: [Commit & reveal](/rules/commit-reveal).
+
+## Q
+
+### Quarry
+One of the three resource nodes. When controlled, it mints STONE and WOOD each round. See: [Resource nodes](/mechanics/nodes).
+
+## R
+
+### Reflection
+A gate modifier that causes damage at the affected gate to echo onto the other gates instead. See: [Gate modifiers](/mechanics/modifiers).
+
+### Repair
+Budget spent to heal the vault, up to a per-round cap. Does not heal trap damage or direct-damage abilities. See: [Vault & repair](/mechanics/vault).
+
+### Reveal phase
+The second phase of each round. Players reveal their salt and allocation; the contract verifies it matches their earlier commitment, then resolves the round. See: [Commit & reveal](/rules/commit-reveal).
+
+### Round
+One full cycle of commit, reveal, and resolution. Each match is a sequence of rounds that ends when a vault hits zero. See: [Round loop](/rules/round-loop).
+
+## S
+
+### Salt
+A random value prepended to the allocation before hashing in the commit phase. Prevents opponents from brute-forcing the commitment. See: [Commit & reveal](/rules/commit-reveal).
+
+### Siege Sword
+An attacker-focused ability that sets your pressure at one chosen gate to a fixed value. Costs iron and wood. See: [Abilities](/mechanics/abilities).
+
+### Stone Cloak
+A defender-focused ability that reduces all gate damage taken for one round. Costs stone and linen. See: [Abilities](/mechanics/abilities).
+
+## T
+
+### Trap
+A hidden device placed on a node you own. If the opponent takes that node, they take vault damage that cannot be repaired. Traps last one round and must be re-placed. See: [Traps](/mechanics/traps).
+
+## V
+
+### Vault HP
+Your health bar. It starts at 50 per match; when it reaches 0, you lose. Repair can heal it, but trap damage and Ember Blast bypass repair. See: [Vault & repair](/mechanics/vault).
+
+### vRNG
+Verifiable random number generation, provided by Cartridge, used to roll gate modifiers each round. See: [Gate modifiers](/mechanics/modifiers).

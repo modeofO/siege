@@ -1,0 +1,43 @@
+---
+title: Vault & repair
+description: Vault HP and the repair action.
+---
+
+# Vault & repair
+
+*The vault is the last room in the keep. When it empties, so does the match.*
+
+Your vault starts each match at **50 HP**. When it reaches **zero, you lose** — that's the whole win condition on the defensive side. Everything else in this page is about keeping that number above zero.
+
+## How damage accumulates
+
+Vault HP comes down from three different sources each round:
+
+- **Gate damage** — any attack that gets past a gate's defense (after [gate modifiers](/mechanics/modifiers) and abilities have resolved) bleeds into the vault.
+- **Ember Blast's direct damage** — the Ember Blast [ability](/mechanics/abilities) skips the gate layer entirely and hits the vault straight on.
+- **Trap triggers** — if you take a node the opponent [trapped](/mechanics/traps), the trap damages your vault when you walk into it.
+
+All three are added together when the round resolves. See [Scoring & damage](/rules/scoring) for the full order of operations.
+
+## Repair
+
+Alongside attack and defense, every round you can allocate up to **3 points** to the `repair` slot. Each point heals **1 HP**, up to the **50 HP cap** — you can never exceed max.
+
+Repair resolves **after damage is applied**, not before. So if you take 6 damage this round and repair for 3, the net swing on your vault is −3, not −6 followed by a full heal-back. Repair is patching the hole the round just punched.
+
+## What repair cannot fix
+
+Repair absorbs gate damage, but two sources slip past it:
+
+- **[Trap](/mechanics/traps) damage.** Walking into a trapped node lands after repair has already resolved — the trap fires on a vault that has already been patched, and your repair action can't catch it.
+- **Ember Blast's direct damage.** Ember Blast bypasses the gate layer *and* bypasses repair. It's the one ability in the game designed specifically to punch through a well-defended round. See [Abilities](/mechanics/abilities).
+
+## Why repair matters
+
+Repair exists to smooth out bad rounds. A round where the opponent pressures every gate and punches through for 6 damage can be reduced to 3 net damage with a full repair allocation — enough to keep you in the match.
+
+But repair is expensive. Three points into repair is three points you are **not** spending on attack, defense, or node contests. Over-repair and you'll heal the vault while slowly losing every gate and every node; under-repair and one bad round will end the match. Reading when a round is going to get ugly — and committing the repair points *before* the damage lands — is most of the defensive game.
+
+- [Scoring & damage](/rules/scoring) — the full damage resolution order
+- [Traps](/mechanics/traps) — why trap damage ignores repair
+- [Abilities](/mechanics/abilities) — Ember Blast and other vault-relevant abilities

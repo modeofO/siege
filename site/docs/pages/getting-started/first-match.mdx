@@ -1,0 +1,35 @@
+---
+title: Your first match
+description: Finding an opponent and playing your first round.
+---
+
+# Your first match
+
+*The gates are ready. Your opponent is chosen. Step forward.*
+
+## Creating a match
+
+In the game client, click **Create Match**. The client will mint a new match and give you a shareable link or match ID. Send it to your opponent and wait for them to join. Your wallet needs to be connected before you create the match.
+
+## Joining a match
+
+Open the match link your opponent sent you and confirm. You are in. Both players' wallets must be connected before a round can start.
+
+## Playing your first round
+
+1. **See the modifiers.** At the start of each round, each of the three gates independently rolls a modifier — Normal, Narrow Pass, Mirror Gate, Deadlock, or Reflection. Both players can see all three before allocating, so plan around them. Details in [Mechanics: modifiers](/mechanics/modifiers).
+2. **Allocate your budget.** You have 10 points to spend, plus any bonus from nodes you controlled last round. Split them across the 13-slot allocation: three attack pressure points, three gate defenses, repair, three node contests, and three trap slots. See [Rules: budget](/rules/budget) for the full breakdown.
+3. **Commit.** Your allocation is hashed with a random salt and submitted on-chain. Your opponent sees only the hash — never your actual plan. See [Rules: commit & reveal](/rules/commit-reveal).
+4. **Wait for the opponent.** Once they have committed too, the reveal phase opens.
+5. **Reveal.** Submit your allocation and salt. The contract checks the hash matches, runs scoring, and updates both vaults' HP.
+6. **Next round.** If both vaults are still standing, loop back to step 1.
+
+## What to expect
+
+A typical match runs three to six rounds. The first few will feel like you are discovering moves — there is a lot of information on screen between gates, modifiers, nodes, and traps. Take your time. Round timers are generous, and the commit-reveal flow means nothing is locked in until you press the button.
+
+## Next steps
+
+- Read the [rules](/rules/goal) for the full game.
+- Dive into the [Mechanics](/mechanics/gates) section for gates, nodes, traps, and abilities.
+- Keep the [glossary](/glossary) open whenever a term is unfamiliar.

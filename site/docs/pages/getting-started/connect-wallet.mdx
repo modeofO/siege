@@ -1,0 +1,31 @@
+---
+title: Connect your wallet
+description: How to connect a Cartridge Controller wallet.
+---
+
+# Connect your wallet
+
+*Every commander signs their orders. Here is how you seal yours.*
+
+## What is Cartridge Controller?
+
+Cartridge Controller is a browser-based wallet built for Starknet games. There is no extension to install — it runs directly in the browser. Signing uses passkeys (Face ID, Touch ID, or a hardware security key), and session keys let the game pre-approve a set of gameplay actions so you are not prompted to sign every move.
+
+## How to connect
+
+1. Open the game client.
+2. Click **Connect wallet**.
+3. Controller opens a popup asking you to create a new passkey or use an existing one.
+4. On first connect, your browser prompts you to create a passkey. On later connects, just approve.
+5. Done. The client shows your address in the top-right.
+
+## What a session covers
+
+When you connect, Controller creates a session that pre-approves the gameplay calls Siege needs — creating matches, committing your allocation, and revealing it. A single approval at the start of play covers an entire match, with no extra prompts per round. Cartridge's paymaster covers the gas, so you do not pay any fees to play.
+
+## Troubleshooting
+
+- **Popup blocked.** Allow popups for the site and click Connect again.
+- **Passkey creation failed.** Make sure your browser supports WebAuthn. Every modern browser does, but some corporate or hardened profiles disable it.
+- **Session expired.** Sessions rotate periodically for safety. Click Connect again to refresh — you will not lose any game state.
+- **Wrong address shown.** If you have more than one passkey on the device, Controller may pick the wrong one. Disconnect, reconnect, and choose the right credential in the popup.
