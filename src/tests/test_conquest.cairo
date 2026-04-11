@@ -644,4 +644,70 @@ mod tests {
         assert(defense.preset_count == 4, 'should have 4 presets');
         assert(defense.p3_p0 == 2, 'p3 slot 0 should be 2');
     }
+
+    #[test]
+    #[should_panic(expected: ("Cannot conquest faction ally", 'ENTRYPOINT_FAILED'))]
+    fn test_conquest_blocks_friendly_fire() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Put both players in the same faction
+        world.write_model_test(@siege_dojo::models::faction::Faction {
+            faction_id: 1,
+            leader: player_a,
+            name: 'TestClan',
+            tag: 'TC',
+            member_count: 2,
+            created_at: 0,
+            dissolved: false,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: player_a,
+            faction_id: 1,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: player_b,
+            faction_id: 1,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1);
+
+        let mut tp: siege_dojo::models::parcel::Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 0, 0);
+    }
+
+    #[test]
+    fn test_conquest_reinforcement_disabled_by_default() {
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1);
+
+        let kb: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
+        assert(!kb.faction_reinforcement_enabled, 'default off');
+
+        let mut tp: siege_dojo::models::parcel::Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb_mut = kb;
+        kb_mut.parcel_count += 1;
+        world.write_model_test(@kb_mut);
+
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 0, 0);
+
+        let target: siege_dojo::models::parcel::Parcel = world.read_model(9_u32);
+        assert(target.owner == player_a, 'attacker wins weak defense');
+    }
 }

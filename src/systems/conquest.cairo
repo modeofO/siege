@@ -35,6 +35,7 @@ pub mod conquest {
     use siege_dojo::models::player_kingdom::PlayerKingdom;
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::preset_defense::PresetDefense;
+    use siege_dojo::models::faction_member::FactionMember;
     use siege_dojo::utils::hex;
     use super::{IERC1155Dispatcher, IERC1155DispatcherTrait};
     use super::{ability_type_from_token, ability_tier_from_token};
@@ -136,6 +137,13 @@ pub mod conquest {
             assert(defender != attacker, 'Cannot attack own parcel');
             assert(!target.is_home, 'Cannot attack home parcel');
 
+            // Shared borders — can't conquest your own faction
+            let attacker_member: FactionMember = world.read_model(attacker);
+            let defender_member: FactionMember = world.read_model(defender);
+            if attacker_member.faction_id != 0 && attacker_member.faction_id == defender_member.faction_id {
+                panic!("Cannot conquest faction ally");
+            }
+
             // Attacker kingdom for adjacency + parcel cap check
             let atk_kingdom: PlayerKingdom = world.read_model(attacker);
             assert(atk_kingdom.registered, 'Not registered');
@@ -146,13 +154,50 @@ pub mod conquest {
             assert(non_home < cap, 'Parcel cap reached');
             let config: WorldConfig = world.read_model(0_u8);
             let mut has_adjacent = false;
+
+            // Check if defender wants reinforcement
+            let defender_kingdom: PlayerKingdom = world.read_model(defender);
+            let reinforcement_on = defender_kingdom.faction_reinforcement_enabled;
+            let defender_member_for_pool: FactionMember = world.read_model(defender);
+            let defender_faction_id = defender_member_for_pool.faction_id;
+
+            // Ally preset pool (up to 3 allies)
+            let mut ally_p0_1: u8 = 0; let mut ally_p1_1: u8 = 0; let mut ally_p2_1: u8 = 0;
+            let mut ally_g0_1: u8 = 0; let mut ally_g1_1: u8 = 0; let mut ally_g2_1: u8 = 0;
+            let mut ally_p0_2: u8 = 0; let mut ally_p1_2: u8 = 0; let mut ally_p2_2: u8 = 0;
+            let mut ally_g0_2: u8 = 0; let mut ally_g1_2: u8 = 0; let mut ally_g2_2: u8 = 0;
+            let mut ally_p0_3: u8 = 0; let mut ally_p1_3: u8 = 0; let mut ally_p2_3: u8 = 0;
+            let mut ally_g0_3: u8 = 0; let mut ally_g1_3: u8 = 0; let mut ally_g2_3: u8 = 0;
+            let mut ally_count: u8 = 0;
+
             let mut pi: u32 = 0;
             while pi < config.total_parcels {
-                if !has_adjacent {
-                    let parcel: Parcel = world.read_model(pi);
-                    if parcel.owner == attacker {
-                        if hex::is_neighbor(parcel.col, parcel.row, target.col, target.row) {
-                            has_adjacent = true;
+                let parcel_iter: Parcel = world.read_model(pi);
+                // Attacker adjacency
+                if !has_adjacent && parcel_iter.owner == attacker {
+                    if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+                        has_adjacent = true;
+                    }
+                }
+                // Faction ally reinforcement
+                if reinforcement_on && defender_faction_id != 0 && ally_count < 3 {
+                    if parcel_iter.owner.is_non_zero() && parcel_iter.owner != defender {
+                        let ally_member: FactionMember = world.read_model(parcel_iter.owner);
+                        if ally_member.faction_id == defender_faction_id {
+                            if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+                                let ally_defense: siege_dojo::models::preset_defense::PresetDefense = world.read_model(parcel_iter.owner);
+                                if ally_count == 0 {
+                                    ally_p0_1 = ally_defense.p0_p0; ally_p1_1 = ally_defense.p0_p1; ally_p2_1 = ally_defense.p0_p2;
+                                    ally_g0_1 = ally_defense.p0_g0; ally_g1_1 = ally_defense.p0_g1; ally_g2_1 = ally_defense.p0_g2;
+                                } else if ally_count == 1 {
+                                    ally_p0_2 = ally_defense.p0_p0; ally_p1_2 = ally_defense.p0_p1; ally_p2_2 = ally_defense.p0_p2;
+                                    ally_g0_2 = ally_defense.p0_g0; ally_g1_2 = ally_defense.p0_g1; ally_g2_2 = ally_defense.p0_g2;
+                                } else {
+                                    ally_p0_3 = ally_defense.p0_p0; ally_p1_3 = ally_defense.p0_p1; ally_p2_3 = ally_defense.p0_p2;
+                                    ally_g0_3 = ally_defense.p0_g0; ally_g1_3 = ally_defense.p0_g1; ally_g2_3 = ally_defense.p0_g2;
+                                }
+                                ally_count += 1;
+                            }
                         }
                     }
                 }
@@ -162,7 +207,7 @@ pub mod conquest {
 
             // Get defender's preset defense and select via VRF
             let defense: PresetDefense = world.read_model(defender);
-            assert(defense.preset_count > 0, 'No defense set');
+            assert(defense.preset_count + ally_count > 0, 'No defense set');
 
             // VRF selects preset index (0, 1, or 2)
             // Read VRF from ResourceConfig (same pattern as actions_1v1)
@@ -175,17 +220,29 @@ pub mod conquest {
             };
             let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
             let random_value: u256 = vrf.consume_random(Source::Nonce(starknet::get_contract_address())).into();
-            let preset_idx: u8 = (random_value % defense.preset_count.into()).try_into().unwrap();
+            let total_pool: u8 = defense.preset_count + ally_count;
+            let preset_idx: u8 = (random_value % total_pool.into()).try_into().unwrap();
 
-            // Read selected preset
-            let (def_p0, def_p1, def_p2, def_g0, def_g1, def_g2) = if preset_idx == 0 {
-                (defense.p0_p0, defense.p0_p1, defense.p0_p2, defense.p0_g0, defense.p0_g1, defense.p0_g2)
-            } else if preset_idx == 1 {
-                (defense.p1_p0, defense.p1_p1, defense.p1_p2, defense.p1_g0, defense.p1_g1, defense.p1_g2)
-            } else if preset_idx == 2 {
-                (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
+            // Read selected preset — defender slots first, then ally slots
+            let (def_p0, def_p1, def_p2, def_g0, def_g1, def_g2) = if preset_idx < defense.preset_count {
+                if preset_idx == 0 {
+                    (defense.p0_p0, defense.p0_p1, defense.p0_p2, defense.p0_g0, defense.p0_g1, defense.p0_g2)
+                } else if preset_idx == 1 {
+                    (defense.p1_p0, defense.p1_p1, defense.p1_p2, defense.p1_g0, defense.p1_g1, defense.p1_g2)
+                } else if preset_idx == 2 {
+                    (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
+                } else {
+                    (defense.p3_p0, defense.p3_p1, defense.p3_p2, defense.p3_g0, defense.p3_g1, defense.p3_g2)
+                }
             } else {
-                (defense.p3_p0, defense.p3_p1, defense.p3_p2, defense.p3_g0, defense.p3_g1, defense.p3_g2)
+                let ally_idx = preset_idx - defense.preset_count;
+                if ally_idx == 0 {
+                    (ally_p0_1, ally_p1_1, ally_p2_1, ally_g0_1, ally_g1_1, ally_g2_1)
+                } else if ally_idx == 1 {
+                    (ally_p0_2, ally_p1_2, ally_p2_2, ally_g0_2, ally_g1_2, ally_g2_2)
+                } else {
+                    (ally_p0_3, ally_p1_3, ally_p2_3, ally_g0_3, ally_g1_3, ally_g2_3)
+                }
             };
 
             // --- Apply attacker ability effects ---
