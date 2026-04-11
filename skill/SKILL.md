@@ -5,6 +5,8 @@ description: Development guide for Siege, an asymmetric turn-based strategy game
 
 # Siege Game Development
 
+> **Scope note.** This skill covers the **2v2 commit-reveal core** — `actions.cairo`, `commit_reveal.cairo`, `resolution.cairo`, the MCP server, and the `/match` frontend. Most active feature work now lives in **1v1 mode** (`*_1v1` contracts), **crafting/abilities**, and the **world metagame** (`world_system`, `conquest`, parcels, kingdoms, pillaging, reputation). For those, read `CLAUDE.md` at the repo root plus the relevant spec in `docs/superpowers/specs/` — this skill stays focused on the 2v2 flow so it remains load-bearing for the original architecture.
+
 ## Architecture Overview
 
 Siege is a 2v2 turn-based strategy game. Each team = 1 human + 1 AI agent. One attacks, one defends. Roles are secret. Each side has a vault (100 HP); first to 0 loses.
@@ -145,8 +147,17 @@ See [references/deployment.md](references/deployment.md) for current URLs, contr
 
 ## Key Design Decisions
 
-- **Dojo over raw Cairo**: Uses Dojo ECS for model storage and world contract. Chose Dojo v1.7.1/Cairo 2.13.1 for compatibility
+- **Dojo over raw Cairo**: Uses Dojo ECS for model storage and world contract. Current toolchain: Dojo v1.8.0, sozo v1.8.6, scarb 2.13.1, Cairo 2.13.1 (see repo-root `CLAUDE.md` for the full matrix and upgrade notes).
 - **Torii-first reads**: MCP server tries Torii GraphQL before falling back to direct RPC entity reads
 - **MCP server never holds keys**: It builds calldata; the agent submits txs via starknet-agentic session keys scoped to the game contract
 - **Simultaneous turns via commit-reveal**: Both teams commit hashed moves, then reveal. Prevents second-mover advantage
 - **Repair before damage**: In resolution, HP is restored first, then damage applied. This slightly favors defense
+
+## Pointers to neighbouring systems
+
+These live outside the scope of this skill but regularly interact with the 2v2 layer:
+
+- **1v1 mode** — `src/systems/actions_1v1.cairo`, `commit_reveal_1v1.cairo`, `resolution_1v1.cairo`. Same commit-reveal pattern but solo allocations, gate modifiers, traps, and ability effects. Budgets, HP, and hash layouts differ — do not port constants blindly.
+- **Crafting and abilities** — `src/systems/crafting_1v1.cairo` + `src/tokens/ability_token.cairo` (ERC-1155, 10 tokens across 2 tiers). Abilities mutate per-gate values and total damage inside `resolution_1v1`.
+- **World metagame** — `src/systems/world_system.cairo` (register player, staked matches, parcel claims, drip, pillage, kingdom upgrades) and `src/systems/conquest.cairo` (async preset-defense attacks via vRF). Models: `parcel`, `player_kingdom`, `preset_defense`, `player_reputation`, `match_record`, `match_stakes_1v1`, `pillage`, `pillage_eligibility`, `world_config`.
+- **Design specs** — `docs/superpowers/specs/` (reputation, ability tiers, conquest revisions, pillaging, alliances, game direction). These are usually more current than either this skill or `CLAUDE.md`.
