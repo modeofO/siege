@@ -20,6 +20,9 @@ pub mod models {
     pub mod match_record;
     pub mod pillage_eligibility;
     pub mod pillage;
+    pub mod faction;
+    pub mod faction_member;
+    pub mod faction_invite;
 }
 
 pub mod tokens;
@@ -61,4 +64,5 @@ pub mod tests {
     pub mod test_reputation;
     pub mod test_ability_tiers;
     pub mod test_pillaging;
+    pub mod test_factions;
 }

@@ -14,4 +14,5 @@ pub struct PlayerKingdom {
     pub last_drip_time: u64,
     pub tier: u8,
     pub total_wins: u32,
+    pub faction_reinforcement_enabled: bool,
 }
