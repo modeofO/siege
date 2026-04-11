@@ -31,8 +31,9 @@ There is no UI. To actually form, join, manage, or leave a faction today, a play
 
 | File | Change |
 |---|---|
+| `frontend/src/lib/worldState.ts` | Extend `usePlayerKingdom` and `PlayerKingdomData` to include `tier`, `totalWins`, and `factionReinforcementEnabled`. Current hook queries `registered / home_0-2 / parcel_count / free_craft_used` only; faction UI needs the tier and reinforcement toggle state. Extension is additive — no existing consumers break. |
 | `frontend/src/lib/factions.ts` | Add `useFactionMembers(factionId: number \| null)` hook that polls Torii for `FactionMember` rows matching the given faction_id. Mirrors the existing `useAllFactions` shape. |
-| `frontend/src/app/world/page.tsx` | Import `FactionPanel`, render it after the "Your Kingdom" card. Pass `{ account, address, kingdom, refresh }` as props. No other changes. |
+| `frontend/src/app/world/page.tsx` | Import `FactionPanel`, render it after the "Your Kingdom" card. Pass `{ account, address, kingdom, refresh }` as props. The `kingdom` prop already flows through (no wiring changes) — the extension in `worldState.ts` automatically provides `tier` and `factionReinforcementEnabled` on the existing object. |
 
 ### Component responsibilities
 
@@ -50,7 +51,7 @@ There is no UI. To actually form, join, manage, or leave a faction today, a play
 Read:   usePlayerFaction(address)   → { member, faction, cooldownRemaining }
         usePendingInvites(address)  → invites[]
 Props:  kingdom.tier
-        kingdom.faction_reinforcement_enabled
+        kingdom.factionReinforcementEnabled
 
 Branch:
   !member || member.factionId === 0   (player not currently in a faction)
@@ -86,7 +87,7 @@ Below the list: if `kingdom.tier >= 1`, also show the `⚔ FOUND A FACTION ⚔` 
 Main management panel. Top-to-bottom:
 
 1. **Header row** — faction name (serif gold), tag badge, `LED BY 0x12a4…8bfe`, member count.
-2. **Reinforcement toggle** — labeled row with on/off switch. Label `FACTION REINFORCEMENT`, description `Adjacent faction allies contribute a defense preset to conquest fights against your parcels.` Reads `kingdom.faction_reinforcement_enabled`, calls `setFactionReinforcement(account, next)` on change.
+2. **Reinforcement toggle** — labeled row with on/off switch. Label `FACTION REINFORCEMENT`, description `Adjacent faction allies contribute a defense preset to conquest fights against your parcels.` Reads `kingdom.factionReinforcementEnabled`, calls `setFactionReinforcement(account, next)` on change.
 3. **Member list** — one row per member from `useFactionMembers(faction.factionId)`. Row contents: truncated address, joined date, gold `★` leader badge, `[Kick]` button on the right (leader-only, excluded for self-row).
 4. **Invite form** — leader-only. Label `INVITE A PLAYER`, wallet-address text input, `[Invite]` button.
 5. **Leave button** — destructive treatment (red outline). Two-click confirmation pattern (see below).
@@ -164,7 +165,7 @@ Labeled row near the top of State 4:
 - Label `FACTION REINFORCEMENT`
 - Description `Adjacent faction allies contribute a defense preset to conquest fights against your parcels.`
 - Toggle switch on the right
-- Reads from `kingdom.faction_reinforcement_enabled`
+- Reads from `kingdom.factionReinforcementEnabled`
 - On change: calls `setFactionReinforcement(account, next)`, shows pending indicator on the switch until tx resolves, then calls `refresh()` so the `kingdom` prop re-reads
 
 ## Validation & error handling
@@ -227,16 +228,17 @@ Out of scope for v1 — may be follow-up sessions:
 
 Rough order for the implementation plan (will be detailed in a separate plan document):
 
-1. Add `useFactionMembers` hook to `lib/factions.ts`
-2. Scaffold `FactionPanel.tsx` with the four-state branch returning placeholder content per state
-3. Wire `FactionPanel` into `/world/page.tsx`
-4. Build State 1 (locked, trivial)
-5. Build State 2 (unaligned + create button), stub the modal
-6. Build `CreateFactionModal.tsx` (form, validation, cost display, submit)
-7. Build State 3 (invite list + accept buttons + cooldown handling)
-8. Build State 4 header + reinforcement toggle
-9. Build State 4 member list with leader badge
-10. Build State 4 kick buttons with two-click confirmation
-11. Build State 4 invite form
-12. Build State 4 leave button with two-click confirmation
-13. Final lint/typecheck pass on new files only (pre-existing lint debt is out of scope)
+1. Extend `usePlayerKingdom` in `lib/worldState.ts` to include `tier`, `totalWins`, `factionReinforcementEnabled`
+2. Add `useFactionMembers` hook to `lib/factions.ts`
+3. Scaffold `FactionPanel.tsx` with the four-state branch returning placeholder content per state
+4. Wire `FactionPanel` into `/world/page.tsx`
+5. Build State 1 (locked, trivial)
+6. Build State 2 (unaligned + create button), stub the modal
+7. Build `CreateFactionModal.tsx` (form, validation, cost display, submit)
+8. Build State 3 (invite list + accept buttons + cooldown handling)
+9. Build State 4 header + reinforcement toggle
+10. Build State 4 member list with leader badge
+11. Build State 4 kick buttons with two-click confirmation
+12. Build State 4 invite form
+13. Build State 4 leave button with two-click confirmation
+14. Final lint/typecheck pass on new files only (pre-existing lint debt is out of scope)
