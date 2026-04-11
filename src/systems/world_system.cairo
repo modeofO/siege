@@ -13,6 +13,12 @@ pub trait IWorldSystem<T> {
     fn upgrade_kingdom(ref self: T);
     fn initiate_pillage(ref self: T, match_id: u64, home_parcel_id: u32);
     fn claim_pillage_drip(ref self: T, home_parcel_id: u32);
+    fn create_faction(ref self: T, name: felt252, tag: felt252) -> u32;
+    fn invite_member(ref self: T, target: ContractAddress);
+    fn accept_invite(ref self: T, faction_id: u32);
+    fn leave_faction(ref self: T);
+    fn kick_member(ref self: T, target: ContractAddress);
+    fn set_faction_reinforcement(ref self: T, enabled: bool);
 }
 
 pub fn tier_ability_slots(tier: u8) -> u8 {
@@ -106,6 +112,9 @@ pub mod world_system {
     use siege_dojo::models::match_record::MatchRecord;
     use siege_dojo::models::pillage_eligibility::PillageEligibility;
     use siege_dojo::models::pillage::Pillage;
+    use siege_dojo::models::faction::{Faction, FactionCounter};
+    use siege_dojo::models::faction_member::FactionMember;
+    use siege_dojo::models::faction_invite::FactionInvite;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
     const PILLAGE_WINDOW: u64 = 86400; // 24 hours in seconds
@@ -843,6 +852,165 @@ pub mod world_system {
             }
 
             kingdom.tier = next;
+            world.write_model(@kingdom);
+        }
+
+        fn create_faction(ref self: ContractState, name: felt252, tag: felt252) -> u32 {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
+            assert(kingdom.tier >= 1, 'Strategos tier required');
+
+            let existing: FactionMember = world.read_model(caller);
+            assert(existing.faction_id == 0, 'Already in a faction');
+
+            // Burn formation cost: 30 Iron + 30 Stone + 20 Wood
+            let rc: ResourceConfig = world.read_model(0_u8);
+            super::burn_upgrade_resources(rc.iron, caller, 30);
+            super::burn_upgrade_resources(rc.stone, caller, 30);
+            super::burn_upgrade_resources(rc.wood, caller, 20);
+
+            // Allocate new faction ID
+            let mut counter: FactionCounter = world.read_model(0_u8);
+            counter.count += 1;
+            let new_id = counter.count;
+            world.write_model(@counter);
+
+            let now = get_block_timestamp();
+
+            world.write_model(@Faction {
+                faction_id: new_id,
+                leader: caller,
+                name,
+                tag,
+                member_count: 1,
+                created_at: now,
+                dissolved: false,
+            });
+
+            world.write_model(@FactionMember {
+                player: caller,
+                faction_id: new_id,
+                joined_at: now,
+                last_leave_time: 0,
+            });
+
+            new_id
+        }
+
+        fn invite_member(ref self: ContractState, target: ContractAddress) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let caller_member: FactionMember = world.read_model(caller);
+            assert(caller_member.faction_id != 0, 'Not in a faction');
+
+            let faction: Faction = world.read_model(caller_member.faction_id);
+            assert(caller == faction.leader, 'Not the leader');
+            assert(!faction.dissolved, 'Faction dissolved');
+            assert(target != caller, 'Cannot invite self');
+
+            let target_kingdom: PlayerKingdom = world.read_model(target);
+            assert(target_kingdom.registered, 'Target not registered');
+
+            world.write_model(@FactionInvite {
+                target,
+                faction_id: caller_member.faction_id,
+                invited_by: caller,
+                invited_at: get_block_timestamp(),
+                used: false,
+            });
+        }
+
+        fn accept_invite(ref self: ContractState, faction_id: u32) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            assert(faction_id > 0, 'Invalid faction id');
+
+            let mut invite: FactionInvite = world.read_model((caller, faction_id));
+            let zero_addr: ContractAddress = 0.try_into().unwrap();
+            assert(invite.invited_by != zero_addr, 'No invite');
+            assert(!invite.used, 'Invite already used');
+
+            let mut caller_member: FactionMember = world.read_model(caller);
+            assert(caller_member.faction_id == 0, 'Already in a faction');
+
+            let now = get_block_timestamp();
+            if caller_member.last_leave_time > 0 {
+                assert(now >= caller_member.last_leave_time + 86400, 'Leave cooldown active');
+            }
+
+            let mut faction: Faction = world.read_model(faction_id);
+            assert(!faction.dissolved, 'Faction dissolved');
+
+            caller_member.faction_id = faction_id;
+            caller_member.joined_at = now;
+            world.write_model(@caller_member);
+
+            faction.member_count += 1;
+            world.write_model(@faction);
+
+            invite.used = true;
+            world.write_model(@invite);
+        }
+
+        fn leave_faction(ref self: ContractState) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let mut member: FactionMember = world.read_model(caller);
+            assert(member.faction_id != 0, 'Not in a faction');
+
+            let mut faction: Faction = world.read_model(member.faction_id);
+            assert(!faction.dissolved, 'Already dissolved');
+
+            if caller == faction.leader {
+                faction.dissolved = true;
+            }
+
+            if faction.member_count > 0 {
+                faction.member_count -= 1;
+            }
+            world.write_model(@faction);
+
+            member.faction_id = 0;
+            member.last_leave_time = get_block_timestamp();
+            world.write_model(@member);
+        }
+
+        fn kick_member(ref self: ContractState, target: ContractAddress) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let caller_member: FactionMember = world.read_model(caller);
+            assert(caller_member.faction_id != 0, 'Not in a faction');
+
+            let mut faction: Faction = world.read_model(caller_member.faction_id);
+            assert(caller == faction.leader, 'Not the leader');
+
+            let mut target_member: FactionMember = world.read_model(target);
+            assert(target_member.faction_id == caller_member.faction_id, 'Target not in faction');
+            assert(target != caller, 'Cannot kick self');
+
+            target_member.faction_id = 0;
+            target_member.last_leave_time = get_block_timestamp();
+            world.write_model(@target_member);
+
+            if faction.member_count > 0 {
+                faction.member_count -= 1;
+            }
+            world.write_model(@faction);
+        }
+
+        fn set_faction_reinforcement(ref self: ContractState, enabled: bool) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            let mut kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
+            kingdom.faction_reinforcement_enabled = enabled;
             world.write_model(@kingdom);
         }
     }
