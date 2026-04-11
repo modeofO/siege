@@ -1,0 +1,68 @@
+/*
+ * Siege docs theme
+ * Port of frontend/src/app/globals.css — dark medieval war-room.
+ * Vocs auto-detects and imports this file.
+ */
+
+:root.dark {
+  /* Vocs built-ins → siege palette */
+  --vocs-color_background: #0d0b0a;
+  --vocs-color_background2: #1a1714;
+  --vocs-color_background3: #252019;
+  --vocs-color_border: #3d3428;
+  --vocs-color_text: #d4cfc6;
+  --vocs-color_text2: #7a7060;
+  --vocs-color_textAccent: #daa520;
+
+  /* Typography */
+  --vocs-fontFamily_default: 'Cinzel', 'Times New Roman', serif;
+  --vocs-fontFamily_mono: 'ui-monospace', 'SFMono-Regular', Menlo, monospace;
+
+  /* Custom siege vars for components */
+  --siege-color-accent: #b8860b;
+  --siege-color-parchment: #2a2318;
+  --siege-color-friendly: #c8a44e;
+  --siege-color-enemy: #c44332;
+  --siege-color-gold: #daa520;
+}
+
+/* Body background: desk image + dim overlay */
+body {
+  background-color: #0d0b0a;
+  background-image: url('/desk_preview.png');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: rgba(13, 11, 10, 0.55);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Shared panel utility — used by AbilityCard and ModifierCard */
+.panel-medieval {
+  background: linear-gradient(
+    135deg,
+    var(--vocs-color_background2) 0%,
+    var(--siege-color-parchment) 100%
+  );
+  border: 1px solid var(--vocs-color_border);
+  border-radius: 4px;
+  padding: 1rem;
+}
+
+/* Heading tweak: slightly more letter-spacing on display headings */
+.Vocs_H1, .Vocs_H2 {
+  letter-spacing: 0.02em;
+}
