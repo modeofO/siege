@@ -70,6 +70,22 @@ body > * {
   background-color: transparent;
 }
 
+/* Right gutter (outline/TOC + AI CTA column) — force transparent so the desk
+ * shows through. The gutter's own CSS has no background-color, but the
+ * AiCtaDropdown button inside it fills with var(--vocs-color_background),
+ * and anything else we nest here should stay legible without occluding. */
+.vocs_DocsLayout_gutterRight,
+.vocs_DocsLayout_gutterRight_withSidebar {
+  background-color: transparent;
+}
+
+/* "Ask in ChatGPT" CTA button — frosted plate instead of solid fill */
+.vocs_AiCtaDropdown_button {
+  background-color: color-mix(in srgb, var(--vocs-color_background) 55%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+}
+
 /* Top nav gutter — subtle frosted plate so the nav stays legible */
 .vocs_DocsLayout_gutterTop {
   background-color: color-mix(in srgb, var(--vocs-color_background) 60%, transparent);
@@ -77,9 +93,12 @@ body > * {
   backdrop-filter: blur(6px);
 }
 
-/* Inner prose column — semi-transparent "plate" over the desk for readability */
+/* Inner prose column — semi-transparent "plate" over the desk for readability.
+ * Dropped from 0.78 → 0.58 so the wood grain is faintly visible through the
+ * content. Text stays readable thanks to the Cinzel display face + Vocs's
+ * contrast-safe text colors. */
 .vocs_Content {
-  background-color: rgba(13, 11, 10, 0.78);
+  background-color: rgba(13, 11, 10, 0.58);
   -webkit-backdrop-filter: blur(2px);
   backdrop-filter: blur(2px);
 }
