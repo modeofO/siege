@@ -155,11 +155,11 @@ pub mod conquest {
             let config: WorldConfig = world.read_model(0_u8);
             let mut has_adjacent = false;
 
-            // Check if defender wants reinforcement
+            // Check if defender wants reinforcement. defender_member was already
+            // read above for the friendly-fire check — reuse it here.
             let defender_kingdom: PlayerKingdom = world.read_model(defender);
             let reinforcement_on = defender_kingdom.faction_reinforcement_enabled;
-            let defender_member_for_pool: FactionMember = world.read_model(defender);
-            let defender_faction_id = defender_member_for_pool.faction_id;
+            let defender_faction_id = defender_member.faction_id;
 
             // Ally preset pool (up to 3 allies)
             let mut ally_p0_1: u8 = 0; let mut ally_p1_1: u8 = 0; let mut ally_p2_1: u8 = 0;
@@ -179,7 +179,12 @@ pub mod conquest {
                         has_adjacent = true;
                     }
                 }
-                // Faction ally reinforcement
+                // Faction ally reinforcement.
+                // NOTE: entries are per-adjacent-parcel, not per-ally-player. An ally
+                // that owns multiple parcels bordering the target contributes their
+                // preset 0 once per adjacent parcel (up to the ally_count cap of 3).
+                // This is exercised by test_conquest_reinforcement_ally_contributes_to_pool.
+                // If per-ally dedup is desired in the future, track seen owners here.
                 if reinforcement_on && defender_faction_id != 0 && ally_count < 3 {
                     if parcel_iter.owner.is_non_zero() && parcel_iter.owner != defender {
                         let ally_member: FactionMember = world.read_model(parcel_iter.owner);

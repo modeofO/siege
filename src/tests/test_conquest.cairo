@@ -710,4 +710,165 @@ mod tests {
         let target: siege_dojo::models::parcel::Parcel = world.read_model(9_u32);
         assert(target.owner == player_a, 'attacker wins weak defense');
     }
+
+    // ── Task 8: Reinforcement pool — positive / guard / empty-pool tests ──
+
+    #[test]
+    fn test_conquest_reinforcement_ally_contributes_to_pool() {
+        // Defender opts in with ZERO own presets. An ally in the same faction
+        // owns a parcel adjacent to the target and has a strong preset 0. The
+        // mock VRF returns 0, defender_preset_count = 0, so preset_idx 0 falls
+        // into the ally slot — the ally's preset is what fights the attacker,
+        // and the attacker loses.
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Defender opts into faction reinforcement. No own presets.
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.faction_reinforcement_enabled = true;
+        world.write_model_test(@kb);
+
+        // Put defender + ally in the same faction (faction_id = 2).
+        let ally = deploy_user_salted(77);
+        world.write_model_test(@siege_dojo::models::faction::Faction {
+            faction_id: 2,
+            leader: ally,
+            name: 'Allied',
+            tag: 'AL',
+            member_count: 2,
+            created_at: 0,
+            dissolved: false,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: ally,
+            faction_id: 2,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: player_b,
+            faction_id: 2,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+
+        // Ally owns parcel 6 at (col=1,row=1), adjacent to target parcel 7 at (col=2,row=1).
+        // Parcel 6 is unclaimed after conquest_setup (only parcel 8 was assigned).
+        let mut ally_parcel: Parcel = world.read_model(6_u32);
+        ally_parcel.owner = ally;
+        world.write_model_test(@ally_parcel);
+
+        // Ally's preset 0: 4/4/4 attack, 0/0/0 defense (heavy counterattack).
+        world.write_model_test(@PresetDefense {
+            player: ally,
+            p0_p0: 4, p0_p1: 4, p0_p2: 4, p0_g0: 0, p0_g1: 0, p0_g2: 0,
+            p1_p0: 0, p1_p1: 0, p1_p2: 0, p1_g0: 0, p1_g1: 0, p1_g2: 0,
+            p2_p0: 0, p2_p1: 0, p2_p2: 0, p2_g0: 0, p2_g1: 0, p2_g2: 0,
+            p3_p0: 0, p3_p1: 0, p3_p2: 0, p3_g0: 0, p3_g1: 0, p3_g2: 0,
+            preset_count: 1,
+        });
+
+        // Give player_b parcel 7 at (2,1) as the target. Player_a already has
+        // parcel 2 (home at (2,0)) adjacent to parcel 7, so attacker adjacency holds.
+        let mut tp: Parcel = world.read_model(7_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb_parcel: PlayerKingdom = world.read_model(player_b);
+        kb_parcel.parcel_count += 1;
+        world.write_model_test(@kb_parcel);
+
+        let ka_before: PlayerKingdom = world.read_model(player_a);
+
+        // Attacker launches weak attack.
+        //   Ally preset (VRF-picked): p=4/4/4, g=0/0/0
+        //   Attacker:                 p=1/1/1, g=0/0/0
+        //   Damage to defender: (1-0)*3 = 3 → def_hp = 15-3 = 12
+        //   Damage to attacker: (4-0)*3 = 12 → atk_hp = 10-12 clamps to 0
+        //   0 < 12 → defender (ally) wins → attacker loses a parcel
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(7, 1, 1, 1, 0, 0, 0, 0, 0);
+
+        let target: Parcel = world.read_model(7_u32);
+        assert(target.owner == player_b, 'ally preset should defend');
+
+        let ka_after: PlayerKingdom = world.read_model(player_a);
+        assert(ka_after.parcel_count < ka_before.parcel_count, 'attacker should lose parcel');
+    }
+
+    #[test]
+    fn test_conquest_reinforcement_opt_in_without_faction() {
+        // Defender opts in but is NOT in a faction. The `defender_faction_id != 0`
+        // guard short-circuits the ally loop, so opt-in is a no-op and the
+        // defender's own presets handle the fight normally.
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.faction_reinforcement_enabled = true;
+        world.write_model_test(@kb);
+
+        starknet::testing::set_contract_address(player_b);
+        conquest_sys.set_preset_defense(0, 0, 0, 0, 1, 1, 1);
+
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb_mut: PlayerKingdom = world.read_model(player_b);
+        kb_mut.parcel_count += 1;
+        world.write_model_test(@kb_mut);
+
+        // Attacker wins via overwhelming attack on gate 0.
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 10, 0, 0, 0, 0, 0, 0, 0);
+
+        let target: Parcel = world.read_model(9_u32);
+        assert(target.owner == player_a, 'opt-in alone should not help');
+    }
+
+    #[test]
+    #[should_panic(expected: ('No defense set', 'ENTRYPOINT_FAILED'))]
+    fn test_conquest_reinforcement_empty_pool_panics() {
+        // Defender opts in AND is in a faction, but no faction ally owns a
+        // parcel adjacent to the target, and defender has no own presets.
+        // `defense.preset_count + ally_count == 0` → panic 'No defense set'.
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.faction_reinforcement_enabled = true;
+        world.write_model_test(@kb);
+
+        // Ally exists + is in the same faction, but owns no parcels.
+        let ally = deploy_user_salted(88);
+        world.write_model_test(@siege_dojo::models::faction::Faction {
+            faction_id: 3,
+            leader: ally,
+            name: 'Distant',
+            tag: 'DS',
+            member_count: 2,
+            created_at: 0,
+            dissolved: false,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: ally,
+            faction_id: 3,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: player_b,
+            faction_id: 3,
+            joined_at: 0,
+            last_leave_time: 0,
+        });
+
+        // Target is parcel 9 (player_a has adjacency via parcel 8).
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb_mut: PlayerKingdom = world.read_model(player_b);
+        kb_mut.parcel_count += 1;
+        world.write_model_test(@kb_mut);
+
+        // Defender has 0 presets, ally contributes nothing → panic.
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 1, 1, 1, 0, 0, 0, 0, 0);
+    }
 }
