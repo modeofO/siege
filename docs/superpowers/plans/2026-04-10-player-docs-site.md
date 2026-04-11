@@ -484,6 +484,8 @@ git commit -m "feat(site): port medieval war-room theme from frontend"
 - Create: `site/src/data/abilities.ts`
 - Create: `site/src/data/abilities.test.ts`
 
+**Scope update (2026-04-10):** The game now has **10 abilities** live on Sepolia — 5 T1 (IDs 1–5) and 5 T2 (IDs 6–10), each T2 a stronger variant of a T1 type. T2 crafting burns the matching T1. This task covers all 10. Source of truth: `CLAUDE.md` → "Abilities" section.
+
 - [ ] **Step 1: Write the failing test**
 
 File: `site/src/data/abilities.test.ts`
@@ -493,14 +495,15 @@ import { describe, it, expect } from 'vitest'
 import { ABILITIES, type Ability } from './abilities'
 
 describe('ABILITIES', () => {
-  it('contains exactly 5 T1 abilities', () => {
-    expect(ABILITIES).toHaveLength(5)
-    expect(ABILITIES.every(a => a.tier === 1)).toBe(true)
+  it('contains exactly 10 abilities (5 T1 + 5 T2)', () => {
+    expect(ABILITIES).toHaveLength(10)
+    expect(ABILITIES.filter(a => a.tier === 1)).toHaveLength(5)
+    expect(ABILITIES.filter(a => a.tier === 2)).toHaveLength(5)
   })
 
-  it('has unique IDs matching on-chain token IDs 1..5', () => {
+  it('has unique IDs matching on-chain token IDs 1..10', () => {
     const ids = ABILITIES.map(a => a.id).sort((a, b) => a - b)
-    expect(ids).toEqual([1, 2, 3, 4, 5])
+    expect(ids).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10])
   })
 
   it('has unique URL slugs', () => {
@@ -508,15 +511,29 @@ describe('ABILITIES', () => {
     expect(new Set(slugs).size).toBe(ABILITIES.length)
   })
 
-  it('includes all 5 named abilities', () => {
-    const names = ABILITIES.map(a => a.name).sort()
-    expect(names).toEqual([
-      'Ember Blast',
-      'Fortify',
-      'Hex',
-      'Siege Sword',
-      'Stone Cloak',
-    ])
+  it('includes all 5 type names at each tier', () => {
+    const expected = [
+      'Ember Blast', 'Fortify', 'Hex', 'Siege Sword', 'Stone Cloak',
+    ]
+    const t1 = ABILITIES.filter(a => a.tier === 1).map(a => a.name).sort()
+    const t2 = ABILITIES.filter(a => a.tier === 2).map(a => a.name).sort()
+    expect(t1).toEqual(expected)
+    expect(t2).toEqual(expected)
+  })
+
+  it('id ↔ type/tier relationship matches the on-chain helpers', () => {
+    // ability_type(id) = ((id - 1) % 5) + 1     → 1..5
+    // ability_tier(id) = Math.floor((id - 1) / 5) + 1   → 1 or 2
+    for (const a of ABILITIES) {
+      expect(((a.id - 1) % 5) + 1).toBe(a.type)
+      expect(Math.floor((a.id - 1) / 5) + 1).toBe(a.tier)
+    }
+  })
+
+  it('T1 never requires burning a T1; T2 always does', () => {
+    for (const a of ABILITIES) {
+      expect(a.requiresT1).toBe(a.tier === 2)
+    }
   })
 
   it('every ability has non-empty flavor, effect, and at least one cost', () => {
@@ -541,9 +558,17 @@ Expected: FAIL with "Cannot find module './abilities'" or similar.
 
 ```ts
 /**
- * Source of truth for T1 abilities.
- * Values come from CLAUDE.md's T1 ability table and the on-chain
- * AbilityToken contract (token IDs 1-5, currently live on Sepolia).
+ * Source of truth for abilities.
+ * Values come from CLAUDE.md's Abilities table and the on-chain
+ * AbilityToken contract (token IDs 1-10, currently live on Sepolia).
+ *
+ * 10 total abilities: 5 T1 (IDs 1-5) and 5 T2 (IDs 6-10). T2 is a
+ * stronger variant of each T1 type; T2 crafting burns 1 of the matching
+ * T1 in addition to its resource cost.
+ *
+ * Helpers matching the Cairo + TS sides:
+ *   ability_type(id) = ((id - 1) % 5) + 1   → 1..5
+ *   ability_tier(id) = ((id - 1) / 5) + 1   → 1 or 2
  */
 
 export type ResourceToken =
@@ -551,83 +576,185 @@ export type ResourceToken =
 
 export type ResourceCost = { token: ResourceToken; amount: number }
 
+/**
+ * The 5 distinct ability "types". Each type has a T1 and a T2 variant.
+ * Type is stable across tiers; tier controls power level + cost.
+ */
+export type AbilityType = 1 | 2 | 3 | 4 | 5
+
 export type Ability = {
-  id: number          // matches on-chain token ID
-  slug: string        // URL-safe, e.g. "siege-sword"
-  name: string
-  tier: 1 | 2 | 3
-  flavor: string      // one-line lore (tone B)
-  effect: string      // plain-English mechanical effect
+  id: number              // 1..10, matches on-chain token ID
+  type: AbilityType       // ((id - 1) % 5) + 1
+  slug: string            // URL-safe, unique per ability (e.g. "siege-sword", "siege-sword-t2")
+  name: string            // Display name (T1 and T2 share the same name)
+  tier: 1 | 2             // Math.floor((id - 1) / 5) + 1
+  flavor: string          // one-line lore (tone B)
+  effect: string          // plain-English mechanical effect
   cost: ResourceCost[]
-  iconPath: string    // path under docs/public
+  requiresT1: boolean     // true for every T2; crafting burns the matching T1
+  iconPath: string        // path under docs/public; T2 reuses T1's SVG
 }
 
 export const ABILITIES: Ability[] = [
+  // ─── T1 ───────────────────────────────────────────────
   {
     id: 1,
+    type: 1,
     slug: 'siege-sword',
     name: 'Siege Sword',
     tier: 1,
     flavor: 'Forged for one purpose: to find the crack in a gate.',
-    effect: 'Deals maximum damage (10) to one chosen gate.',
+    effect: 'Sets your attack on one chosen gate to 5.',
     cost: [
       { token: 'iron', amount: 3 },
       { token: 'wood', amount: 2 },
     ],
+    requiresT1: false,
     iconPath: '/sprites/abilities/siege-sword.svg',
   },
   {
     id: 2,
+    type: 2,
     slug: 'stone-cloak',
     name: 'Stone Cloak',
     tier: 1,
     flavor: 'Drape the walls in quarry-dust and weather the day.',
-    effect: 'Blocks all damage to every gate this round.',
+    effect: 'Halves all gate damage taken this round.',
     cost: [
       { token: 'stone', amount: 3 },
       { token: 'linen', amount: 2 },
     ],
+    requiresT1: false,
     iconPath: '/sprites/abilities/stone-cloak.svg',
   },
   {
     id: 3,
+    type: 3,
     slug: 'ember-blast',
     name: 'Ember Blast',
     tier: 1,
     flavor: 'Coals hurled past the gates, into the vault itself.',
-    effect: 'Deals 5 direct damage to the enemy vault, bypassing all gates.',
+    effect: 'Deals 2 direct damage to the enemy vault, bypassing all gates.',
     cost: [
       { token: 'ember', amount: 3 },
       { token: 'seeds', amount: 2 },
     ],
+    requiresT1: false,
     iconPath: '/sprites/abilities/ember-blast.svg',
   },
   {
     id: 4,
+    type: 4,
     slug: 'hex',
     name: 'Hex',
     tier: 1,
-    flavor: 'A quiet curse whispered over the opponent\'s ledger.',
-    effect: 'Reduces the opponent\'s budget by 7 this round.',
+    flavor: "A quiet curse whispered over the opponent's ledger.",
+    effect: "Reduces the opponent's total damage by 3 this round.",
     cost: [
       { token: 'iron', amount: 2 },
       { token: 'stone', amount: 2 },
       { token: 'ember', amount: 1 },
     ],
+    requiresT1: false,
     iconPath: '/sprites/abilities/hex.svg',
   },
   {
     id: 5,
+    type: 5,
     slug: 'fortify',
     name: 'Fortify',
     tier: 1,
     flavor: 'Brace every beam. Nothing comes through today.',
-    effect: 'Doubles all defense values this round.',
+    effect: 'Grants +1 defense at every gate this round.',
     cost: [
       { token: 'stone', amount: 2 },
       { token: 'linen', amount: 2 },
       { token: 'wood', amount: 1 },
     ],
+    requiresT1: false,
+    iconPath: '/sprites/abilities/fortify.svg',
+  },
+
+  // ─── T2 ───────────────────────────────────────────────
+  {
+    id: 6,
+    type: 1,
+    slug: 'siege-sword-t2',
+    name: 'Siege Sword',
+    tier: 2,
+    flavor: 'Twice-tempered steel. When it strikes, the gate has already fallen.',
+    effect: 'Sets your attack on one chosen gate to 10.',
+    cost: [
+      { token: 'iron', amount: 30 },
+      { token: 'wood', amount: 20 },
+      { token: 'ember', amount: 10 },
+    ],
+    requiresT1: true,
+    iconPath: '/sprites/abilities/siege-sword.svg',
+  },
+  {
+    id: 7,
+    type: 2,
+    slug: 'stone-cloak-t2',
+    name: 'Stone Cloak',
+    tier: 2,
+    flavor: 'Quarry and thread woven so tight the stones hold their breath.',
+    effect: 'Reduces all gate damage taken this round to zero.',
+    cost: [
+      { token: 'stone', amount: 30 },
+      { token: 'linen', amount: 20 },
+      { token: 'seeds', amount: 10 },
+    ],
+    requiresT1: true,
+    iconPath: '/sprites/abilities/stone-cloak.svg',
+  },
+  {
+    id: 8,
+    type: 3,
+    slug: 'ember-blast-t2',
+    name: 'Ember Blast',
+    tier: 2,
+    flavor: 'Not coals this time — a furnace loosed straight at the vault.',
+    effect: 'Deals 6 direct damage to the enemy vault, bypassing all gates.',
+    cost: [
+      { token: 'ember', amount: 30 },
+      { token: 'seeds', amount: 20 },
+      { token: 'iron', amount: 10 },
+    ],
+    requiresT1: true,
+    iconPath: '/sprites/abilities/ember-blast.svg',
+  },
+  {
+    id: 9,
+    type: 4,
+    slug: 'hex-t2',
+    name: 'Hex',
+    tier: 2,
+    flavor: 'Written in fire this time. The ledger burns before they can read it.',
+    effect: "Reduces the opponent's total damage by 8 this round.",
+    cost: [
+      { token: 'iron', amount: 20 },
+      { token: 'stone', amount: 20 },
+      { token: 'ember', amount: 10 },
+      { token: 'wood', amount: 10 },
+    ],
+    requiresT1: true,
+    iconPath: '/sprites/abilities/hex.svg',
+  },
+  {
+    id: 10,
+    type: 5,
+    slug: 'fortify-t2',
+    name: 'Fortify',
+    tier: 2,
+    flavor: 'Every beam doubled. Every stone doubled. A wall behind the wall.',
+    effect: 'Doubles all defense values this round.',
+    cost: [
+      { token: 'stone', amount: 20 },
+      { token: 'linen', amount: 20 },
+      { token: 'wood', amount: 10 },
+    ],
+    requiresT1: true,
     iconPath: '/sprites/abilities/fortify.svg',
   },
 ]
@@ -636,13 +763,18 @@ export const ABILITIES: Ability[] = [
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `cd site && npm test -- abilities`
-Expected: all 5 tests pass.
+Expected: all 7 tests pass.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Verify type-check is clean**
+
+Run: `cd site && npx tsc --noEmit`
+Expected: exit 0, no errors.
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add site/src/data/abilities.ts site/src/data/abilities.test.ts
-git commit -m "feat(site): add abilities data + integrity tests"
+git commit -m "feat(site): add abilities data (T1 + T2) with integrity tests"
 ```
 
 ---
