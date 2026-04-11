@@ -291,6 +291,7 @@ pub mod world_system {
                 last_drip_time: get_block_timestamp(),
                 tier: 0,
                 total_wins: 0,
+                faction_reinforcement_enabled: false,
             });
         }
 

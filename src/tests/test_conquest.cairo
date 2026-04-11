@@ -85,6 +85,9 @@ mod tests {
     use siege_dojo::tokens::ability_token::{
         AbilityToken, IAbilityTokenDispatcher, IAbilityTokenDispatcherTrait,
     };
+    use siege_dojo::models::faction::{m_Faction, m_FactionCounter};
+    use siege_dojo::models::faction_member::m_FactionMember;
+    use siege_dojo::models::faction_invite::m_FactionInvite;
     use super::{MockVrfProvider, MockAccount};
 
     fn deploy_mock_vrf() -> starknet::ContractAddress {
@@ -137,6 +140,10 @@ mod tests {
                 TestResource::Model(m_RoundTraps1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
                 TestResource::Model(m_ResourceConfig::TEST_CLASS_HASH),
+                TestResource::Model(m_Faction::TEST_CLASS_HASH),
+                TestResource::Model(m_FactionCounter::TEST_CLASS_HASH),
+                TestResource::Model(m_FactionMember::TEST_CLASS_HASH),
+                TestResource::Model(m_FactionInvite::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),

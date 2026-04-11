@@ -48,6 +48,9 @@ mod tests {
     use siege_dojo::models::player_reputation::m_PlayerReputation;
     use siege_dojo::models::match_record::m_MatchRecord;
     use siege_dojo::models::pillage_eligibility::m_PillageEligibility;
+    use siege_dojo::models::faction::{m_Faction, m_FactionCounter};
+    use siege_dojo::models::faction_member::m_FactionMember;
+    use siege_dojo::models::faction_invite::m_FactionInvite;
     use siege_dojo::models::pillage::m_Pillage;
     use siege_dojo::models::events::{
         e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished,
@@ -166,6 +169,10 @@ mod tests {
                 TestResource::Model(m_MatchRecord::TEST_CLASS_HASH),
                 TestResource::Model(m_PillageEligibility::TEST_CLASS_HASH),
                 TestResource::Model(m_Pillage::TEST_CLASS_HASH),
+                TestResource::Model(m_Faction::TEST_CLASS_HASH),
+                TestResource::Model(m_FactionCounter::TEST_CLASS_HASH),
+                TestResource::Model(m_FactionMember::TEST_CLASS_HASH),
+                TestResource::Model(m_FactionInvite::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
@@ -304,6 +311,7 @@ mod tests {
             last_drip_time: 0,
             tier: 2,
             total_wins: 7,
+            faction_reinforcement_enabled: false,
         };
         world.write_model_test(@kingdom);
 
@@ -333,6 +341,7 @@ mod tests {
             last_drip_time: 0,
             tier: 0,
             total_wins: 0,
+            faction_reinforcement_enabled: false,
         };
         world.write_model_test(@kingdom);
 
