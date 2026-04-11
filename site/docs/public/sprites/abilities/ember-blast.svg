@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+<rect width="200" height="200" fill="#1a1714" rx="16"/>
+<defs><pattern id="d" width="1.5" height="1.5" patternUnits="userSpaceOnUse" patternTransform="rotate(10)"><circle cx=".75" cy=".75" r=".42" fill="white"/></pattern><mask id="m"><rect width="200" height="200" fill="url(#d)"/></mask></defs>
+<style>.o{fill:#ff8844}.r{fill:#ff4455}.y{fill:#ffe040}</style>
+<path d="M100 22C108 58 132 68 128 100 142 78 150 94 140 132 152 118 160 134 142 166Q122 182 100 182 78 182 58 166C40 134 48 118 60 132 50 94 58 78 72 100 68 68 92 58 100 22Z" class="o" mask="url(#m)"/>
+<path d="M100 50C106 72 122 82 118 106 130 92 132 104 124 132Q112 166 100 166 88 166 76 132C68 104 70 92 82 106 78 82 94 72 100 50Z" class="r" opacity=".85" mask="url(#m)"/>
+<path d="M100 82C104 96 114 104 112 118Q106 148 100 148 94 148 88 118C86 104 96 96 100 82Z" class="y" mask="url(#m)"/>
+<circle cx="48" cy="56" r="2.5" class="o" opacity=".6"/>
+<circle cx="152" cy="52" r="2" class="o" opacity=".5"/>
+<circle cx="40" cy="90" r="2" class="o" opacity=".4"/>
+<circle cx="160" cy="86" r="1.8" class="o" opacity=".35"/>
+<circle cx="44" cy="124" r="1.5" class="o" opacity=".28"/>
+<circle cx="156" cy="128" r="1.5" class="o" opacity=".25"/>
+<circle cx="72" cy="38" r="1.5" class="r" opacity=".5"/>
+<circle cx="132" cy="42" r="1.5" class="r" opacity=".4"/>
+<circle cx="90" cy="14" r="1.8" class="y" opacity=".7"/>
+<circle cx="112" cy="10" r="1.5" class="y" opacity=".6"/>
+<circle cx="84" cy="6" r="1.2" class="y" opacity=".45"/>
+<circle cx="118" cy="16" r="2" class="y" opacity=".5"/>
+<circle cx="96" cy="2" r="1" class="y" opacity=".35"/>
+<circle cx="106" cy="4" r="1" class="o" opacity=".3"/>
+</svg>
