@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import {
   usePlayerFaction,
@@ -48,14 +49,25 @@ void truncAddr;
 export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
   const invites = usePendingInvites(address);
+  const [createModalOpen, setCreateModalOpen] = useState(false);
 
-  // Silence unused prop warnings on the scaffold — consumed in later tasks.
+  // Silence unused prop/hook warnings for scaffolded states still being built.
   void account;
   void worldSystemAddress;
   void refresh;
   void cooldownRemaining;
 
   const inFaction = member && member.factionId !== 0 && faction;
+
+  const openCreate = () => setCreateModalOpen(true);
+  const closeCreate = () => setCreateModalOpen(false);
+  const onCreated = () => {
+    setCreateModalOpen(false);
+    refresh();
+  };
+
+  // Silence unused-until-later callbacks.
+  void onCreated;
 
   if (inFaction) {
     return <InFactionView />;
@@ -69,7 +81,14 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
     return <PolisLockedView />;
   }
 
-  return <UnalignedView />;
+  return (
+    <>
+      <UnalignedView onCreate={openCreate} />
+      {createModalOpen && (
+        <CreateFactionPlaceholder onClose={closeCreate} />
+      )}
+    </>
+  );
 }
 
 function PolisLockedView() {
@@ -85,15 +104,25 @@ function PolisLockedView() {
   );
 }
 
-function UnalignedView() {
+interface UnalignedViewProps {
+  onCreate: () => void;
+}
+
+function UnalignedView({ onCreate }: UnalignedViewProps) {
   return (
-    <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
+    <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-4">
       <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
         Unaligned
       </div>
-      <div className="text-[11px] text-[#7a7060]">
-        (Unaligned + create — built in Task 5)
+      <div className="text-[11px] text-[#7a7060] leading-relaxed">
+        Form a faction to lead allies, or wait for an invitation. Faction leaders share borders with members and reinforce each other in conquest fights.
       </div>
+      <button
+        onClick={onCreate}
+        className="w-full py-3 rounded font-bold tracking-wider text-sm font-serif transition-all bg-[#daa520]/10 border-2 border-[#daa520] text-[#daa520] hover:bg-[#daa520]/20"
+      >
+        ⚔ FOUND A FACTION ⚔
+      </button>
     </div>
   );
 }
@@ -119,6 +148,28 @@ function InFactionView() {
       </div>
       <div className="text-[11px] text-[#7a7060]">
         (In-faction management — built in Tasks 8–12)
+      </div>
+    </div>
+  );
+}
+
+interface CreateFactionPlaceholderProps {
+  onClose: () => void;
+}
+
+function CreateFactionPlaceholder({ onClose }: CreateFactionPlaceholderProps) {
+  return (
+    <div className="fixed inset-0 bg-[#0d0b0a]/90 flex items-center justify-center z-50">
+      <div className="bg-[#1a1714] border border-[#3d3428] rounded-lg p-6 max-w-lg w-full mx-4 space-y-4">
+        <div className="text-center text-[#daa520] font-serif tracking-wider">
+          FOUND A FACTION (placeholder — Task 6)
+        </div>
+        <button
+          onClick={onClose}
+          className="w-full py-2 rounded text-xs tracking-wider bg-[#252019] text-[#7a7060] border border-[#3d3428] hover:text-[#d4cfc6]"
+        >
+          CLOSE
+        </button>
       </div>
     </div>
   );
