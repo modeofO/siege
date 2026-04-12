@@ -97,6 +97,9 @@ export interface PlayerKingdomData {
   home2: number;
   parcelCount: number;
   freeCraftUsed: boolean;
+  tier: number;
+  totalWins: number;
+  factionReinforcementEnabled: boolean;
 }
 
 export function usePlayerKingdom(playerAddress: string | null, refreshKey?: number) {
@@ -105,6 +108,9 @@ export function usePlayerKingdom(playerAddress: string | null, refreshKey?: numb
     home0: 0, home1: 0, home2: 0,
     parcelCount: 0,
     freeCraftUsed: false,
+    tier: 0,
+    totalWins: 0,
+    factionReinforcementEnabled: false,
   });
 
   useEffect(() => {
@@ -119,12 +125,16 @@ export function usePlayerKingdom(playerAddress: string | null, refreshKey?: numb
           home_2: string;
           parcel_count: string;
           free_craft_used: boolean;
+          tier: string;
+          total_wins: string;
+          faction_reinforcement_enabled: boolean;
         }>;
       }>(`
         query {
           siegeDojoPlayerKingdomModels(where: { player: "${playerAddress}" }) {
             edges { node {
               registered home_0 home_1 home_2 parcel_count free_craft_used
+              tier total_wins faction_reinforcement_enabled
             } }
           }
         }
@@ -139,6 +149,9 @@ export function usePlayerKingdom(playerAddress: string | null, refreshKey?: numb
           home2: toNum(node.home_2),
           parcelCount: toNum(node.parcel_count),
           freeCraftUsed: !!node.free_craft_used,
+          tier: toNum(node.tier),
+          totalWins: toNum(node.total_wins),
+          factionReinforcementEnabled: !!node.faction_reinforcement_enabled,
         });
       }
     };
