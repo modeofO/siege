@@ -38,7 +38,6 @@ const truncAddr = (a: string): string =>
 // Silence unused-import warnings for functions wired up in later tasks.
 // These are referenced here so ESLint doesn't flag the imports while we
 // scaffold the panel. They get used inside the state sub-views.
-void inviteMember;
 void leaveFaction;
 
 export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
@@ -281,6 +280,41 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
     }
   };
 
+  const [inviteTarget, setInviteTarget] = useState("");
+  const [inviteSubmitting, setInviteSubmitting] = useState(false);
+  const [inviteError, setInviteError] = useState("");
+  const [inviteSuccess, setInviteSuccess] = useState(false);
+
+  const validateInvite = (value: string): string | null => {
+    const v = value.trim();
+    if (!v) return "Address required.";
+    if (v.length < 3) return "Address too short.";
+    if (!/^0x[0-9a-fA-F]+$/.test(v)) return "Invalid address format.";
+    return null;
+  };
+
+  const handleInviteSubmit = async () => {
+    const validation = validateInvite(inviteTarget);
+    if (validation) {
+      setInviteError(validation);
+      return;
+    }
+    setInviteSubmitting(true);
+    setInviteError("");
+    setInviteSuccess(false);
+    try {
+      await inviteMember(account, inviteTarget.trim());
+      setInviteTarget("");
+      setInviteSuccess(true);
+      setTimeout(() => setInviteSuccess(false), 3000);
+    } catch (e) {
+      console.error("Invite member failed:", e);
+      setInviteError(e instanceof Error ? e.message : "Invite failed");
+    } finally {
+      setInviteSubmitting(false);
+    }
+  };
+
   const handleToggleReinforcement = async () => {
     setToggling(true);
     setToggleError("");
@@ -426,6 +460,38 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
           </div>
         )}
       </div>
+
+      {/* Leader-only: invite form */}
+      {isLeader && (
+        <div className="border-t border-[#3d3428] pt-3 space-y-2">
+          <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">
+            Invite a Player
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={inviteTarget}
+              onChange={(e) => { setInviteTarget(e.target.value); setInviteError(""); }}
+              placeholder="0x0123..."
+              disabled={inviteSubmitting}
+              className="flex-1 px-3 py-2 rounded bg-[#252019] border border-[#3d3428] text-[#d4cfc6] text-[11px] font-mono placeholder-[#3d3428] focus:outline-none focus:border-[#daa520]/50"
+            />
+            <button
+              onClick={handleInviteSubmit}
+              disabled={inviteSubmitting}
+              className="px-4 py-2 rounded text-[10px] font-bold tracking-wider border border-[#daa520] text-[#daa520] hover:bg-[#daa520]/10 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {inviteSubmitting ? "..." : "INVITE"}
+            </button>
+          </div>
+          {inviteError && (
+            <div className="text-[#ff3344] text-[10px]">{inviteError}</div>
+          )}
+          {inviteSuccess && (
+            <div className="text-[#4a7c59] text-[10px]">Invite sent.</div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
