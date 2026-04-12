@@ -24,22 +24,22 @@ const PARCEL_TYPE_NAMES: Record<number, string> = {
 
 const HEX_SIZE = 36; // radius in pixels
 
-// Flat-top hex: width = sqrt(3) * size, height = 2 * size
+// Pointy-top hex: width = sqrt(3) * size, height = 2 * size
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
 const HEX_HEIGHT = 2 * HEX_SIZE;
 
-// Even-row offset to pixel position (flat-top hex)
+// Even-row offset to pixel position (pointy-top hex)
 function hexToPixel(col: number, row: number): { x: number; y: number } {
   const x = col * HEX_WIDTH + (row % 2 === 1 ? HEX_WIDTH / 2 : 0);
   const y = row * (HEX_HEIGHT * 0.75);
   return { x, y };
 }
 
-// Flat-top hexagon points
+// Pointy-top hexagon points (vertices at top/bottom, flat edges left/right)
 function hexPoints(cx: number, cy: number): string {
   const points: string[] = [];
   for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 180) * (60 * i);
+    const angle = (Math.PI / 180) * (60 * i + 30);
     const px = cx + HEX_SIZE * Math.cos(angle);
     const py = cy + HEX_SIZE * Math.sin(angle);
     points.push(`${px},${py}`);

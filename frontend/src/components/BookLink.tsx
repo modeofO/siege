@@ -61,8 +61,8 @@ export function BookLink() {
       className="hidden lg:block group pointer-events-auto"
       style={{
         position: "fixed",
-        top: moving ? "50vh" : "5rem",
-        right: moving ? "auto" : "2rem",
+        top: moving ? "50vh" : "8rem",
+        right: moving ? "auto" : "0.5rem",
         left: moving ? "50vw" : "auto",
         transform: moving
           ? "translate(-50%, -50%) scale(1.6)"
@@ -73,7 +73,7 @@ export function BookLink() {
       }}
     >
       {/* Stacked sprites — each cross-fades in at its phase */}
-      <div className="relative w-56 xl:w-72">
+      <div className="relative w-40 xl:w-48">
         {/* Closed — base sprite, fades out once half takes over */}
         <img
           src="/sprites/book_preview.png"
