@@ -39,13 +39,10 @@ const truncAddr = (a: string): string =>
 // scaffold the panel. They get used inside the state sub-views.
 void useFactionMembers;
 void inviteMember;
-void acceptInvite;
 void leaveFaction;
 void kickMember;
 void setFactionReinforcement;
-void formatCooldown;
 void addrEq;
-void truncAddr;
 
 export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
@@ -54,7 +51,6 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
 
   // Silence unused prop/hook warnings for scaffolded states still being built.
   void worldSystemAddress;
-  void cooldownRemaining;
 
   const inFaction = member && member.factionId !== 0 && faction;
 
@@ -70,7 +66,25 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
   }
 
   if (invites.length > 0) {
-    return <InvitesView />;
+    return (
+      <>
+        <InvitesView
+          invites={invites}
+          account={account}
+          cooldownRemaining={cooldownRemaining}
+          canCreate={kingdom.tier >= 1}
+          onCreate={openCreate}
+          onAccepted={refresh}
+        />
+        {createModalOpen && (
+          <CreateFactionModal
+            account={account}
+            onClose={closeCreate}
+            onCreated={onCreated}
+          />
+        )}
+      </>
+    );
   }
 
   if (kingdom.tier < 1) {
@@ -127,15 +141,82 @@ function UnalignedView({ onCreate }: UnalignedViewProps) {
   );
 }
 
-function InvitesView() {
+interface InvitesViewProps {
+  invites: ReturnType<typeof usePendingInvites>;
+  account: AccountInterface;
+  cooldownRemaining: number;
+  canCreate: boolean;
+  onCreate: () => void;
+  onAccepted: () => void;
+}
+
+function InvitesView({ invites, account, cooldownRemaining, canCreate, onCreate, onAccepted }: InvitesViewProps) {
+  const [accepting, setAccepting] = useState<number | null>(null);
+  const [error, setError] = useState("");
+
+  const handleAccept = async (factionId: number) => {
+    setAccepting(factionId);
+    setError("");
+    try {
+      await acceptInvite(account, factionId);
+      onAccepted();
+    } catch (e) {
+      console.error("Accept invite failed:", e);
+      setError(e instanceof Error ? e.message : "Accept failed");
+    } finally {
+      setAccepting(null);
+    }
+  };
+
+  const cooldownLocked = cooldownRemaining > 0;
+
   return (
-    <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
+    <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-4">
       <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
         Pending Invites
       </div>
-      <div className="text-[11px] text-[#7a7060]">
-        (Invites list + accept — built in Task 7)
+
+      {cooldownLocked && (
+        <div className="text-[10px] text-[#daa520]/70 bg-[#daa520]/5 border border-[#daa520]/20 rounded px-2 py-1">
+          Leave cooldown active — {formatCooldown(cooldownRemaining)} remaining before you can accept an invite.
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {invites.map((inv) => (
+          <div
+            key={`${inv.factionId}-${inv.invitedBy}`}
+            className="flex items-center justify-between border border-[#3d3428] rounded p-2 bg-[#0d0b0a]/40"
+          >
+            <div className="text-[11px] text-[#d4cfc6]">
+              <div className="font-serif">Faction #{inv.factionId}</div>
+              <div className="text-[9px] text-[#7a7060]">
+                from {truncAddr(inv.invitedBy)}
+              </div>
+            </div>
+            <button
+              onClick={() => handleAccept(inv.factionId)}
+              disabled={cooldownLocked || accepting !== null}
+              className="px-3 py-1 rounded text-[10px] font-bold tracking-wider border border-[#daa520] text-[#daa520] hover:bg-[#daa520]/10 disabled:opacity-30 disabled:cursor-not-allowed"
+            >
+              {accepting === inv.factionId ? "..." : "ACCEPT"}
+            </button>
+          </div>
+        ))}
       </div>
+
+      {canCreate && (
+        <button
+          onClick={onCreate}
+          className="w-full py-2 rounded font-bold tracking-wider text-[11px] font-serif transition-all bg-[#252019] border border-[#3d3428] text-[#7a7060] hover:text-[#daa520] hover:border-[#daa520]/50"
+        >
+          Or found your own faction
+        </button>
+      )}
+
+      {error && (
+        <div className="text-[#ff3344] text-xs text-center">{error}</div>
+      )}
     </div>
   );
 }
