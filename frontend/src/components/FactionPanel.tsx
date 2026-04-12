@@ -14,6 +14,7 @@ import {
   formatCooldown,
 } from "@/lib/factions";
 import type { PlayerKingdomData } from "@/lib/worldState";
+import { CreateFactionModal } from "@/components/CreateFactionModal";
 
 interface FactionPanelProps {
   account: AccountInterface;
@@ -52,9 +53,7 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
   const [createModalOpen, setCreateModalOpen] = useState(false);
 
   // Silence unused prop/hook warnings for scaffolded states still being built.
-  void account;
   void worldSystemAddress;
-  void refresh;
   void cooldownRemaining;
 
   const inFaction = member && member.factionId !== 0 && faction;
@@ -65,9 +64,6 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
     setCreateModalOpen(false);
     refresh();
   };
-
-  // Silence unused-until-later callbacks.
-  void onCreated;
 
   if (inFaction) {
     return <InFactionView />;
@@ -85,7 +81,11 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
     <>
       <UnalignedView onCreate={openCreate} />
       {createModalOpen && (
-        <CreateFactionPlaceholder onClose={closeCreate} />
+        <CreateFactionModal
+          account={account}
+          onClose={closeCreate}
+          onCreated={onCreated}
+        />
       )}
     </>
   );
@@ -153,24 +153,3 @@ function InFactionView() {
   );
 }
 
-interface CreateFactionPlaceholderProps {
-  onClose: () => void;
-}
-
-function CreateFactionPlaceholder({ onClose }: CreateFactionPlaceholderProps) {
-  return (
-    <div className="fixed inset-0 bg-[#0d0b0a]/90 flex items-center justify-center z-50">
-      <div className="bg-[#1a1714] border border-[#3d3428] rounded-lg p-6 max-w-lg w-full mx-4 space-y-4">
-        <div className="text-center text-[#daa520] font-serif tracking-wider">
-          FOUND A FACTION (placeholder — Task 6)
-        </div>
-        <button
-          onClick={onClose}
-          className="w-full py-2 rounded text-xs tracking-wider bg-[#252019] text-[#7a7060] border border-[#3d3428] hover:text-[#d4cfc6]"
-        >
-          CLOSE
-        </button>
-      </div>
-    </div>
-  );
-}
