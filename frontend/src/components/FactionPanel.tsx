@@ -21,7 +21,6 @@ interface FactionPanelProps {
   account: AccountInterface;
   address: string;
   kingdom: PlayerKingdomData;
-  worldSystemAddress: string;
   refresh: () => void;
 }
 
@@ -35,13 +34,10 @@ const addrEq = (a: string | undefined, b: string | undefined): boolean => {
 const truncAddr = (a: string): string =>
   a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : (a || "");
 
-export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
+export function FactionPanel({ account, address, kingdom, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
   const invites = usePendingInvites(address);
   const [createModalOpen, setCreateModalOpen] = useState(false);
-
-  // Silence unused prop/hook warnings for scaffolded states still being built.
-  void worldSystemAddress;
 
   const inFaction = member && member.factionId !== 0 && faction;
 

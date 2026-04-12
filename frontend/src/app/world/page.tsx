@@ -162,7 +162,6 @@ export default function WorldPage() {
           account={account}
           address={address}
           kingdom={kingdom}
-          worldSystemAddress={WORLD_SYSTEM_ADDRESS}
           refresh={refresh}
         />
       )}
