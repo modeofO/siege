@@ -20,10 +20,12 @@ pub trait IAbilityToken<T> {
     fn mint(ref self: T, to: ContractAddress, token_id: u256, amount: u256);
     fn burn(ref self: T, from: ContractAddress, token_id: u256, amount: u256);
     fn set_minter(ref self: T, new_minter: ContractAddress);
+    fn set_minter2(ref self: T, new_minter2: ContractAddress);
     fn set_burner(ref self: T, new_burner: ContractAddress);
     fn set_ability_svg(ref self: T, ability_type: u8, svg: ByteArray);
     fn admin(self: @T) -> ContractAddress;
     fn minter(self: @T) -> ContractAddress;
+    fn minter2(self: @T) -> ContractAddress;
     fn burner(self: @T) -> ContractAddress;
 }
 
@@ -63,6 +65,7 @@ pub mod AbilityToken {
         src5: SRC5Component::Storage,
         admin_address: ContractAddress,
         minter_address: ContractAddress,
+        minter2_address: ContractAddress,
         burner_address: ContractAddress,
         ability_svgs: Map<u8, ByteArray>,
     }
@@ -104,7 +107,11 @@ pub mod AbilityToken {
     #[abi(embed_v0)]
     impl AbilityTokenImpl of super::IAbilityToken<ContractState> {
         fn mint(ref self: ContractState, to: ContractAddress, token_id: u256, amount: u256) {
-            assert(get_caller_address() == self.minter_address.read(), 'Not minter');
+            let caller = get_caller_address();
+            assert(
+                caller == self.minter_address.read() || caller == self.minter2_address.read(),
+                'Not minter',
+            );
             self.erc1155.mint_with_acceptance_check(to, token_id, amount, array![].span());
         }
 
@@ -120,6 +127,11 @@ pub mod AbilityToken {
         fn set_minter(ref self: ContractState, new_minter: ContractAddress) {
             assert(get_caller_address() == self.admin_address.read(), 'Not admin');
             self.minter_address.write(new_minter);
+        }
+
+        fn set_minter2(ref self: ContractState, new_minter2: ContractAddress) {
+            assert(get_caller_address() == self.admin_address.read(), 'Not admin');
+            self.minter2_address.write(new_minter2);
         }
 
         fn set_burner(ref self: ContractState, new_burner: ContractAddress) {
@@ -139,6 +151,10 @@ pub mod AbilityToken {
 
         fn minter(self: @ContractState) -> ContractAddress {
             self.minter_address.read()
+        }
+
+        fn minter2(self: @ContractState) -> ContractAddress {
+            self.minter2_address.read()
         }
 
         fn burner(self: @ContractState) -> ContractAddress {
