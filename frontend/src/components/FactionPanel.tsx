@@ -35,11 +35,6 @@ const addrEq = (a: string | undefined, b: string | undefined): boolean => {
 const truncAddr = (a: string): string =>
   a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : (a || "");
 
-// Silence unused-import warnings for functions wired up in later tasks.
-// These are referenced here so ESLint doesn't flag the imports while we
-// scaffold the panel. They get used inside the state sub-views.
-void leaveFaction;
-
 export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
   const invites = usePendingInvites(address);
@@ -315,6 +310,35 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
     }
   };
 
+  const [leavePending, setLeavePending] = useState(false);
+  const [leaveSubmitting, setLeaveSubmitting] = useState(false);
+  const [leaveError, setLeaveError] = useState("");
+
+  const handleLeaveRequest = () => {
+    setLeaveError("");
+    setLeavePending(true);
+  };
+
+  const handleLeaveCancel = () => {
+    setLeavePending(false);
+  };
+
+  const handleLeaveConfirm = async () => {
+    if (leaveSubmitting) return;
+    setLeaveSubmitting(true);
+    setLeaveError("");
+    try {
+      await leaveFaction(account);
+      setLeavePending(false);
+      refresh();
+    } catch (e) {
+      console.error("Leave faction failed:", e);
+      setLeaveError(e instanceof Error ? e.message : "Leave failed");
+    } finally {
+      setLeaveSubmitting(false);
+    }
+  };
+
   const handleToggleReinforcement = async () => {
     setToggling(true);
     setToggleError("");
@@ -492,6 +516,45 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
           )}
         </div>
       )}
+
+      {/* Leave faction (all members) */}
+      <div className="border-t border-[#3d3428] pt-3 space-y-2">
+        {!leavePending ? (
+          <button
+            onClick={handleLeaveRequest}
+            className="w-full py-2 rounded text-[11px] font-bold tracking-wider border border-[#ff3344]/40 text-[#ff3344]/80 hover:bg-[#ff3344]/5 hover:border-[#ff3344]"
+          >
+            LEAVE FACTION
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <div className="text-[10px] text-[#ff3344]/80 text-center">
+              {isLeader
+                ? "Confirm leave · This will DISSOLVE the faction for all members"
+                : "Confirm leave · 24h cooldown before rejoining any faction"}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleLeaveConfirm}
+                disabled={leaveSubmitting}
+                className="flex-1 py-2 rounded text-[10px] font-bold tracking-wider border border-[#ff3344] text-[#ff3344] hover:bg-[#ff3344]/10 disabled:opacity-30"
+              >
+                {leaveSubmitting ? "LEAVING..." : "CONFIRM LEAVE"}
+              </button>
+              <button
+                onClick={handleLeaveCancel}
+                disabled={leaveSubmitting}
+                className="px-4 py-2 rounded text-[10px] text-[#7a7060] border border-[#3d3428] hover:text-[#d4cfc6] disabled:opacity-30"
+              >
+                CANCEL
+              </button>
+            </div>
+          </div>
+        )}
+        {leaveError && (
+          <div className="text-[#ff3344] text-[10px] text-center">{leaveError}</div>
+        )}
+      </div>
     </div>
   );
 }
