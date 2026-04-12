@@ -78,8 +78,8 @@ function PolisLockedView() {
       <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
         Factions
       </div>
-      <div className="text-[11px] text-[#7a7060]">
-        (Polis locked — built in Task 4)
+      <div className="text-[11px] text-[#7a7060] leading-relaxed">
+        Reach <span className="text-[#daa520] font-bold">Strategos</span> tier to form or join a faction. Factions share borders, reinforce each other in conquest fights, and pool contributions toward campaign objectives.
       </div>
     </div>
   );
