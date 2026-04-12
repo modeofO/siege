@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
 import {
   usePlayerFaction,
@@ -40,7 +40,6 @@ const truncAddr = (a: string): string =>
 // scaffold the panel. They get used inside the state sub-views.
 void inviteMember;
 void leaveFaction;
-void kickMember;
 
 export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
@@ -241,6 +240,47 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
   const [toggleError, setToggleError] = useState("");
   const members = useFactionMembers(faction.factionId);
 
+  // target address currently in "confirm kick" state, or null
+  const [kickPending, setKickPending] = useState<string | null>(null);
+  const [kickSubmitting, setKickSubmitting] = useState<string | null>(null);
+  const [kickError, setKickError] = useState<{ target: string; message: string } | null>(null);
+
+  // Auto-revert kick confirmation after 5 seconds — unless a submission is in flight.
+  useEffect(() => {
+    if (!kickPending) return;
+    if (kickSubmitting === kickPending) return;
+    const t = setTimeout(() => setKickPending(null), 5000);
+    return () => clearTimeout(t);
+  }, [kickPending, kickSubmitting]);
+
+  const handleKickRequest = (target: string) => {
+    setKickError(null);
+    setKickPending(target);
+  };
+
+  const handleKickCancel = () => {
+    setKickPending(null);
+  };
+
+  const handleKickConfirm = async (target: string) => {
+    if (kickSubmitting) return;
+    setKickSubmitting(target);
+    setKickError(null);
+    try {
+      await kickMember(account, target);
+      setKickPending(null);
+      refresh();
+    } catch (e) {
+      console.error("Kick member failed:", e);
+      setKickError({
+        target,
+        message: e instanceof Error ? e.message : "Kick failed",
+      });
+    } finally {
+      setKickSubmitting(null);
+    }
+  };
+
   const handleToggleReinforcement = async () => {
     setToggling(true);
     setToggleError("");
@@ -330,21 +370,56 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
               return (
                 <div
                   key={m.player}
-                  className="flex items-center justify-between px-2 py-1.5 rounded border border-[#3d3428] bg-[#0d0b0a]/40"
+                  className="px-2 py-1.5 rounded border border-[#3d3428] bg-[#0d0b0a]/40"
                 >
-                  <div className="flex items-center gap-2">
-                    {isMemberLeader && (
-                      <span className="text-[#daa520] text-[11px]" title="Faction leader">★</span>
-                    )}
-                    <span className="text-[11px] text-[#d4cfc6] font-mono">
-                      {truncAddr(m.player)}
-                    </span>
-                    {isSelf && (
-                      <span className="text-[9px] text-[#7a7060] tracking-wider uppercase">
-                        you
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {isMemberLeader && (
+                        <span className="text-[#daa520] text-[11px]" title="Faction leader">★</span>
+                      )}
+                      <span className="text-[11px] text-[#d4cfc6] font-mono">
+                        {truncAddr(m.player)}
                       </span>
+                      {isSelf && (
+                        <span className="text-[9px] text-[#7a7060] tracking-wider uppercase">
+                          you
+                        </span>
+                      )}
+                    </div>
+                    {isLeader && !isSelf && (
+                      <div className="flex items-center gap-1">
+                        {kickPending === m.player ? (
+                          <>
+                            <button
+                              onClick={() => handleKickConfirm(m.player)}
+                              disabled={kickSubmitting === m.player}
+                              className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider border border-[#ff3344] text-[#ff3344] hover:bg-[#ff3344]/10 disabled:opacity-30"
+                            >
+                              {kickSubmitting === m.player ? "..." : "CONFIRM"}
+                            </button>
+                            <button
+                              onClick={handleKickCancel}
+                              disabled={kickSubmitting === m.player}
+                              className="px-2 py-0.5 rounded text-[9px] text-[#7a7060] hover:text-[#d4cfc6] disabled:opacity-30"
+                              aria-label="Cancel kick"
+                            >
+                              ✕
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleKickRequest(m.player)}
+                            className="px-2 py-0.5 rounded text-[9px] font-bold tracking-wider border border-[#3d3428] text-[#7a7060] hover:border-[#ff3344] hover:text-[#ff3344]"
+                          >
+                            KICK
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
+                  {kickError && addrEq(kickError.target, m.player) && (
+                    <div className="text-[#ff3344] text-[9px] mt-1">{kickError.message}</div>
+                  )}
                 </div>
               );
             })}
