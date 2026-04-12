@@ -285,6 +285,49 @@ export function useAllFactions(): FactionData[] {
   return data;
 }
 
+export function useFactionMembers(factionId: number | null): FactionMemberData[] {
+  const [data, setData] = useState<FactionMemberData[]>([]);
+
+  useEffect(() => {
+    if (!factionId || factionId <= 0) return;
+
+    const doFetch = async () => {
+      const result = await toriiQuery<{
+        siegeDojoFactionMemberModels: GraphEdges<{
+          player: string;
+          faction_id: string;
+          joined_at: string;
+          last_leave_time: string;
+        }>;
+      }>(`
+        query {
+          siegeDojoFactionMemberModels(first: 1000) {
+            edges { node { player faction_id joined_at last_leave_time } }
+          }
+        }
+      `);
+
+      const entries = (result?.siegeDojoFactionMemberModels?.edges || [])
+        .map((e) => ({
+          player: e.node.player,
+          factionId: toNum(e.node.faction_id),
+          joinedAt: toNum(e.node.joined_at),
+          lastLeaveTime: toNum(e.node.last_leave_time),
+        }))
+        .filter((m) => m.factionId === factionId);
+
+      entries.sort((a, b) => a.joinedAt - b.joinedAt);
+      setData(entries);
+    };
+
+    const t = setTimeout(() => { void doFetch(); }, 0);
+    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [factionId]);
+
+  return data;
+}
+
 function strToFelt(s: string): string {
   let hex = "";
   for (let i = 0; i < s.length && i < 31; i++) {
