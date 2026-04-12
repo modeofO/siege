@@ -12,6 +12,8 @@ import {
   kickMember,
   setFactionReinforcement,
   formatCooldown,
+  type FactionData,
+  type FactionMemberData,
 } from "@/lib/factions";
 import type { PlayerKingdomData } from "@/lib/worldState";
 import { CreateFactionModal } from "@/components/CreateFactionModal";
@@ -41,8 +43,6 @@ void useFactionMembers;
 void inviteMember;
 void leaveFaction;
 void kickMember;
-void setFactionReinforcement;
-void addrEq;
 
 export function FactionPanel({ account, address, kingdom, worldSystemAddress, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
@@ -61,8 +61,17 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
     refresh();
   };
 
-  if (inFaction) {
-    return <InFactionView />;
+  if (inFaction && faction && member) {
+    return (
+      <InFactionView
+        account={account}
+        address={address}
+        faction={faction}
+        member={member}
+        kingdom={kingdom}
+        refresh={refresh}
+      />
+    );
   }
 
   if (invites.length > 0) {
@@ -221,14 +230,95 @@ function InvitesView({ invites, account, cooldownRemaining, canCreate, onCreate,
   );
 }
 
-function InFactionView() {
+interface InFactionViewProps {
+  account: AccountInterface;
+  address: string;
+  faction: FactionData;
+  member: FactionMemberData;
+  kingdom: PlayerKingdomData;
+  refresh: () => void;
+}
+
+function InFactionView({ account, address, faction, member, kingdom, refresh }: InFactionViewProps) {
+  const isLeader = addrEq(address, faction.leader);
+  const [toggling, setToggling] = useState(false);
+  const [toggleError, setToggleError] = useState("");
+
+  // Member is not consumed by header/toggle yet but will be in later tasks.
+  void member;
+
+  const handleToggleReinforcement = async () => {
+    setToggling(true);
+    setToggleError("");
+    try {
+      await setFactionReinforcement(account, !kingdom.factionReinforcementEnabled);
+      refresh();
+    } catch (e) {
+      console.error("Toggle reinforcement failed:", e);
+      setToggleError(e instanceof Error ? e.message : "Toggle failed");
+    } finally {
+      setToggling(false);
+    }
+  };
+
+  const reinforcementOn = kingdom.factionReinforcementEnabled;
+
   return (
-    <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
-      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-        Your Faction
+    <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-4">
+      {/* Header */}
+      <div className="flex items-start justify-between">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold font-serif text-[#daa520] tracking-wider">
+              {faction.name || `Faction #${faction.factionId}`}
+            </h3>
+            {faction.tag && (
+              <div className="px-2 py-0.5 rounded text-[10px] font-bold tracking-wider border border-[#daa520]/50 text-[#daa520] bg-[#daa520]/5">
+                {faction.tag}
+              </div>
+            )}
+          </div>
+          <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">
+            Led by {truncAddr(faction.leader)} {isLeader && "· you"}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xl font-bold font-serif text-[#d4cfc6]">
+            {faction.memberCount}
+          </div>
+          <div className="text-[9px] text-[#7a7060] tracking-wider uppercase">
+            {faction.memberCount === 1 ? "Member" : "Members"}
+          </div>
+        </div>
       </div>
-      <div className="text-[11px] text-[#7a7060]">
-        (In-faction management — built in Tasks 8–12)
+
+      {/* Reinforcement toggle */}
+      <div className="border-t border-[#3d3428] pt-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1 space-y-1">
+            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">
+              Faction Reinforcement
+            </div>
+            <div className="text-[11px] text-[#7a7060] leading-relaxed">
+              Adjacent faction allies contribute a defense preset to conquest fights against your parcels.
+            </div>
+          </div>
+          <button
+            onClick={handleToggleReinforcement}
+            disabled={toggling}
+            aria-pressed={reinforcementOn}
+            className={`shrink-0 px-4 py-2 rounded text-[10px] font-bold tracking-wider border transition-colors ${
+              reinforcementOn
+                ? "bg-[#daa520]/15 border-[#daa520] text-[#daa520]"
+                : "bg-[#252019] border-[#3d3428] text-[#7a7060] hover:text-[#d4cfc6]"
+            } ${toggling ? "opacity-60 cursor-wait" : ""}`}
+          >
+            {toggling ? "..." : reinforcementOn ? "ON" : "OFF"}
+          </button>
+        </div>
+        {toggleError && (
+          <div className="text-[#ff3344] text-[10px] text-right mt-1">{toggleError}</div>
+        )}
       </div>
     </div>
   );
