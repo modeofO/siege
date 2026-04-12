@@ -13,7 +13,6 @@ import {
   setFactionReinforcement,
   formatCooldown,
   type FactionData,
-  type FactionMemberData,
 } from "@/lib/factions";
 import type { PlayerKingdomData } from "@/lib/worldState";
 import { CreateFactionModal } from "@/components/CreateFactionModal";
@@ -39,7 +38,6 @@ const truncAddr = (a: string): string =>
 // Silence unused-import warnings for functions wired up in later tasks.
 // These are referenced here so ESLint doesn't flag the imports while we
 // scaffold the panel. They get used inside the state sub-views.
-void useFactionMembers;
 void inviteMember;
 void leaveFaction;
 void kickMember;
@@ -67,7 +65,6 @@ export function FactionPanel({ account, address, kingdom, worldSystemAddress, re
         account={account}
         address={address}
         faction={faction}
-        member={member}
         kingdom={kingdom}
         refresh={refresh}
       />
@@ -234,18 +231,15 @@ interface InFactionViewProps {
   account: AccountInterface;
   address: string;
   faction: FactionData;
-  member: FactionMemberData;
   kingdom: PlayerKingdomData;
   refresh: () => void;
 }
 
-function InFactionView({ account, address, faction, member, kingdom, refresh }: InFactionViewProps) {
+function InFactionView({ account, address, faction, kingdom, refresh }: InFactionViewProps) {
   const isLeader = addrEq(address, faction.leader);
   const [toggling, setToggling] = useState(false);
   const [toggleError, setToggleError] = useState("");
-
-  // Member is not consumed by header/toggle yet but will be in later tasks.
-  void member;
+  const members = useFactionMembers(faction.factionId);
 
   const handleToggleReinforcement = async () => {
     setToggling(true);
@@ -318,6 +312,43 @@ function InFactionView({ account, address, faction, member, kingdom, refresh }: 
         </div>
         {toggleError && (
           <div className="text-[#ff3344] text-[10px] text-right mt-1">{toggleError}</div>
+        )}
+      </div>
+
+      {/* Member list */}
+      <div className="border-t border-[#3d3428] pt-3 space-y-2">
+        <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">
+          Members
+        </div>
+        {members.length === 0 ? (
+          <div className="text-[10px] text-[#7a7060] italic">Loading members…</div>
+        ) : (
+          <div className="space-y-1">
+            {members.map((m) => {
+              const isMemberLeader = addrEq(m.player, faction.leader);
+              const isSelf = addrEq(m.player, address);
+              return (
+                <div
+                  key={m.player}
+                  className="flex items-center justify-between px-2 py-1.5 rounded border border-[#3d3428] bg-[#0d0b0a]/40"
+                >
+                  <div className="flex items-center gap-2">
+                    {isMemberLeader && (
+                      <span className="text-[#daa520] text-[11px]" title="Faction leader">★</span>
+                    )}
+                    <span className="text-[11px] text-[#d4cfc6] font-mono">
+                      {truncAddr(m.player)}
+                    </span>
+                    {isSelf && (
+                      <span className="text-[9px] text-[#7a7060] tracking-wider uppercase">
+                        you
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         )}
       </div>
     </div>
