@@ -7,6 +7,7 @@ import { useWorldParcels, usePlayerKingdom } from "@/lib/worldState";
 import { HexGrid } from "@/components/HexGrid";
 import { RegisterKingdom } from "@/components/RegisterKingdom";
 import { fetchAbilityBalances } from "@/lib/abilityToken";
+import { FactionPanel } from "@/components/FactionPanel";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 
@@ -153,6 +154,17 @@ export default function WorldPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Faction panel */}
+      {kingdom.registered && (
+        <FactionPanel
+          account={account}
+          address={address}
+          kingdom={kingdom}
+          worldSystemAddress={WORLD_SYSTEM_ADDRESS}
+          refresh={refresh}
+        />
       )}
     </div>
   );
