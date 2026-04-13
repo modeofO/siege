@@ -11,6 +11,22 @@ Siege Dojo is a Starknet / Dojo ECS strategy game. Two gameplay modes coexist in
 
 Both modes read the same resource tokens, ability tokens, and `MatchCounter`.
 
+## Frontend terminology (important for new code)
+
+The **frontend** uses renamed labels to avoid collision with Realms: Eternum branding. The **backend** (Cairo models, function names, entrypoint names) keeps the original terminology:
+
+| Backend (unchanged) | Frontend label (shown to players) |
+|---|---|
+| `World`, `/world` | `THE MARCHES` |
+| `PlayerKingdom`, "kingdom" | `Your Hold` |
+| `register_player` button copy | `CLAIM YOUR HOLD` / `ESTABLISH HOLD` |
+
+Don't rename backend models or function names — only update the UI copy. When writing new UI, use `Hold` / `Marches` language.
+
+## Open work tracker
+
+Current playtest bug backlog + upcoming features are tracked as GitHub issues #1–#10 on `modeofO/siege`. Issue #10 is the "dogfood the stack" meta-audit, blocked on all the others. Check the issue list for priorities before starting new work.
+
 ## Toolchain
 
 | Tool | Version | Notes |
@@ -47,8 +63,16 @@ sozo -P sepolia migrate
 sozo -P sepolia auth grant writer \
   siege_dojo,siege_dojo-actions \
   siege_dojo,siege_dojo-commit_reveal \
-  siege_dojo,siege_dojo-resolution
+  siege_dojo,siege_dojo-resolution \
+  siege_dojo,siege_dojo-actions_1v1 \
+  siege_dojo,siege_dojo-commit_reveal_1v1 \
+  siege_dojo,siege_dojo-resolution_1v1 \
+  siege_dojo,siege_dojo-crafting_1v1 \
+  siege_dojo,siege_dojo-world_system \
+  siege_dojo,siege_dojo-conquest
 ```
+
+Full Sepolia deploy was run 2026-04-12 — see `dojo_dev.toml` must exist locally (gitignored). The docker builder image (`docker compose run --rm builder sozo ...`) is the safe path for Sepolia migrations since it ships with sozo 1.8.6.
 
 **Torii:** `https://api.cartridge.gg/x/siege-dojo/torii` (hosted on Slot)
 - GraphQL: `https://api.cartridge.gg/x/siege-dojo/torii/graphql`
@@ -108,13 +132,11 @@ NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b
 NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb
 ```
 
-`NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS` and `NEXT_PUBLIC_CONQUEST_ADDRESS` are read by `lib/conquest.ts`, `lib/pillage.ts`, `app/world/page.tsx`, and the preset-defense hooks — fill these in with the live addresses when the metagame ships.
+`NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS` and `NEXT_PUBLIC_CONQUEST_ADDRESS` are read by `lib/conquest.ts`, `lib/pillage.ts`, `app/world/page.tsx`, `lib/factions.ts`, and the preset-defense hooks. Live Sepolia addresses above are the current deployment (as of 2026-04-12).
 
 ### Session policies (Cartridge Controller)
 
-Defined in `providers.tsx`. Covers all gameplay entrypoints for gasless, no-prompt transactions:
-- `create_match` on actions contract
-- `commit`, `reveal_attacker`, `reveal_defender` on commit_reveal contract
+Defined in `providers.tsx`. Covers gameplay entrypoints for gasless, no-prompt transactions. **Known incomplete** — see open issue #5 (auto-reveal stuck because sessions prompt for out-of-policy calls). Before adding new on-chain entrypoints that users trigger from the UI, make sure they're added here or the wallet will prompt on every tx.
 
 ### Contract calls (`contracts.ts`)
 
@@ -246,15 +268,20 @@ T2 crafting requires burning 1 of the matching T1 ability in addition to the res
 **Resolution effects:** applied by `resolution_1v1.cairo` during the round, and by `conquest.cairo` for async parcel attacks. Effects are tier-aware — edit both places when rebalancing.
 
 **AbilityToken contract:** pure Starknet ERC-1155 (not a Dojo contract) in `src/tokens/ability_token.cairo`. Supporting modules: `base64.cairo` (encoder), `ability_metadata.cairo` (JSON builder). Three roles:
-- `admin` — rotates minter/burner and per-ability SVGs (set at deploy to deployer address, immutable)
-- `minter` — only `crafting_1v1` can mint
+- `admin` — rotates minter/minter2/burner and per-ability SVGs (set at deploy to deployer address, immutable)
+- `minter` — primary minter; currently `crafting_1v1` (for craft flow)
+- `minter2` — secondary minter; currently `world_system` (for starter-ability mint on register + staked-match settlement). Added in v3 (deployed 2026-04-12) because both crafting_1v1 and world_system need mint access.
 - `burner` — set when Phase 2B ships; starts at `0x0` (abilities are immortal until then)
 
 **Metadata:** fully on-chain. `uri(token_id)` returns `data:application/json;base64,...` with inline SVG image — no external server, no IPFS. Built at read time by `ability_metadata.cairo` using admin-settable per-ability SVGs stored in contract storage. Updating art requires one `set_ability_svg(ability_type, svg)` admin transaction per ability — no redeploy.
 
 **Sepolia addresses:**
 - `crafting_1v1`: `0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235`
-- `AbilityToken` (v2): `0xe1f7c5fd7bd557ff5c69db03b49a62e40f3cc01ee11524ef862a71952ddcfe`
+- `AbilityToken` (v3, with `minter2`): `0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb`
+- `world_system`: `0x2f57935f694040aec8cf89ecd4c7a404bb33819996c419fd7af6fc8971b8c4a`
+- `conquest`: `0x1e7598c506f3947bee5d850f46762a8a25cc2680a345f72e70b333671b2bd2e`
+
+(AbilityToken v2 at `0xe1f7c5fd...` is still on-chain but orphaned — v3 superseded it when the minter2 pattern was added. Torii + ResourceConfig + frontend all point at v3.)
 
 **Historical note:** Phase 2A used a `PlayerAbilities` Dojo model with u8 counters. Phase 2A.5 dropped it in favor of ERC-1155 so abilities would show in the wallet. The old model is still orphaned on-chain but not read by any live code.
 
@@ -326,7 +353,7 @@ The world layer wraps 1v1 matches in a persistent hex-grid map. Entry points liv
 - `src/models/` — Dojo ECS models. Core: `match_state`, `node_state`, `commitment`, `round_moves`, `match_counter`, `events`, `resource_config`. 1v1: `match_state_1v1`, `round_moves_1v1`, `round_modifiers_1v1`, `round_traps_1v1`, `match_abilities_1v1`, `match_stakes_1v1`. World: `parcel`, `player_kingdom`, `player_reputation`, `world_config`, `preset_defense`, `match_record`, `pillage`, `pillage_eligibility`.
 - `src/tokens/` — non-Dojo Starknet contracts (`ability_token.cairo` ERC-1155, `base64.cairo`, `ability_metadata.cairo`).
 - `src/utils/hex.cairo` — offset-coordinate hex math (neighbors, distance).
-- `frontend/src/app/` — Next.js routes: `/` (landing), `/match` (2v2), `/match-1v1` (1v1 create/join/[id]), `/craft`, `/world`, `/how-to-play`.
+- `frontend/src/app/` — Next.js routes: `/` (splash with "⚔ ENTER THE MARCHES ⚔" CTA), `/match` (2v2, UI-hidden legacy), `/match-1v1` (1v1 create/join/[id]), `/craft`, `/world` (hub — THE MARCHES + Your Hold summary + BATTLES section + FactionPanel). Compass top-left links to the external docs site (https://siege-mauve.vercel.app/). No more `/how-to-play` — use the docs site instead.
 - `frontend/src/lib/` — `contracts.ts` (2v2), `contracts1v1.ts` (1v1), `craftingContracts.ts`, `abilityToken.ts`, `conquest.ts`, `pillage.ts`, `reputation.ts`, `tiers.ts`, `worldState.ts`, `gameState.ts`, `gameState1v1.ts`, `crypto.ts`, `useResourceBalances.ts`, `toriiSubscription.ts`.
 - `frontend/src/components/` — per-feature UI (`GateDisplay`, `NodeMap`, `VaultDisplay`, `AllocationForm1v1`, `AbilitySelector`, `HexGrid`, `KingdomUpgrade`, `RegisterKingdom`, `PressurePointAllocator`, `Navbar`, `ConnectWallet`, `AccountSelector`, `Timer`, `RoundHistory`, `MatchStatus`, `EndScreen`, `CompassLink`, `BookLink`).
 - `scripts/` — Dev scripts (`local-dev.sh`, `play-opponent.js`, `run-test.sh`, `test-reveal.js`, token deploy scripts). Has its own `package.json` — run `npm install` inside `scripts/` before using tsx scripts.
@@ -341,7 +368,7 @@ Before planning or implementing any non-trivial feature, read the matching spec 
 
 - `skill/SKILL.md` — development skill focused on the 2v2 mode: architecture, hash layouts, common tasks, debugging checklist. Still the best starting point for commit-reveal and resolution work.
 - `docs/superpowers/specs/` — design specs. Recent: `2026-04-08-game-direction-redesign.md`, `2026-04-09-reputation-system-design.md`, `2026-04-10-ability-tiers-design.md`, `2026-04-10-conquest-revisions-design.md`, `2026-04-10-pillaging-system-design.md`, `2026-04-10-alliance-faction-system-design.md`, `2026-04-10-player-docs-site-design.md`.
-- `docs/superpowers/plans/` — implementation plans tied to the specs above (`kingdom-tiers`, `reputation-system`, `ability-tiers`, `conquest-revisions`, `pillaging-system`).
+- `docs/superpowers/plans/` — implementation plans tied to the specs above (`kingdom-tiers`, `reputation-system`, `ability-tiers`, `conquest-revisions`, `pillaging-system`, `alliance-faction-system`, `faction-ui`).
 - `docs/blender-style-guide.md` — art style guide.
 - `README.md` — public-facing project overview (may lag the metagame work).
 - `SEPOLIA_MIGRATION_SUMMARY.md` — one-shot notes from the v1.8.1 blake2s migration; kept for historical context.
