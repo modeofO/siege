@@ -1,23 +1,17 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-
 /**
  * Fixed-position clickable compass that lives in the layout.
- * Mirrors BookLink: book is top-right → /craft, compass is top-left → /how-to-play.
+ * Mirrors BookLink: book is top-right → /craft, compass is top-left → external docs site.
  *
  * Hover: subtle lift + warm drop shadow + caption reveal.
- * Hidden on /how-to-play since the user is already there.
  */
 export function CompassLink() {
-  const pathname = usePathname();
-
-  if (pathname === "/how-to-play") return null;
-
   return (
-    <Link
-      href="/how-to-play"
+    <a
+      href="https://siege-mauve.vercel.app/"
+      target="_blank"
+      rel="noopener noreferrer"
       aria-label="Open Field Guide"
       className="hidden lg:block group pointer-events-auto transition-transform duration-300 ease-out hover:scale-105 hover:translate-x-1"
       style={{
@@ -39,6 +33,6 @@ export function CompassLink() {
           FIELD GUIDE
         </span>
       </span>
-    </Link>
+    </a>
   );
 }
