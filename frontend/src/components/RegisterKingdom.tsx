@@ -53,7 +53,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
       <div className="bg-[#1a1714] border border-[#3d3428] rounded-lg p-6 max-w-lg w-full mx-4 space-y-6">
         <div className="text-center">
           <h2 className="text-xl font-bold font-serif text-[#daa520] tracking-wider">
-            CLAIM YOUR KINGDOM
+            CLAIM YOUR HOLD
           </h2>
           <p className="text-xs text-[#7a7060] mt-2">
             Choose 3 home parcels. These are permanent and cannot be conquered.
@@ -95,7 +95,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
           disabled={submitting}
           className="w-full py-3 rounded font-bold tracking-wider text-sm font-serif transition-all bg-[#daa520]/10 border-2 border-[#daa520] text-[#daa520] hover:bg-[#daa520]/20 disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          {submitting ? "CLAIMING..." : "⛊ ESTABLISH KINGDOM ⛊"}
+          {submitting ? "CLAIMING..." : "⛊ ESTABLISH HOLD ⛊"}
         </button>
 
         {error && (

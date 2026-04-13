@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import Link from "next/link";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useWorldParcels, usePlayerKingdom } from "@/lib/worldState";
@@ -84,7 +85,7 @@ export default function WorldPage() {
       {/* Map header */}
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold font-serif text-[#daa520] tracking-wider">
-          THE REALM
+          THE MARCHES
         </h1>
         {kingdom.registered && (
           <div className="text-xs text-[#7a7060]">
@@ -112,11 +113,11 @@ export default function WorldPage() {
         )}
       </div>
 
-      {/* Kingdom summary */}
+      {/* Hold summary */}
       {kingdom.registered && (
         <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
           <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-            Your Kingdom
+            Your Hold
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -152,6 +153,32 @@ export default function WorldPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Battles */}
+      {kingdom.registered && (
+        <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
+          <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
+            Battles
+          </div>
+          <div className="text-[11px] text-[#7a7060] leading-relaxed">
+            Challenge another player to a staked 1v1 match.
+          </div>
+          <div className="flex gap-3">
+            <Link
+              href="/match-1v1/create"
+              className="flex-1 text-center px-4 py-2 bg-[#c8a44e]/10 border-2 border-[#c8a44e]/60 text-[#c8a44e] rounded font-bold tracking-wider text-sm font-serif hover:bg-[#c8a44e]/20 hover:border-[#c8a44e] transition-all"
+            >
+              CREATE MATCH
+            </Link>
+            <Link
+              href="/match-1v1/join"
+              className="flex-1 text-center px-4 py-2 bg-[#252019] border border-[#3d3428] text-[#7a7060] rounded font-bold tracking-wider text-sm hover:text-[#c8a44e] hover:border-[#c8a44e]/50 transition-all"
+            >
+              JOIN MATCH
+            </Link>
           </div>
         </div>
       )}
