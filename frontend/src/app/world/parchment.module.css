@@ -80,8 +80,8 @@
   left: 0;
   width: 30%;
   height: 80%;
-  opacity: 0.28;
-  filter: blur(9px) brightness(0.68) saturate(0.55);
+  opacity: 0.55;
+  filter: blur(9px) brightness(0.82) saturate(0.70);
   transform: translateX(-20%);
   will-change: transform;
 }

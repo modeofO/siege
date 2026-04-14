@@ -26,8 +26,8 @@ const PARCEL_TYPE_NAMES: Record<number, string> = {
 
 function TorchOverlay() {
   const positions = [
-    { top: "3%", left: "2%" },
-    { top: "3%", right: "2%" },
+    { top: "9%", left: "5%" },
+    { top: "9%", right: "5%" },
     { bottom: "4%", left: "3%" },
     { bottom: "4%", right: "3%" },
   ];
