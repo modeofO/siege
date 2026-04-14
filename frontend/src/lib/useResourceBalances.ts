@@ -1,10 +1,9 @@
-// useResourceBalances.ts — query ERC-20 resource token balances for a player
-import { useEffect, useState } from "react";
-import { RpcProvider } from "starknet";
+// useResourceBalances.ts — read ERC-20 resource token balances for a player
+// via Torii's token index (pushed updates), not direct Starknet RPC calls.
+import { useMemo } from "react";
+import { useTokens } from "@dojoengine/sdk/react";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
-
-// ERC-20 token addresses (deployed on Sepolia)
+// ERC-20 token addresses (deployed on Sepolia).
 export const RESOURCE_TOKENS = {
   iron:  "0x2154b81255def0de319c2310b38eb54484794e64b54a7a9adce583e4079a77b",
   linen: "0x511a65b969eb95a9e510b7809dff5e9c53ac325002423dea0e35ce0a1880f2b",
@@ -23,46 +22,54 @@ export interface ResourceBalances {
   seeds: number;
 }
 
-const POLL_INTERVAL = 8000; // Less frequent than game state — balances don't change mid-round
+const EMPTY_BALANCES: ResourceBalances = {
+  iron: 0, linen: 0, stone: 0, wood: 0, ember: 0, seeds: 0,
+};
+
+// Normalize addresses for comparison (drop leading zeros, lowercase).
+function normalizeAddr(a: string): string {
+  try {
+    return "0x" + BigInt(a).toString(16);
+  } catch {
+    return a.toLowerCase();
+  }
+}
+
+const TOKEN_LOOKUP: Record<string, keyof ResourceBalances> = Object.fromEntries(
+  Object.entries(RESOURCE_TOKENS).map(([k, v]) => [
+    normalizeAddr(v),
+    k as keyof ResourceBalances,
+  ]),
+);
+
+const RESOURCE_ADDRS = Object.values(RESOURCE_TOKENS);
 
 export function useResourceBalances(playerAddress: string | undefined): ResourceBalances {
-  const [balances, setBalances] = useState<ResourceBalances>({
-    iron: 0, linen: 0, stone: 0, wood: 0, ember: 0, seeds: 0,
-  });
+  // Stable request object — a new array/object reference every render would
+  // cause useTokens to tear down and re-open the subscription on every render.
+  const request = useMemo(
+    () => ({
+      contractAddresses: RESOURCE_ADDRS,
+      accountAddresses: playerAddress ? [playerAddress] : [],
+    }),
+    [playerAddress],
+  );
 
-  useEffect(() => {
-    if (!playerAddress) return;
+  const { balances } = useTokens(request);
 
-    const provider = new RpcProvider({ nodeUrl: RPC_URL });
-
-    const fetchBalances = async () => {
+  return useMemo<ResourceBalances>(() => {
+    if (!playerAddress) return EMPTY_BALANCES;
+    const result: ResourceBalances = { ...EMPTY_BALANCES };
+    for (const bal of balances) {
+      const key = TOKEN_LOOKUP[normalizeAddr(bal.contract_address)];
+      if (!key) continue;
       try {
-        const results: Partial<ResourceBalances> = {};
-
-        for (const [name, addr] of Object.entries(RESOURCE_TOKENS)) {
-          try {
-            const result = await provider.callContract({
-              contractAddress: addr,
-              entrypoint: "balance_of",
-              calldata: [playerAddress],
-            });
-            // Result is [low, high] u256 — just use low since values are small
-            results[name as keyof ResourceBalances] = Number(result[0] || 0);
-          } catch {
-            results[name as keyof ResourceBalances] = 0;
-          }
-        }
-
-        setBalances(results as ResourceBalances);
+        // balance is u256 as hex; our values are small (< 2^32), so number is safe
+        result[key] = Number(BigInt(bal.balance));
       } catch {
-        // Silently fail — balances will show 0
+        result[key] = 0;
       }
-    };
-
-    const t = setTimeout(() => { void fetchBalances(); }, 0);
-    const i = setInterval(() => { void fetchBalances(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
-  }, [playerAddress]);
-
-  return balances;
+    }
+    return result;
+  }, [playerAddress, balances]);
 }
