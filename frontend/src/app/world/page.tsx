@@ -7,7 +7,8 @@ import { useAccount } from "@/app/providers";
 import { useWorldParcels, usePlayerKingdom } from "@/lib/worldState";
 import { HexGrid } from "@/components/HexGrid";
 import { RegisterKingdom } from "@/components/RegisterKingdom";
-import { fetchAbilityBalances } from "@/lib/abilityToken";
+import { fetchAllAbilityBalances } from "@/lib/abilityToken";
+import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
@@ -27,17 +28,17 @@ export default function WorldPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const { parcels, loading } = useWorldParcels(refreshKey);
   const kingdom = usePlayerKingdom(address || null, refreshKey);
-  const [abilities, setAbilities] = useState<Record<string, number>>({});
+  const [abilities, setAbilities] = useState<Record<number, number>>({});
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
-  // Fetch ability balances
+  // Fetch ability balances (all 10 token IDs — T1 1..5, T2 6..10)
   useEffect(() => {
     if (!address) return;
     const fetchAb = async () => {
       try {
         const provider = new RpcProvider({ nodeUrl: RPC_URL });
-        const balances = await fetchAbilityBalances(provider, address);
+        const balances = await fetchAllAbilityBalances(provider, address);
         setAbilities(balances);
       } catch {
         // Ignore — ability token may not be deployed
@@ -140,14 +141,12 @@ export default function WorldPage() {
             {/* Abilities */}
             <div className="space-y-1">
               <div className="text-[10px] text-[#7a7060] uppercase tracking-wider">Abilities</div>
-              <div className="flex gap-2 flex-wrap">
-                {Object.entries(abilities).map(([name, count]) =>
-                  count > 0 ? (
-                    <div key={name} className="px-2 py-1 rounded text-[10px] bg-[#252019] text-[#d4cfc6]">
-                      {name}: {count}
-                    </div>
-                  ) : null,
-                )}
+              <div className="flex gap-1.5 flex-wrap">
+                {Object.entries(abilities)
+                  .filter(([, count]) => count > 0)
+                  .map(([id, count]) => (
+                    <AbilityIcon key={id} tokenId={Number(id)} count={count} size={40} />
+                  ))}
                 {Object.values(abilities).every((c) => c === 0) && (
                   <div className="text-[10px] text-[#7a7060]">None</div>
                 )}
