@@ -24,6 +24,25 @@ const PARCEL_TYPE_NAMES: Record<number, string> = {
   2: "Grove",
 };
 
+function TorchOverlay() {
+  const positions = [
+    { top: "3%", left: "2%" },
+    { top: "3%", right: "2%" },
+    { bottom: "4%", left: "3%" },
+    { bottom: "4%", right: "3%" },
+  ];
+
+  return (
+    <>
+      {positions.map((pos, i) => (
+        <div key={i} className={styles.torch} style={pos}>
+          <span className={styles.torchGlow} />
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function WorldPage() {
   const { account, address } = useAccount();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -120,6 +139,7 @@ export default function WorldPage() {
             />
           )}
         </div>
+        <TorchOverlay />
       </div>
 
       {/* Hold summary */}
