@@ -3,7 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/copy-manifests.js",
     "dev": "next dev --experimental-https",
+    "prebuild": "node scripts/copy-manifests.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -14,13 +16,19 @@
     "@cartridge/connector": "^0.13.10",
     "@cartridge/controller": "^0.13.10",
     "@cartridge/presets": "^0.5.2",
+    "@dojoengine/core": "^1.8.8",
+    "@dojoengine/sdk": "^1.9.0",
+    "@dojoengine/state": "^1.8.5",
+    "@dojoengine/torii-client": "^1.8.2",
     "@starknet-react/chains": "^5.0.3",
     "@starknet-react/core": "^5.0.3",
     "graphql-ws": "^6.0.8",
+    "immer": "^11.1.4",
     "next": "16.1.6",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "starknet": "^8.9.2"
+    "starknet": "^8.9.2",
+    "zustand": "^5.0.12"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

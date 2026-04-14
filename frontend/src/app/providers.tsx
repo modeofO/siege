@@ -11,6 +11,7 @@ import {
 } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
 import type { SessionPolicies } from "@cartridge/controller";
+import { DojoProvider } from "@/lib/dojoSdk";
 import { CONTRACTS } from "@/lib/contracts";
 import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
 import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
@@ -235,8 +236,10 @@ function SepoliaProvider({ children }: { children: React.ReactNode }) {
 // ---------- Exported provider ----------
 
 export function StarknetProvider({ children }: { children: React.ReactNode }) {
-  if (IS_DEVNET) {
-    return <DevProvider>{children}</DevProvider>;
-  }
-  return <SepoliaProvider>{children}</SepoliaProvider>;
+  const inner = IS_DEVNET ? (
+    <DevProvider>{children}</DevProvider>
+  ) : (
+    <SepoliaProvider>{children}</SepoliaProvider>
+  );
+  return <DojoProvider>{inner}</DojoProvider>;
 }
