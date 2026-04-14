@@ -11,6 +11,7 @@ interface AllocationForm1v1Props {
   onChange: (allocations: number[]) => void;
   onCommit: () => void;
   submitting: boolean;
+  confirming: boolean;
   error: string;
   nodes: [NodeOwner, NodeOwner, NodeOwner];
   isPlayerA: boolean;
@@ -22,15 +23,25 @@ interface AllocationForm1v1Props {
   onAbilitySelect: (abilityId: number, abilityTarget: number) => void;
 }
 
+function Spinner() {
+  return (
+    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+      <path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const GATE_NAMES = ["East", "West", "Under."];
 const NODE_NAMES = ["Forge", "Quarry", "Grove"];
 const NODE_RESOURCES = ["Iron + Linen", "Stone + Wood", "Ember + Seeds"];
 const NODE_SPRITES = ["/sprites/node-forge.png", "/sprites/node-quarry.png", "/sprites/node-grove.png"];
 
 export function AllocationForm1v1({
-  budget, allocations, onChange, onCommit, submitting, error, nodes, isPlayerA,
+  budget, allocations, onChange, onCommit, submitting, confirming, error, nodes, isPlayerA,
   abilities, abilitiesUsed, selectedAbility, selectedTarget, onAbilitySelect,
 }: AllocationForm1v1Props) {
+  const busy = submitting || confirming;
   const trapCost = ((allocations[10] || 0) + (allocations[11] || 0) + (allocations[12] || 0)) * 2;
   const allocationTotal = allocations.slice(0, 10).reduce((a, b) => a + b, 0);
   const total = allocationTotal + trapCost;
@@ -208,16 +219,30 @@ export function AllocationForm1v1({
       {/* Commit button — full-width, prominent */}
       <button
         onClick={onCommit}
-        disabled={submitting || !budgetExact}
-        className={`w-full py-3 rounded font-bold tracking-wider text-sm font-serif transition-all disabled:opacity-30 disabled:cursor-not-allowed ${
-          budgetExact
-            ? "bg-green-500/10 border-2 border-green-400 text-green-400 commit-ready hover:bg-green-500/20"
-            : remaining > 0
-              ? "bg-[#daa520]/10 border-2 border-[#daa520]/40 text-[#daa520]"
-              : "bg-[#ff3344]/10 border-2 border-[#ff3344]/40 text-[#ff3344]"
+        disabled={busy || !budgetExact}
+        className={`w-full py-3 rounded font-bold tracking-wider text-sm font-serif transition-all disabled:cursor-not-allowed ${
+          busy
+            ? "bg-[#c8a44e]/10 border-2 border-[#c8a44e] text-[#c8a44e] animate-pulse"
+            : budgetExact
+              ? "bg-green-500/10 border-2 border-green-400 text-green-400 commit-ready hover:bg-green-500/20"
+              : remaining > 0
+                ? "bg-[#daa520]/10 border-2 border-[#daa520]/40 text-[#daa520] opacity-30"
+                : "bg-[#ff3344]/10 border-2 border-[#ff3344]/40 text-[#ff3344] opacity-30"
         }`}
       >
-        {submitting ? "SUBMITTING..." : "\u2694 COMMIT ORDERS \u2694"}
+        {submitting ? (
+          <span className="inline-flex items-center gap-2">
+            <Spinner />
+            SUBMITTING...
+          </span>
+        ) : confirming ? (
+          <span className="inline-flex items-center gap-2">
+            <Spinner />
+            CONFIRMING ON-CHAIN...
+          </span>
+        ) : (
+          "\u2694 COMMIT ORDERS \u2694"
+        )}
       </button>
       {error && (
         <div className="text-[#ff3344] text-xs text-center">{error}</div>

@@ -10,6 +10,15 @@ interface RegisterKingdomProps {
   onRegistered: () => void;
 }
 
+function Spinner() {
+  return (
+    <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25" />
+      <path d="M12 2 A10 10 0 0 1 22 12" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 const PARCEL_TYPES = [
   { id: 0, name: "Forge", resources: "Iron + Linen", color: "#b87333" },
   { id: 1, name: "Quarry", resources: "Stone + Wood", color: "#8a8a9a" },
@@ -19,7 +28,13 @@ const PARCEL_TYPES = [
 export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: RegisterKingdomProps) {
   const [selections, setSelections] = useState<number[]>([0, 1, 2]);
   const [submitting, setSubmitting] = useState(false);
+  // After the register tx resolves we stay in `confirming` indefinitely —
+  // the parent `/world` page auto-unmounts this modal once Torii reports
+  // kingdom.registered === true. This keeps the button locked in a
+  // visibly pending state during the ~5-10s indexing lag (issue #11).
+  const [confirming, setConfirming] = useState(false);
   const [error, setError] = useState("");
+  const busy = submitting || confirming;
 
   const handleSelect = (slotIndex: number, typeId: number) => {
     const next = [...selections];
@@ -39,11 +54,15 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
           ...selections.map((s) => s.toString()),
         ],
       });
+      // Tx submitted — transition to confirming. Parent unmounts us when
+      // kingdom.registered flips true on Torii, so `confirming` stays
+      // true until that happens.
+      setSubmitting(false);
+      setConfirming(true);
       onRegistered();
     } catch (e) {
       console.error("Registration failed:", e);
       setError(e instanceof Error ? e.message : "Registration failed");
-    } finally {
       setSubmitting(false);
     }
   };
@@ -92,11 +111,32 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
 
         <button
           onClick={handleRegister}
-          disabled={submitting}
-          className="w-full py-3 rounded font-bold tracking-wider text-sm font-serif transition-all bg-[#daa520]/10 border-2 border-[#daa520] text-[#daa520] hover:bg-[#daa520]/20 disabled:opacity-30 disabled:cursor-not-allowed"
+          disabled={busy}
+          className={`w-full py-3 rounded font-bold tracking-wider text-sm font-serif transition-all disabled:cursor-not-allowed ${
+            busy
+              ? "bg-[#c8a44e]/10 border-2 border-[#c8a44e] text-[#c8a44e] animate-pulse"
+              : "bg-[#daa520]/10 border-2 border-[#daa520] text-[#daa520] hover:bg-[#daa520]/20"
+          }`}
         >
-          {submitting ? "CLAIMING..." : "⛊ ESTABLISH HOLD ⛊"}
+          {submitting ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Spinner />
+              CLAIMING...
+            </span>
+          ) : confirming ? (
+            <span className="inline-flex items-center justify-center gap-2">
+              <Spinner />
+              CONFIRMING ON-CHAIN...
+            </span>
+          ) : (
+            "\u26ca ESTABLISH HOLD \u26ca"
+          )}
         </button>
+        {confirming && (
+          <div className="text-[10px] text-[#7a7060] text-center animate-pulse">
+            Your hold is being carved into the marches. This can take up to 10 seconds.
+          </div>
+        )}
 
         {error && (
           <div className="text-[#ff3344] text-xs text-center">{error}</div>

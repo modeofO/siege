@@ -102,6 +102,10 @@ export default function Match1v1Page() {
   // Allocations: [p0,p1,p2, g0,g1,g2, repair, nc0,nc1,nc2]
   const [allocations, setAllocations] = useState<number[]>(new Array(13).fill(0));
   const [submitting, setSubmitting] = useState(false);
+  // After a commit tx resolves, we stay in `confirming` until Torii reports
+  // the committed flag on-chain. Keeps the button disabled in a visibly
+  // pending state during the ~5-10s indexing lag (issue #11).
+  const [confirming, setConfirming] = useState(false);
   const [autoRevealStatus, setAutoRevealStatus] = useState<"idle" | "pending" | "done" | "error">("idle");
   const [autoRevealError, setAutoRevealError] = useState("");
   const [revealRetry, setRevealRetry] = useState(0);
@@ -123,6 +127,8 @@ export default function Match1v1Page() {
     setRevealRetry(0);
     autoRevealLock.current = false;
     commitLock.current = false;
+    setSubmitting(false);
+    setConfirming(false);
     setError("");
   }, [state?.round]);
 
@@ -289,15 +295,25 @@ export default function Match1v1Page() {
         `siege_1v1_ability_${matchId}_${state.round}`,
         JSON.stringify({ abilityId: selectedAbility, abilityTarget: selectedTarget }),
       );
-      // Single refresh — refreshKey propagates to all hooks
+      // Tx submitted — now wait for Torii to reflect `committed`. Button
+      // stays disabled with a "CONFIRMING ON-CHAIN..." label until the
+      // useEffect below flips `confirming` off.
+      setSubmitting(false);
+      setConfirming(true);
       void refresh();
     } catch (e) {
       console.error("Commit failed:", e);
       setError(e instanceof Error ? e.message : "Commit failed");
-    } finally {
+      commitLock.current = false;
       setSubmitting(false);
     }
   }, [account, state, allocations, budget, matchId, refresh, selectedAbility, selectedTarget]);
+
+  // Clear confirming once Torii reports the commit on-chain (ends the
+  // 5-10s indexing lag where the button was previously re-enabling).
+  useEffect(() => {
+    if (committed && confirming) setConfirming(false);
+  }, [committed, confirming]);
 
   // Loading
   if (loading || !state) {
@@ -526,13 +542,14 @@ export default function Match1v1Page() {
 
       {/* ===== 4. DEPLOYMENT PANEL ===== */}
       <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">
-        {state.phase === "committing" && !committed ? (
+        {state.phase === "committing" && (!committed || confirming) ? (
           <AllocationForm1v1
             budget={budget}
             allocations={allocations}
             onChange={setAllocations}
             onCommit={handleCommit}
             submitting={submitting}
+            confirming={confirming}
             error={error}
             nodes={state.nodes}
             isPlayerA={isPlayerA}
