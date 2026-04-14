@@ -1,8 +1,8 @@
 {
   "world": {
     "class_hash": "0x613551abceb2b37073b1149bb862ea70cf029981ce1ca47e9dd7c7ab97cb65d",
-    "address": "0x7ba32eaaa2a25145ea713e17ad1f42dc7f9f08355a2fd058a9a875e609fa8c0",
-    "seed": "siege_dojo",
+    "address": "0x22824cd5897655db69f0b04c5ab4180989addce42dd05ec64e17283d9e58707",
+    "seed": "siege_dojo_v2",
     "name": "siege_dojo",
     "entrypoints": [
       "uuid",
@@ -33,7 +33,7 @@
   },
   "contracts": [
     {
-      "address": "0x2e7aaec86013c6f4719227f995b91bb935571eb48ae11fed039cd4345ba0d2b",
+      "address": "0x4ae15829516bcf010ef3bd85bedeb62c4dd5047ffba5e44327b3fdb1f2db5d8",
       "class_hash": "0x2c414649782347837df2e227d2227d6d948eb8300409ec5c986c38a5c18f5a5",
       "init_calldata": [],
       "tag": "siege_dojo-actions",
@@ -44,7 +44,7 @@
       ]
     },
     {
-      "address": "0x7cbd822e0dc535d084dd71b76ba332d76cb370954c83a5ebe5625f36cdfa1c",
+      "address": "0x520bdcaa5ca4d04bd1aee77362eca6a284ba2bbf0690f5696b87e13007c8603",
       "class_hash": "0x9350fde559ff66cedf03136db03ce935e2ed48bb19bd4fa294240fa50df665",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
@@ -58,7 +58,7 @@
       ]
     },
     {
-      "address": "0x6c61d75ff72a9b5ccf82cd78b48777f3486d10e8077cf9456a6feff0a0273c8",
+      "address": "0x64e62948faafdb00095ef82722729d3c09feef74b1242259369691e2812cfa7",
       "class_hash": "0x25c918d33577b814103793959e779eea266d5d44acf0a3d546fb468704139f8",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal",
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "address": "0x516bdf650dcaebe431a06fba09766ee2d4be79c477e73ba220a64c4f6d4af80",
+      "address": "0x31ff951f7405f24e69f42dc3009ff20702fca8079d6551733fc39da90ab1e81",
       "class_hash": "0x43d5493ee6c9c3dd34fc402266f4acf85c39aa9b50cf46cba6db59dd8135709",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal_1v1",
@@ -85,7 +85,7 @@
       ]
     },
     {
-      "address": "0x1e7598c506f3947bee5d850f46762a8a25cc2680a345f72e70b333671b2bd2e",
+      "address": "0x4f2bcdd8b544f77886834bc567a8a221b15bd723f330b86d3d0339889941969",
       "class_hash": "0x6b1f384492abf1c1fb008b512d13db1cfa20f73e8a4be91935702252f8ceca7",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "address": "0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235",
+      "address": "0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7",
       "class_hash": "0x26925dd4a5d54a8b432c1a83c721c3953ee22c75cc72639f9113b60428f92cb",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
@@ -109,7 +109,7 @@
       ]
     },
     {
-      "address": "0x4aa2e5246a0791d02d88c9f10fdc78a18331146b4498ea475e1f7b0faf4baad",
+      "address": "0x5d11ded0e69b5b8029aec945269975957900d27cb66648bb8db02efd20e842",
       "class_hash": "0x636964b849eb0e4f5eb97fc13541ec84fc39d8c8825e42b0a4c47ba957e01da",
       "init_calldata": [],
       "tag": "siege_dojo-resolution",
@@ -120,7 +120,7 @@
       ]
     },
     {
-      "address": "0x1b31a6098f1b9081e925e98cd9627c6a5cce39073e92c3f5bf827cb09abe36b",
+      "address": "0x27e7a9c43ef49f90987943358b3a5d5aadc74c5c8ba79bd3eadea9514decf97",
       "class_hash": "0x7ddf9fb2b1e1fda8e014fd43c1cf0c00d0287b9bbad5a2442017cd3b728932f",
       "init_calldata": [],
       "tag": "siege_dojo-resolution_1v1",
@@ -131,8 +131,8 @@
       ]
     },
     {
-      "address": "0x2f57935f694040aec8cf89ecd4c7a404bb33819996c419fd7af6fc8971b8c4a",
-      "class_hash": "0x74b4ed78d6185e011ed0a216d8080c36ac39e0d5ca09703f156963cdfc7cb2f",
+      "address": "0x2d7d0a53f6a4e24f62b33ae7e0203f5c155476ff7fdb53b10a5fffa48d84064",
+      "class_hash": "0x6f0a516c26e5d34921b703c8e5c73b03bb119d16876e3e8f71ae875d45c14c9",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",

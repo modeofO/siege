@@ -51,7 +51,7 @@ docker compose down           # tear down
 
 ## Sepolia
 
-**World:** `0x07ba32eaaa2a25145ea713e17ad1f42dc7f9f08355a2fd058a9a875e609fa8c0`
+**World:** `0x022824cd5897655db69f0b04c5ab4180989addce42dd05ec64e17283d9e58707` (v2 seed `siege_dojo_v2`, deployed 2026-04-13; prior v1 world `0x07ba32ea...` is orphaned)
 **RPC:** `https://api.cartridge.gg/x/starknet/sepolia` (spec v0.9.0 — required by sozo v1.8.6)
 
 ```bash
@@ -115,24 +115,24 @@ NEXT_PUBLIC_TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
 NEXT_PUBLIC_RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
 
 # 2v2 actions / commit_reveal (legacy mode)
-NEXT_PUBLIC_ACTIONS_ADDRESS=0x02e7aaec86013c6f4719227f995b91bb935571eb48ae11fed039cd4345ba0d2b
-NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x06c61d75ff72a9b5ccf82cd78b48777f3486d10e8077cf9456a6feff0a0273c8
+NEXT_PUBLIC_ACTIONS_ADDRESS=0x4ae15829516bcf010ef3bd85bedeb62c4dd5047ffba5e44327b3fdb1f2db5d8
+NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x64e62948faafdb00095ef82722729d3c09feef74b1242259369691e2812cfa7
 
 # 1v1 mode contracts
-NEXT_PUBLIC_ACTIONS_1V1_ADDRESS=0x7cbd822e0dc535d084dd71b76ba332d76cb370954c83a5ebe5625f36cdfa1c
-NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS=0x516bdf650dcaebe431a06fba09766ee2d4be79c477e73ba220a64c4f6d4af80
-NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS=0x1b31a6098f1b9081e925e98cd9627c6a5cce39073e92c3f5bf827cb09abe36b
+NEXT_PUBLIC_ACTIONS_1V1_ADDRESS=0x520bdcaa5ca4d04bd1aee77362eca6a284ba2bbf0690f5696b87e13007c8603
+NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS=0x31ff951f7405f24e69f42dc3009ff20702fca8079d6551733fc39da90ab1e81
+NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS=0x27e7a9c43ef49f90987943358b3a5d5aadc74c5c8ba79bd3eadea9514decf97
 
 # World metagame
-NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS=0x2f57935f694040aec8cf89ecd4c7a404bb33819996c419fd7af6fc8971b8c4a
-NEXT_PUBLIC_CONQUEST_ADDRESS=0x1e7598c506f3947bee5d850f46762a8a25cc2680a345f72e70b333671b2bd2e
+NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS=0x2d7d0a53f6a4e24f62b33ae7e0203f5c155476ff7fdb53b10a5fffa48d84064
+NEXT_PUBLIC_CONQUEST_ADDRESS=0x4f2bcdd8b544f77886834bc567a8a221b15bd723f330b86d3d0339889941969
 
 # Tokens + crafting
-NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235
+NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7
 NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb
 ```
 
-`NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS` and `NEXT_PUBLIC_CONQUEST_ADDRESS` are read by `lib/conquest.ts`, `lib/pillage.ts`, `app/world/page.tsx`, `lib/factions.ts`, and the preset-defense hooks. Live Sepolia addresses above are the current deployment (as of 2026-04-12).
+`NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS` and `NEXT_PUBLIC_CONQUEST_ADDRESS` are read by `lib/conquest.ts`, `lib/pillage.ts`, `app/world/page.tsx`, `lib/factions.ts`, and the preset-defense hooks. Live Sepolia addresses above are the current deployment (fresh seed `siege_dojo_v2`, deployed 2026-04-13; spatial starting algorithm from #1 is live).
 
 ### Session policies (Cartridge Controller)
 
@@ -180,9 +180,9 @@ Same world as 2v2 (`siege_dojo`). Deployed to Sepolia alongside existing contrac
 
 | Contract | Address |
 |----------|---------|
-| `actions_1v1` | `0x7cbd822e0dc535d084dd71b76ba332d76cb370954c83a5ebe5625f36cdfa1c` |
-| `commit_reveal_1v1` | `0x516bdf650dcaebe431a06fba09766ee2d4be79c477e73ba220a64c4f6d4af80` |
-| `resolution_1v1` | `0x1b31a6098f1b9081e925e98cd9627c6a5cce39073e92c3f5bf827cb09abe36b` |
+| `actions_1v1` | `0x520bdcaa5ca4d04bd1aee77362eca6a284ba2bbf0690f5696b87e13007c8603` |
+| `commit_reveal_1v1` | `0x31ff951f7405f24e69f42dc3009ff20702fca8079d6551733fc39da90ab1e81` |
+| `resolution_1v1` | `0x27e7a9c43ef49f90987943358b3a5d5aadc74c5c8ba79bd3eadea9514decf97` |
 
 Models: `MatchState1v1`, `RoundMoves1v1`, `RoundModifiers1v1`, `RoundTraps1v1`. Reuses `Commitment`, `NodeState`, `MatchCounter`.
 
@@ -276,10 +276,10 @@ T2 crafting requires burning 1 of the matching T1 ability in addition to the res
 **Metadata:** fully on-chain. `uri(token_id)` returns `data:application/json;base64,...` with inline SVG image — no external server, no IPFS. Built at read time by `ability_metadata.cairo` using admin-settable per-ability SVGs stored in contract storage. Updating art requires one `set_ability_svg(ability_type, svg)` admin transaction per ability — no redeploy.
 
 **Sepolia addresses:**
-- `crafting_1v1`: `0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235`
+- `crafting_1v1`: `0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7`
 - `AbilityToken` (v3, with `minter2`): `0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb`
-- `world_system`: `0x2f57935f694040aec8cf89ecd4c7a404bb33819996c419fd7af6fc8971b8c4a`
-- `conquest`: `0x1e7598c506f3947bee5d850f46762a8a25cc2680a345f72e70b333671b2bd2e`
+- `world_system`: `0x2d7d0a53f6a4e24f62b33ae7e0203f5c155476ff7fdb53b10a5fffa48d84064`
+- `conquest`: `0x4f2bcdd8b544f77886834bc567a8a221b15bd723f330b86d3d0339889941969`
 
 (AbilityToken v2 at `0xe1f7c5fd...` is still on-chain but orphaned — v3 superseded it when the minter2 pattern was added. Torii + ResourceConfig + frontend all point at v3.)
 

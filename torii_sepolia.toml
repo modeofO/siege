@@ -1,6 +1,6 @@
 rpc = "https://api.cartridge.gg/x/starknet/sepolia"
-world_address = "0x07ba32eaaa2a25145ea713e17ad1f42dc7f9f08355a2fd058a9a875e609fa8c0"
-world_block = 8188551
+world_address = "0x022824cd5897655db69f0b04c5ab4180989addce42dd05ec64e17283d9e58707"
+world_block = 8725500
 
 [indexing]
 allowed_origins = ["*"]

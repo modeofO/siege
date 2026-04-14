@@ -5,7 +5,7 @@ import { RESOURCE_TOKENS } from "./useResourceBalances";
 // Crafting contract address — set via NEXT_PUBLIC_CRAFTING_1V1_ADDRESS in .env.local
 export const CRAFTING_1V1_ADDRESS =
   process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS ||
-  "0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235";
+  "0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7";
 
 export type AbilityCost = Record<string, number>;
 

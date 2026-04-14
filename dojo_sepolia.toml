@@ -1,6 +1,6 @@
 [world]
 name = "siege_dojo"
-seed = "siege_dojo"
+seed = "siege_dojo_v2"
 
 [namespace]
 default = "siege_dojo"
@@ -9,4 +9,4 @@ default = "siege_dojo"
 rpc_url = "https://api.cartridge.gg/x/starknet/sepolia"
 account_address = "$DOJO_ACCOUNT_ADDRESS"
 private_key = "$DOJO_PRIVATE_KEY"
-world_address = "0x07ba32eaaa2a25145ea713e17ad1f42dc7f9f08355a2fd058a9a875e609fa8c0"
+world_address = "0x022824cd5897655db69f0b04c5ab4180989addce42dd05ec64e17283d9e58707"
