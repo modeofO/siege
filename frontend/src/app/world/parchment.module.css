@@ -1,0 +1,109 @@
+/* frontend/src/app/world/parchment.module.css */
+
+.parchmentFrame {
+  position: relative;
+  margin-left: auto;
+  margin-right: auto;
+  aspect-ratio: 3 / 2;
+  width: 100%;
+  max-width: 64rem;
+}
+
+.parchmentImage {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  user-select: none;
+}
+
+.hexGridWrapper {
+  position: absolute;
+  top: 12%;
+  right: 14%;
+  bottom: 14%;
+  left: 14%;
+}
+
+.torch {
+  position: absolute;
+  width: 7%;
+  aspect-ratio: 1 / 1;
+  background-image: url("/sprites/torch-sconce.png");
+  background-size: contain;
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
+.torchGlow {
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  width: 180%;
+  height: 120%;
+  transform: translateX(-50%);
+  background: radial-gradient(
+    ellipse at 50% 80%,
+    rgba(255, 180, 90, 0.85) 0%,
+    rgba(255, 140, 50, 0.55) 25%,
+    rgba(255, 100, 30, 0.25) 50%,
+    rgba(255, 100, 30, 0) 75%
+  );
+  filter: blur(6px);
+  opacity: 0.85;
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+.cloudClip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 25%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cloud {
+  position: absolute;
+  top: 10%;
+  left: 0;
+  width: 30%;
+  height: 80%;
+  opacity: 0.2;
+  filter: blur(8px);
+  transform: translateX(-20%);
+  will-change: transform;
+}
+
+@keyframes flicker-opacity {
+  0%   { opacity: 0.70; }
+  50%  { opacity: 1.00; }
+  100% { opacity: 0.78; }
+}
+
+@keyframes flicker-scale {
+  0%   { transform: translateX(-50%) scale(0.95); }
+  50%  { transform: translateX(-50%) scale(1.08); }
+  100% { transform: translateX(-50%) scale(0.98); }
+}
+
+@keyframes drift {
+  0%   { transform: translateX(-20%); }
+  100% { transform: translateX(140%); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .torchGlow {
+    animation:
+      flicker-opacity 0.7s ease-in-out infinite alternate,
+      flicker-scale 1.3s ease-in-out infinite alternate;
+  }
+
+  .cloud {
+    animation: drift var(--cloud-duration, 45s) linear infinite;
+    animation-delay: var(--cloud-delay, 0s);
+  }
+}
