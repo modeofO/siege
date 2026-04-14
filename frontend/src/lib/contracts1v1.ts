@@ -82,16 +82,40 @@ export async function revealMove1v1(
     calldata: [matchId, salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, abilityId, abilityTarget],
   };
 
-  if (includeVrf) {
+  const calls = includeVrf
     // 2nd reveal triggers resolution which consumes vRNG
-    return account.execute(
-      [vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION), revealCall],
-      TX_OPTS,
+    ? [vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION), revealCall]
+    : [revealCall];
+
+  const tx = await account.execute(calls, TX_OPTS);
+
+  // account.execute resolves once the sequencer ACCEPTS the tx, not after it
+  // executes. A tx can be accepted and then revert silently (e.g. a reveal
+  // that races another reveal — the later one triggers resolution without
+  // vRF and reverts). Wait for the receipt so we can surface reverts as
+  // thrown errors that the reveal retry path can handle.
+  try {
+    const receipt = await account.waitForTransaction(tx.transaction_hash, {
+      retryInterval: 2000,
+    });
+    const anyReceipt = receipt as { execution_status?: string; revert_reason?: string };
+    if (anyReceipt.execution_status === "REVERTED") {
+      const reason = anyReceipt.revert_reason || "unknown revert";
+      // Normalise to a message the attemptReveal() handler recognises.
+      // If the revert came from missing vRF, include "not consumed" so the
+      // retry path flips the includeVrf flag.
+      throw new Error(`Reveal reverted: ${reason}`);
+    }
+  } catch (e) {
+    // waitForTransaction itself can throw on timeout or RPC error. Surface
+    // those so the caller's retry path can act instead of claiming success.
+    if (e instanceof Error && e.message.startsWith("Reveal reverted:")) throw e;
+    throw new Error(
+      `Reveal receipt wait failed: ${e instanceof Error ? e.message : String(e)}`,
     );
   }
 
-  // 1st reveal — no vRNG needed
-  return account.execute(revealCall, TX_OPTS);
+  return tx;
 }
 
 export const CONTRACTS_WORLD = {

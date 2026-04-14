@@ -96,7 +96,9 @@ export default function Match1v1Page() {
   // Allocations: [p0,p1,p2, g0,g1,g2, repair, nc0,nc1,nc2]
   const [allocations, setAllocations] = useState<number[]>(new Array(13).fill(0));
   const [submitting, setSubmitting] = useState(false);
-  const [autoRevealStatus, setAutoRevealStatus] = useState<"idle" | "pending" | "done">("idle");
+  const [autoRevealStatus, setAutoRevealStatus] = useState<"idle" | "pending" | "done" | "error">("idle");
+  const [autoRevealError, setAutoRevealError] = useState("");
+  const [revealRetry, setRevealRetry] = useState(0);
   const autoRevealLock = useRef(false);
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
@@ -110,9 +112,17 @@ export default function Match1v1Page() {
   useEffect(() => {
     setAllocations(new Array(13).fill(0));
     setAutoRevealStatus("idle");
+    setAutoRevealError("");
+    setRevealRetry(0);
     autoRevealLock.current = false;
     setError("");
   }, [state?.round]);
+
+  // One-shot mount log — if this never appears in console after reload, the
+  // page is serving a stale bundle and a hard refresh is needed.
+  useEffect(() => {
+    console.log("[siege] match-1v1 page loaded — reveal gate diagnostics v1");
+  }, []);
 
   // Extract error message from Cartridge's structured errors
   function extractErrorMsg(e: unknown): string {
@@ -130,30 +140,57 @@ export default function Match1v1Page() {
   // Check if an error is a known recoverable case
   const isAlreadyRevealed = (msg: string) =>
     msg.includes("Already revealed") || msg.includes("416c72656164792072657665616c6564");
-  const isNotConsumed = (msg: string) =>
-    msg.includes("not consumed") || msg.includes("6e6f7420636f6e73756d6564");
 
   // Auto-reveal: when both committed & we haven't revealed yet
   useEffect(() => {
+    // Unconditional gate-state log so we can see WHY this effect returns early.
+    // If no `[auto-reveal]` log appears at all, the code isn't loaded (stale bundle).
+    console.log("[auto-reveal] gate check", {
+      hasAccount: !!account,
+      hasState: !!state,
+      round: state?.round,
+      committed,
+      revealed,
+      commitCount: roundStatus.commitCount,
+      revealCount: roundStatus.revealCount,
+      locked: autoRevealLock.current,
+      status: autoRevealStatus,
+    });
+
     if (
       !account || !state || !committed || revealed ||
       roundStatus.commitCount < 2 || autoRevealLock.current
     ) return;
 
+    // Claim the lock BEFORE the salt check so this effect doesn't busy-spin
+    // across poll refreshes when local data is missing.
+    autoRevealLock.current = true;
+
     const salt = getSalt1v1(matchId, state.round);
     const move = getMove1v1(matchId, state.round);
-    if (!salt || !move) return;
+    if (!salt || !move) {
+      console.warn(
+        `[auto-reveal] No local commit data for match ${matchId} round ${state.round}. ` +
+        `This browser/tab did not store the salt — likely committed from a different device.`,
+      );
+      setAutoRevealStatus("error");
+      setAutoRevealError(
+        "Local commit data not found in this browser. Commits must be revealed from " +
+        "the same browser they were made in. If you committed in another tab or device, " +
+        "reopen the match there to reveal.",
+      );
+      return;
+    }
 
-    // Lock via ref (doesn't trigger re-render)
-    autoRevealLock.current = true;
     setAutoRevealStatus("pending");
+    console.log(`[auto-reveal] starting reveal for match ${matchId} round ${state.round} (revealCount=${roundStatus.revealCount})`);
 
     const abilityData = localStorage.getItem(`siege_1v1_ability_${matchId}_${state.round}`);
     const parsedAbility = abilityData
       ? JSON.parse(abilityData)
       : { abilityId: 0, abilityTarget: 0 };
 
-    const attemptReveal = async (includeVrf: boolean): Promise<void> => {
+    const attemptReveal = async (includeVrf: boolean, alreadyFlipped = false): Promise<void> => {
       try {
         await revealMove1v1(
           account, matchId, salt,
@@ -168,16 +205,16 @@ export default function Match1v1Page() {
       } catch (e) {
         const msg = extractErrorMsg(e);
         if (isAlreadyRevealed(msg)) {
-          console.log("Already revealed — round progressed normally.");
+          console.log("[auto-reveal] Already revealed — round progressed normally.");
           return;
         }
-        if (isNotConsumed(msg) && includeVrf) {
-          console.log("vRNG not consumed, retrying without...");
-          return attemptReveal(false);
-        }
-        if (isNotConsumed(msg) && !includeVrf) {
-          console.log("Retrying with vRNG...");
-          return attemptReveal(true);
+        // Race-condition recovery: we chose a vRF mode based on a poll that
+        // may have been stale by the time our tx landed. If the tx reverted
+        // (most commonly because we were actually the 2nd reveal but omitted
+        // vRF, or vice versa), flip vRF and try once more before giving up.
+        if (!alreadyFlipped) {
+          console.log(`[auto-reveal] reveal failed with includeVrf=${includeVrf}, retrying with includeVrf=${!includeVrf}. Reason: ${msg}`);
+          return attemptReveal(!includeVrf, true);
         }
         throw e;
       }
@@ -190,15 +227,29 @@ export default function Match1v1Page() {
         try {
           const isSecondReveal = roundStatus.revealCount >= 1;
           await attemptReveal(isSecondReveal);
+          setAutoRevealStatus("done");
+          setAutoRevealError("");
         } catch (e) {
           console.error("Auto-reveal failed:", e);
+          // Keep lock engaged on error so the effect does not re-fire on the
+          // next poll (state identity changes every ~4s and would cause a
+          // wallet-prompt spam loop). The RETRY REVEAL button explicitly
+          // clears the lock and bumps revealRetry to re-trigger.
+          setAutoRevealStatus("error");
+          setAutoRevealError(extractErrorMsg(e));
         }
-        setAutoRevealStatus("done");
         // Single refresh — refreshKey propagates to all hooks
         void refresh();
       })();
     }, delay);
-  }, [account, state, matchId, committed, revealed, roundStatus.commitCount, roundStatus.revealCount, refresh]);
+  }, [account, state, matchId, committed, revealed, roundStatus.commitCount, roundStatus.revealCount, refresh, revealRetry, autoRevealStatus]);
+
+  const handleRetryReveal = useCallback(() => {
+    autoRevealLock.current = false;
+    setAutoRevealStatus("idle");
+    setAutoRevealError("");
+    setRevealRetry((c) => c + 1);
+  }, []);
 
   // Commit handler
   const commitLock = useRef(false);
@@ -309,7 +360,13 @@ export default function Match1v1Page() {
   if (committed && !revealed && roundStatus.commitCount < 2) {
     phaseText = "Waiting for opponent to commit...";
   } else if (committed && !revealed && roundStatus.commitCount >= 2) {
-    phaseText = autoRevealStatus === "pending" ? "Auto-revealing your move..." : "Preparing to reveal...";
+    if (autoRevealStatus === "error") {
+      phaseText = "Reveal failed — retry below";
+    } else if (autoRevealStatus === "pending") {
+      phaseText = "Auto-revealing your move...";
+    } else {
+      phaseText = "Preparing to reveal...";
+    }
   } else if (committed && revealed && roundStatus.revealCount < 2) {
     phaseText = "Waiting for opponent to reveal...";
   } else if (state.phase === "resolving") {
@@ -470,11 +527,26 @@ export default function Match1v1Page() {
             onAbilitySelect={handleAbilitySelect}
           />
         ) : (
-          <div className="p-3 flex items-center justify-center">
+          <div className="p-3 flex flex-col items-center justify-center gap-2">
             {phaseText ? (
-              <span className="text-[#7a7060] text-sm animate-pulse tracking-wide">{phaseText}</span>
+              <span className={`text-sm tracking-wide ${autoRevealStatus === "error" ? "text-[#ff9944]" : "text-[#7a7060] animate-pulse"}`}>{phaseText}</span>
             ) : (
               <span className="text-[#7a7060] text-xs">Awaiting next phase...</span>
+            )}
+            {autoRevealStatus === "error" && (
+              <>
+                {autoRevealError && (
+                  <span className="text-[10px] text-[#7a7060] font-mono max-w-full truncate px-2">
+                    {autoRevealError}
+                  </span>
+                )}
+                <button
+                  onClick={handleRetryReveal}
+                  className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors"
+                >
+                  RETRY REVEAL
+                </button>
+              </>
             )}
           </div>
         )}
