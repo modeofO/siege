@@ -64,8 +64,14 @@
   height: 35%;
   overflow: hidden;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 45%, transparent 100%);
-  mask-image: linear-gradient(to bottom, black 0%, black 45%, transparent 100%);
+  -webkit-mask-image:
+    linear-gradient(to bottom, black 0%, black 45%, transparent 100%),
+    linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
+  -webkit-mask-composite: source-in;
+  mask-image:
+    linear-gradient(to bottom, black 0%, black 45%, transparent 100%),
+    linear-gradient(to right, transparent 0%, black 14%, black 86%, transparent 100%);
+  mask-composite: intersect;
 }
 
 .cloud {
