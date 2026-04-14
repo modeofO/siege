@@ -24,7 +24,6 @@ import {
   getMove1v1,
 } from "@/lib/crypto";
 import { commitMove1v1, revealMove1v1 } from "@/lib/contracts1v1";
-import { useToriiSubscription } from "@/lib/toriiSubscription";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
@@ -40,9 +39,6 @@ export default function Match1v1Page() {
   const { state, loading, refresh, refreshKey } = useMatchState1v1(matchId);
   const history = useRoundHistory1v1(matchId);
   const resources = useResourceBalances(address);
-
-  // Real-time updates via WebSocket — triggers refresh on any world event
-  useToriiSubscription(matchId, refresh);
 
   // Role detection
   const addrMatch = (a: string | undefined, b: string | undefined) => {
@@ -222,10 +218,9 @@ export default function Match1v1Page() {
           console.log("[auto-reveal] Already revealed — round progressed normally.");
           return;
         }
-        // Race-condition recovery: we chose a vRF mode based on a poll that
-        // may have been stale by the time our tx landed. If the tx reverted
-        // (most commonly because we were actually the 2nd reveal but omitted
-        // vRF, or vice versa), flip vRF and try once more before giving up.
+        // Race: we picked includeVrf based on the observed revealCount at
+        // submit time, but chain state at inclusion can differ. Flip and
+        // retry once.
         if (!alreadyFlipped) {
           console.log(`[auto-reveal] reveal failed with includeVrf=${includeVrf}, retrying with includeVrf=${!includeVrf}. Reason: ${msg}`);
           return attemptReveal(!includeVrf, true);
@@ -234,7 +229,6 @@ export default function Match1v1Page() {
       }
     };
 
-    // Small random delay (1-3s) so both browsers don't fire simultaneously
     const delay = 1000 + Math.random() * 2000;
     setTimeout(() => {
       (async () => {
@@ -245,14 +239,9 @@ export default function Match1v1Page() {
           setAutoRevealError("");
         } catch (e) {
           console.error("Auto-reveal failed:", e);
-          // Keep lock engaged on error so the effect does not re-fire on the
-          // next poll (state identity changes every ~4s and would cause a
-          // wallet-prompt spam loop). The RETRY REVEAL button explicitly
-          // clears the lock and bumps revealRetry to re-trigger.
           setAutoRevealStatus("error");
           setAutoRevealError(extractErrorMsg(e));
         }
-        // Single refresh — refreshKey propagates to all hooks
         void refresh();
       })();
     }, delay);

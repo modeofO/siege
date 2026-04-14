@@ -76,6 +76,13 @@ export async function revealMove1v1(
   abilityId: string, abilityTarget: string,
   includeVrf: boolean,
 ) {
+  // VRF gating is racy but necessary: the 1st reveal must NOT include
+  // request_random (Cartridge VRF rejects a 2nd request before the 1st is
+  // consumed, with "VrfProvider: not consumed"), and the 2nd reveal MUST
+  // include it (resolve_round fires and calls consume_random, needing a
+  // pending random). Who's "1st" vs "2nd" can flip between submit and
+  // inclusion — the caller handles that revert with a retry. Issue #16
+  // tracks the Cairo-side fix that eliminates this race.
   const revealCall = {
     contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
     entrypoint: "reveal",
@@ -83,7 +90,6 @@ export async function revealMove1v1(
   };
 
   const calls = includeVrf
-    // 2nd reveal triggers resolution which consumes vRNG
     ? [vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION), revealCall]
     : [revealCall];
 
@@ -100,15 +106,9 @@ export async function revealMove1v1(
     });
     const anyReceipt = receipt as { execution_status?: string; revert_reason?: string };
     if (anyReceipt.execution_status === "REVERTED") {
-      const reason = anyReceipt.revert_reason || "unknown revert";
-      // Normalise to a message the attemptReveal() handler recognises.
-      // If the revert came from missing vRF, include "not consumed" so the
-      // retry path flips the includeVrf flag.
-      throw new Error(`Reveal reverted: ${reason}`);
+      throw new Error(`Reveal reverted: ${anyReceipt.revert_reason || "unknown revert"}`);
     }
   } catch (e) {
-    // waitForTransaction itself can throw on timeout or RPC error. Surface
-    // those so the caller's retry path can act instead of claiming success.
     if (e instanceof Error && e.message.startsWith("Reveal reverted:")) throw e;
     throw new Error(
       `Reveal receipt wait failed: ${e instanceof Error ? e.message : String(e)}`,
