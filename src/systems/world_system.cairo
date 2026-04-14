@@ -231,30 +231,109 @@ pub mod world_system {
             let config: WorldConfig = world.read_model(0_u8);
             assert(config.initialized, 'World not initialized');
 
-            let mut home_ids: Array<u32> = ArrayTrait::new();
-            let mut type_idx: u32 = 0;
             let zero_addr: ContractAddress = 0.try_into().unwrap();
 
+            // Spatial starting algorithm (farthest-first anchor, then cluster).
+            //
+            // 1. Collect positions of every already-claimed parcel once.
+            // 2. First home (home_types[0]): pick the unclaimed parcel of that
+            //    type that MAXIMIZES min-distance to any claimed parcel.
+            //    Tie-break: lowest parcel_id (first candidate to reach the max wins,
+            //    since we only update on strict-greater).
+            // 3. Second + third homes: pick the unclaimed parcel of the requested
+            //    type with MINIMUM distance to the first home, so the player's
+            //    three homes cluster. Tie-break: lowest parcel_id.
+            //
+            // Result: new players spawn in the least-crowded region, with their
+            // three homes adjacent enough to form a defensible cluster.
+
+            let mut claimed_cols: Array<u16> = ArrayTrait::new();
+            let mut claimed_rows: Array<u16> = ArrayTrait::new();
+            let mut scan: u32 = 0;
+            while scan < config.total_parcels {
+                let p: Parcel = world.read_model(scan);
+                if p.owner != zero_addr {
+                    claimed_cols.append(p.col);
+                    claimed_rows.append(p.row);
+                }
+                scan += 1;
+            };
+            let n_claimed = claimed_cols.len();
+
+            let first_type = *home_types.at(0);
+            assert(first_type <= 2, 'Invalid parcel type');
+
+            let mut first_home_id: u32 = 0;
+            let mut first_home_col: u16 = 0;
+            let mut first_home_row: u16 = 0;
+            let mut first_home_score: u16 = 0;
+            let mut first_home_found = false;
+
+            let mut p_idx: u32 = 0;
+            while p_idx < config.total_parcels {
+                let parcel: Parcel = world.read_model(p_idx);
+                if parcel.owner == zero_addr && parcel.parcel_type == first_type {
+                    // Min-distance to any already-claimed parcel (sentinel if empty).
+                    let score: u16 = if n_claimed == 0 {
+                        65535_u16
+                    } else {
+                        let mut min_dist: u16 = 65535_u16;
+                        let mut q: u32 = 0;
+                        while q < n_claimed {
+                            let d = siege_dojo::utils::hex::hex_distance(
+                                parcel.col, parcel.row,
+                                *claimed_cols.at(q), *claimed_rows.at(q),
+                            );
+                            if d < min_dist { min_dist = d; }
+                            q += 1;
+                        };
+                        min_dist
+                    };
+
+                    if !first_home_found || score > first_home_score {
+                        first_home_id = p_idx;
+                        first_home_col = parcel.col;
+                        first_home_row = parcel.row;
+                        first_home_score = score;
+                        first_home_found = true;
+                    }
+                }
+                p_idx += 1;
+            };
+            assert(first_home_found, 'No parcel available for type');
+
+            let mut home_ids: Array<u32> = ArrayTrait::new();
+            home_ids.append(first_home_id);
+
+            let mut type_idx: u32 = 1;
             while type_idx < 3 {
                 let wanted_type = *home_types.at(type_idx);
                 assert(wanted_type <= 2, 'Invalid parcel type');
+
+                let mut best_id: u32 = 0;
+                let mut best_dist: u16 = 65535_u16;
                 let mut found = false;
+
                 let mut p: u32 = 0;
                 while p < config.total_parcels {
-                    if !found {
-                        let parcel: Parcel = world.read_model(p);
-                        if parcel.owner == zero_addr && parcel.parcel_type == wanted_type {
-                            // Check not already assigned in this registration
-                            let mut already_used = false;
-                            let mut j: u32 = 0;
-                            while j < home_ids.len() {
-                                if *home_ids.at(j) == p {
-                                    already_used = true;
-                                }
-                                j += 1;
-                            };
-                            if !already_used {
-                                home_ids.append(p);
+                    let parcel: Parcel = world.read_model(p);
+                    if parcel.owner == zero_addr && parcel.parcel_type == wanted_type {
+                        let mut already_used = false;
+                        let mut j: u32 = 0;
+                        while j < home_ids.len() {
+                            if *home_ids.at(j) == p {
+                                already_used = true;
+                            }
+                            j += 1;
+                        };
+                        if !already_used {
+                            let d = siege_dojo::utils::hex::hex_distance(
+                                parcel.col, parcel.row,
+                                first_home_col, first_home_row,
+                            );
+                            if !found || d < best_dist {
+                                best_id = p;
+                                best_dist = d;
                                 found = true;
                             }
                         }
@@ -262,6 +341,7 @@ pub mod world_system {
                     p += 1;
                 };
                 assert(found, 'No parcel available for type');
+                home_ids.append(best_id);
                 type_idx += 1;
             };
 

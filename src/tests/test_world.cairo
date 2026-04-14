@@ -243,6 +243,84 @@ mod tests {
     }
 
     #[test]
+    fn test_register_player_spatial_separation() {
+        // Two sequential registrations on the same 2x5 grid should end up in
+        // separated corners — not adjacent. Reproduces the bug from issue #1
+        // where sequential picks put new players directly on top of existing.
+        let (mut world, ws) = setup();
+
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
+        ws.initialize_world(cols, rows, types);
+
+        let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
+        let ability_token = deploy_ability_token(admin);
+        let (ws_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(admin);
+        ability_token.set_minter(ws_addr);
+
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.ability_token = ability_token.contract_address;
+        world.write_model_test(@rc);
+
+        // Two distinct player addresses — use different deploy salts so both
+        // contracts can coexist.
+        let (player_a, _) = starknet::syscalls::deploy_syscall(
+            MockAccount::TEST_CLASS_HASH.try_into().unwrap(),
+            1,
+            array![].span(),
+            false,
+        ).unwrap_syscall();
+        let (player_b, _) = starknet::syscalls::deploy_syscall(
+            MockAccount::TEST_CLASS_HASH.try_into().unwrap(),
+            2,
+            array![].span(),
+            false,
+        ).unwrap_syscall();
+
+        starknet::testing::set_contract_address(player_a);
+        ws.register_player(array![0_u8, 1_u8, 2_u8]);
+
+        starknet::testing::set_contract_address(player_b);
+        ws.register_player(array![0_u8, 1_u8, 2_u8]);
+
+        let kingdom_a: PlayerKingdom = world.read_model(player_a);
+        let kingdom_b: PlayerKingdom = world.read_model(player_b);
+
+        // Players must have distinct homes.
+        assert(kingdom_a.home_0 != kingdom_b.home_0, 'home_0 collision');
+        assert(kingdom_a.home_0 != kingdom_b.home_1, 'A-home_0 vs B-home_1');
+        assert(kingdom_a.home_0 != kingdom_b.home_2, 'A-home_0 vs B-home_2');
+        assert(kingdom_a.home_1 != kingdom_b.home_0, 'A-home_1 vs B-home_0');
+        assert(kingdom_a.home_1 != kingdom_b.home_1, 'home_1 collision');
+        assert(kingdom_a.home_1 != kingdom_b.home_2, 'A-home_1 vs B-home_2');
+        assert(kingdom_a.home_2 != kingdom_b.home_0, 'A-home_2 vs B-home_0');
+        assert(kingdom_a.home_2 != kingdom_b.home_1, 'A-home_2 vs B-home_1');
+        assert(kingdom_a.home_2 != kingdom_b.home_2, 'home_2 collision');
+
+        // Minimum distance between any A-home and any B-home must be >= 2
+        // (no adjacency between newly-registered players on a fresh world).
+        let a_ids: Array<u32> = array![kingdom_a.home_0, kingdom_a.home_1, kingdom_a.home_2];
+        let b_ids: Array<u32> = array![kingdom_b.home_0, kingdom_b.home_1, kingdom_b.home_2];
+
+        let mut min_cross: u16 = 65535_u16;
+        let mut i: u32 = 0;
+        while i < 3 {
+            let ap: Parcel = world.read_model(*a_ids.at(i));
+            let mut j: u32 = 0;
+            while j < 3 {
+                let bp: Parcel = world.read_model(*b_ids.at(j));
+                let d = siege_dojo::utils::hex::hex_distance(ap.col, ap.row, bp.col, bp.row);
+                if d < min_cross { min_cross = d; }
+                j += 1;
+            };
+            i += 1;
+        };
+        assert(min_cross >= 2, 'players too close');
+    }
+
+    #[test]
     #[should_panic(expected: ('Already registered', 'ENTRYPOINT_FAILED'))]
     fn test_cannot_register_twice() {
         let (mut world, ws) = setup();

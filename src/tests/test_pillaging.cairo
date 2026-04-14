@@ -124,6 +124,49 @@ mod tests {
         addr
     }
 
+    /// Patch state so the given player owns exactly parcels h0/h1/h2 as homes,
+    /// regardless of what register_player's spatial algorithm picked. Used to
+    /// stabilise pillaging tests whose adjacency assertions assumed the old
+    /// first-unclaimed-per-type behaviour.
+    fn force_legacy_homes(
+        ref world: dojo::world::WorldStorage,
+        player: starknet::ContractAddress,
+        h0: u32, h1: u32, h2: u32,
+    ) {
+        let mut kingdom: PlayerKingdom = world.read_model(player);
+        let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
+
+        let current: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
+        let mut i: u32 = 0;
+        while i < 3 {
+            let pid = *current.at(i);
+            let mut p: Parcel = world.read_model(pid);
+            if p.owner == player {
+                p.owner = zero_addr;
+                p.is_home = false;
+                world.write_model_test(@p);
+            }
+            i += 1;
+        };
+
+        let desired: Array<u32> = array![h0, h1, h2];
+        let mut i: u32 = 0;
+        while i < 3 {
+            let pid = *desired.at(i);
+            let mut p: Parcel = world.read_model(pid);
+            p.owner = player;
+            p.is_home = true;
+            world.write_model_test(@p);
+            i += 1;
+        };
+
+        kingdom.home_0 = h0;
+        kingdom.home_1 = h1;
+        kingdom.home_2 = h2;
+        kingdom.parcel_count = 3;
+        world.write_model_test(@kingdom);
+    }
+
     fn namespace_def() -> NamespaceDef {
         NamespaceDef {
             namespace: "siege_dojo",
@@ -211,19 +254,21 @@ mod tests {
         let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
         world_sys.initialize_world(cols, rows, types);
 
-        // Register player A
+        // Register player A; pin homes to parcels 0/1/2 (legacy layout).
         let player_a = deploy_user();
         starknet::testing::set_contract_address(player_a);
         world_sys.register_player(array![0, 1, 2]);
+        force_legacy_homes(ref world, player_a, 0, 1, 2);
         let mut ka: PlayerKingdom = world.read_model(player_a);
         ka.tier = 2;
         world.write_model_test(@ka);
         erc1155.set_approval_for_all(world_sys_addr, true);
 
-        // Register player B
+        // Register player B; pin homes to parcels 3/4/5 (legacy layout).
         let player_b = deploy_user();
         starknet::testing::set_contract_address(player_b);
         world_sys.register_player(array![0, 1, 2]);
+        force_legacy_homes(ref world, player_b, 3, 4, 5);
         let mut kb: PlayerKingdom = world.read_model(player_b);
         kb.tier = 2;
         world.write_model_test(@kb);

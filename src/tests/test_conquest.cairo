@@ -122,6 +122,51 @@ mod tests {
         addr
     }
 
+    /// Patch state so the given player owns exactly parcels h0/h1/h2 as homes,
+    /// regardless of what register_player picked. Releases whatever homes the
+    /// algorithm picked and overrides PlayerKingdom fields. Used to stabilise
+    /// conquest/pillaging tests after the spatial starting algorithm change.
+    fn force_legacy_homes(
+        ref world: dojo::world::WorldStorage,
+        player: starknet::ContractAddress,
+        h0: u32, h1: u32, h2: u32,
+    ) {
+        let mut kingdom: PlayerKingdom = world.read_model(player);
+        let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
+
+        // Release current homes
+        let current_homes: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
+        let mut i: u32 = 0;
+        while i < 3 {
+            let pid = *current_homes.at(i);
+            let mut p: Parcel = world.read_model(pid);
+            if p.owner == player {
+                p.owner = zero_addr;
+                p.is_home = false;
+                world.write_model_test(@p);
+            }
+            i += 1;
+        };
+
+        // Claim the desired homes
+        let desired: Array<u32> = array![h0, h1, h2];
+        let mut i: u32 = 0;
+        while i < 3 {
+            let pid = *desired.at(i);
+            let mut p: Parcel = world.read_model(pid);
+            p.owner = player;
+            p.is_home = true;
+            world.write_model_test(@p);
+            i += 1;
+        };
+
+        kingdom.home_0 = h0;
+        kingdom.home_1 = h1;
+        kingdom.home_2 = h2;
+        kingdom.parcel_count = 3;
+        world.write_model_test(@kingdom);
+    }
+
     fn namespace_def() -> NamespaceDef {
         NamespaceDef {
             namespace: "siege_dojo",
@@ -209,21 +254,22 @@ mod tests {
         let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
         world_sys.initialize_world(cols, rows, types);
 
-        // Register player_a: picks first unclaimed of each type
-        //   type 0 → parcel 0 (col=0,row=0)
-        //   type 1 → parcel 1 (col=1,row=0)
-        //   type 2 → parcel 2 (col=2,row=0)
+        // Register player_a, then force the home layout to the legacy
+        // first-unclaimed-per-type layout (parcels 0/1/2). The new spatial
+        // algorithm clusters homes differently, which breaks these tests'
+        // adjacency assumptions — but nothing here actually exercises the
+        // registration algorithm itself, so we patch state to the stable
+        // layout the rest of the setup expects.
         let player_a = deploy_user();
         starknet::testing::set_contract_address(player_a);
         world_sys.register_player(array![0, 1, 2]);
+        force_legacy_homes(ref world, player_a, 0, 1, 2);
 
-        // Register player_b: picks next unclaimed of each type
-        //   type 0 → parcel 3 (col=3,row=0)
-        //   type 1 → parcel 4 (col=4,row=0)  ← NOTE: parcel 4 goes to player_b as home!
-        //   type 2 → parcel 5 (col=0,row=1)
+        // Same for player_b → parcels 3/4/5
         let player_b = deploy_user();
         starknet::testing::set_contract_address(player_b);
         world_sys.register_player(array![0, 1, 2]);
+        force_legacy_homes(ref world, player_b, 3, 4, 5);
 
         // Upgrade player_b to Hegemonia (tier 2) so they can set 3 preset defense slots
         let mut kb_tier: PlayerKingdom = world.read_model(player_b);
