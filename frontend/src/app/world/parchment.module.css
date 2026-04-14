@@ -61,9 +61,11 @@
   top: 0;
   left: 0;
   width: 100%;
-  height: 25%;
+  height: 35%;
   overflow: hidden;
   pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black 0%, black 45%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0%, black 45%, transparent 100%);
 }
 
 .cloud {
@@ -72,8 +74,8 @@
   left: 0;
   width: 30%;
   height: 80%;
-  opacity: 0.2;
-  filter: blur(8px);
+  opacity: 0.28;
+  filter: blur(9px) brightness(0.68) saturate(0.55);
   transform: translateX(-20%);
   will-change: transform;
 }
@@ -98,8 +100,8 @@
 @media (prefers-reduced-motion: no-preference) {
   .torchGlow {
     animation:
-      flicker-opacity 0.7s ease-in-out infinite alternate,
-      flicker-scale 1.3s ease-in-out infinite alternate;
+      flicker-opacity 1.9s ease-in-out infinite alternate,
+      flicker-scale 3.1s ease-in-out infinite alternate;
   }
 
   .cloud {
