@@ -2,9 +2,10 @@ import { defineConfig } from 'vocs'
 import path from 'node:path'
 
 export default defineConfig({
-  title: 'Siege',
+  title: 'Siege - docs',
   description: 'Player guide to Siege — rules, mechanics, and glossary.',
-  titleTemplate: '%s · Siege',
+  titleTemplate: '%s · Siege - docs',
+  iconUrl: '/sprites/abilities/siege-sword.svg',
   theme: {
     colorScheme: 'dark',
     // With `colorScheme: 'dark'`, Vocs types accentColor as a plain string.

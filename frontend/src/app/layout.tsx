@@ -10,8 +10,13 @@ const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 const serif = Cinzel({ variable: "--font-serif", subsets: ["latin"], weight: ["400", "700"] });
 
 export const metadata: Metadata = {
-  title: "SIEGE — Trust Your AI",
+  title: "Siege",
   description: "A strategic commit-reveal game on Starknet. Team up with your AI agent. Attack or defend. Trust is everything.",
+  icons: {
+    icon: "/sprites/abilities/siege-sword.svg",
+    shortcut: "/sprites/abilities/siege-sword.svg",
+    apple: "/sprites/abilities/siege-sword.svg",
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
