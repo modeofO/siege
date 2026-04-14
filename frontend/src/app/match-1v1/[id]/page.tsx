@@ -100,6 +100,7 @@ export default function Match1v1Page() {
   const [autoRevealError, setAutoRevealError] = useState("");
   const [revealRetry, setRevealRetry] = useState(0);
   const autoRevealLock = useRef(false);
+  const commitLock = useRef(false);
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
@@ -115,6 +116,7 @@ export default function Match1v1Page() {
     setAutoRevealError("");
     setRevealRetry(0);
     autoRevealLock.current = false;
+    commitLock.current = false;
     setError("");
   }, [state?.round]);
 
@@ -252,7 +254,6 @@ export default function Match1v1Page() {
   }, []);
 
   // Commit handler
-  const commitLock = useRef(false);
   const handleCommit = useCallback(async () => {
     if (!account || !state || commitLock.current) return;
     const trapCost = (allocations[10] + allocations[11] + allocations[12]) * 2;
