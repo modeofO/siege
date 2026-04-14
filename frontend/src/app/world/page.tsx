@@ -43,6 +43,40 @@ function TorchOverlay() {
   );
 }
 
+function CloudDrift() {
+  const clouds = [
+    { top: "30%", duration: "45s", delay: "0s", scale: 1.0 },
+    { top: "55%", duration: "65s", delay: "-20s", scale: 0.7 },
+    { top: "15%", duration: "55s", delay: "-40s", scale: 1.2 },
+  ];
+
+  return (
+    <div className={styles.cloudClip}>
+      {clouds.map((c, i) => (
+        <svg
+          key={i}
+          className={styles.cloud}
+          style={
+            {
+              top: c.top,
+              transform: `scale(${c.scale})`,
+              "--cloud-duration": c.duration,
+              "--cloud-delay": c.delay,
+            } as React.CSSProperties
+          }
+          viewBox="0 0 200 60"
+          preserveAspectRatio="none"
+        >
+          <ellipse cx="40" cy="30" rx="35" ry="14" fill="#f0e8d8" />
+          <ellipse cx="85" cy="25" rx="45" ry="18" fill="#f0e8d8" />
+          <ellipse cx="140" cy="32" rx="38" ry="15" fill="#f0e8d8" />
+          <ellipse cx="175" cy="28" rx="22" ry="12" fill="#f0e8d8" />
+        </svg>
+      ))}
+    </div>
+  );
+}
+
 export default function WorldPage() {
   const { account, address } = useAccount();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -139,6 +173,7 @@ export default function WorldPage() {
             />
           )}
         </div>
+        <CloudDrift />
         <TorchOverlay />
       </div>
 
