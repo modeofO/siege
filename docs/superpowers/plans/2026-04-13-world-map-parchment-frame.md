@@ -18,7 +18,7 @@
 
 | Path | Action | Responsibility |
 |---|---|---|
-| `<blender-scene>` | Modify | Add `Parchment` collection at offset (400, 100, 0) and `TorchSconce` collection at (500, 100, 0), each with camera + 3-point lights. Scene is the existing long-lived Blender file per `docs/blender-style-guide.md`. |
+| `<blender-scene>` | Modify | Add `Parchment` collection at offset (500, 100, 0) and `TorchSconce` collection at (600, 100, 0), each with camera + 3-point lights. Scene is the existing long-lived Blender file per `docs/blender-style-guide.md`. Note: `(400, 100, 0)` is already occupied by a pre-existing `Compass` collection that broke the +100 X offset convention — we skip past it. |
 | `frontend/public/sprites/parchment-map.png` | Create | 2400×1600 RGBA, transparent background, AgX Medium High Contrast. The main frame asset. |
 | `frontend/public/sprites/torch-sconce.png` | Create | 512×512 RGBA, transparent background. Unlit sconce only — flame is pure CSS. |
 | `frontend/src/app/world/parchment.module.css` | Create | CSS module with `@keyframes flicker-opacity`, `@keyframes flicker-scale`, `@keyframes drift`, plus `.parchmentFrame`, `.torch`, `.torchGlow`, `.cloud` class selectors. Keyframes gated behind `@media (prefers-reduced-motion: no-preference)`. |
@@ -57,7 +57,7 @@ Using the Blender MCP, run (or equivalent via native MCP primitives):
 ```python
 import bpy
 
-PARCHMENT_ORIGIN = (400, 100, 0)
+PARCHMENT_ORIGIN = (500, 100, 0)
 
 # Create collection
 parchment_coll = bpy.data.collections.new("Parchment")
@@ -400,7 +400,7 @@ if brass is None:
 A flat disc with four raised directional arms.
 
 ```python
-PARCHMENT_ORIGIN = (400, 100, 0)
+PARCHMENT_ORIGIN = (500, 100, 0)
 COMPASS_POS = (PARCHMENT_ORIGIN[0] + 5.5, PARCHMENT_ORIGIN[1] + 3.2, PARCHMENT_ORIGIN[2] + 0.05)
 
 # Disc base
@@ -543,7 +543,7 @@ Expected: commit succeeds with the single new file.
 ## Task 5: Build torch sconce + render + commit
 
 **Files:**
-- Modify: Blender scene (add `TorchSconce` collection at offset `(500, 100, 0)`)
+- Modify: Blender scene (add `TorchSconce` collection at offset `(600, 100, 0)`)
 - Create: `frontend/public/sprites/torch-sconce.png`
 
 - [ ] **Step 1: Create the collection and origin**
@@ -551,7 +551,7 @@ Expected: commit succeeds with the single new file.
 ```python
 import bpy, math
 
-TORCH_ORIGIN = (500, 100, 0)
+TORCH_ORIGIN = (600, 100, 0)
 torch_coll = bpy.data.collections.new("TorchSconce")
 bpy.context.scene.collection.children.link(torch_coll)
 ```
