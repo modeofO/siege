@@ -1,6 +1,7 @@
 "use client";
 
-import { ABILITIES } from "@/lib/craftingContracts";
+import { ABILITIES, abilityType } from "@/lib/craftingContracts";
+import { AbilityIcon } from "./AbilityIcon";
 
 interface AbilitySelectorProps {
   abilities: [number, number, number];
@@ -22,11 +23,14 @@ export function AbilitySelector({
   const hasAny = abilities.some((a) => a > 0);
   if (!hasAny) return null;
 
+  // Siege Sword (type 1) needs a gate target — both T1 (id 1) and T2 (id 6).
+  const needsGateTarget = (id: number) => abilityType(id) === 1;
+
   const handleClick = (abilityId: number) => {
     if (selectedAbility === abilityId) {
       onSelect(0, 0);
     } else {
-      onSelect(abilityId, abilityId === 1 ? selectedTarget : 0);
+      onSelect(abilityId, needsGateTarget(abilityId) ? selectedTarget : 0);
     }
   };
 
@@ -68,15 +72,20 @@ export function AbilitySelector({
                       : "border-[#3d3428] bg-[#252019] hover:border-[#7a7060]"
               }`}
             >
-              <div className="flex items-center gap-1">
-                <div className="text-xs font-bold text-[#d4cfc6] font-serif">{ability.name}</div>
-                {ability.tier === 2 && (
-                  <span className="text-[8px] px-1 py-0.5 rounded border border-[#daa520] text-[#daa520] font-bold tracking-wider">
-                    T2
-                  </span>
-                )}
+              <div className="flex items-center gap-2">
+                <AbilityIcon tokenId={abilityId} count={1} size={32} />
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-1">
+                    <div className="text-xs font-bold text-[#d4cfc6] font-serif truncate">{ability.name}</div>
+                    {ability.tier === 2 && (
+                      <span className="text-[8px] px-1 py-0.5 rounded border border-[#daa520] text-[#daa520] font-bold tracking-wider shrink-0">
+                        T2
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[9px] text-[#7a7060] mt-0.5 leading-tight">{ability.effect}</div>
+                </div>
               </div>
-              <div className="text-[9px] text-[#7a7060] mt-0.5 leading-tight">{ability.effect}</div>
               {isUsed && (
                 <div className="absolute inset-0 flex items-center justify-center bg-[#0d0b0a]/60 rounded-lg">
                   <span className="text-[10px] font-bold text-[#7a7060] tracking-wider">USED</span>
@@ -87,7 +96,7 @@ export function AbilitySelector({
         })}
       </div>
 
-      {selectedAbility === 1 && (
+      {needsGateTarget(selectedAbility) && (
         <div className="flex items-center gap-2 pl-1">
           <span className="text-[10px] text-[#7a7060] tracking-wider">TARGET GATE:</span>
           {GATE_NAMES.map((name, gi) => (

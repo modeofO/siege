@@ -564,6 +564,85 @@ export function useMatchAbilities1v1(
   return data;
 }
 
+export interface MatchStakesData {
+  a: [number, number, number];
+  b: [number, number, number];
+  aUsed: [boolean, boolean, boolean];
+  bUsed: [boolean, boolean, boolean];
+  isStaked: boolean;
+  loaded: boolean;
+}
+
+/**
+ * Returns both players' staked abilities for a match. Used by the stakes
+ * header (issue #4). Non-staked 1v1 matches will return all zeros and
+ * `isStaked: false`.
+ */
+export function useMatchStakes1v1(
+  matchId: string | null,
+  refreshKey?: number,
+): MatchStakesData {
+  const [data, setData] = useState<MatchStakesData>({
+    a: [0, 0, 0],
+    b: [0, 0, 0],
+    aUsed: [false, false, false],
+    bUsed: [false, false, false],
+    isStaked: false,
+    loaded: false,
+  });
+
+  useEffect(() => {
+    if (!matchId) return;
+    const id = Number(matchId);
+
+    const fetch = async () => {
+      const result = await toriiQuery<{
+        siegeDojoMatchAbilities1V1Models: GraphEdges<{
+          a_ability_1: string; a_ability_2: string; a_ability_3: string;
+          b_ability_1: string; b_ability_2: string; b_ability_3: string;
+          a_used_1: boolean; a_used_2: boolean; a_used_3: boolean;
+          b_used_1: boolean; b_used_2: boolean; b_used_3: boolean;
+        }>;
+      }>(`
+        query {
+          siegeDojoMatchAbilities1V1Models(where: { match_id: "${id}" }) {
+            edges { node {
+              a_ability_1 a_ability_2 a_ability_3
+              b_ability_1 b_ability_2 b_ability_3
+              a_used_1 a_used_2 a_used_3
+              b_used_1 b_used_2 b_used_3
+            } }
+          }
+        }
+      `);
+      const node = result?.siegeDojoMatchAbilities1V1Models?.edges?.[0]?.node;
+      if (!node) {
+        setData((d) => ({ ...d, loaded: true }));
+        return;
+      }
+      const a: [number, number, number] = [
+        toNum(node.a_ability_1), toNum(node.a_ability_2), toNum(node.a_ability_3),
+      ];
+      const b: [number, number, number] = [
+        toNum(node.b_ability_1), toNum(node.b_ability_2), toNum(node.b_ability_3),
+      ];
+      setData({
+        a, b,
+        aUsed: [!!node.a_used_1, !!node.a_used_2, !!node.a_used_3],
+        bUsed: [!!node.b_used_1, !!node.b_used_2, !!node.b_used_3],
+        isStaked: a.some((x) => x > 0) || b.some((x) => x > 0),
+        loaded: true,
+      });
+    };
+
+    const t = setTimeout(() => { void fetch(); }, 0);
+    const i = setInterval(() => { void fetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [matchId, refreshKey]);
+
+  return data;
+}
+
 export function useRoundModifiers1v1(matchId: string | null, round: number) {
   const [modifiers, setModifiers] = useState<[number, number, number]>([0, 0, 0]);
 

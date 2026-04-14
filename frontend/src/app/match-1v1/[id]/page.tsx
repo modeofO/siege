@@ -27,6 +27,9 @@ import { commitMove1v1, revealMove1v1 } from "@/lib/contracts1v1";
 import { useToriiSubscription } from "@/lib/toriiSubscription";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
+import { MatchStakesHeader } from "@/components/MatchStakesHeader";
+import { HoldStatusStrip } from "@/components/HoldStatusStrip";
+import { useMatchStakes1v1 } from "@/lib/gameState1v1";
 import Link from "next/link";
 
 export default function Match1v1Page() {
@@ -81,6 +84,9 @@ export default function Match1v1Page() {
     state?.playerA || null,
     refreshKey,
   );
+
+  // Stakes for the match header (#4) — both sides' wagered abilities.
+  const matchStakes = useMatchStakes1v1(matchId, refreshKey);
 
   const handleAbilitySelect = useCallback((abilityId: number, target: number) => {
     setSelectedAbility(abilityId);
@@ -441,6 +447,15 @@ export default function Match1v1Page() {
           </div>
         </div>
       </div>
+
+      {/* ===== 1b. STAKES + HOLD STATUS ===== */}
+      <MatchStakesHeader stakes={matchStakes} isPlayerA={isPlayerA} />
+      <HoldStatusStrip
+        playerA={state.playerA}
+        playerB={state.playerB}
+        isPlayerA={isPlayerA}
+        refreshKey={refreshKey}
+      />
 
       {/* ===== 2. BATTLEFIELD PANEL ===== */}
       <div className="border border-[#3d3428] rounded-lg p-3 bg-[#1a1714]">
