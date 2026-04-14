@@ -10,6 +10,7 @@ import { RegisterKingdom } from "@/components/RegisterKingdom";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
+import styles from "./parchment.module.css";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 
@@ -95,23 +96,30 @@ export default function WorldPage() {
         )}
       </div>
 
-      {/* Hex grid */}
-      <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4">
-        {parcels.length === 0 ? (
-          <div className="text-center text-[#7a7060] py-12">
-            World not initialized. No parcels found.
-          </div>
-        ) : (
-          <HexGrid
-            parcels={parcels}
-            playerAddress={address}
-            homeParcelIds={
-              kingdom.registered
-                ? [kingdom.home0, kingdom.home1, kingdom.home2]
-                : []
-            }
-          />
-        )}
+      {/* Hex grid — parchment frame */}
+      <div className={styles.parchmentFrame}>
+        <img
+          src="/sprites/parchment-map.png"
+          alt=""
+          className={styles.parchmentImage}
+        />
+        <div className={styles.hexGridWrapper}>
+          {parcels.length === 0 ? (
+            <div className="text-center text-[#7a7060] py-12">
+              World not initialized. No parcels found.
+            </div>
+          ) : (
+            <HexGrid
+              parcels={parcels}
+              playerAddress={address}
+              homeParcelIds={
+                kingdom.registered
+                  ? [kingdom.home0, kingdom.home1, kingdom.home2]
+                  : []
+              }
+            />
+          )}
+        </div>
       </div>
 
       {/* Hold summary */}
