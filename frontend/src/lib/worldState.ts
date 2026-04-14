@@ -1,10 +1,37 @@
 // frontend/src/lib/worldState.ts
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
+import { ToriiQueryBuilder, KeysClause } from "@dojoengine/sdk";
+import {
+  ModelsMapping,
+  type SchemaType,
+  type PlayerKingdom as PlayerKingdomModel,
+} from "@/bindings/typescript/models.gen";
 
 const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 const POLL_INTERVAL = 4000;
+
+function safeNum(v: unknown): number {
+  if (v === undefined || v === null) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function flatModels<T extends object>(store: unknown): T[] {
+  const iter = Array.isArray(store)
+    ? store
+    : Object.values(store as Record<string, unknown>);
+  const out: T[] = [];
+  for (const entry of iter) {
+    if (!entry || typeof entry !== "object") continue;
+    for (const v of Object.values(entry as Record<string, unknown>)) {
+      if (v && typeof v === "object") out.push(v as T);
+    }
+  }
+  return out;
+}
 
 type GraphEdges<T> = { edges: Array<{ node: T }> };
 
@@ -102,64 +129,48 @@ export interface PlayerKingdomData {
   factionReinforcementEnabled: boolean;
 }
 
-export function usePlayerKingdom(playerAddress: string | null, refreshKey?: number) {
-  const [kingdom, setKingdom] = useState<PlayerKingdomData>({
-    registered: false,
-    home0: 0, home1: 0, home2: 0,
-    parcelCount: 0,
-    freeCraftUsed: false,
-    tier: 0,
-    totalWins: 0,
-    factionReinforcementEnabled: false,
-  });
+const EMPTY_KINGDOM: PlayerKingdomData = {
+  registered: false,
+  home0: 0, home1: 0, home2: 0,
+  parcelCount: 0,
+  freeCraftUsed: false,
+  tier: 0,
+  totalWins: 0,
+  factionReinforcementEnabled: false,
+};
 
-  useEffect(() => {
-    if (!playerAddress) return;
+export function usePlayerKingdom(playerAddress: string | null, _refreshKey?: number) {
+  useEntityQuery(
+    new ToriiQueryBuilder<SchemaType>()
+      .withClause(
+        KeysClause<SchemaType>(
+          [ModelsMapping.PlayerKingdom],
+          [playerAddress ?? undefined],
+          "VariableLen",
+        ).build(),
+      )
+      .includeHashedKeys(),
+  );
 
-    const fetch = async () => {
-      const data = await toriiQuery<{
-        siegeDojoPlayerKingdomModels: GraphEdges<{
-          registered: boolean;
-          home_0: string;
-          home_1: string;
-          home_2: string;
-          parcel_count: string;
-          free_craft_used: boolean;
-          tier: string;
-          total_wins: string;
-          faction_reinforcement_enabled: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoPlayerKingdomModels(where: { player: "${playerAddress}" }) {
-            edges { node {
-              registered home_0 home_1 home_2 parcel_count free_craft_used
-              tier total_wins faction_reinforcement_enabled
-            } }
-          }
-        }
-      `);
+  const kingdoms = useModels(ModelsMapping.PlayerKingdom);
 
-      const node = data?.siegeDojoPlayerKingdomModels?.edges?.[0]?.node;
-      if (node) {
-        setKingdom({
-          registered: !!node.registered,
-          home0: toNum(node.home_0),
-          home1: toNum(node.home_1),
-          home2: toNum(node.home_2),
-          parcelCount: toNum(node.parcel_count),
-          freeCraftUsed: !!node.free_craft_used,
-          tier: toNum(node.tier),
-          totalWins: toNum(node.total_wins),
-          factionReinforcementEnabled: !!node.faction_reinforcement_enabled,
-        });
-      }
+  return useMemo<PlayerKingdomData>(() => {
+    if (!playerAddress) return EMPTY_KINGDOM;
+    const addr = playerAddress.toLowerCase();
+    const k = flatModels<PlayerKingdomModel>(kingdoms).find(
+      (x) => String(x.player).toLowerCase() === addr,
+    );
+    if (!k) return EMPTY_KINGDOM;
+    return {
+      registered: !!k.registered,
+      home0: safeNum(k.home_0),
+      home1: safeNum(k.home_1),
+      home2: safeNum(k.home_2),
+      parcelCount: safeNum(k.parcel_count),
+      freeCraftUsed: !!k.free_craft_used,
+      tier: safeNum(k.tier),
+      totalWins: safeNum(k.total_wins),
+      factionReinforcementEnabled: !!k.faction_reinforcement_enabled,
     };
-
-    const t = setTimeout(() => { void fetch(); }, 0);
-    const i = setInterval(() => { void fetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
-  }, [playerAddress, refreshKey]);
-
-  return kingdom;
+  }, [playerAddress, kingdoms]);
 }

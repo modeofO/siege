@@ -1,4 +1,33 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
+import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
+import { ToriiQueryBuilder, KeysClause } from "@dojoengine/sdk";
+import {
+  ModelsMapping,
+  type SchemaType,
+  type PlayerReputation,
+  type PlayerKingdom as PlayerKingdomModel,
+  type MatchRecord,
+} from "@/bindings/typescript/models.gen";
+
+function safeNum(v: unknown): number {
+  if (v === undefined || v === null) return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function flatModels<T extends object>(store: unknown): T[] {
+  const iter = Array.isArray(store)
+    ? store
+    : Object.values(store as Record<string, unknown>);
+  const out: T[] = [];
+  for (const entry of iter) {
+    if (!entry || typeof entry !== "object") continue;
+    for (const v of Object.values(entry as Record<string, unknown>)) {
+      if (v && typeof v === "object") out.push(v as T);
+    }
+  }
+  return out;
+}
 
 export const BRACKET_NAMES = ["Newcomer", "Developing", "Experienced", "Veteran", "Elite"] as const;
 export type BracketName = (typeof BRACKET_NAMES)[number];
@@ -27,135 +56,87 @@ export interface MatchRecordData {
   isBloodRival: boolean;
 }
 
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
-const POLL_INTERVAL = 4000;
-
-type GraphEdges<T> = { edges: Array<{ node: T }> };
-
-function toNum(v: number | string | null | undefined): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return Number(v);
-  return 0;
-}
-
-async function toriiQuery<T>(query: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${TORII_URL}/graphql`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.errors) return null;
-    return (data?.data as T) || null;
-  } catch {
-    return null;
-  }
-}
 
 export function usePlayerReputation(playerAddress: string | null): PlayerReputationData | null {
-  const [data, setData] = useState<PlayerReputationData | null>(null);
+  useEntityQuery(
+    new ToriiQueryBuilder<SchemaType>()
+      .withClause(
+        KeysClause<SchemaType>(
+          [ModelsMapping.PlayerReputation, ModelsMapping.PlayerKingdom],
+          [playerAddress ?? undefined],
+          "VariableLen",
+        ).build(),
+      )
+      .includeHashedKeys(),
+  );
 
-  useEffect(() => {
-    if (!playerAddress) return;
+  const reputations = useModels(ModelsMapping.PlayerReputation);
+  const kingdoms = useModels(ModelsMapping.PlayerKingdom);
 
-    const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoPlayerReputationModels: GraphEdges<{
-          total_losses: string;
-          current_streak: string;
-          best_streak: string;
-          bracket: string;
-        }>;
-        siegeDojoPlayerKingdomModels: GraphEdges<{
-          total_wins: string;
-        }>;
-      }>(`
-        query {
-          siegeDojoPlayerReputationModels(where: { player: "${playerAddress}" }) {
-            edges { node { total_losses current_streak best_streak bracket } }
-          }
-          siegeDojoPlayerKingdomModels(where: { player: "${playerAddress}" }) {
-            edges { node { total_wins } }
-          }
-        }
-      `);
+  return useMemo<PlayerReputationData | null>(() => {
+    if (!playerAddress) return null;
+    const addr = playerAddress.toLowerCase();
+    const rep = flatModels<PlayerReputation>(reputations).find(
+      (x) => String(x.player).toLowerCase() === addr,
+    );
+    const kingdom = flatModels<PlayerKingdomModel>(kingdoms).find(
+      (x) => String(x.player).toLowerCase() === addr,
+    );
 
-      const rep = result?.siegeDojoPlayerReputationModels?.edges?.[0]?.node;
-      const kingdom = result?.siegeDojoPlayerKingdomModels?.edges?.[0]?.node;
+    const totalWins = safeNum(kingdom?.total_wins);
+    const totalLosses = safeNum(rep?.total_losses);
+    const totalMatches = totalWins + totalLosses;
 
-      const totalWins = toNum(kingdom?.total_wins);
-      const totalLosses = toNum(rep?.total_losses);
-      const totalMatches = totalWins + totalLosses;
-
-      setData({
-        totalWins,
-        totalLosses,
-        totalMatches,
-        winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0,
-        currentStreak: toNum(rep?.current_streak),
-        bestStreak: toNum(rep?.best_streak),
-        bracket: toNum(rep?.bracket),
-      });
+    return {
+      totalWins,
+      totalLosses,
+      totalMatches,
+      winRate: totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0,
+      currentStreak: safeNum(rep?.current_streak),
+      bestStreak: safeNum(rep?.best_streak),
+      bracket: safeNum(rep?.bracket),
     };
-
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
-  }, [playerAddress]);
-
-  return data;
+  }, [playerAddress, reputations, kingdoms]);
 }
 
 export function useMatchRecords(playerAddress: string | null): MatchRecordData[] {
-  const [records, setRecords] = useState<MatchRecordData[]>([]);
+  useEntityQuery(
+    new ToriiQueryBuilder<SchemaType>()
+      .withClause(
+        KeysClause<SchemaType>(
+          [ModelsMapping.MatchRecord],
+          [playerAddress ?? undefined],
+          "VariableLen",
+        ).build(),
+      )
+      .includeHashedKeys(),
+  );
 
-  useEffect(() => {
-    if (!playerAddress) return;
+  const matchRecords = useModels(ModelsMapping.MatchRecord);
 
-    const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoMatchRecordModels: GraphEdges<{
-          opponent: string;
-          wins: string;
-          losses: string;
-          last_match_id: string;
-        }>;
-      }>(`
-        query {
-          siegeDojoMatchRecordModels(where: { player: "${playerAddress}" }) {
-            edges { node { opponent wins losses last_match_id } }
-          }
-        }
-      `);
-
-      const entries = (result?.siegeDojoMatchRecordModels?.edges || []).map((e) => {
-        const wins = toNum(e.node.wins);
-        const losses = toNum(e.node.losses);
+  return useMemo<MatchRecordData[]>(() => {
+    if (!playerAddress) return [];
+    const addr = playerAddress.toLowerCase();
+    const entries = flatModels<MatchRecord>(matchRecords)
+      .filter((r) => String(r.player).toLowerCase() === addr)
+      .map((r) => {
+        const wins = safeNum(r.wins);
+        const losses = safeNum(r.losses);
         const totalMatches = wins + losses;
         const winRate = totalMatches > 0 ? (wins / totalMatches) * 100 : 0;
         return {
-          opponent: e.node.opponent,
+          opponent: String(r.opponent),
           wins,
           losses,
           totalMatches,
-          lastMatchId: toNum(e.node.last_match_id),
+          lastMatchId: safeNum(r.last_match_id),
           isRival: totalMatches >= 5,
           isBloodRival: totalMatches >= 10 && winRate >= 35 && winRate <= 65,
         };
       });
-
-      entries.sort((a, b) => b.totalMatches - a.totalMatches);
-      setRecords(entries);
-    };
-
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
-  }, [playerAddress]);
-
-  return records;
+    entries.sort((a, b) => b.totalMatches - a.totalMatches);
+    return entries;
+  }, [playerAddress, matchRecords]);
 }
 
 export function bracketMismatchWarning(myBracket: number, opponentBracket: number): string | null {
