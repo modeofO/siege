@@ -1,14 +1,5 @@
-// Hex adjacency helpers — TypeScript port of src/utils/hex.cairo.
-// Even-row offset coordinates; neighbor set depends on row parity.
+// TS port of src/utils/hex.cairo (even-row offset). Assumes non-negative ints (Cairo u16).
 
-function abs(v: number): number {
-  return v < 0 ? -v : v;
-}
-
-/**
- * Cube-coordinate distance between two offset-coordinate hex cells.
- * Mirrors hex_distance in src/utils/hex.cairo.
- */
 export function hexDistance(col1: number, row1: number, col2: number, row2: number): number {
   const r1p = row1 % 2;
   const r2p = row2 % 2;
@@ -18,10 +9,9 @@ export function hexDistance(col1: number, row1: number, col2: number, row2: numb
   const x2 = col2 - (row2 - r2p) / 2;
   const z2 = row2;
   const y2 = -x2 - z2;
-  return Math.max(abs(x1 - x2), abs(y1 - y2), abs(z1 - z2));
+  return Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2), Math.abs(z1 - z2));
 }
 
-/** Two cells are neighbors iff distance is exactly 1. */
 export function isNeighbor(col1: number, row1: number, col2: number, row2: number): boolean {
   return hexDistance(col1, row1, col2, row2) === 1;
 }

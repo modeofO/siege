@@ -56,11 +56,11 @@ export function KingdomUpgrade({ tier, totalWins }: KingdomUpgradeProps) {
       </div>
       {cost && (
         <div className="text-[10px] text-[#7a7060] mb-3 space-y-0.5">
-          {"iron" in cost && <div>Iron: {cost.iron}</div>}
-          {"stone" in cost && <div>Stone: {cost.stone}</div>}
-          {"wood" in cost && <div>Wood: {cost.wood}</div>}
-          {"ember" in cost && <div>Ember: {(cost as any).ember}</div>}
-          {"seeds" in cost && <div>Seeds: {(cost as any).seeds}</div>}
+          <div>Iron: {cost.iron}</div>
+          <div>Stone: {cost.stone}</div>
+          <div>Wood: {cost.wood}</div>
+          {cost.ember !== undefined && <div>Ember: {cost.ember}</div>}
+          {cost.seeds !== undefined && <div>Seeds: {cost.seeds}</div>}
         </div>
       )}
       <button

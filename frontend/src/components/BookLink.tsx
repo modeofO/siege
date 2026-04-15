@@ -75,6 +75,7 @@ export function BookLink() {
       {/* Stacked sprites — each cross-fades in at its phase */}
       <div className="relative w-40 xl:w-48">
         {/* Closed — base sprite, fades out once half takes over */}
+        {/* eslint-disable-next-line @next/next/no-img-element -- animation uses CSS % widths, Image fill breaks the stack */}
         <img
           src="/sprites/book_preview.png"
           alt=""
@@ -85,6 +86,7 @@ export function BookLink() {
           }}
         />
         {/* Half-open — fades in over the closed sprite */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/sprites/book_half.png"
           alt=""
@@ -98,6 +100,7 @@ export function BookLink() {
           }}
         />
         {/* Open — final frame, fades in over the half-open */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/sprites/book_open.png"
           alt=""

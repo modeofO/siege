@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import type { NodeOwner } from "@/lib/gameState1v1";
 import { AbilitySelector } from "./AbilitySelector";
 
@@ -173,7 +174,7 @@ export function AllocationForm1v1({
 
             return (
               <div key={ni} className="bg-[#252019] rounded-lg p-2 space-y-1.5 flex flex-col items-center">
-                <img src={NODE_SPRITES[ni]} alt={name} className="w-20 h-20 object-contain rounded-lg" />
+                <Image src={NODE_SPRITES[ni]} alt={name} width={80} height={80} className="w-20 h-20 object-contain rounded-lg" />
                 <div className="text-xs text-[#d4cfc6] font-bold text-center">{name}</div>
                 <div className="text-[10px] text-[#7a7060] text-center">{NODE_RESOURCES[ni]}</div>
                 {isTrapped ? (

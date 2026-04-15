@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useWorldParcels, usePlayerKingdom } from "@/lib/worldState";
@@ -151,9 +152,12 @@ export default function WorldPage() {
 
       {/* Hex grid — parchment frame */}
       <div className={styles.parchmentFrame}>
-        <img
+        <Image
           src="/sprites/parchment-map.png"
           alt=""
+          fill
+          priority
+          sizes="100vw"
           className={styles.parchmentImage}
         />
         <div className={styles.hexGridWrapper}>
