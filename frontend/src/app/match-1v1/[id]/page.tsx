@@ -27,9 +27,9 @@ import { commitMove1v1, revealMove1v1 } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
+import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
 import { useMatchStakes1v1 } from "@/lib/gameState1v1";
-import Link from "next/link";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -331,32 +331,21 @@ export default function Match1v1Page() {
 
   // End screen
   if (state.phase === "finished" && state.winner !== null) {
-    const didWin = (state.winner === 1 && isPlayerA) || (state.winner === 2 && isPlayerB);
-    const isDraw = state.winner === 0;
+    const winnerNum = (state.winner === 0 || state.winner === 1 || state.winner === 2
+      ? state.winner
+      : 0) as 0 | 1 | 2;
     return (
-      <div className="fixed inset-0 bg-[#0d0b0a]/95 z-50 flex items-center justify-center">
-        <div className="text-center space-y-8 max-w-md">
-          <div className="space-y-2">
-            <div className={`text-6xl font-bold tracking-widest font-serif ${isDraw ? "text-[#daa520]" : didWin ? "text-[#c8a44e]" : "text-[#ff3344]"}`}>
-              {isDraw ? "DRAW" : didWin ? "VICTORY" : "DEFEAT"}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-              <div className="text-[#7a7060] text-xs mb-1">Your Vault</div>
-              <div className="text-xl font-bold">{isPlayerA ? state.vaultAHp : state.vaultBHp} HP</div>
-            </div>
-            <div className="border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-              <div className="text-[#7a7060] text-xs mb-1">Enemy Vault</div>
-              <div className="text-xl font-bold">{isPlayerA ? state.vaultBHp : state.vaultAHp} HP</div>
-            </div>
-          </div>
-          <div className="text-[#7a7060] text-xs">{history.length} rounds played</div>
-          <Link href="/" className="inline-block px-8 py-3 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] rounded hover:bg-[#c8a44e]/20 transition-colors tracking-wider text-sm">
-            RETURN HOME
-          </Link>
-        </div>
-      </div>
+      <MatchEndActions
+        matchId={matchId}
+        winner={winnerNum}
+        isPlayerA={isPlayerA}
+        isPlayerB={isPlayerB}
+        playerAAddr={state.playerA || ""}
+        playerBAddr={state.playerB || ""}
+        vaultAHp={state.vaultAHp}
+        vaultBHp={state.vaultBHp}
+        roundsPlayed={history.length}
+      />
     );
   }
 

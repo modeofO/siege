@@ -23,7 +23,7 @@ const TX_OPTS = IS_DEVNET ? DEVNET_TX_OPTS : undefined;
 
 // request_random(caller, source): caller = contract that will consume_random,
 // source must match what consume_random uses: Source::Nonce(contract_address)
-function vrfRequestRandomCall(callerContract: string) {
+export function vrfRequestRandomCall(callerContract: string) {
   return {
     contractAddress: VRF_PROVIDER_ADDRESS,
     entrypoint: "request_random",
