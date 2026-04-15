@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-disable @typescript-eslint/no-require-imports */
 // Copies manifest_*.json from the repo root into src/manifests/.
 // Runs as a predev/prebuild hook — Next.js/Turbopack refuses imports outside the
 // project root, and sozo migrate writes manifests at the workspace root.
