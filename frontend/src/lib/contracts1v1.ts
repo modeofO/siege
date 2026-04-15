@@ -21,6 +21,39 @@ const DEVNET_TX_OPTS: UniversalDetails = {
 
 const TX_OPTS = IS_DEVNET ? DEVNET_TX_OPTS : undefined;
 
+// Cartridge surfaces reverts as {code, message, data: {execution_error}} — dig
+// the execution_error out so the UI shows the Cairo assert string, not JSON.
+export function extractErrorMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null) {
+    const obj = e as Record<string, unknown>;
+    const execErr = (obj.data as Record<string, unknown>)?.execution_error;
+    if (typeof execErr === "string") return execErr;
+    if (typeof obj.message === "string") return obj.message;
+  }
+  return String(e);
+}
+
+// account.execute resolves on sequencer ACCEPT, not on-chain success. Wait for
+// the receipt and throw on REVERTED so callers can surface the real error
+// instead of mistaking a revert for a sync delay.
+export async function waitForReceiptOrThrow(
+  account: AccountInterface,
+  txHash: string,
+  context: string,
+): Promise<void> {
+  try {
+    const receipt = await account.waitForTransaction(txHash, { retryInterval: 2000 });
+    const anyReceipt = receipt as { execution_status?: string; revert_reason?: string };
+    if (anyReceipt.execution_status === "REVERTED") {
+      throw new Error(`${context} reverted: ${anyReceipt.revert_reason || "unknown revert"}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith(`${context} reverted:`)) throw e;
+    throw new Error(`${context} receipt wait failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 // request_random(caller, source): caller = contract that will consume_random,
 // source must match what consume_random uses: Source::Nonce(contract_address)
 export function vrfRequestRandomCall(callerContract: string) {
@@ -94,27 +127,8 @@ export async function revealMove1v1(
     : [revealCall];
 
   const tx = await account.execute(calls, TX_OPTS);
-
-  // account.execute resolves once the sequencer ACCEPTS the tx, not after it
-  // executes. A tx can be accepted and then revert silently (e.g. a reveal
-  // that races another reveal — the later one triggers resolution without
-  // vRF and reverts). Wait for the receipt so we can surface reverts as
-  // thrown errors that the reveal retry path can handle.
-  try {
-    const receipt = await account.waitForTransaction(tx.transaction_hash, {
-      retryInterval: 2000,
-    });
-    const anyReceipt = receipt as { execution_status?: string; revert_reason?: string };
-    if (anyReceipt.execution_status === "REVERTED") {
-      throw new Error(`Reveal reverted: ${anyReceipt.revert_reason || "unknown revert"}`);
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith("Reveal reverted:")) throw e;
-    throw new Error(
-      `Reveal receipt wait failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-
+  // Reveal can race another reveal + revert silently — surface via receipt.
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Reveal");
   return tx;
 }
 

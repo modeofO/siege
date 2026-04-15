@@ -43,7 +43,7 @@ function safeNum(v: unknown): number {
  * i.e., the full 252-bit representation. `BigInt("4").toString(16) = "4"`,
  * but Torii expects `"0x00…04"`.
  */
-function toFeltHex(v: string | null | undefined): string | undefined {
+export function toFeltHex(v: string | null | undefined): string | undefined {
   if (!v) return undefined;
   try {
     return "0x" + BigInt(v).toString(16).padStart(64, "0");

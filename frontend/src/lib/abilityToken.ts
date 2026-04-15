@@ -84,28 +84,23 @@ export async function fetchAllAbilityBalances(
   provider: RpcProvider,
   playerAddress: string,
 ): Promise<Record<number, number>> {
+  const ids = Array.from({ length: 10 }, (_, i) => i + 1);
+  const accounts = ids.map(() => playerAddress);
+  const tokenIdsFlat: string[] = [];
+  for (const id of ids) tokenIdsFlat.push(id.toString(), "0");
+
+  const result = await provider.callContract({
+    contractAddress: ABILITY_TOKEN_ADDRESS,
+    entrypoint: "balance_of_batch",
+    calldata: [accounts.length.toString(), ...accounts, ids.length.toString(), ...tokenIdsFlat],
+  });
+
   const balances: Record<number, number> = {};
   for (let i = 1; i <= 10; i++) balances[i] = 0;
-
-  try {
-    const ids = Array.from({ length: 10 }, (_, i) => i + 1);
-    const accounts = ids.map(() => playerAddress);
-    const tokenIdsFlat: string[] = [];
-    for (const id of ids) tokenIdsFlat.push(id.toString(), "0");
-
-    const result = await provider.callContract({
-      contractAddress: ABILITY_TOKEN_ADDRESS,
-      entrypoint: "balance_of_batch",
-      calldata: [accounts.length.toString(), ...accounts, ids.length.toString(), ...tokenIdsFlat],
-    });
-
-    // Layout: [array_len, bal1_low, bal1_high, ...]
-    for (let i = 0; i < 10 && 1 + i * 2 < result.length; i++) {
-      const low = result[1 + i * 2];
-      balances[i + 1] = Number(BigInt(low || 0));
-    }
-  } catch {
-    // Keep zeros
+  // Layout: [array_len, bal1_low, bal1_high, ...]
+  for (let i = 0; i < 10 && 1 + i * 2 < result.length; i++) {
+    const low = result[1 + i * 2];
+    balances[i + 1] = Number(BigInt(low || 0));
   }
   return balances;
 }

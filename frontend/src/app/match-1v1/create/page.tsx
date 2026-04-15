@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
-import { createMatch1v1 } from "@/lib/contracts1v1";
+import { createMatch1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { createStakedMatch, useAbilityBalances } from "@/lib/stakedMatch";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
@@ -57,18 +57,16 @@ export default function Create1v1Page() {
   const isHexAddress = (s: string) => /^0x[0-9a-fA-F]+$/.test(s);
   const opponentAddr = isHexAddress(opponentInput) ? opponentInput : resolvedAddr;
 
-  // Kingdom (for tier → max stake slots)
   const kingdom = usePlayerKingdom(address ?? null);
-  const maxSlots = TIER_INFO[kingdom.tier]?.abilitySlots ?? 1;
+  // MatchStakes1v1 has 3 stake slots per side; world_system caps at 3 regardless of tier.
+  const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
 
-  // Ability balances (only fetched in staked mode to avoid RPC noise)
   const rpcProvider = useMemo(() => new RpcProvider({ nodeUrl: RPC_URL }), []);
-  const { balances, loading: balancesLoading } = useAbilityBalances(
+  const { balances, loading: balancesLoading, error: balancesError } = useAbilityBalances(
     mode === "staked" ? rpcProvider : undefined,
     mode === "staked" ? address : null,
   );
 
-  // Reset selected wager when switching to practice / losing kingdom
   useEffect(() => {
     if (mode !== "staked" || !kingdom.registered) {
       setSelectedIds([]);
@@ -87,13 +85,18 @@ export default function Create1v1Page() {
     }
     setLookupLoading(true);
     debounceRef.current = setTimeout(async () => {
-      const results = await lookupUsernames([input]);
-      const addr = results.get(input);
-      if (addr) {
-        setResolvedAddr(addr);
-        setResolvedUsername(input);
+      try {
+        const results = await lookupUsernames([input]);
+        const addr = results.get(input);
+        if (addr) {
+          setResolvedAddr(addr);
+          setResolvedUsername(input);
+        }
+      } catch (e) {
+        console.error("[create] username lookup failed:", e);
+      } finally {
+        setLookupLoading(false);
       }
-      setLookupLoading(false);
     }, 400);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -103,6 +106,7 @@ export default function Create1v1Page() {
   const stakedValid =
     mode === "staked" &&
     kingdom.registered &&
+    !balancesError &&
     selectedIds.length >= 1 &&
     selectedIds.length <= maxSlots;
 
@@ -138,7 +142,7 @@ export default function Create1v1Page() {
 
       setError("Transaction submitted but Torii has not indexed the match yet. Try refreshing.");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Transaction failed");
+      setError(extractErrorMsg(e));
     } finally {
       setLoading(false);
     }
@@ -245,17 +249,25 @@ export default function Create1v1Page() {
             </div>
           ) : (
             <>
-              <AbilityWagerPicker
-                balances={balances}
-                selected={selectedIds}
-                maxSlots={maxSlots}
-                onChange={setSelectedIds}
-                balancesLoading={balancesLoading}
-              />
-              {!balancesLoading && selectedIds.length === 0 && (
-                <div className="text-[11px] text-[#7a7060]">
-                  Select at least 1 ability to wager.
+              {balancesError ? (
+                <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
+                  Could not load ability balances — check your RPC connection and refresh. ({balancesError})
                 </div>
+              ) : (
+                <>
+                  <AbilityWagerPicker
+                    balances={balances}
+                    selected={selectedIds}
+                    maxSlots={maxSlots}
+                    onChange={setSelectedIds}
+                    balancesLoading={balancesLoading}
+                  />
+                  {!balancesLoading && selectedIds.length === 0 && (
+                    <div className="text-[11px] text-[#7a7060]">
+                      Select at least 1 ability to wager.
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}

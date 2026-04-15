@@ -1,13 +1,3 @@
-// frontend/src/lib/stakedMatch.ts
-//
-// Staked-match contract wrappers + reads. Pairs with world_system:
-//   create_staked_match(opponent, abilities) -> match_id
-//   join_staked_match(match_id, abilities)
-//   settle_match(match_id)          — asserts !stakes.settled
-//   claim_parcel(match_id, parcel_id) — requires stakes.settled, parcel unclaimed
-//
-// Plus a gRPC subscription on MatchStakes1v1 (with the real `settled` flag —
-// unlike useMatchStakes1v1 in gameState1v1.ts which reads MatchAbilities1v1).
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -19,8 +9,14 @@ import {
   type SchemaType,
   type MatchStakes1v1 as MatchStakes1v1Model,
 } from "@/bindings/typescript/models.gen";
-import { CONTRACTS_1V1, CONTRACTS_WORLD, vrfRequestRandomCall } from "@/lib/contracts1v1";
-import { fetchAllAbilityBalances } from "@/lib/abilityToken";
+import {
+  CONTRACTS_1V1,
+  CONTRACTS_WORLD,
+  vrfRequestRandomCall,
+  waitForReceiptOrThrow,
+} from "@/lib/contracts1v1";
+import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityToken";
+import { toFeltHex } from "@/lib/gameState1v1";
 import { useWorldParcels, type ParcelData } from "@/lib/worldState";
 import { isNeighbor } from "@/lib/hex";
 import { TIER_INFO } from "@/lib/tiers";
@@ -38,24 +34,28 @@ const DEVNET_TX_OPTS: UniversalDetails = {
 
 const TX_OPTS = IS_DEVNET ? DEVNET_TX_OPTS : undefined;
 
+// world_system.create_staked_match calls AbilityToken.safe_transfer_from(caller, world_system, ...).
+// OZ ERC-1155 requires the caller of safe_transfer_from to be `from` or an approved operator;
+// here msg.sender is world_system, so the user must have approved world_system as operator first.
+function approveAbilityTokenForWorldSystem() {
+  return {
+    contractAddress: ABILITY_TOKEN_ADDRESS,
+    entrypoint: "set_approval_for_all",
+    calldata: [CONTRACTS_WORLD.WORLD_SYSTEM, "1"],
+  };
+}
+
 // ---------- Call builders ----------
 
-/**
- * Creates a staked 1v1 match. Caller becomes player_a. `abilities` is 1..3
- * ability token IDs (1-10) that get escrowed on world_system. Match starts in
- * Pending status until the opponent calls joinStakedMatch.
- */
 export async function createStakedMatch(
   account: AccountInterface,
   opponent: string,
   abilities: number[],
 ) {
-  // world_system.create_staked_match invokes actions_1v1.create_match_1v1
-  // internally, which consumes vRF to roll the first round's gate modifiers.
-  // The request_random source must match actions_1v1 (where consume_random
-  // runs via get_contract_address), not world_system.
-  return account.execute(
+  // vRF source must be actions_1v1 — create_staked_match forwards to create_match_1v1 where consume_random runs.
+  const tx = await account.execute(
     [
+      approveAbilityTokenForWorldSystem(),
       vrfRequestRandomCall(CONTRACTS_1V1.ACTIONS),
       {
         contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
@@ -65,35 +65,31 @@ export async function createStakedMatch(
     ],
     TX_OPTS,
   );
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Create staked match");
+  return tx;
 }
 
-/**
- * Joins a pending staked match. Caller must be match.player_b. Wager is
- * min(a_count, b_count); any excess on either side is refunded. Transitions
- * the match to Active and wires MatchAbilities1v1 for battle use.
- */
 export async function joinStakedMatch(
   account: AccountInterface,
   matchId: string,
   abilities: number[],
 ) {
-  return account.execute(
-    {
-      contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
-      entrypoint: "join_staked_match",
-      calldata: [matchId, abilities.length.toString(), ...abilities.map(String)],
-    },
+  const tx = await account.execute(
+    [
+      approveAbilityTokenForWorldSystem(),
+      {
+        contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
+        entrypoint: "join_staked_match",
+        calldata: [matchId, abilities.length.toString(), ...abilities.map(String)],
+      },
+    ],
     TX_OPTS,
   );
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Join staked match");
+  return tx;
 }
 
-/**
- * Settles a finished match. Transfers escrowed abilities to the winner (or
- * refunds both on draw), releases the loser's furthest-from-home parcel,
- * updates reputation/match records, grants pillage eligibility if neighbors.
- * Callable on practice matches too — MatchStakes1v1 exists with zeros and
- * the stake-transfer loop becomes a no-op.
- */
+// Safe on practice matches: Dojo read_model returns a zeroed MatchStakes1v1 default, so the stake-transfer loop iterates zero times.
 export async function settleMatch(account: AccountInterface, matchId: string) {
   return account.execute(
     {
@@ -105,12 +101,6 @@ export async function settleMatch(account: AccountInterface, matchId: string) {
   );
 }
 
-/**
- * Winner claims an unclaimed parcel adjacent to their territory. Gated on
- * parcel cap, adjacency, and stakes.settled. Parcel must have owner == 0 —
- * settleMatch releases the loser's furthest parcel, which typically produces
- * the adjacent candidate.
- */
 export async function claimParcel(
   account: AccountInterface,
   matchId: string,
@@ -176,22 +166,7 @@ const EMPTY_ESCROW: MatchEscrowData = {
   loaded: false,
 };
 
-function toFeltHex(matchId: string): string {
-  try {
-    return "0x" + BigInt(matchId).toString(16);
-  } catch {
-    return matchId;
-  }
-}
-
-/**
- * Subscribes to the MatchStakes1v1 row for a match via gRPC. Returns the
- * `settled` flag (source of truth for whether settle_match has been called)
- * plus the escrowed stake lists for both sides.
- *
- * Distinct from useMatchStakes1v1 in gameState1v1.ts, which reads
- * MatchAbilities1v1 (the in-round ability model, not the stake escrow).
- */
+// Reads MatchStakes1v1 (escrow + settled). gameState1v1.useMatchStakes1v1 reads MatchAbilities1v1 — different model.
 export function useMatchEscrow(matchId: string | null): MatchEscrowData {
   useEntityQuery(
     new ToriiQueryBuilder<SchemaType>()
@@ -246,12 +221,6 @@ export interface ClaimCandidatesResult {
   loading: boolean;
 }
 
-/**
- * Returns parcels the winner can claim: owner == 0, hex-adjacent to any parcel
- * the winner already owns, and within tier_parcel_cap. Used by the match-end
- * claim picker. `parcelCount` is the winner's PlayerKingdom.parcel_count, from
- * which we derive non-home count (parcel_count > 3 ? parcel_count - 3 : 0).
- */
 export function useClaimCandidates(
   winnerAddress: string | null | undefined,
   winnerTier: number,
@@ -261,6 +230,7 @@ export function useClaimCandidates(
 
   return useMemo<ClaimCandidatesResult>(() => {
     const parcelCap = TIER_INFO[winnerTier]?.parcelCap ?? TIER_INFO[0].parcelCap;
+    // non-home count = parcel_count - 3 (3 homes always counted first).
     const nonHomeCount = winnerParcelCount > 3 ? winnerParcelCount - 3 : 0;
     const atCap = nonHomeCount >= parcelCap;
 
@@ -299,41 +269,42 @@ export function useClaimCandidates(
 
 // ---------- Ability balances hook ----------
 
-/**
- * Reads the player's ERC-1155 ability balances via balance_of_batch on the
- * AbilityToken contract. Returns a map keyed by token ID (1..10). Refetches
- * when `bumpKey` changes so callers can force a refresh after a tx.
- */
 export function useAbilityBalances(
   provider: RpcProvider | undefined,
   address: string | null | undefined,
   bumpKey: number = 0,
-): { balances: Record<number, number>; loading: boolean } {
+): { balances: Record<number, number>; loading: boolean; error: string | null } {
   const [balances, setBalances] = useState<Record<number, number>>(
     () => Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 0])),
   );
-  // Track which (address, bumpKey) pair the current `balances` were fetched
-  // for. `loading` is derived by comparing against the live pair — avoids
-  // synchronous setState in the effect body (the project lints strictly).
+  // derived-loading pattern: loading = liveKey !== loadedKey (avoids setState-in-effect for lint).
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const liveKey = provider && address ? `${address}:${bumpKey}` : null;
-  const loading = liveKey !== null && loadedKey !== liveKey;
+  const loading = liveKey !== null && loadedKey !== liveKey && error === null;
 
   useEffect(() => {
     let cancelled = false;
     if (!provider || !address) return;
     const key = `${address}:${bumpKey}`;
-    fetchAllAbilityBalances(provider, address).then((result) => {
-      if (!cancelled) {
+    fetchAllAbilityBalances(provider, address)
+      .then((result) => {
+        if (cancelled) return;
         setBalances(result);
         setLoadedKey(key);
-      }
-    });
+        setError(null);
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return;
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("[useAbilityBalances] balance_of_batch failed:", e);
+        setError(msg);
+      });
     return () => {
       cancelled = true;
     };
   }, [provider, address, bumpKey]);
 
-  return { balances, loading };
+  return { balances, loading, error };
 }

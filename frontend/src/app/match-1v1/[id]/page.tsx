@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useAccount } from "@/app/providers";
 import {
@@ -23,7 +24,7 @@ import {
   getSalt1v1,
   getMove1v1,
 } from "@/lib/crypto";
-import { commitMove1v1, revealMove1v1 } from "@/lib/contracts1v1";
+import { commitMove1v1, revealMove1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
@@ -133,19 +134,6 @@ export default function Match1v1Page() {
   useEffect(() => {
     console.log("[siege] match-1v1 page loaded — reveal gate diagnostics v1");
   }, []);
-
-  // Extract error message from Cartridge's structured errors
-  function extractErrorMsg(e: unknown): string {
-    if (e instanceof Error) return e.message;
-    if (typeof e === "object" && e !== null) {
-      const obj = e as Record<string, unknown>;
-      // Cartridge error: {code, message, data: {execution_error: "..."}}
-      const execErr = (obj.data as Record<string, unknown>)?.execution_error;
-      if (typeof execErr === "string") return execErr;
-      if (typeof obj.message === "string") return obj.message;
-    }
-    return String(e);
-  }
 
   // Check if an error is a known recoverable case
   const isAlreadyRevealed = (msg: string) =>
@@ -292,7 +280,7 @@ export default function Match1v1Page() {
       void refresh();
     } catch (e) {
       console.error("Commit failed:", e);
-      setError(e instanceof Error ? e.message : "Commit failed");
+      setError(extractErrorMsg(e));
       commitLock.current = false;
       setSubmitting(false);
     }
@@ -407,7 +395,7 @@ export default function Match1v1Page() {
         <div className="grid grid-cols-2 gap-6 px-4 pb-3">
           {/* Your Citadel */}
           <div className="flex flex-col items-center">
-            <img src="/sprites/citadel.png" alt="Your Citadel" className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]" />
+            <Image src="/sprites/citadel.png" alt="Your Citadel" width={128} height={128} className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]" />
             <span className="text-xs tracking-wider text-[#c8a44e] uppercase font-bold mt-1">Your Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
@@ -424,7 +412,7 @@ export default function Match1v1Page() {
           </div>
           {/* Enemy Citadel */}
           <div className="flex flex-col items-center">
-            <img src="/sprites/citadel.png" alt="Enemy Citadel" className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]" style={{ filter: "hue-rotate(340deg) saturate(1.5)" }} />
+            <Image src="/sprites/citadel.png" alt="Enemy Citadel" width={128} height={128} className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]" style={{ filter: "hue-rotate(340deg) saturate(1.5)" }} />
             <span className="text-xs tracking-wider text-[#ff3344] uppercase font-bold mt-1">Enemy Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
@@ -487,7 +475,7 @@ export default function Match1v1Page() {
                 const hasModifier = mod !== 0;
                 return (
                   <div key={idx} className={`rounded-lg text-center flex flex-col items-center justify-end gap-1 p-2 ${hasModifier ? `bg-[#252019]/50 border border-[#3d3428] ${modGlow}` : ""}`}>
-                    <img src={sprite} alt={name} className={`object-contain rounded-xl ${isMain ? "w-44 h-44" : "w-32 h-32"}`} />
+                    <Image src={sprite} alt={name} width={isMain ? 176 : 128} height={isMain ? 176 : 128} className={`object-contain rounded-xl ${isMain ? "w-44 h-44" : "w-32 h-32"}`} />
                     <div className={`font-bold font-serif ${isMain ? "text-sm text-[#d4cfc6]" : "text-xs text-[#d4cfc6]"}`}>{name}</div>
                     <div className={`text-xs font-bold ${modColor}`}>{modName}</div>
                     {modDesc && <div className="text-[10px] text-[#7a7060] leading-tight">{modDesc}</div>}

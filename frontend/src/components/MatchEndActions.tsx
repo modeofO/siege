@@ -10,6 +10,7 @@ import {
   settleMatch,
   claimParcel,
 } from "@/lib/stakedMatch";
+import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { tierName } from "@/lib/tiers";
 
@@ -97,7 +98,7 @@ export function MatchEndActions({
         { retryInterval: 2000 },
       );
     } catch (e) {
-      setTxError(e instanceof Error ? e.message : "Settle failed");
+      setTxError(extractErrorMsg(e));
     } finally {
       setSettling(false);
     }
@@ -114,7 +115,7 @@ export function MatchEndActions({
       );
       setClaimed(parcelId);
     } catch (e) {
-      setTxError(e instanceof Error ? e.message : "Claim failed");
+      setTxError(extractErrorMsg(e));
     } finally {
       setClaiming(null);
     }
@@ -130,7 +131,6 @@ export function MatchEndActions({
   return (
     <div className="fixed inset-0 bg-[#0d0b0a]/95 z-50 flex items-center justify-center overflow-y-auto py-8">
       <div className="text-center space-y-6 max-w-md w-full px-4">
-        {/* Title */}
         <div className="space-y-2">
           <div className={`text-6xl font-bold tracking-widest font-serif ${titleColor}`}>
             {title}
@@ -144,7 +144,6 @@ export function MatchEndActions({
           )}
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-2 gap-3 text-sm">
           <div className="border border-[#3d3428] rounded p-3 bg-[#1a1714]">
             <div className="text-[#7a7060] text-xs mb-1">Your Vault</div>
@@ -157,7 +156,6 @@ export function MatchEndActions({
         </div>
         <div className="text-[#7a7060] text-xs">{roundsPlayed} rounds played</div>
 
-        {/* Stakes summary (only if staked) */}
         {escrow.loaded && escrow.isStaked && (
           <div className="space-y-2">
             <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">
@@ -168,7 +166,6 @@ export function MatchEndActions({
           </div>
         )}
 
-        {/* Settle action */}
         {isParticipant && escrow.loaded && escrow.exists && !escrow.settled && (
           <div className="space-y-2">
             <button
@@ -190,7 +187,6 @@ export function MatchEndActions({
           </div>
         )}
 
-        {/* Claim picker (winner only, after settle) */}
         {didWin && escrow.loaded && escrow.settled && claimed === null && (
           <div className="space-y-2">
             <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">
@@ -230,14 +226,12 @@ export function MatchEndActions({
           </div>
         )}
 
-        {/* Claimed success */}
         {claimed !== null && (
           <div className="text-[11px] text-[#c8a44e] border border-[#c8a44e]/40 rounded p-3 bg-[#c8a44e]/5">
             Parcel {claimed} claimed. The Marches widen.
           </div>
         )}
 
-        {/* Errors */}
         {txError && (
           <div className="text-[11px] text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
             {txError}

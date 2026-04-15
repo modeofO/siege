@@ -10,6 +10,7 @@ import {
   useAbilityBalances,
   useMatchEscrow,
 } from "@/lib/stakedMatch";
+import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
 import { AbilityWagerPicker } from "@/components/AbilityWagerPicker";
@@ -31,10 +32,11 @@ export default function Join1v1Page() {
   const matchId = matchIdInput.trim() || null;
   const escrow = useMatchEscrow(matchId);
   const kingdom = usePlayerKingdom(address ?? null);
-  const maxSlots = TIER_INFO[kingdom.tier]?.abilitySlots ?? 1;
+  // MatchStakes1v1 has 3 stake slots per side; world_system caps at 3 regardless of tier.
+  const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
 
   const rpcProvider = useMemo(() => new RpcProvider({ nodeUrl: RPC_URL }), []);
-  const { balances, loading: balancesLoading } = useAbilityBalances(
+  const { balances, loading: balancesLoading, error: balancesError } = useAbilityBalances(
     escrow.isStaked ? rpcProvider : undefined,
     escrow.isStaked ? address : null,
   );
@@ -51,7 +53,6 @@ export default function Join1v1Page() {
       return;
     }
 
-    // Staked: require caller to match wager before navigating.
     if (!kingdom.registered) {
       setError("Register your Hold in the Marches before joining a staked match.");
       return;
@@ -67,7 +68,7 @@ export default function Join1v1Page() {
       await account.waitForTransaction(tx.transaction_hash, { retryInterval: 2000 });
       router.push(`/match-1v1/${matchId}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Join failed");
+      setError(extractErrorMsg(e));
     } finally {
       setLoading(false);
     }
@@ -77,7 +78,7 @@ export default function Join1v1Page() {
     !!matchId &&
     isConnected &&
     !loading &&
-    (!escrow.isStaked || (kingdom.registered && selectedIds.length >= 1));
+    (!escrow.isStaked || (kingdom.registered && !balancesError && selectedIds.length >= 1));
 
   return (
     <div className="max-w-lg mx-auto mt-12 space-y-6">
@@ -135,6 +136,10 @@ export default function Join1v1Page() {
               <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
                 Register your Hold in the Marches before staking.{" "}
                 <Link href="/world" className="underline">Go to Marches</Link>
+              </div>
+            ) : balancesError ? (
+              <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
+                Could not load ability balances — check your RPC connection and refresh. ({balancesError})
               </div>
             ) : (
               <AbilityWagerPicker

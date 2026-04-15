@@ -18,6 +18,7 @@ import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
 import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/pillage";
 import { CONQUEST_ADDRESS } from "@/lib/conquest";
+import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
 
 // ---------- Network mode ----------
 
@@ -185,6 +186,13 @@ const SESSION_POLICIES: SessionPolicies = {
       methods: [
         { name: "Set Preset Defense", entrypoint: "set_preset_defense" },
         { name: "Initiate Conquest", entrypoint: "initiate_conquest" },
+      ],
+    },
+
+    // --- AbilityToken: world_system needs operator approval to escrow staked abilities ---
+    [ABILITY_TOKEN_ADDRESS]: {
+      methods: [
+        { name: "Approve Ability Operator", entrypoint: "set_approval_for_all" },
       ],
     },
   },

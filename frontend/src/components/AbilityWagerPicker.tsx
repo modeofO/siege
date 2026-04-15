@@ -11,12 +11,6 @@ interface AbilityWagerPickerProps {
   balancesLoading?: boolean;
 }
 
-/**
- * Shared picker for staked-match wagers. Used on /match-1v1/create to pick
- * the creator's stake and on /match-1v1/join to pick the joiner's matching
- * stake. Clicking an ability toggles it; clicking again removes it. Capped
- * at `maxSlots` (tier_ability_slots) and by available balance per token ID.
- */
 export function AbilityWagerPicker({
   balances,
   selected,
@@ -29,8 +23,9 @@ export function AbilityWagerPicker({
   }
 
   const toggle = (id: number) => {
-    if (selected.includes(id)) {
-      onChange(selected.filter((x) => x !== id));
+    const idx = selected.lastIndexOf(id);
+    if (idx !== -1) {
+      onChange([...selected.slice(0, idx), ...selected.slice(idx + 1)]);
       return;
     }
     if (selected.length >= maxSlots) return;
