@@ -138,6 +138,8 @@ NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959
 
 Defined in `providers.tsx`. Covers gameplay entrypoints for gasless, no-prompt transactions. **Known incomplete** — see open issue #5 (auto-reveal stuck because sessions prompt for out-of-policy calls). Before adding new on-chain entrypoints that users trigger from the UI, make sure they're added here or the wallet will prompt on every tx.
 
+**Lifecycle — policies are pinned to the session at connect time.** A Cartridge Controller session registers on-chain with the `SessionPolicies` set that existed when the user connected. Adding entries to `SESSION_POLICIES` after that does **not** propagate to existing sessions — affected users keep seeing a "Review Transactions" sheet on the newly-added entrypoint until they disconnect + reconnect, which starts a fresh session registered with the current policy set. Any PR that adds a new policy entry (e.g. #16 will add `resolution_1v1.resolve_round`) should ship with a release-note line telling players to reconnect their Controller. The recent SDK migration (commits `00b67d8..02482e3`) did **not** change `SESSION_POLICIES`, so no reconnect is required for that merge.
+
 ### Contract calls (`contracts.ts`)
 
 - `DEVNET_TX_OPTS` (skip validation, zero gas) applied only in devnet mode
