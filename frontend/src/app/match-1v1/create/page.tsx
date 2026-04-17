@@ -62,10 +62,11 @@ export default function Create1v1Page() {
   const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
 
   const rpcProvider = useMemo(() => new RpcProvider({ nodeUrl: RPC_URL }), []);
-  const { balances, loading: balancesLoading, error: balancesError } = useAbilityBalances(
-    mode === "staked" ? rpcProvider : undefined,
-    mode === "staked" ? address : null,
-  );
+  const {
+    balances,
+    loading: balancesLoading,
+    error: balancesError,
+  } = useAbilityBalances(mode === "staked" ? rpcProvider : undefined, mode === "staked" ? address : null);
 
   useEffect(() => {
     if (mode !== "staked" || !kingdom.registered) {
@@ -159,9 +160,7 @@ export default function Create1v1Page() {
             ? "Your wager is escrowed. Share the match ID — your opponent must match your wager to begin."
             : "Share this match ID with your opponent:"}
         </div>
-        <div className="bg-[#12121a] border border-[#2a2a3a] rounded p-4 text-2xl font-bold">
-          {matchId}
-        </div>
+        <div className="bg-[#12121a] border border-[#2a2a3a] rounded p-4 text-2xl font-bold">{matchId}</div>
         <Link
           href={`/match-1v1/${matchId}`}
           className="inline-block px-6 py-2 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded text-sm hover:bg-[#ffd700]/20 transition-colors"
@@ -208,7 +207,9 @@ export default function Create1v1Page() {
       <div className="text-xs text-[#6a6a7a] leading-relaxed -mt-3">
         {mode === "practice"
           ? "Practice match. No abilities wagered, no parcels transferred. Reputation unchanged until the winner settles."
-          : "Stake 1–" + maxSlots + " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}
+          : "Stake 1–" +
+            maxSlots +
+            " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}
       </div>
 
       {/* Opponent */}
@@ -224,7 +225,10 @@ export default function Create1v1Page() {
         {lookupLoading && <div className="text-xs text-[#6a6a7a]">Looking up username...</div>}
         {resolvedUsername && resolvedAddr && (
           <div className="text-xs text-[#33cc66]">
-            {resolvedUsername} → <span className="font-mono">{resolvedAddr.slice(0, 10)}...{resolvedAddr.slice(-6)}</span>
+            {resolvedUsername} →{" "}
+            <span className="font-mono">
+              {resolvedAddr.slice(0, 10)}...{resolvedAddr.slice(-6)}
+            </span>
           </div>
         )}
         {!lookupLoading && opponentInput.trim() && !isHexAddress(opponentInput) && !resolvedAddr && (
@@ -245,7 +249,9 @@ export default function Create1v1Page() {
           {!kingdom.registered ? (
             <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
               Register your Hold in the Marches before staking abilities.{" "}
-              <Link href="/world" className="underline">Go to Marches</Link>
+              <Link href="/world" className="underline">
+                Go to Marches
+              </Link>
             </div>
           ) : (
             <>
@@ -263,9 +269,7 @@ export default function Create1v1Page() {
                     balancesLoading={balancesLoading}
                   />
                   {!balancesLoading && selectedIds.length === 0 && (
-                    <div className="text-[11px] text-[#7a7060]">
-                      Select at least 1 ability to wager.
-                    </div>
+                    <div className="text-[11px] text-[#7a7060]">Select at least 1 ability to wager.</div>
                   )}
                 </>
               )}
@@ -285,11 +289,7 @@ export default function Create1v1Page() {
         disabled={!canCreate || loading}
         className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
       >
-        {loading
-          ? "CREATING..."
-          : mode === "staked"
-            ? "CREATE STAKED MATCH"
-            : "CREATE 1v1 MATCH"}
+        {loading ? "CREATING..." : mode === "staked" ? "CREATE STAKED MATCH" : "CREATE 1v1 MATCH"}
       </button>
     </div>
   );

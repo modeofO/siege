@@ -25,7 +25,7 @@ export async function createMatch(
   teamAAttacker: string,
   teamADefender: string,
   teamBAttacker: string,
-  teamBDefender: string
+  teamBDefender: string,
 ) {
   return account.execute(
     {
@@ -37,11 +37,7 @@ export async function createMatch(
   );
 }
 
-export async function commitMove(
-  account: AccountInterface,
-  matchId: string,
-  commitment: string
-) {
+export async function commitMove(account: AccountInterface, matchId: string, commitment: string) {
   return account.execute(
     {
       contractAddress: CONTRACTS.COMMIT_REVEAL,
@@ -57,7 +53,7 @@ export async function revealAttacker(
   matchId: string,
   salt: string,
   pressurePoints: [string, string, string],
-  nodeContests: [string, string, string]
+  nodeContests: [string, string, string],
 ) {
   return account.execute(
     {
@@ -75,7 +71,7 @@ export async function revealDefender(
   salt: string,
   pressurePoints: [string, string, string],
   repair: string,
-  nodeContests: [string, string, string]
+  nodeContests: [string, string, string],
 ) {
   return account.execute(
     {

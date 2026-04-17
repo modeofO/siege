@@ -81,26 +81,42 @@
   width: 30%;
   height: 80%;
   opacity: 0.55;
-  filter: blur(9px) brightness(0.82) saturate(0.70);
+  filter: blur(9px) brightness(0.82) saturate(0.7);
   transform: translateX(-20%);
   will-change: transform;
 }
 
 @keyframes flicker-opacity {
-  0%   { opacity: 0.70; }
-  50%  { opacity: 1.00; }
-  100% { opacity: 0.78; }
+  0% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.78;
+  }
 }
 
 @keyframes flicker-scale {
-  0%   { transform: translateX(-50%) scale(0.95); }
-  50%  { transform: translateX(-50%) scale(1.08); }
-  100% { transform: translateX(-50%) scale(0.98); }
+  0% {
+    transform: translateX(-50%) scale(0.95);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.08);
+  }
+  100% {
+    transform: translateX(-50%) scale(0.98);
+  }
 }
 
 @keyframes drift {
-  0%   { transform: translateX(-20%); }
-  100% { transform: translateX(140%); }
+  0% {
+    transform: translateX(-20%);
+  }
+  100% {
+    transform: translateX(140%);
+  }
 }
 
 @media (prefers-reduced-motion: no-preference) {

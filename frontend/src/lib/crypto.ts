@@ -6,7 +6,11 @@ import { hash } from "starknet";
 export function generateSalt(): string {
   const bytes = new Uint8Array(31); // 31 bytes to stay within felt252
   crypto.getRandomValues(bytes);
-  const hex = "0x" + Array.from(bytes).map(b => b.toString(16).padStart(2, "0")).join("");
+  const hex =
+    "0x" +
+    Array.from(bytes)
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
   return hex;
 }
 
@@ -20,11 +24,16 @@ export function computeAttackerCommitment(
   p2: number,
   nc0: number,
   nc1: number,
-  nc2: number
+  nc2: number,
 ): string {
   return hash.computePoseidonHashOnElements([
-    salt, p0.toString(), p1.toString(), p2.toString(),
-    nc0.toString(), nc1.toString(), nc2.toString(),
+    salt,
+    p0.toString(),
+    p1.toString(),
+    p2.toString(),
+    nc0.toString(),
+    nc1.toString(),
+    nc2.toString(),
   ]);
 }
 
@@ -39,11 +48,17 @@ export function computeDefenderCommitment(
   repair: number,
   nc0: number,
   nc1: number,
-  nc2: number
+  nc2: number,
 ): string {
   return hash.computePoseidonHashOnElements([
-    salt, p0.toString(), p1.toString(), p2.toString(),
-    repair.toString(), nc0.toString(), nc1.toString(), nc2.toString(),
+    salt,
+    p0.toString(),
+    p1.toString(),
+    p2.toString(),
+    repair.toString(),
+    nc0.toString(),
+    nc1.toString(),
+    nc2.toString(),
   ]);
 }
 
@@ -85,21 +100,39 @@ export function getMove(matchId: string, round: number): number[] | null {
  */
 export function computeCommitment1v1(
   salt: string,
-  p0: number, p1: number, p2: number,
-  g0: number, g1: number, g2: number,
+  p0: number,
+  p1: number,
+  p2: number,
+  g0: number,
+  g1: number,
+  g2: number,
   repair: number,
-  nc0: number, nc1: number, nc2: number,
-  trap0: number, trap1: number, trap2: number,
-  abilityId: number, abilityTarget: number,
+  nc0: number,
+  nc1: number,
+  nc2: number,
+  trap0: number,
+  trap1: number,
+  trap2: number,
+  abilityId: number,
+  abilityTarget: number,
 ): string {
   return hash.computePoseidonHashOnElements([
     salt,
-    p0.toString(), p1.toString(), p2.toString(),
-    g0.toString(), g1.toString(), g2.toString(),
+    p0.toString(),
+    p1.toString(),
+    p2.toString(),
+    g0.toString(),
+    g1.toString(),
+    g2.toString(),
     repair.toString(),
-    nc0.toString(), nc1.toString(), nc2.toString(),
-    trap0.toString(), trap1.toString(), trap2.toString(),
-    abilityId.toString(), abilityTarget.toString(),
+    nc0.toString(),
+    nc1.toString(),
+    nc2.toString(),
+    trap0.toString(),
+    trap1.toString(),
+    trap2.toString(),
+    abilityId.toString(),
+    abilityTarget.toString(),
   ]);
 }
 

@@ -8,15 +8,11 @@ const manifest = IS_DEVNET ? manifestDev : manifestSepolia;
 
 export const TORII_URL =
   process.env.NEXT_PUBLIC_TORII_URL ||
-  (IS_DEVNET
-    ? "http://localhost:8080"
-    : "https://api.cartridge.gg/x/siege-dojo/torii");
+  (IS_DEVNET ? "http://localhost:8080" : "https://api.cartridge.gg/x/siege-dojo/torii");
 
 export const RPC_URL =
   process.env.NEXT_PUBLIC_RPC_URL ||
-  (IS_DEVNET
-    ? "http://localhost:5050"
-    : "https://api.cartridge.gg/x/starknet/sepolia");
+  (IS_DEVNET ? "http://localhost:5050" : "https://api.cartridge.gg/x/starknet/sepolia");
 
 export const CHAIN_ID = IS_DEVNET ? "KATANA" : "SN_SEPOLIA";
 

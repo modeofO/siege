@@ -9,12 +9,7 @@ import {
   type SchemaType,
   type MatchStakes1v1 as MatchStakes1v1Model,
 } from "@/bindings/typescript/models.gen";
-import {
-  CONTRACTS_1V1,
-  CONTRACTS_WORLD,
-  vrfRequestRandomCall,
-  waitForReceiptOrThrow,
-} from "@/lib/contracts1v1";
+import { CONTRACTS_1V1, CONTRACTS_WORLD, vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
 import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { toFeltHex } from "@/lib/gameState1v1";
 import { useWorldParcels, type ParcelData } from "@/lib/worldState";
@@ -47,11 +42,7 @@ function approveAbilityTokenForWorldSystem() {
 
 // ---------- Call builders ----------
 
-export async function createStakedMatch(
-  account: AccountInterface,
-  opponent: string,
-  abilities: number[],
-) {
+export async function createStakedMatch(account: AccountInterface, opponent: string, abilities: number[]) {
   // vRF source must be actions_1v1 — create_staked_match forwards to create_match_1v1 where consume_random runs.
   const tx = await account.execute(
     [
@@ -69,11 +60,7 @@ export async function createStakedMatch(
   return tx;
 }
 
-export async function joinStakedMatch(
-  account: AccountInterface,
-  matchId: string,
-  abilities: number[],
-) {
+export async function joinStakedMatch(account: AccountInterface, matchId: string, abilities: number[]) {
   const tx = await account.execute(
     [
       approveAbilityTokenForWorldSystem(),
@@ -103,11 +90,7 @@ export async function settleMatch(account: AccountInterface, matchId: string) {
   return tx;
 }
 
-export async function claimParcel(
-  account: AccountInterface,
-  matchId: string,
-  parcelId: number,
-) {
+export async function claimParcel(account: AccountInterface, matchId: string, parcelId: number) {
   const tx = await account.execute(
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
@@ -137,9 +120,7 @@ function safeNum(v: unknown): number {
 }
 
 function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store)
-    ? store
-    : Object.values(store as Record<string, unknown>);
+  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
   const out: T[] = [];
   for (const entry of iter) {
     if (!entry || typeof entry !== "object") continue;
@@ -189,16 +170,10 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
   return useMemo<MatchEscrowData>(() => {
     if (!matchId) return EMPTY_ESCROW;
     const idBig = BigInt(matchId);
-    const node = flatModels<MatchStakes1v1Model>(stakes).find((m) =>
-      safeBigIntEq(m.match_id, idBig),
-    );
+    const node = flatModels<MatchStakes1v1Model>(stakes).find((m) => safeBigIntEq(m.match_id, idBig));
     if (!node) return { ...EMPTY_ESCROW, loaded: true };
-    const a: [number, number, number] = [
-      safeNum(node.a_stake_1), safeNum(node.a_stake_2), safeNum(node.a_stake_3),
-    ];
-    const b: [number, number, number] = [
-      safeNum(node.b_stake_1), safeNum(node.b_stake_2), safeNum(node.b_stake_3),
-    ];
+    const a: [number, number, number] = [safeNum(node.a_stake_1), safeNum(node.a_stake_2), safeNum(node.a_stake_3)];
+    const b: [number, number, number] = [safeNum(node.b_stake_1), safeNum(node.b_stake_2), safeNum(node.b_stake_3)];
     return {
       a,
       b,
@@ -278,8 +253,8 @@ export function useAbilityBalances(
   address: string | null | undefined,
   bumpKey: number = 0,
 ): { balances: Record<number, number>; loading: boolean; error: string | null } {
-  const [balances, setBalances] = useState<Record<number, number>>(
-    () => Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 0])),
+  const [balances, setBalances] = useState<Record<number, number>>(() =>
+    Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 0])),
   );
   // derived-loading pattern: loading = liveKey !== loadedKey (avoids setState-in-effect for lint).
   const [loadedKey, setLoadedKey] = useState<string | null>(null);

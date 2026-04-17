@@ -27,12 +27,15 @@ interface FactionPanelProps {
 // BigInt-safe address equality — handles unpadded/padded Torii variants.
 const addrEq = (a: string | undefined, b: string | undefined): boolean => {
   if (!a || !b) return false;
-  try { return BigInt(a) === BigInt(b); } catch { return false; }
+  try {
+    return BigInt(a) === BigInt(b);
+  } catch {
+    return false;
+  }
 };
 
 // Short display form of an address.
-const truncAddr = (a: string): string =>
-  a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : (a || "");
+const truncAddr = (a: string): string => (a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a || "");
 
 export function FactionPanel({ account, address, kingdom, refresh }: FactionPanelProps) {
   const { member, faction, cooldownRemaining } = usePlayerFaction(address);
@@ -49,15 +52,7 @@ export function FactionPanel({ account, address, kingdom, refresh }: FactionPane
   };
 
   if (inFaction && faction && member) {
-    return (
-      <InFactionView
-        account={account}
-        address={address}
-        faction={faction}
-        kingdom={kingdom}
-        refresh={refresh}
-      />
-    );
+    return <InFactionView account={account} address={address} faction={faction} kingdom={kingdom} refresh={refresh} />;
   }
 
   if (invites.length > 0) {
@@ -71,13 +66,7 @@ export function FactionPanel({ account, address, kingdom, refresh }: FactionPane
           onCreate={openCreate}
           onAccepted={refresh}
         />
-        {createModalOpen && (
-          <CreateFactionModal
-            account={account}
-            onClose={closeCreate}
-            onCreated={onCreated}
-          />
-        )}
+        {createModalOpen && <CreateFactionModal account={account} onClose={closeCreate} onCreated={onCreated} />}
       </>
     );
   }
@@ -89,13 +78,7 @@ export function FactionPanel({ account, address, kingdom, refresh }: FactionPane
   return (
     <>
       <UnalignedView onCreate={openCreate} />
-      {createModalOpen && (
-        <CreateFactionModal
-          account={account}
-          onClose={closeCreate}
-          onCreated={onCreated}
-        />
-      )}
+      {createModalOpen && <CreateFactionModal account={account} onClose={closeCreate} onCreated={onCreated} />}
     </>
   );
 }
@@ -103,11 +86,10 @@ export function FactionPanel({ account, address, kingdom, refresh }: FactionPane
 function PolisLockedView() {
   return (
     <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
-      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-        Factions
-      </div>
+      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Factions</div>
       <div className="text-[11px] text-[#7a7060] leading-relaxed">
-        Reach <span className="text-[#daa520] font-bold">Strategos</span> tier to form or join a faction. Factions share borders, reinforce each other in conquest fights, and pool contributions toward campaign objectives.
+        Reach <span className="text-[#daa520] font-bold">Strategos</span> tier to form or join a faction. Factions share
+        borders, reinforce each other in conquest fights, and pool contributions toward campaign objectives.
       </div>
     </div>
   );
@@ -120,11 +102,10 @@ interface UnalignedViewProps {
 function UnalignedView({ onCreate }: UnalignedViewProps) {
   return (
     <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-4">
-      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-        Unaligned
-      </div>
+      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Unaligned</div>
       <div className="text-[11px] text-[#7a7060] leading-relaxed">
-        Form a faction to lead allies, or wait for an invitation. Faction leaders share borders with members and reinforce each other in conquest fights.
+        Form a faction to lead allies, or wait for an invitation. Faction leaders share borders with members and
+        reinforce each other in conquest fights.
       </div>
       <button
         onClick={onCreate}
@@ -167,9 +148,7 @@ function InvitesView({ invites, account, cooldownRemaining, canCreate, onCreate,
 
   return (
     <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-4">
-      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-        Pending Invites
-      </div>
+      <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Pending Invites</div>
 
       {cooldownLocked && (
         <div className="text-[10px] text-[#daa520]/70 bg-[#daa520]/5 border border-[#daa520]/20 rounded px-2 py-1">
@@ -185,9 +164,7 @@ function InvitesView({ invites, account, cooldownRemaining, canCreate, onCreate,
           >
             <div className="text-[11px] text-[#d4cfc6]">
               <div className="font-serif">Faction #{inv.factionId}</div>
-              <div className="text-[9px] text-[#7a7060]">
-                from {truncAddr(inv.invitedBy)}
-              </div>
+              <div className="text-[9px] text-[#7a7060]">from {truncAddr(inv.invitedBy)}</div>
             </div>
             <button
               onClick={() => handleAccept(inv.factionId)}
@@ -209,9 +186,7 @@ function InvitesView({ invites, account, cooldownRemaining, canCreate, onCreate,
         </button>
       )}
 
-      {error && (
-        <div className="text-[#ff3344] text-xs text-center">{error}</div>
-      )}
+      {error && <div className="text-[#ff3344] text-xs text-center">{error}</div>}
     </div>
   );
 }
@@ -371,9 +346,7 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xl font-bold font-serif text-[#d4cfc6]">
-            {faction.memberCount}
-          </div>
+          <div className="text-xl font-bold font-serif text-[#d4cfc6]">{faction.memberCount}</div>
           <div className="text-[9px] text-[#7a7060] tracking-wider uppercase">
             {faction.memberCount === 1 ? "Member" : "Members"}
           </div>
@@ -384,9 +357,7 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
       <div className="border-t border-[#3d3428] pt-3">
         <div className="flex items-start justify-between gap-4">
           <div className="flex-1 space-y-1">
-            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">
-              Faction Reinforcement
-            </div>
+            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">Faction Reinforcement</div>
             <div className="text-[11px] text-[#7a7060] leading-relaxed">
               Adjacent faction allies contribute a defense preset to conquest fights against your parcels.
             </div>
@@ -404,16 +375,12 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
             {toggling ? "..." : reinforcementOn ? "ON" : "OFF"}
           </button>
         </div>
-        {toggleError && (
-          <div className="text-[#ff3344] text-[10px] text-right mt-1">{toggleError}</div>
-        )}
+        {toggleError && <div className="text-[#ff3344] text-[10px] text-right mt-1">{toggleError}</div>}
       </div>
 
       {/* Member list */}
       <div className="border-t border-[#3d3428] pt-3 space-y-2">
-        <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">
-          Members
-        </div>
+        <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">Members</div>
         {members.length === 0 ? (
           <div className="text-[10px] text-[#7a7060] italic">Loading members…</div>
         ) : (
@@ -422,23 +389,16 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
               const isMemberLeader = addrEq(m.player, faction.leader);
               const isSelf = addrEq(m.player, address);
               return (
-                <div
-                  key={m.player}
-                  className="px-2 py-1.5 rounded border border-[#3d3428] bg-[#0d0b0a]/40"
-                >
+                <div key={m.player} className="px-2 py-1.5 rounded border border-[#3d3428] bg-[#0d0b0a]/40">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       {isMemberLeader && (
-                        <span className="text-[#daa520] text-[11px]" title="Faction leader">★</span>
-                      )}
-                      <span className="text-[11px] text-[#d4cfc6] font-mono">
-                        {truncAddr(m.player)}
-                      </span>
-                      {isSelf && (
-                        <span className="text-[9px] text-[#7a7060] tracking-wider uppercase">
-                          you
+                        <span className="text-[#daa520] text-[11px]" title="Faction leader">
+                          ★
                         </span>
                       )}
+                      <span className="text-[11px] text-[#d4cfc6] font-mono">{truncAddr(m.player)}</span>
+                      {isSelf && <span className="text-[9px] text-[#7a7060] tracking-wider uppercase">you</span>}
                     </div>
                     {isLeader && !isSelf && (
                       <div className="flex items-center gap-1">
@@ -484,14 +444,15 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
       {/* Leader-only: invite form */}
       {isLeader && (
         <div className="border-t border-[#3d3428] pt-3 space-y-2">
-          <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">
-            Invite a Player
-          </div>
+          <div className="text-[10px] text-[#7a7060] tracking-wider uppercase font-serif">Invite a Player</div>
           <div className="flex gap-2">
             <input
               type="text"
               value={inviteTarget}
-              onChange={(e) => { setInviteTarget(e.target.value); setInviteError(""); }}
+              onChange={(e) => {
+                setInviteTarget(e.target.value);
+                setInviteError("");
+              }}
               placeholder="0x0123..."
               disabled={inviteSubmitting}
               className="flex-1 px-3 py-2 rounded bg-[#252019] border border-[#3d3428] text-[#d4cfc6] text-[11px] font-mono placeholder-[#3d3428] focus:outline-none focus:border-[#daa520]/50"
@@ -504,12 +465,8 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
               {inviteSubmitting ? "..." : "INVITE"}
             </button>
           </div>
-          {inviteError && (
-            <div className="text-[#ff3344] text-[10px]">{inviteError}</div>
-          )}
-          {inviteSuccess && (
-            <div className="text-[#4a7c59] text-[10px]">Invite sent.</div>
-          )}
+          {inviteError && <div className="text-[#ff3344] text-[10px]">{inviteError}</div>}
+          {inviteSuccess && <div className="text-[#4a7c59] text-[10px]">Invite sent.</div>}
         </div>
       )}
 
@@ -547,11 +504,8 @@ function InFactionView({ account, address, faction, kingdom, refresh }: InFactio
             </div>
           </div>
         )}
-        {leaveError && (
-          <div className="text-[#ff3344] text-[10px] text-center">{leaveError}</div>
-        )}
+        {leaveError && <div className="text-[#ff3344] text-[10px] text-center">{leaveError}</div>}
       </div>
     </div>
   );
 }
-

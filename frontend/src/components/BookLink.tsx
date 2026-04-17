@@ -15,9 +15,9 @@ import { useRouter, usePathname } from "next/navigation";
  *
  * Hidden entirely on /craft since that page renders its own book.
  */
-const MOVE_MS = 750;   // travel time from corner to center
-const HALF_MS = 280;   // closed → half-open fade
-const OPEN_MS = 320;   // half-open → open fade
+const MOVE_MS = 750; // travel time from corner to center
+const HALF_MS = 280; // closed → half-open fade
+const OPEN_MS = 320; // half-open → open fade
 const NAV_DELAY_MS = MOVE_MS + HALF_MS + OPEN_MS - 80; // fire nav just before full open settles
 
 type Phase = "idle" | "moving" | "half" | "opening";
@@ -64,9 +64,7 @@ export function BookLink() {
         top: moving ? "50vh" : "8rem",
         right: moving ? "auto" : "0.5rem",
         left: moving ? "50vw" : "auto",
-        transform: moving
-          ? "translate(-50%, -50%) scale(1.6)"
-          : "translate(0, 0) scale(1)",
+        transform: moving ? "translate(-50%, -50%) scale(1.6)" : "translate(0, 0) scale(1)",
         // Cubic bezier for a deliberate ease that starts gently and settles
         transition: `top ${MOVE_MS}ms cubic-bezier(0.5, 0, 0.2, 1), left ${MOVE_MS}ms cubic-bezier(0.5, 0, 0.2, 1), right ${MOVE_MS}ms cubic-bezier(0.5, 0, 0.2, 1), transform ${MOVE_MS}ms cubic-bezier(0.5, 0, 0.2, 1)`,
         zIndex: 30,

@@ -36,7 +36,12 @@ describe("isNeighbor", () => {
 
   // Even-row neighbors at (2, 2) — exactly 6 cells, from hex.cairo even branch
   const evenRowNeighbors = [
-    [1, 1], [2, 1], [1, 2], [3, 2], [1, 3], [2, 3],
+    [1, 1],
+    [2, 1],
+    [1, 2],
+    [3, 2],
+    [1, 3],
+    [2, 3],
   ] as const;
   test.each(evenRowNeighbors)("(2,2) even-row neighbor (%d,%d)", (c, r) => {
     expect(isNeighbor(2, 2, c, r)).toBe(true);
@@ -44,7 +49,12 @@ describe("isNeighbor", () => {
 
   // Odd-row neighbors at (1, 1) — exactly 6 cells, from hex.cairo odd branch
   const oddRowNeighbors = [
-    [1, 0], [2, 0], [0, 1], [2, 1], [1, 2], [2, 2],
+    [1, 0],
+    [2, 0],
+    [0, 1],
+    [2, 1],
+    [1, 2],
+    [2, 2],
   ] as const;
   test.each(oddRowNeighbors)("(1,1) odd-row neighbor (%d,%d)", (c, r) => {
     expect(isNeighbor(1, 1, c, r)).toBe(true);

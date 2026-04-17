@@ -56,10 +56,7 @@ export function CreateFactionModal({ account, onClose, onCreated }: CreateFactio
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-[#0d0b0a]/90 flex items-center justify-center z-50"
-      onClick={handleBackdrop}
-    >
+    <div className="fixed inset-0 bg-[#0d0b0a]/90 flex items-center justify-center z-50" onClick={handleBackdrop}>
       <div className="bg-[#1a1714] border border-[#3d3428] rounded-lg p-6 max-w-lg w-full mx-4 space-y-5 relative">
         <button
           onClick={onClose}
@@ -71,19 +68,13 @@ export function CreateFactionModal({ account, onClose, onCreated }: CreateFactio
         </button>
 
         <div className="text-center">
-          <h2 className="text-xl font-bold font-serif text-[#daa520] tracking-wider">
-            ⚔ FOUND A FACTION ⚔
-          </h2>
-          <p className="text-xs text-[#7a7060] mt-2">
-            Rally allies under your banner.
-          </p>
+          <h2 className="text-xl font-bold font-serif text-[#daa520] tracking-wider">⚔ FOUND A FACTION ⚔</h2>
+          <p className="text-xs text-[#7a7060] mt-2">Rally allies under your banner.</p>
         </div>
 
         <div className="space-y-3">
           <div className="space-y-1">
-            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">
-              Faction Name
-            </div>
+            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">Faction Name</div>
             <input
               type="text"
               value={name}
@@ -97,9 +88,7 @@ export function CreateFactionModal({ account, onClose, onCreated }: CreateFactio
           </div>
 
           <div className="space-y-1">
-            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">
-              Banner Tag
-            </div>
+            <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">Banner Tag</div>
             <input
               type="text"
               value={tag}
@@ -114,21 +103,14 @@ export function CreateFactionModal({ account, onClose, onCreated }: CreateFactio
         </div>
 
         <div className="border border-[#3d3428] rounded p-3 space-y-2 bg-[#0d0b0a]/40">
-          <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">
-            Formation Cost
-          </div>
+          <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">Formation Cost</div>
           <div className="grid grid-cols-3 gap-2">
             {RESOURCE_COSTS.map((r) => (
-              <div
-                key={r.name}
-                className="text-center px-2 py-1 rounded border border-[#3d3428] bg-[#1a1510]"
-              >
+              <div key={r.name} className="text-center px-2 py-1 rounded border border-[#3d3428] bg-[#1a1510]">
                 <div className="text-sm font-bold" style={{ color: r.color }}>
                   {r.amount}
                 </div>
-                <div className="text-[9px] text-[#7a7060] tracking-wider">
-                  {r.name}
-                </div>
+                <div className="text-[9px] text-[#7a7060] tracking-wider">{r.name}</div>
               </div>
             ))}
           </div>
@@ -142,9 +124,7 @@ export function CreateFactionModal({ account, onClose, onCreated }: CreateFactio
           {submitting ? "ESTABLISHING..." : "⚔ ESTABLISH FACTION ⚔"}
         </button>
 
-        {error && (
-          <div className="text-[#ff3344] text-xs text-center break-words">{error}</div>
-        )}
+        {error && <div className="text-[#ff3344] text-xs text-center break-words">{error}</div>}
       </div>
     </div>
   );

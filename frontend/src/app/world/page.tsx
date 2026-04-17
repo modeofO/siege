@@ -16,8 +16,7 @@ import styles from "./parchment.module.css";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 
 // World system contract address — will need env var for Sepolia
-const WORLD_SYSTEM_ADDRESS =
-  process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "0x0";
+const WORLD_SYSTEM_ADDRESS = process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "0x0";
 
 const PARCEL_TYPE_NAMES: Record<number, string> = {
   0: "Forge",
@@ -106,9 +105,7 @@ export default function WorldPage() {
 
   // Get home parcel types for display
   const homeParcelTypes = kingdom.registered
-    ? [kingdom.home0, kingdom.home1, kingdom.home2]
-        .map((id) => parcels.find((p) => p.parcelId === id))
-        .filter(Boolean)
+    ? [kingdom.home0, kingdom.home1, kingdom.home2].map((id) => parcels.find((p) => p.parcelId === id)).filter(Boolean)
     : [];
 
   if (!account || !address) {
@@ -131,49 +128,26 @@ export default function WorldPage() {
     <div className="space-y-4 py-4">
       {/* Registration overlay */}
       {!kingdom.registered && parcels.length > 0 && (
-        <RegisterKingdom
-          account={account}
-          worldSystemAddress={WORLD_SYSTEM_ADDRESS}
-          onRegistered={refresh}
-        />
+        <RegisterKingdom account={account} worldSystemAddress={WORLD_SYSTEM_ADDRESS} onRegistered={refresh} />
       )}
 
       {/* Map header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-bold font-serif text-[#daa520] tracking-wider">
-          THE MARCHES
-        </h1>
-        {kingdom.registered && (
-          <div className="text-xs text-[#7a7060]">
-            {kingdom.parcelCount} parcels owned
-          </div>
-        )}
+        <h1 className="text-lg font-bold font-serif text-[#daa520] tracking-wider">THE MARCHES</h1>
+        {kingdom.registered && <div className="text-xs text-[#7a7060]">{kingdom.parcelCount} parcels owned</div>}
       </div>
 
       {/* Hex grid — parchment frame */}
       <div className={styles.parchmentFrame}>
-        <Image
-          src="/sprites/parchment-map.png"
-          alt=""
-          fill
-          priority
-          sizes="100vw"
-          className={styles.parchmentImage}
-        />
+        <Image src="/sprites/parchment-map.png" alt="" fill priority sizes="100vw" className={styles.parchmentImage} />
         <div className={styles.hexGridWrapper}>
           {parcels.length === 0 ? (
-            <div className="text-center text-[#7a7060] py-12">
-              World not initialized. No parcels found.
-            </div>
+            <div className="text-center text-[#7a7060] py-12">World not initialized. No parcels found.</div>
           ) : (
             <HexGrid
               parcels={parcels}
               playerAddress={address}
-              homeParcelIds={
-                kingdom.registered
-                  ? [kingdom.home0, kingdom.home1, kingdom.home2]
-                  : []
-              }
+              homeParcelIds={kingdom.registered ? [kingdom.home0, kingdom.home1, kingdom.home2] : []}
             />
           )}
         </div>
@@ -184,9 +158,7 @@ export default function WorldPage() {
       {/* Hold summary */}
       {kingdom.registered && (
         <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
-          <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-            Your Hold
-          </div>
+          <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Your Hold</div>
 
           <div className="grid grid-cols-2 gap-4">
             {/* Home parcels */}
@@ -197,7 +169,9 @@ export default function WorldPage() {
                   <div
                     key={i}
                     className="px-2 py-1 rounded text-[10px] font-bold border border-[#daa520]/30"
-                    style={{ color: p ? { 0: "#b87333", 1: "#8a8a9a", 2: "#4a7c59" }[p.parcelType as 0 | 1 | 2] : "#7a7060" }}
+                    style={{
+                      color: p ? { 0: "#b87333", 1: "#8a8a9a", 2: "#4a7c59" }[p.parcelType as 0 | 1 | 2] : "#7a7060",
+                    }}
                   >
                     {p ? PARCEL_TYPE_NAMES[p.parcelType] : "?"}
                   </div>
@@ -226,9 +200,7 @@ export default function WorldPage() {
       {/* Battles */}
       {kingdom.registered && (
         <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
-          <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">
-            Battles
-          </div>
+          <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Battles</div>
           <div className="text-[11px] text-[#7a7060] leading-relaxed">
             Challenge another player to a staked 1v1 match.
           </div>
@@ -250,14 +222,7 @@ export default function WorldPage() {
       )}
 
       {/* Faction panel */}
-      {kingdom.registered && (
-        <FactionPanel
-          account={account}
-          address={address}
-          kingdom={kingdom}
-          refresh={refresh}
-        />
-      )}
+      {kingdom.registered && <FactionPanel account={account} address={address} kingdom={kingdom} refresh={refresh} />}
     </div>
   );
 }

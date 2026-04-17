@@ -28,10 +28,10 @@ export function PressurePointAllocator({ role, budget, allocations, onChange }: 
   return (
     <div className="border border-[#2a2a3a] rounded-lg p-4 bg-[#12121a] space-y-3">
       <div className="flex justify-between items-center">
-        <span className="text-xs tracking-wider text-[#6a6a7a] uppercase">
-          Allocation — {role}
-        </span>
-        <span className={`text-sm font-bold ${remaining === 0 ? "text-green-400" : remaining < 0 ? "text-red-400" : "text-[#ffd700]"}`}>
+        <span className="text-xs tracking-wider text-[#6a6a7a] uppercase">Allocation — {role}</span>
+        <span
+          className={`text-sm font-bold ${remaining === 0 ? "text-green-400" : remaining < 0 ? "text-red-400" : "text-[#ffd700]"}`}
+        >
           Remaining: {remaining}
         </span>
       </div>
@@ -59,10 +59,10 @@ export function PressurePointAllocator({ role, budget, allocations, onChange }: 
       ))}
 
       <div className="flex justify-between text-xs text-[#6a6a7a] pt-2 border-t border-[#2a2a3a]">
-        <span>Total: {total} / {budget}</span>
-        {remaining !== 0 && (
-          <span className="text-[#ffd700]">Must allocate exactly {budget}</span>
-        )}
+        <span>
+          Total: {total} / {budget}
+        </span>
+        {remaining !== 0 && <span className="text-[#ffd700]">Must allocate exactly {budget}</span>}
       </div>
     </div>
   );

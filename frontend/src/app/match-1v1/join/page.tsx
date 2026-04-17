@@ -5,11 +5,7 @@ import { useState, useMemo } from "react";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useRouter } from "next/navigation";
-import {
-  joinStakedMatch,
-  useAbilityBalances,
-  useMatchEscrow,
-} from "@/lib/stakedMatch";
+import { joinStakedMatch, useAbilityBalances, useMatchEscrow } from "@/lib/stakedMatch";
 import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
@@ -36,10 +32,11 @@ export default function Join1v1Page() {
   const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
 
   const rpcProvider = useMemo(() => new RpcProvider({ nodeUrl: RPC_URL }), []);
-  const { balances, loading: balancesLoading, error: balancesError } = useAbilityBalances(
-    escrow.isStaked ? rpcProvider : undefined,
-    escrow.isStaked ? address : null,
-  );
+  const {
+    balances,
+    loading: balancesLoading,
+    error: balancesError,
+  } = useAbilityBalances(escrow.isStaked ? rpcProvider : undefined, escrow.isStaked ? address : null);
 
   const aStakeCount = escrow.a.filter((x) => x > 0).length;
 
@@ -115,13 +112,11 @@ export default function Join1v1Page() {
               ⚔ Challenger&apos;s Wager ⚔
             </div>
             <div className="flex items-center justify-center gap-2">
-              {escrow.a.map((id, i) =>
-                id > 0 ? <AbilityIcon key={i} tokenId={id} count={1} size={32} /> : null,
-              )}
+              {escrow.a.map((id, i) => (id > 0 ? <AbilityIcon key={i} tokenId={id} count={1} size={32} /> : null))}
             </div>
             <div className="text-[10px] text-center text-[#7a7060]">
-              {aStakeCount} ability{aStakeCount === 1 ? "" : "s"} escrowed — match this to activate the game.
-              Actual wager = min(yours, theirs); excess is refunded.
+              {aStakeCount} ability{aStakeCount === 1 ? "" : "s"} escrowed — match this to activate the game. Actual
+              wager = min(yours, theirs); excess is refunded.
             </div>
           </div>
 
@@ -135,7 +130,9 @@ export default function Join1v1Page() {
             {!kingdom.registered ? (
               <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
                 Register your Hold in the Marches before staking.{" "}
-                <Link href="/world" className="underline">Go to Marches</Link>
+                <Link href="/world" className="underline">
+                  Go to Marches
+                </Link>
               </div>
             ) : balancesError ? (
               <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
@@ -161,11 +158,7 @@ export default function Join1v1Page() {
         disabled={!canJoin}
         className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
       >
-        {loading
-          ? "JOINING..."
-          : escrow.isStaked
-            ? "MATCH WAGER & JOIN"
-            : "JOIN MATCH"}
+        {loading ? "JOINING..." : escrow.isStaked ? "MATCH WAGER & JOIN" : "JOIN MATCH"}
       </button>
     </div>
   );

@@ -71,9 +71,7 @@ function enumVariant(e: unknown): string {
  * model values so callers can just `.find()` / `.filter()`.
  */
 function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store)
-    ? store
-    : Object.values(store as Record<string, unknown>);
+  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
   const out: T[] = [];
   for (const entry of iter) {
     if (!entry || typeof entry !== "object") continue;
@@ -138,7 +136,10 @@ function computeBudget(nodes: NodeOwner[], team: "teamA" | "teamB"): number {
 }
 
 function computeGateBreakdown(
-  aAtk: number[], aDef: number[], bAtk: number[], bDef: number[],
+  aAtk: number[],
+  aDef: number[],
+  bAtk: number[],
+  bDef: number[],
   mods: [number, number, number],
 ): { gateBreakdown: GateDamage[]; damageToA: number; damageToB: number } {
   const dmgToB = [0, 0, 0];
@@ -149,27 +150,44 @@ function computeGateBreakdown(
   const unusedDefA = [0, 0, 0]; // A's defense not consumed by direct attack
 
   for (let g = 0; g < 3; g++) {
-    let aa = aAtk[g], ad = aDef[g], ba = bAtk[g], bd = bDef[g];
+    let aa = aAtk[g],
+      ad = aDef[g],
+      ba = bAtk[g],
+      bd = bDef[g];
     const mod = mods[g];
 
-    if (mod === 1) { // Narrow Pass
-      aa = Math.min(aa, 3); ad = Math.min(ad, 3);
-      ba = Math.min(ba, 3); bd = Math.min(bd, 3);
+    if (mod === 1) {
+      // Narrow Pass
+      aa = Math.min(aa, 3);
+      ad = Math.min(ad, 3);
+      ba = Math.min(ba, 3);
+      bd = Math.min(bd, 3);
     }
-    if (mod === 2) { // Mirror
+    if (mod === 2) {
+      // Mirror
       [aa, ad] = [ad, aa];
       [ba, bd] = [bd, ba];
     }
-    if (mod === 3) { // Deadlock
+    if (mod === 3) {
+      // Deadlock
       // no damage — but defense is still "unused" for reflection blocking
       unusedDefB[g] = bd;
       unusedDefA[g] = ad;
-    } else if (mod === 4) { // Reflection
+    } else if (mod === 4) {
+      // Reflection
       if (aa > bd) ovfToB[g] = aa - bd;
       if (ba > ad) ovfToA[g] = ba - ad;
     } else {
-      if (aa > bd) { dmgToB[g] = aa - bd; } else { unusedDefB[g] = bd - aa; }
-      if (ba > ad) { dmgToA[g] = ba - ad; } else { unusedDefA[g] = ad - ba; }
+      if (aa > bd) {
+        dmgToB[g] = aa - bd;
+      } else {
+        unusedDefB[g] = bd - aa;
+      }
+      if (ba > ad) {
+        dmgToA[g] = ba - ad;
+      } else {
+        unusedDefA[g] = ad - ba;
+      }
     }
   }
 
@@ -179,7 +197,8 @@ function computeGateBreakdown(
     if (ovfToB[g] > 0) {
       const per = Math.floor(ovfToB[g] / 2);
       for (let t = 0; t < 3; t++) {
-        if (t !== g && mods[t] !== 3) { // 3 = Deadlock
+        if (t !== g && mods[t] !== 3) {
+          // 3 = Deadlock
           const blocked = Math.min(per, unusedDefB[t]);
           dmgToB[t] += per - blocked;
         }
@@ -188,7 +207,8 @@ function computeGateBreakdown(
     if (ovfToA[g] > 0) {
       const per = Math.floor(ovfToA[g] / 2);
       for (let t = 0; t < 3; t++) {
-        if (t !== g && mods[t] !== 3) { // 3 = Deadlock
+        if (t !== g && mods[t] !== 3) {
+          // 3 = Deadlock
           const blocked = Math.min(per, unusedDefA[t]);
           dmgToA[t] += per - blocked;
         }
@@ -196,12 +216,15 @@ function computeGateBreakdown(
     }
   }
 
-  const gateBreakdown: GateDamage[] = [0, 1, 2].map(g => ({
+  const gateBreakdown: GateDamage[] = [0, 1, 2].map((g) => ({
     gate: g,
     modifier: mods[g],
-    attackA: aAtk[g], defenseA: aDef[g],
-    attackB: bAtk[g], defenseB: bDef[g],
-    dmgToA: dmgToA[g], dmgToB: dmgToB[g],
+    attackA: aAtk[g],
+    defenseA: aDef[g],
+    attackB: bAtk[g],
+    defenseB: bDef[g],
+    dmgToA: dmgToA[g],
+    dmgToB: dmgToB[g],
   }));
 
   return {
@@ -252,9 +275,7 @@ export function useMatchState1v1(matchId: string | null) {
     if (!matchId) return null;
     const idBig = BigInt(matchId);
 
-    const match = flatModels<MatchState1v1Model>(matchStates).find(
-      (m) => safeBigIntEq(m.match_id, idBig),
-    );
+    const match = flatModels<MatchState1v1Model>(matchStates).find((m) => safeBigIntEq(m.match_id, idBig));
     if (!match) return null;
 
     const round = safeNum(match.current_round);
@@ -346,21 +367,13 @@ export function useRoundStatus1v1(matchId: string | null, round: number, _refres
   return result;
 }
 
-export function useCommitmentStatus1v1(
-  matchId: string | null,
-  round: number,
-  role: 0 | 1,
-  _refreshKey?: number,
-) {
+export function useCommitmentStatus1v1(matchId: string | null, round: number, role: 0 | 1, _refreshKey?: number) {
   const commitments = useModels(ModelsMapping.Commitment);
   const result = useMemo(() => {
     if (!matchId) return { committed: false, revealed: false };
     const idBig = BigInt(matchId);
     const c = flatModels<Commitment>(commitments).find(
-      (x) =>
-        safeBigIntEq(x.match_id, idBig) &&
-        safeNumEq(x.round, round) &&
-        safeNumEq(x.role, role),
+      (x) => safeBigIntEq(x.match_id, idBig) && safeNumEq(x.round, round) && safeNumEq(x.role, role),
     );
     if (!c) return { committed: false, revealed: false };
     return { committed: !!c.committed, revealed: !!c.revealed };
@@ -464,9 +477,7 @@ export function useMatchAbilities1v1(
     if (!matchId || !playerAddress || !playerA) return empty;
     const idBig = BigInt(matchId);
     const isA = playerAddress.toLowerCase() === playerA.toLowerCase();
-    const node = flatModels<MatchAbilities1v1>(matchAbilities).find(
-      (m) => safeBigIntEq(m.match_id, idBig),
-    );
+    const node = flatModels<MatchAbilities1v1>(matchAbilities).find((m) => safeBigIntEq(m.match_id, idBig));
     if (!node) return empty;
     return isA
       ? {
@@ -498,10 +509,7 @@ export interface MatchStakesData {
 // abilities-in-play model) rather than the dedicated MatchStakes1v1 model.
 // Preserved verbatim from the original behavior — semantic cleanup is out of
 // scope for this transport migration.
-export function useMatchStakes1v1(
-  matchId: string | null,
-  _refreshKey?: number,
-): MatchStakesData {
+export function useMatchStakes1v1(matchId: string | null, _refreshKey?: number): MatchStakesData {
   const matchAbilities = useModels(ModelsMapping.MatchAbilities1v1);
 
   return useMemo<MatchStakesData>(() => {
@@ -515,15 +523,17 @@ export function useMatchStakes1v1(
     };
     if (!matchId) return empty;
     const idBig = BigInt(matchId);
-    const node = flatModels<MatchAbilities1v1>(matchAbilities).find(
-      (m) => safeBigIntEq(m.match_id, idBig),
-    );
+    const node = flatModels<MatchAbilities1v1>(matchAbilities).find((m) => safeBigIntEq(m.match_id, idBig));
     if (!node) return { ...empty, loaded: true };
     const a: [number, number, number] = [
-      safeNum(node.a_ability_1), safeNum(node.a_ability_2), safeNum(node.a_ability_3),
+      safeNum(node.a_ability_1),
+      safeNum(node.a_ability_2),
+      safeNum(node.a_ability_3),
     ];
     const b: [number, number, number] = [
-      safeNum(node.b_ability_1), safeNum(node.b_ability_2), safeNum(node.b_ability_3),
+      safeNum(node.b_ability_1),
+      safeNum(node.b_ability_2),
+      safeNum(node.b_ability_3),
     ];
     return {
       a,

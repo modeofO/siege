@@ -17,18 +17,10 @@ const GATE_LAYOUT = [
 ];
 
 export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps) {
-  const yourAttack = lastRound
-    ? yourTeam === 1 ? lastRound.team1Attack : lastRound.team2Attack
-    : null;
-  const yourDefense = lastRound
-    ? yourTeam === 1 ? lastRound.team1Defense : lastRound.team2Defense
-    : null;
-  const enemyAttack = lastRound
-    ? yourTeam === 1 ? lastRound.team2Attack : lastRound.team1Attack
-    : null;
-  const enemyDefense = lastRound
-    ? yourTeam === 1 ? lastRound.team2Defense : lastRound.team1Defense
-    : null;
+  const yourAttack = lastRound ? (yourTeam === 1 ? lastRound.team1Attack : lastRound.team2Attack) : null;
+  const yourDefense = lastRound ? (yourTeam === 1 ? lastRound.team1Defense : lastRound.team2Defense) : null;
+  const enemyAttack = lastRound ? (yourTeam === 1 ? lastRound.team2Attack : lastRound.team1Attack) : null;
+  const enemyDefense = lastRound ? (yourTeam === 1 ? lastRound.team2Defense : lastRound.team1Defense) : null;
 
   const hasData = lastRound !== null;
 
@@ -37,14 +29,8 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
       {/* Header with schematic line */}
       <div className="px-4 pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <span className="text-[10px] tracking-[0.4em] text-[#6a6a7a] uppercase">
-            Vault Entry Points
-          </span>
-          {hasData && (
-            <span className="text-[10px] text-[#2a2a3a] font-mono">
-              R{lastRound.round} DATA
-            </span>
-          )}
+          <span className="text-[10px] tracking-[0.4em] text-[#6a6a7a] uppercase">Vault Entry Points</span>
+          {hasData && <span className="text-[10px] text-[#2a2a3a] font-mono">R{lastRound.round} DATA</span>}
         </div>
         <div className="flex items-center gap-1.5 text-[10px] text-[#2a2a3a]">
           <span className="inline-block w-2 h-[2px] bg-[#00d4ff]/50" />
@@ -72,17 +58,10 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
           const didBreak = outBreak > 0;
 
           return (
-            <div
-              key={gate.name}
-              className="relative flex flex-col items-center px-3 py-4 group"
-            >
+            <div key={gate.name} className="relative flex flex-col items-center px-3 py-4 group">
               {/* Breach warning glow */}
-              {hasData && isBreached && (
-                <div className="absolute inset-0 bg-[#ff3344]/[0.03]" />
-              )}
-              {hasData && didBreak && (
-                <div className="absolute inset-0 bg-[#00d4ff]/[0.03]" />
-              )}
+              {hasData && isBreached && <div className="absolute inset-0 bg-[#ff3344]/[0.03]" />}
+              {hasData && didBreak && <div className="absolute inset-0 bg-[#00d4ff]/[0.03]" />}
 
               {/* Gate glyph */}
               <div className="relative mb-2">
@@ -102,12 +81,8 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
               </div>
 
               {/* Gate name */}
-              <div className="text-[11px] font-bold tracking-[0.15em] text-[#e0e0e8] mb-0.5">
-                {gate.name}
-              </div>
-              <div className="text-[9px] text-[#2a2a3a] mb-3 tracking-wider">
-                {gate.desc}
-              </div>
+              <div className="text-[11px] font-bold tracking-[0.15em] text-[#e0e0e8] mb-0.5">{gate.name}</div>
+              <div className="text-[9px] text-[#2a2a3a] mb-3 tracking-wider">{gate.desc}</div>
 
               {hasData ? (
                 <div className="w-full space-y-3">
@@ -139,9 +114,7 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
               ) : (
                 <div className="flex flex-col items-center gap-1 mt-1">
                   <div className="w-8 h-[1px] bg-[#1a1a26]" />
-                  <span className="text-[9px] text-[#2a2a3a] tracking-wider">
-                    AWAITING INTEL
-                  </span>
+                  <span className="text-[9px] text-[#2a2a3a] tracking-wider">AWAITING INTEL</span>
                   <div className="w-8 h-[1px] bg-[#1a1a26]" />
                 </div>
               )}
@@ -151,9 +124,7 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
       </div>
 
       {/* Bottom status strip */}
-      {hasData && (
-        <div className="h-[1px] bg-gradient-to-r from-transparent via-[#2a2a3a] to-transparent" />
-      )}
+      {hasData && <div className="h-[1px] bg-gradient-to-r from-transparent via-[#2a2a3a] to-transparent" />}
       {hasData && (
         <div className="px-4 py-2 flex justify-between text-[9px] tracking-wider">
           <span className="text-[#6a6a7a]">
@@ -164,8 +135,8 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
                 const d = enemyDefense?.[g.dataIndex] ?? 0;
                 return sum + Math.max(0, a - d);
               }, 0)}
-            </span>
-            {" "}TOTAL
+            </span>{" "}
+            TOTAL
           </span>
           <span className="text-[#6a6a7a]">
             TOOK{" "}
@@ -175,8 +146,8 @@ export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps)
                 const d = yourDefense?.[g.dataIndex] ?? 0;
                 return sum + Math.max(0, a - d);
               }, 0)}
-            </span>
-            {" "}TOTAL
+            </span>{" "}
+            TOTAL
           </span>
         </div>
       )}
@@ -221,22 +192,13 @@ function GateMetric({
       {/* Stacked bar */}
       <div className="relative w-full h-[6px] bg-[#0a0a0f] rounded-sm overflow-hidden">
         {/* Defense threshold */}
-        <div
-          className="absolute top-0 h-full bg-[#6a6a7a]/20 rounded-sm"
-          style={{ width: `${defPct}%` }}
-        />
+        <div className="absolute top-0 h-full bg-[#6a6a7a]/20 rounded-sm" style={{ width: `${defPct}%` }} />
         {/* Defense marker line */}
         {defense > 0 && (
-          <div
-            className="absolute top-0 w-[2px] h-full bg-[#6a6a7a]/50"
-            style={{ left: `${defPct}%` }}
-          />
+          <div className="absolute top-0 w-[2px] h-full bg-[#6a6a7a]/50" style={{ left: `${defPct}%` }} />
         )}
         {/* Attack bar */}
-        <div
-          className={`absolute top-0 h-full ${barBg} rounded-sm`}
-          style={{ width: `${atkPct}%`, opacity: 0.7 }}
-        />
+        <div className={`absolute top-0 h-full ${barBg} rounded-sm`} style={{ width: `${atkPct}%`, opacity: 0.7 }} />
         {/* Breakthrough segment */}
         {breakthrough > 0 && (
           <div
@@ -254,9 +216,7 @@ function GateMetric({
       {breakthrough > 0 && (
         <div className="flex items-center gap-1">
           <span className="inline-block w-1 h-1 rounded-full bg-green-400" />
-          <span className="text-[9px] text-green-400/80 tracking-wider">
-            {breakthrough} BREACH
-          </span>
+          <span className="text-[9px] text-green-400/80 tracking-wider">{breakthrough} BREACH</span>
         </div>
       )}
     </div>

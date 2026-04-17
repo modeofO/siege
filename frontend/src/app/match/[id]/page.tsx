@@ -4,7 +4,15 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useAccount } from "@/app/providers";
 import { useMatchState, useRoundHistory, useMatchPlayers, useCommitmentStatus } from "@/lib/gameState";
-import { generateSalt, computeAttackerCommitment, computeDefenderCommitment, storeSalt, storeMove, getSalt, getMove } from "@/lib/crypto";
+import {
+  generateSalt,
+  computeAttackerCommitment,
+  computeDefenderCommitment,
+  storeSalt,
+  storeMove,
+  getSalt,
+  getMove,
+} from "@/lib/crypto";
 import { commitMove, revealAttacker, revealDefender } from "@/lib/contracts";
 import { VaultDisplay } from "@/components/VaultDisplay";
 import { NodeMap } from "@/components/NodeMap";
@@ -38,13 +46,21 @@ export default function GamePage() {
   let roleFound = false;
   if (players && address) {
     if (addrMatch(players.teamAAttacker, address)) {
-      YOUR_TEAM = 1; YOUR_ROLE = "attacker"; roleFound = true;
+      YOUR_TEAM = 1;
+      YOUR_ROLE = "attacker";
+      roleFound = true;
     } else if (addrMatch(players.teamADefender, address)) {
-      YOUR_TEAM = 1; YOUR_ROLE = "defender"; roleFound = true;
+      YOUR_TEAM = 1;
+      YOUR_ROLE = "defender";
+      roleFound = true;
     } else if (addrMatch(players.teamBAttacker, address)) {
-      YOUR_TEAM = 2; YOUR_ROLE = "attacker"; roleFound = true;
+      YOUR_TEAM = 2;
+      YOUR_ROLE = "attacker";
+      roleFound = true;
     } else if (addrMatch(players.teamBDefender, address)) {
-      YOUR_TEAM = 2; YOUR_ROLE = "defender"; roleFound = true;
+      YOUR_TEAM = 2;
+      YOUR_ROLE = "defender";
+      roleFound = true;
     }
   }
 
@@ -61,16 +77,9 @@ export default function GamePage() {
   const deadlineRef = useRef({ key: "", deadline: 0 });
 
   // On-chain commitment status — survives page reloads
-  const { committed, revealed } = useCommitmentStatus(
-    matchId,
-    state?.round ?? 1,
-    YOUR_TEAM,
-    YOUR_ROLE,
-  );
+  const { committed, revealed } = useCommitmentStatus(matchId, state?.round ?? 1, YOUR_TEAM, YOUR_ROLE);
 
-  const budget = state
-    ? YOUR_TEAM === 1 ? state.team1Budget : state.team2Budget
-    : 10;
+  const budget = state ? (YOUR_TEAM === 1 ? state.team1Budget : state.team2Budget) : 10;
 
   const handleCommit = useCallback(async () => {
     if (!account || !state) return;
@@ -86,13 +95,24 @@ export default function GamePage() {
       let commitment: string;
       if (YOUR_ROLE === "attacker") {
         commitment = computeAttackerCommitment(
-          salt, allocations[0], allocations[1], allocations[2],
-          allocations[3], allocations[4], allocations[5]
+          salt,
+          allocations[0],
+          allocations[1],
+          allocations[2],
+          allocations[3],
+          allocations[4],
+          allocations[5],
         );
       } else {
         commitment = computeDefenderCommitment(
-          salt, allocations[0], allocations[1], allocations[2],
-          allocations[3], allocations[4], allocations[5], allocations[6]
+          salt,
+          allocations[0],
+          allocations[1],
+          allocations[2],
+          allocations[3],
+          allocations[4],
+          allocations[5],
+          allocations[6],
         );
       }
 
@@ -114,16 +134,20 @@ export default function GamePage() {
 
       if (YOUR_ROLE === "attacker") {
         await revealAttacker(
-          account, matchId, salt,
+          account,
+          matchId,
+          salt,
           [move[0].toString(), move[1].toString(), move[2].toString()],
-          [move[3].toString(), move[4].toString(), move[5].toString()]
+          [move[3].toString(), move[4].toString(), move[5].toString()],
         );
       } else {
         await revealDefender(
-          account, matchId, salt,
+          account,
+          matchId,
+          salt,
           [move[0].toString(), move[1].toString(), move[2].toString()],
           move[3].toString(),
-          [move[4].toString(), move[5].toString(), move[6].toString()]
+          [move[4].toString(), move[5].toString(), move[6].toString()],
         );
       }
     } catch (e) {
@@ -149,10 +173,18 @@ export default function GamePage() {
           Your address: <span className="font-mono text-[#e0e0e8]">{address}</span>
         </div>
         <div className="text-[#6a6a7a] text-xs space-y-1">
-          <div>Team A Atk: <span className="font-mono">{players.teamAAttacker}</span></div>
-          <div>Team A Def: <span className="font-mono">{players.teamADefender}</span></div>
-          <div>Team B Atk: <span className="font-mono">{players.teamBAttacker}</span></div>
-          <div>Team B Def: <span className="font-mono">{players.teamBDefender}</span></div>
+          <div>
+            Team A Atk: <span className="font-mono">{players.teamAAttacker}</span>
+          </div>
+          <div>
+            Team A Def: <span className="font-mono">{players.teamADefender}</span>
+          </div>
+          <div>
+            Team B Atk: <span className="font-mono">{players.teamBAttacker}</span>
+          </div>
+          <div>
+            Team B Def: <span className="font-mono">{players.teamBDefender}</span>
+          </div>
         </div>
       </div>
     );
@@ -191,23 +223,14 @@ export default function GamePage() {
       </div>
 
       {/* Gates */}
-      <GateDisplay
-        yourTeam={YOUR_TEAM}
-        yourRole={YOUR_ROLE}
-        lastRound={history.length > 0 ? history[0] : null}
-      />
+      <GateDisplay yourTeam={YOUR_TEAM} yourRole={YOUR_ROLE} lastRound={history.length > 0 ? history[0] : null} />
 
       {/* Nodes */}
       <NodeMap nodes={state.nodes} />
 
       {/* Allocation (only during committing phase) */}
       {state.phase === "committing" && !committed && (
-        <PressurePointAllocator
-          role={YOUR_ROLE}
-          budget={budget}
-          allocations={allocations}
-          onChange={setAllocations}
-        />
+        <PressurePointAllocator role={YOUR_ROLE} budget={budget} allocations={allocations} onChange={setAllocations} />
       )}
 
       {/* Action buttons */}
@@ -237,9 +260,7 @@ export default function GamePage() {
           {state.phase === "revealing" && revealed && (
             <span className="text-green-400 text-sm">✓ Move revealed — waiting for resolution</span>
           )}
-          {state.phase === "resolving" && (
-            <span className="text-[#6a6a7a] text-sm">⟳ Resolving round...</span>
-          )}
+          {state.phase === "resolving" && <span className="text-[#6a6a7a] text-sm">⟳ Resolving round...</span>}
         </div>
         <div className="text-sm">
           Timer: <Timer deadline={deadline} />

@@ -4,19 +4,14 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAccount } from "@/app/providers";
 import { AbilityIcon } from "./AbilityIcon";
-import {
-  useMatchEscrow,
-  useClaimCandidates,
-  settleMatch,
-  claimParcel,
-} from "@/lib/stakedMatch";
+import { useMatchEscrow, useClaimCandidates, settleMatch, claimParcel } from "@/lib/stakedMatch";
 import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { tierName } from "@/lib/tiers";
 
 interface MatchEndActionsProps {
   matchId: string;
-  winner: 0 | 1 | 2;              // 0 = draw
+  winner: 0 | 1 | 2; // 0 = draw
   isPlayerA: boolean;
   isPlayerB: boolean;
   playerAAddr: string;
@@ -33,7 +28,9 @@ function ParcelBadge({ type, col, row }: { type: number; col: number; row: numbe
   return (
     <div className="flex flex-col items-center gap-0.5 border border-[#3d3428] rounded px-2 py-1.5 bg-[#1a1714] min-w-[72px]">
       <span className="text-[10px] text-[#c8a44e] font-serif tracking-wider">{label}</span>
-      <span className="text-[10px] text-[#7a7060] font-mono">({col},{row})</span>
+      <span className="text-[10px] text-[#7a7060] font-mono">
+        ({col},{row})
+      </span>
     </div>
   );
 }
@@ -47,9 +44,7 @@ function StakeRow({ label, ids }: { label: string; ids: [number, number, number]
         <span className="text-[10px] text-[#7a7060] italic">none</span>
       ) : (
         <div className="flex items-center gap-1">
-          {ids.map((id, i) =>
-            id > 0 ? <AbilityIcon key={i} tokenId={id} count={1} size={28} /> : null,
-          )}
+          {ids.map((id, i) => (id > 0 ? <AbilityIcon key={i} tokenId={id} count={1} size={28} /> : null))}
         </div>
       )}
     </div>
@@ -76,12 +71,13 @@ export function MatchEndActions({
 
   const escrow = useMatchEscrow(matchId);
   const winnerKingdom = usePlayerKingdom(didWin ? (address ?? null) : null);
-  const { candidates, atCap, nonHomeCount, parcelCap, loading: candidatesLoading } =
-    useClaimCandidates(
-      didWin ? winnerAddr : null,
-      winnerKingdom.tier,
-      winnerKingdom.parcelCount,
-    );
+  const {
+    candidates,
+    atCap,
+    nonHomeCount,
+    parcelCap,
+    loading: candidatesLoading,
+  } = useClaimCandidates(didWin ? winnerAddr : null, winnerKingdom.tier, winnerKingdom.parcelCount);
 
   const [settling, setSettling] = useState(false);
   const [claiming, setClaiming] = useState<number | null>(null);
@@ -116,19 +112,13 @@ export function MatchEndActions({
   };
 
   const title = isDraw ? "DRAW" : didWin ? "VICTORY" : "DEFEAT";
-  const titleColor = isDraw
-    ? "text-[#daa520]"
-    : didWin
-      ? "text-[#c8a44e]"
-      : "text-[#ff3344]";
+  const titleColor = isDraw ? "text-[#daa520]" : didWin ? "text-[#c8a44e]" : "text-[#ff3344]";
 
   return (
     <div className="fixed inset-0 bg-[#0d0b0a]/95 z-50 flex items-center justify-center overflow-y-auto py-8">
       <div className="text-center space-y-6 max-w-md w-full px-4">
         <div className="space-y-2">
-          <div className={`text-6xl font-bold tracking-widest font-serif ${titleColor}`}>
-            {title}
-          </div>
+          <div className={`text-6xl font-bold tracking-widest font-serif ${titleColor}`}>{title}</div>
           {didWin && !isDraw && (
             <div className="text-[#7a7060] text-xs tracking-wider">
               {tierName(winnerKingdom.tier).toUpperCase()}
@@ -152,9 +142,7 @@ export function MatchEndActions({
 
         {escrow.loaded && escrow.isStaked && (
           <div className="space-y-2">
-            <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">
-              ⚔ Stakes ⚔
-            </div>
+            <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">⚔ Stakes ⚔</div>
             <StakeRow label={isPlayerA ? "Your wager" : "Opponent wager"} ids={escrow.a} />
             <StakeRow label={isPlayerA ? "Opponent wager" : "Your wager"} ids={escrow.b} />
           </div>
@@ -183,9 +171,7 @@ export function MatchEndActions({
 
         {didWin && escrow.loaded && escrow.settled && claimed === null && (
           <div className="space-y-2">
-            <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">
-              Claim a Parcel
-            </div>
+            <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">Claim a Parcel</div>
             {atCap ? (
               <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
                 Parcel cap reached ({nonHomeCount}/{parcelCap}). Upgrade your Hold to claim more.
@@ -210,11 +196,7 @@ export function MatchEndActions({
                     </button>
                   ))}
                 </div>
-                {claiming !== null && (
-                  <div className="text-[11px] text-[#c8a44e]">
-                    Claiming parcel {claiming}...
-                  </div>
-                )}
+                {claiming !== null && <div className="text-[11px] text-[#c8a44e]">Claiming parcel {claiming}...</div>}
               </>
             )}
           </div>

@@ -5,28 +5,13 @@ import Link from "next/link";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useResourceBalances, type ResourceBalances } from "@/lib/useResourceBalances";
-import {
-  ABILITIES,
-  canAfford,
-  craftAbility,
-  type AbilityCost,
-} from "@/lib/craftingContracts";
-import {
-  fetchAbilityBalances,
-  EMPTY_ABILITY_INVENTORY,
-  type AbilityInventory,
-} from "@/lib/abilityToken";
+import { ABILITIES, canAfford, craftAbility, type AbilityCost } from "@/lib/craftingContracts";
+import { fetchAbilityBalances, EMPTY_ABILITY_INVENTORY, type AbilityInventory } from "@/lib/abilityToken";
 import { LAST_MATCH_KEY } from "@/components/Navbar";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 
-const ABILITY_FIELDS: (keyof AbilityInventory)[] = [
-  "siege_sword",
-  "stone_cloak",
-  "ember_blast",
-  "hex",
-  "fortify",
-];
+const ABILITY_FIELDS: (keyof AbilityInventory)[] = ["siege_sword", "stone_cloak", "ember_blast", "hex", "fortify"];
 
 const RESOURCE_COLORS: Record<string, string> = {
   iron: "text-[#a0a0b0]",
@@ -94,7 +79,7 @@ export default function CraftPage() {
 
   // Per-ability card renderer. `side` drives the Y-rotation so the card
   // leans toward the book's spine, matching the curve of the open pages.
-  const renderAbilityCard = (ability: typeof ABILITIES[number], side: "left" | "right") => {
+  const renderAbilityCard = (ability: (typeof ABILITIES)[number], side: "left" | "right") => {
     const cost = ability.cost as unknown as AbilityCost;
     const affordable = canAfford(cost, resourceBalances);
     const owned = inventory[ABILITY_FIELDS[ability.id - 1]];
@@ -108,8 +93,7 @@ export default function CraftPage() {
         key={ability.id}
         className="relative rounded-sm p-3 space-y-2"
         style={{
-          background:
-            "linear-gradient(180deg, rgba(232, 214, 170, 0.92) 0%, rgba(212, 188, 138, 0.88) 100%)",
+          background: "linear-gradient(180deg, rgba(232, 214, 170, 0.92) 0%, rgba(212, 188, 138, 0.88) 100%)",
           border: "1px solid rgba(74, 48, 22, 0.55)",
           boxShadow: [
             "0 6px 14px rgba(30, 18, 8, 0.55)",
@@ -160,12 +144,8 @@ export default function CraftPage() {
                 key={resource}
                 className="text-[10px] px-1.5 py-0.5 rounded-sm"
                 style={{
-                  background: hasEnough
-                    ? "rgba(74, 48, 22, 0.12)"
-                    : "rgba(178, 34, 52, 0.15)",
-                  border: hasEnough
-                    ? "1px solid rgba(74, 48, 22, 0.4)"
-                    : "1px solid rgba(178, 34, 52, 0.5)",
+                  background: hasEnough ? "rgba(74, 48, 22, 0.12)" : "rgba(178, 34, 52, 0.15)",
+                  border: hasEnough ? "1px solid rgba(74, 48, 22, 0.4)" : "1px solid rgba(178, 34, 52, 0.5)",
                   color: hasEnough ? "#3b2410" : "#8b1a2a",
                 }}
               >
@@ -179,8 +159,7 @@ export default function CraftPage() {
           disabled={!isConnected || !affordable || isCrafting}
           className="w-full py-1.5 rounded-sm font-bold tracking-wider text-xs font-serif transition-all disabled:opacity-40 disabled:cursor-not-allowed"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(74, 48, 22, 0.9) 0%, rgba(48, 30, 12, 0.95) 100%)",
+            background: "linear-gradient(180deg, rgba(74, 48, 22, 0.9) 0%, rgba(48, 30, 12, 0.95) 100%)",
             color: "#e8d6aa",
             border: "1px solid rgba(30, 18, 8, 0.8)",
             boxShadow: [
@@ -312,16 +291,16 @@ export default function CraftPage() {
                     <span className={`font-bold ${RESOURCE_COLORS[name] || ""}`} style={{ color: "#3b2410" }}>
                       {resources[name]}
                     </span>
-                    <span className="capitalize" style={{ color: "#5a3b1e" }}>{name}</span>
+                    <span className="capitalize" style={{ color: "#5a3b1e" }}>
+                      {name}
+                    </span>
                   </div>
                 ))}
               </div>
             </div>
 
             {/* Left-page ability cards */}
-            <div className="space-y-3 mt-1">
-              {leftAbilities.map((ability) => renderAbilityCard(ability, "left"))}
-            </div>
+            <div className="space-y-3 mt-1">{leftAbilities.map((ability) => renderAbilityCard(ability, "left"))}</div>
 
             {error && (
               <div className="text-[10px] text-center" style={{ color: "#8b1a2a" }}>
@@ -338,9 +317,7 @@ export default function CraftPage() {
             }}
           >
             {/* Right-page ability cards */}
-            <div className="space-y-3">
-              {rightAbilities.map((ability) => renderAbilityCard(ability, "right"))}
-            </div>
+            <div className="space-y-3">{rightAbilities.map((ability) => renderAbilityCard(ability, "right"))}</div>
 
             {/* Back home link at the bottom of the right page — tilted to match */}
             <div

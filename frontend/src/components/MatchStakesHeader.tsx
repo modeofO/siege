@@ -48,9 +48,7 @@ export function MatchStakesHeader({ stakes, isPlayerA }: MatchStakesHeaderProps)
   if (!stakes.isStaked) {
     return (
       <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] px-4 py-2 flex items-center justify-center">
-        <span className="text-[10px] tracking-wider text-[#7a7060] uppercase">
-          Practice match — no stakes
-        </span>
+        <span className="text-[10px] tracking-wider text-[#7a7060] uppercase">Practice match — no stakes</span>
       </div>
     );
   }

@@ -4,12 +4,8 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[80vh] gap-10">
       <div className="text-center space-y-4">
-        <h1 className="text-5xl md:text-7xl font-bold tracking-[0.3em] text-[#c8a44e] font-serif">
-          SIEGE
-        </h1>
-        <p className="text-xs md:text-sm text-[#7a7060] tracking-[0.4em] font-serif">
-          COMMIT · REVEAL · CONQUER
-        </p>
+        <h1 className="text-5xl md:text-7xl font-bold tracking-[0.3em] text-[#c8a44e] font-serif">SIEGE</h1>
+        <p className="text-xs md:text-sm text-[#7a7060] tracking-[0.4em] font-serif">COMMIT · REVEAL · CONQUER</p>
       </div>
 
       <Link

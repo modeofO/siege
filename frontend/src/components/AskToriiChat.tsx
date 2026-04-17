@@ -6,8 +6,7 @@ import remarkGfm from "remark-gfm";
 
 const ENDPOINT = "/api/asktorii";
 const STORAGE_KEY = "siege:rookery";
-const TORII_URL =
-  process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
+const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 
 type Role = "you" | "chronicler" | "raven-lost";
 interface Message {
@@ -98,19 +97,14 @@ function Rookery() {
       });
       if (!res.ok) {
         const body = await res.text().catch(() => "");
-        throw new Error(
-          `${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 240)}` : ""}`,
-        );
+        throw new Error(`${res.status} ${res.statusText}${body ? ` — ${body.slice(0, 240)}` : ""}`);
       }
       const data = (await res.json()) as JsonRpcResponse;
       if (data.error) {
         throw new Error(`${data.error.code}: ${data.error.message}`);
       }
       const answer = extractAnswer(data.result);
-      setMessages((m) => [
-        ...m,
-        { id: `${Date.now()}-c`, role: "chronicler", text: answer, ts: Date.now() },
-      ]);
+      setMessages((m) => [...m, { id: `${Date.now()}-c`, role: "chronicler", text: answer, ts: Date.now() }]);
     } catch (e) {
       setMessages((m) => [
         ...m,
@@ -173,9 +167,7 @@ function Rookery() {
         }}
       >
         <RavenGlyph className="w-5 h-5" />
-        <span className="font-serif tracking-[0.3em] text-[10px] uppercase">
-          Rookery
-        </span>
+        <span className="font-serif tracking-[0.3em] text-[10px] uppercase">Rookery</span>
       </button>
 
       {/* ── Panel ── */}
@@ -187,12 +179,9 @@ function Rookery() {
           right: "1.5rem",
           zIndex: 40,
           opacity: open ? 1 : 0,
-          transform: open
-            ? "translateY(0) scale(1)"
-            : "translateY(16px) scale(0.98)",
+          transform: open ? "translateY(0) scale(1)" : "translateY(16px) scale(0.98)",
           pointerEvents: open ? "auto" : "none",
-          backgroundImage:
-            "radial-gradient(120% 60% at 50% 0%, rgba(200,164,78,0.05), transparent 60%)",
+          backgroundImage: "radial-gradient(120% 60% at 50% 0%, rgba(200,164,78,0.05), transparent 60%)",
         }}
         role="dialog"
         aria-label="Rookery — dev wire to asktorii"
@@ -202,9 +191,7 @@ function Rookery() {
           <div className="flex items-center gap-3 min-w-0">
             <RavenGlyph className="w-5 h-5 text-[#c8a44e] shrink-0" />
             <div className="min-w-0">
-              <div className="font-serif tracking-[0.3em] text-xs uppercase text-[#c8a44e]">
-                The Rookery
-              </div>
+              <div className="font-serif tracking-[0.3em] text-xs uppercase text-[#c8a44e]">The Rookery</div>
               <div className="text-[9px] tracking-[0.2em] uppercase text-[#7a7060] truncate">
                 asktorii · the chronicler
               </div>
@@ -261,8 +248,7 @@ function Rookery() {
           </div>
           <div className="flex items-center justify-between mt-2 px-1 text-[9px] tracking-[0.2em] uppercase text-[#5a5246]">
             <span>
-              <Kbd>↵</Kbd> send <span className="mx-1.5 opacity-50">·</span>{" "}
-              <Kbd>⇧↵</Kbd> newline
+              <Kbd>↵</Kbd> send <span className="mx-1.5 opacity-50">·</span> <Kbd>⇧↵</Kbd> newline
             </span>
             <button
               type="button"
@@ -289,9 +275,7 @@ function MessageBubble({ m }: { m: Message }) {
   if (m.role === "you") {
     return (
       <div className="flex flex-col items-end animate-[fadeIn_0.25s_ease-out]">
-        <div className="text-[8px] tracking-[0.3em] uppercase text-[#7a7060] mb-1 mr-1">
-          you
-        </div>
+        <div className="text-[8px] tracking-[0.3em] uppercase text-[#7a7060] mb-1 mr-1">you</div>
         <div className="max-w-[85%] rounded-md rounded-tr-none border border-[#c8a44e]/30 bg-[#1d1813] px-3 py-2 text-sm text-[#d4cfc6] leading-relaxed whitespace-pre-wrap break-words">
           {m.text}
         </div>
@@ -301,9 +285,7 @@ function MessageBubble({ m }: { m: Message }) {
   if (m.role === "raven-lost") {
     return (
       <div className="flex flex-col items-start animate-[fadeIn_0.25s_ease-out]">
-        <div className="text-[8px] tracking-[0.3em] uppercase text-[#a85a4a] mb-1 ml-1">
-          raven lost
-        </div>
+        <div className="text-[8px] tracking-[0.3em] uppercase text-[#a85a4a] mb-1 ml-1">raven lost</div>
         <div className="max-w-[90%] rounded-md rounded-tl-none border border-[#a85a4a]/40 bg-[#1d100e] px-3 py-2 text-xs text-[#e0bbb1] leading-relaxed font-mono whitespace-pre-wrap break-words">
           {m.text}
         </div>
@@ -367,16 +349,30 @@ function Markdown({ children }: { children: string }) {
           ul: ({ children }) => <ul className="my-1.5 ml-4 list-disc marker:text-[#7a7060]">{children}</ul>,
           ol: ({ children }) => <ol className="my-1.5 ml-4 list-decimal marker:text-[#7a7060]">{children}</ol>,
           li: ({ children }) => <li className="my-0.5">{children}</li>,
-          h1: ({ children }) => <h3 className="mt-2 mb-1 font-serif tracking-[0.2em] text-[11px] uppercase text-[#c8a44e]">{children}</h3>,
-          h2: ({ children }) => <h3 className="mt-2 mb-1 font-serif tracking-[0.2em] text-[11px] uppercase text-[#c8a44e]">{children}</h3>,
-          h3: ({ children }) => <h3 className="mt-2 mb-1 font-serif tracking-[0.2em] text-[11px] uppercase text-[#c8a44e]/90">{children}</h3>,
-          h4: ({ children }) => <h4 className="mt-2 mb-1 font-serif tracking-[0.15em] text-[11px] uppercase text-[#c8a44e]/80">{children}</h4>,
+          h1: ({ children }) => (
+            <h3 className="mt-2 mb-1 font-serif tracking-[0.2em] text-[11px] uppercase text-[#c8a44e]">{children}</h3>
+          ),
+          h2: ({ children }) => (
+            <h3 className="mt-2 mb-1 font-serif tracking-[0.2em] text-[11px] uppercase text-[#c8a44e]">{children}</h3>
+          ),
+          h3: ({ children }) => (
+            <h3 className="mt-2 mb-1 font-serif tracking-[0.2em] text-[11px] uppercase text-[#c8a44e]/90">
+              {children}
+            </h3>
+          ),
+          h4: ({ children }) => (
+            <h4 className="mt-2 mb-1 font-serif tracking-[0.15em] text-[11px] uppercase text-[#c8a44e]/80">
+              {children}
+            </h4>
+          ),
           blockquote: ({ children }) => (
             <blockquote className="my-1.5 pl-3 border-l-2 border-[#3d3428] text-[#b5ac9c] italic">
               {children}
             </blockquote>
           ),
-          hr: () => <hr className="my-3 border-0 h-px bg-gradient-to-r from-transparent via-[#3d3428] to-transparent" />,
+          hr: () => (
+            <hr className="my-3 border-0 h-px bg-gradient-to-r from-transparent via-[#3d3428] to-transparent" />
+          ),
           table: ({ children }) => (
             <div className="my-2 overflow-x-auto">
               <table className="w-full text-[12px] border border-[#3d3428] border-collapse">{children}</table>
@@ -387,9 +383,7 @@ function Markdown({ children }: { children: string }) {
               {children}
             </th>
           ),
-          td: ({ children }) => (
-            <td className="px-2 py-1 border border-[#3d3428] align-top">{children}</td>
-          ),
+          td: ({ children }) => <td className="px-2 py-1 border border-[#3d3428] align-top">{children}</td>,
         }}
       >
         {children}
@@ -428,9 +422,7 @@ function EmptyScroll() {
   return (
     <div className="h-full flex flex-col items-center justify-center text-center px-6 py-10 select-none">
       <RavenGlyph className="w-10 h-10 text-[#3d3428] mb-4" />
-      <p className="font-serif tracking-[0.25em] text-[10px] uppercase text-[#7a7060] mb-2">
-        the perch is empty
-      </p>
+      <p className="font-serif tracking-[0.25em] text-[10px] uppercase text-[#7a7060] mb-2">the perch is empty</p>
       <p className="text-[11px] text-[#5a5246] leading-relaxed max-w-[240px]">
         Pose a question and a raven will carry it to the chronicler at the torii.
       </p>
@@ -469,9 +461,11 @@ function extractAnswer(result: unknown): string {
     const content = obj.content;
     if (Array.isArray(content)) {
       const parts = content
-        .map((c) => (c && typeof c === "object" && typeof (c as Record<string, unknown>).text === "string"
-          ? ((c as Record<string, unknown>).text as string)
-          : ""))
+        .map((c) =>
+          c && typeof c === "object" && typeof (c as Record<string, unknown>).text === "string"
+            ? ((c as Record<string, unknown>).text as string)
+            : "",
+        )
         .filter(Boolean);
       if (parts.length) return parts.join("\n\n");
     }
