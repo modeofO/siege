@@ -10,7 +10,7 @@ import {
   useAccount as useStarknetAccount,
 } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
-import type { SessionPolicies } from "@cartridge/controller";
+import type { SessionPolicies } from "@cartridge/presets";
 import { DojoProvider } from "@/lib/dojoSdk";
 import { CONTRACTS } from "@/lib/contracts";
 import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
