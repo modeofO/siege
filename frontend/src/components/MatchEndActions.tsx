@@ -93,10 +93,7 @@ export function MatchEndActions({
     setSettling(true);
     setTxError("");
     try {
-      await account.waitForTransaction(
-        (await settleMatch(account, matchId)).transaction_hash,
-        { retryInterval: 2000 },
-      );
+      await settleMatch(account, matchId);
     } catch (e) {
       setTxError(extractErrorMsg(e));
     } finally {
@@ -109,10 +106,7 @@ export function MatchEndActions({
     setClaiming(parcelId);
     setTxError("");
     try {
-      await account.waitForTransaction(
-        (await claimParcel(account, matchId, parcelId)).transaction_hash,
-        { retryInterval: 2000 },
-      );
+      await claimParcel(account, matchId, parcelId);
       setClaimed(parcelId);
     } catch (e) {
       setTxError(extractErrorMsg(e));

@@ -91,7 +91,7 @@ export async function joinStakedMatch(
 
 // Safe on practice matches: Dojo read_model returns a zeroed MatchStakes1v1 default, so the stake-transfer loop iterates zero times.
 export async function settleMatch(account: AccountInterface, matchId: string) {
-  return account.execute(
+  const tx = await account.execute(
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
       entrypoint: "settle_match",
@@ -99,6 +99,8 @@ export async function settleMatch(account: AccountInterface, matchId: string) {
     },
     TX_OPTS,
   );
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Settle match");
+  return tx;
 }
 
 export async function claimParcel(
@@ -106,7 +108,7 @@ export async function claimParcel(
   matchId: string,
   parcelId: number,
 ) {
-  return account.execute(
+  const tx = await account.execute(
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
       entrypoint: "claim_parcel",
@@ -114,6 +116,8 @@ export async function claimParcel(
     },
     TX_OPTS,
   );
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Claim parcel");
+  return tx;
 }
 
 // ---------- Reads ----------
@@ -286,6 +290,11 @@ export function useAbilityBalances(
 
   useEffect(() => {
     let cancelled = false;
+    // Key changed — clear stale state so address A's numbers don't render under address B.
+    const zeros = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 0]));
+    setBalances(zeros);
+    setError(null);
+    setLoadedKey(null);
     if (!provider || !address) return;
     const key = `${address}:${bumpKey}`;
     fetchAllAbilityBalances(provider, address)
