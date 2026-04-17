@@ -19,9 +19,7 @@ export function ConnectWallet() {
   if (address) {
     return (
       <div className="flex items-center gap-3">
-        {username && (
-          <span className="text-sm text-[#e0e0e8]">{username}</span>
-        )}
+        {username && <span className="text-sm text-[#e0e0e8]">{username}</span>}
         <span className="text-xs text-[#6a6a7a]">
           {address.slice(0, 6)}…{address.slice(-4)}
         </span>

@@ -20,32 +20,23 @@
 
 body {
   background-color: var(--color-bg);
-  background-image: url('/sprites/desk_preview.png');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-image: linear-gradient(rgba(13, 11, 10, 0.55), rgba(13, 11, 10, 0.55)), url("/sprites/desk_preview.png");
+  background-size: cover, cover;
+  background-position: center, center;
+  background-repeat: no-repeat, no-repeat;
+  background-attachment: fixed, fixed;
   color: var(--color-text);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  background: rgba(13, 11, 10, 0.55);
-  pointer-events: none;
-  z-index: 0;
-}
-
-body > * {
-  position: relative;
-  z-index: 1;
 }
 
 /* Pulsing red for critical HP */
 @keyframes pulse-red {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 .animate-pulse-red {
   animation: pulse-red 1s ease-in-out infinite;
@@ -53,8 +44,12 @@ body > * {
 
 /* Damage flash */
 @keyframes damage-flash {
-  0% { background-color: rgba(255, 51, 68, 0.3); }
-  100% { background-color: transparent; }
+  0% {
+    background-color: rgba(255, 51, 68, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
 }
 .animate-damage {
   animation: damage-flash 0.5s ease-out;
@@ -83,7 +78,7 @@ input[type="range"]::-webkit-slider-thumb {
   background: currentColor;
   margin-top: -5px;
   border: 2px solid var(--color-surface);
-  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
 }
 input[type="range"]::-moz-range-track {
   background: var(--color-surface-light);
@@ -96,7 +91,7 @@ input[type="range"]::-moz-range-thumb {
   border-radius: 50%;
   background: currentColor;
   border: 2px solid var(--color-surface);
-  box-shadow: 0 0 4px rgba(0,0,0,0.5);
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
 }
 
 /* Medieval panel texture */
@@ -117,13 +112,20 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Header panel glow */
 .panel-header {
-  box-shadow: 0 0 20px rgba(184, 134, 11, 0.08), inset 0 1px 0 rgba(200, 164, 78, 0.1);
+  box-shadow:
+    0 0 20px rgba(184, 134, 11, 0.08),
+    inset 0 1px 0 rgba(200, 164, 78, 0.1);
 }
 
 /* Commit button glow animation */
 @keyframes commit-pulse {
-  0%, 100% { box-shadow: 0 0 12px rgba(74, 222, 128, 0.2); }
-  50% { box-shadow: 0 0 24px rgba(74, 222, 128, 0.4); }
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(74, 222, 128, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(74, 222, 128, 0.4);
+  }
 }
 .commit-ready {
   animation: commit-pulse 2s ease-in-out infinite;
@@ -131,10 +133,24 @@ input[type="number"]::-webkit-outer-spin-button {
 
 /* Rookery — dev chat panel keyframes */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 @keyframes rookeryPulse {
-  0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
-  40%           { opacity: 1;    transform: translateY(-2px); }
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
 }

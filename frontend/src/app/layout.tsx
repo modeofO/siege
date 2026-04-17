@@ -12,7 +12,8 @@ const serif = Cinzel({ variable: "--font-serif", subsets: ["latin"], weight: ["4
 
 export const metadata: Metadata = {
   title: "Siege",
-  description: "A strategic commit-reveal game on Starknet. Team up with your AI agent. Attack or defend. Trust is everything.",
+  description:
+    "A strategic commit-reveal game on Starknet. Team up with your AI agent. Attack or defend. Trust is everything.",
   icons: {
     icon: "/sprites/abilities/siege-sword.svg",
     shortcut: "/sprites/abilities/siege-sword.svg",
@@ -23,7 +24,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className="dark">
-      <body className={`${mono.variable} ${serif.variable} font-mono antialiased bg-[#0d0b0a] text-[#d4cfc6] min-h-screen`}>
+      <body
+        className={`${mono.variable} ${serif.variable} font-mono antialiased bg-[#0d0b0a] text-[#d4cfc6] min-h-screen`}
+      >
         <StarknetProvider>
           <Navbar />
           <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>

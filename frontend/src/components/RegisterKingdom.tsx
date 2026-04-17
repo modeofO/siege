@@ -49,10 +49,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
       await account.execute({
         contractAddress: worldSystemAddress,
         entrypoint: "register_player",
-        calldata: [
-          selections.length.toString(),
-          ...selections.map((s) => s.toString()),
-        ],
+        calldata: [selections.length.toString(), ...selections.map((s) => s.toString())],
       });
       // Tx submitted — transition to confirming. Parent unmounts us when
       // kingdom.registered flips true on Torii, so `confirming` stays
@@ -71,9 +68,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
     <div className="fixed inset-0 bg-[#0d0b0a]/90 flex items-center justify-center z-50">
       <div className="bg-[#1a1714] border border-[#3d3428] rounded-lg p-6 max-w-lg w-full mx-4 space-y-6">
         <div className="text-center">
-          <h2 className="text-xl font-bold font-serif text-[#daa520] tracking-wider">
-            CLAIM YOUR HOLD
-          </h2>
+          <h2 className="text-xl font-bold font-serif text-[#daa520] tracking-wider">CLAIM YOUR HOLD</h2>
           <p className="text-xs text-[#7a7060] mt-2">
             Choose 3 home parcels. These are permanent and cannot be conquered.
           </p>
@@ -82,9 +77,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
         <div className="space-y-3">
           {[0, 1, 2].map((slotIndex) => (
             <div key={slotIndex} className="space-y-1">
-              <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">
-                Home Parcel {slotIndex + 1}
-              </div>
+              <div className="text-[10px] text-[#7a7060] tracking-wider uppercase">Home Parcel {slotIndex + 1}</div>
               <div className="grid grid-cols-3 gap-2">
                 {PARCEL_TYPES.map((type) => (
                   <button
@@ -96,10 +89,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
                         : "border-[#3d3428] bg-[#252019] hover:border-[#7a7060]"
                     }`}
                   >
-                    <div
-                      className="w-4 h-4 rounded-full mx-auto mb-1"
-                      style={{ backgroundColor: type.color }}
-                    />
+                    <div className="w-4 h-4 rounded-full mx-auto mb-1" style={{ backgroundColor: type.color }} />
                     <div className="text-xs font-bold text-[#d4cfc6] font-serif">{type.name}</div>
                     <div className="text-[9px] text-[#7a7060]">{type.resources}</div>
                   </button>
@@ -138,9 +128,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
           </div>
         )}
 
-        {error && (
-          <div className="text-[#ff3344] text-xs text-center">{error}</div>
-        )}
+        {error && <div className="text-[#ff3344] text-xs text-center">{error}</div>}
       </div>
     </div>
   );

@@ -50,9 +50,7 @@ export function EndScreen({ winner, yourTeam, history, team1Vault, team2Vault }:
           </div>
         </div>
 
-        <div className="text-[#6a6a7a] text-xs">
-          {totalRounds} rounds played
-        </div>
+        <div className="text-[#6a6a7a] text-xs">{totalRounds} rounds played</div>
 
         <Link
           href="/"

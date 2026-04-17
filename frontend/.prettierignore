@@ -1,0 +1,15 @@
+node_modules
+.next
+.turbo
+dist
+build
+coverage
+out
+public
+certificates
+bun.lock
+package-lock.json
+yarn.lock
+next-env.d.ts
+tsconfig.tsbuildinfo
+**/*.generated.*

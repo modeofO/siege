@@ -67,8 +67,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
   const maxY = Math.max(...positions.map((p) => p.y)) + padding;
   const viewBox = `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
 
-  const isOwned = (parcel: ParcelData) =>
-    playerAddress && parcel.owner.toLowerCase() === playerAddress.toLowerCase();
+  const isOwned = (parcel: ParcelData) => playerAddress && parcel.owner.toLowerCase() === playerAddress.toLowerCase();
 
   const isUnclaimed = (parcel: ParcelData) =>
     parcel.owner === "0x0" || parcel.owner === "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -97,11 +96,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
 
   return (
     <div className="relative">
-      <svg
-        viewBox={viewBox}
-        className="w-full max-h-[60vh]"
-        style={{ background: "transparent" }}
-      >
+      <svg viewBox={viewBox} className="w-full max-h-[60vh]" style={{ background: "transparent" }}>
         {/* Glow filter for owned parcels */}
         <defs>
           <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
@@ -125,9 +120,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
               key={parcel.parcelId}
               onMouseEnter={() => setHoveredParcel(parcel)}
               onMouseLeave={() => setHoveredParcel(null)}
-              onClick={() => setSelectedParcel(
-                selectedParcel?.parcelId === parcel.parcelId ? null : parcel,
-              )}
+              onClick={() => setSelectedParcel(selectedParcel?.parcelId === parcel.parcelId ? null : parcel)}
               className="cursor-pointer"
               filter={owned ? "url(#glow-gold)" : undefined}
             >
@@ -140,14 +133,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
               />
               {/* Home parcel marker */}
               {home && (
-                <text
-                  x={x}
-                  y={y + 2}
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  fontSize="14"
-                  fill="#daa520"
-                >
+                <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="central" fontSize="14" fill="#daa520">
                   ⛊
                 </text>
               )}
@@ -179,12 +165,18 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
           <div className="text-[#7a7060]">
             ({hoveredParcel.col}, {hoveredParcel.row})
           </div>
-          <div className={isUnclaimed(hoveredParcel) ? "text-[#7a7060]" : isOwned(hoveredParcel) ? "text-[#daa520]" : "text-[#c44332]"}>
+          <div
+            className={
+              isUnclaimed(hoveredParcel)
+                ? "text-[#7a7060]"
+                : isOwned(hoveredParcel)
+                  ? "text-[#daa520]"
+                  : "text-[#c44332]"
+            }
+          >
             {isOwned(hoveredParcel) ? "Your parcel" : truncateAddress(hoveredParcel.owner)}
           </div>
-          {isHome(hoveredParcel) && (
-            <div className="text-[#daa520] text-[10px]">HOME PARCEL</div>
-          )}
+          {isHome(hoveredParcel) && <div className="text-[#daa520] text-[10px]">HOME PARCEL</div>}
         </div>
       )}
     </div>

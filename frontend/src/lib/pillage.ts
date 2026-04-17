@@ -4,8 +4,7 @@ import type { AccountInterface } from "starknet";
 const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 const POLL_INTERVAL = 4000;
 
-export const WORLD_SYSTEM_ADDRESS =
-  process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "";
+export const WORLD_SYSTEM_ADDRESS = process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "";
 
 export interface PillageData {
   homeParcelId: number;
@@ -103,9 +102,16 @@ export function useActivePillages(playerAddress: string | null): {
       });
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [playerAddress]);
 
   return data;
@@ -150,9 +156,16 @@ export function usePillageEligibilities(playerAddress: string | null): PillageEl
       setData(entries);
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [playerAddress]);
 
   return data;
@@ -171,10 +184,7 @@ export async function initiatePillage(
   return result.transaction_hash;
 }
 
-export async function claimPillageDrip(
-  account: AccountInterface,
-  homeParcelId: number,
-): Promise<string> {
+export async function claimPillageDrip(account: AccountInterface, homeParcelId: number): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "claim_pillage_drip",

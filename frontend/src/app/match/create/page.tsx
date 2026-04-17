@@ -94,12 +94,13 @@ function AddressInput({
         placeholder={placeholder || "Username or address (0x...)"}
         className="w-full bg-[#12121a] border border-[#2a2a3a] rounded px-4 py-3 text-sm focus:border-[#00d4ff] focus:outline-none transition-colors font-mono"
       />
-      {lookupLoading && (
-        <div className="text-xs text-[#6a6a7a]">Looking up username...</div>
-      )}
+      {lookupLoading && <div className="text-xs text-[#6a6a7a]">Looking up username...</div>}
       {resolvedUsername && resolvedAddr && (
         <div className="text-xs text-[#33cc66]">
-          {resolvedUsername} → <span className="font-mono">{resolvedAddr.slice(0, 10)}...{resolvedAddr.slice(-6)}</span>
+          {resolvedUsername} →{" "}
+          <span className="font-mono">
+            {resolvedAddr.slice(0, 10)}...{resolvedAddr.slice(-6)}
+          </span>
         </div>
       )}
       {!lookupLoading && input.trim() && !isHexAddress(input) && !resolvedAddr && (
@@ -257,13 +258,7 @@ export default function CreateMatchPage() {
     const teamADefender = yourRole === "defender" ? address : teamATeammateAddr;
 
     try {
-      const result = await createMatch(
-        account,
-        teamAAttacker,
-        teamADefender,
-        teamBAttackerAddr,
-        teamBDefenderAddr
-      );
+      const result = await createMatch(account, teamAAttacker, teamADefender, teamBAttackerAddr, teamBDefenderAddr);
 
       for (let i = 0; i < 6; i++) {
         try {
@@ -278,9 +273,7 @@ export default function CreateMatchPage() {
         await sleep(1200);
       }
 
-      setError(
-        `Transaction submitted (${result.transaction_hash}), but Torii has not indexed the new match yet.`
-      );
+      setError(`Transaction submitted (${result.transaction_hash}), but Torii has not indexed the new match yet.`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Transaction failed");
     } finally {
@@ -293,9 +286,7 @@ export default function CreateMatchPage() {
       <div className="max-w-lg mx-auto mt-20 text-center space-y-6">
         <div className="text-2xl font-bold text-[#00d4ff]">Match Created</div>
         <div className="text-sm text-[#6a6a7a]">Share this with your opponent:</div>
-        <div className="bg-[#12121a] border border-[#2a2a3a] rounded p-4 text-sm break-all">
-          {matchId}
-        </div>
+        <div className="bg-[#12121a] border border-[#2a2a3a] rounded p-4 text-sm break-all">{matchId}</div>
         <Link
           href={`/match/${matchId}`}
           className="inline-block px-6 py-2 bg-[#00d4ff]/10 border border-[#00d4ff]/40 text-[#00d4ff] rounded text-sm"
@@ -362,13 +353,7 @@ export default function CreateMatchPage() {
 
       <button
         onClick={handleCreate}
-        disabled={
-          !isConnected ||
-          !teamATeammateAddr ||
-          !teamBAttackerAddr ||
-          !teamBDefenderAddr ||
-          loading
-        }
+        disabled={!isConnected || !teamATeammateAddr || !teamBAttackerAddr || !teamBDefenderAddr || loading}
         className="w-full py-3 bg-[#00d4ff]/10 border border-[#00d4ff]/40 text-[#00d4ff] rounded hover:bg-[#00d4ff]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
       >
         {loading ? "CREATING..." : "CREATE MATCH"}

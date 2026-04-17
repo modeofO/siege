@@ -5,9 +5,14 @@ const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 export const VRF_PROVIDER_ADDRESS = "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
 
 export const CONTRACTS_1V1 = {
-  ACTIONS: process.env.NEXT_PUBLIC_ACTIONS_1V1_ADDRESS || "0x520bdcaa5ca4d04bd1aee77362eca6a284ba2bbf0690f5696b87e13007c8603",
-  COMMIT_REVEAL: process.env.NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS || "0x31ff951f7405f24e69f42dc3009ff20702fca8079d6551733fc39da90ab1e81",
-  RESOLUTION: process.env.NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS || "0x27e7a9c43ef49f90987943358b3a5d5aadc74c5c8ba79bd3eadea9514decf97",
+  ACTIONS:
+    process.env.NEXT_PUBLIC_ACTIONS_1V1_ADDRESS || "0x520bdcaa5ca4d04bd1aee77362eca6a284ba2bbf0690f5696b87e13007c8603",
+  COMMIT_REVEAL:
+    process.env.NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS ||
+    "0x31ff951f7405f24e69f42dc3009ff20702fca8079d6551733fc39da90ab1e81",
+  RESOLUTION:
+    process.env.NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS ||
+    "0x27e7a9c43ef49f90987943358b3a5d5aadc74c5c8ba79bd3eadea9514decf97",
 };
 
 const DEVNET_TX_OPTS: UniversalDetails = {
@@ -21,21 +26,46 @@ const DEVNET_TX_OPTS: UniversalDetails = {
 
 const TX_OPTS = IS_DEVNET ? DEVNET_TX_OPTS : undefined;
 
+// Cartridge surfaces reverts as {code, message, data: {execution_error}} — dig
+// the execution_error out so the UI shows the Cairo assert string, not JSON.
+export function extractErrorMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === "object" && e !== null) {
+    const obj = e as Record<string, unknown>;
+    const execErr = (obj.data as Record<string, unknown>)?.execution_error;
+    if (typeof execErr === "string") return execErr;
+    if (typeof obj.message === "string") return obj.message;
+  }
+  return String(e);
+}
+
+// account.execute resolves on sequencer ACCEPT, not on-chain success. Wait for
+// the receipt and throw on REVERTED so callers can surface the real error
+// instead of mistaking a revert for a sync delay.
+export async function waitForReceiptOrThrow(account: AccountInterface, txHash: string, context: string): Promise<void> {
+  try {
+    const receipt = await account.waitForTransaction(txHash, { retryInterval: 2000 });
+    const anyReceipt = receipt as { execution_status?: string; revert_reason?: string };
+    if (anyReceipt.execution_status === "REVERTED") {
+      throw new Error(`${context} reverted: ${anyReceipt.revert_reason || "unknown revert"}`);
+    }
+  } catch (e) {
+    if (e instanceof Error && e.message.startsWith(`${context} reverted:`)) throw e;
+    throw new Error(`${context} receipt wait failed: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
 // request_random(caller, source): caller = contract that will consume_random,
 // source must match what consume_random uses: Source::Nonce(contract_address)
-function vrfRequestRandomCall(callerContract: string) {
+export function vrfRequestRandomCall(callerContract: string) {
   return {
     contractAddress: VRF_PROVIDER_ADDRESS,
     entrypoint: "request_random",
-    calldata: [callerContract, "0", callerContract],  // caller, Source::Nonce(0), nonce_address = caller
+    calldata: [callerContract, "0", callerContract], // caller, Source::Nonce(0), nonce_address = caller
   };
 }
 
-export async function createMatch1v1(
-  account: AccountInterface,
-  playerA: string,
-  playerB: string,
-) {
+export async function createMatch1v1(account: AccountInterface, playerA: string, playerB: string) {
   return account.execute(
     [
       vrfRequestRandomCall(CONTRACTS_1V1.ACTIONS),
@@ -49,11 +79,7 @@ export async function createMatch1v1(
   );
 }
 
-export async function commitMove1v1(
-  account: AccountInterface,
-  matchId: string,
-  commitment: string,
-) {
+export async function commitMove1v1(account: AccountInterface, matchId: string, commitment: string) {
   return account.execute(
     {
       contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
@@ -68,12 +94,21 @@ export async function revealMove1v1(
   account: AccountInterface,
   matchId: string,
   salt: string,
-  p0: string, p1: string, p2: string,
-  g0: string, g1: string, g2: string,
+  p0: string,
+  p1: string,
+  p2: string,
+  g0: string,
+  g1: string,
+  g2: string,
   repair: string,
-  nc0: string, nc1: string, nc2: string,
-  trap0: string, trap1: string, trap2: string,
-  abilityId: string, abilityTarget: string,
+  nc0: string,
+  nc1: string,
+  nc2: string,
+  trap0: string,
+  trap1: string,
+  trap2: string,
+  abilityId: string,
+  abilityTarget: string,
   includeVrf: boolean,
 ) {
   // VRF gating is racy but necessary: the 1st reveal must NOT include
@@ -86,35 +121,32 @@ export async function revealMove1v1(
   const revealCall = {
     contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
     entrypoint: "reveal",
-    calldata: [matchId, salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, abilityId, abilityTarget],
+    calldata: [
+      matchId,
+      salt,
+      p0,
+      p1,
+      p2,
+      g0,
+      g1,
+      g2,
+      repair,
+      nc0,
+      nc1,
+      nc2,
+      trap0,
+      trap1,
+      trap2,
+      abilityId,
+      abilityTarget,
+    ],
   };
 
-  const calls = includeVrf
-    ? [vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION), revealCall]
-    : [revealCall];
+  const calls = includeVrf ? [vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION), revealCall] : [revealCall];
 
   const tx = await account.execute(calls, TX_OPTS);
-
-  // account.execute resolves once the sequencer ACCEPTS the tx, not after it
-  // executes. A tx can be accepted and then revert silently (e.g. a reveal
-  // that races another reveal — the later one triggers resolution without
-  // vRF and reverts). Wait for the receipt so we can surface reverts as
-  // thrown errors that the reveal retry path can handle.
-  try {
-    const receipt = await account.waitForTransaction(tx.transaction_hash, {
-      retryInterval: 2000,
-    });
-    const anyReceipt = receipt as { execution_status?: string; revert_reason?: string };
-    if (anyReceipt.execution_status === "REVERTED") {
-      throw new Error(`Reveal reverted: ${anyReceipt.revert_reason || "unknown revert"}`);
-    }
-  } catch (e) {
-    if (e instanceof Error && e.message.startsWith("Reveal reverted:")) throw e;
-    throw new Error(
-      `Reveal receipt wait failed: ${e instanceof Error ? e.message : String(e)}`,
-    );
-  }
-
+  // Reveal can race another reveal + revert silently — surface via receipt.
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Reveal");
   return tx;
 }
 

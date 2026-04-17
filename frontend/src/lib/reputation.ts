@@ -16,9 +16,7 @@ function safeNum(v: unknown): number {
 }
 
 function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store)
-    ? store
-    : Object.values(store as Record<string, unknown>);
+  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
   const out: T[] = [];
   for (const entry of iter) {
     if (!entry || typeof entry !== "object") continue;
@@ -56,7 +54,6 @@ export interface MatchRecordData {
   isBloodRival: boolean;
 }
 
-
 export function usePlayerReputation(playerAddress: string | null): PlayerReputationData | null {
   useEntityQuery(
     new ToriiQueryBuilder<SchemaType>()
@@ -76,12 +73,8 @@ export function usePlayerReputation(playerAddress: string | null): PlayerReputat
   return useMemo<PlayerReputationData | null>(() => {
     if (!playerAddress) return null;
     const addr = playerAddress.toLowerCase();
-    const rep = flatModels<PlayerReputation>(reputations).find(
-      (x) => String(x.player).toLowerCase() === addr,
-    );
-    const kingdom = flatModels<PlayerKingdomModel>(kingdoms).find(
-      (x) => String(x.player).toLowerCase() === addr,
-    );
+    const rep = flatModels<PlayerReputation>(reputations).find((x) => String(x.player).toLowerCase() === addr);
+    const kingdom = flatModels<PlayerKingdomModel>(kingdoms).find((x) => String(x.player).toLowerCase() === addr);
 
     const totalWins = safeNum(kingdom?.total_wins);
     const totalLosses = safeNum(rep?.total_losses);
@@ -103,11 +96,7 @@ export function useMatchRecords(playerAddress: string | null): MatchRecordData[]
   useEntityQuery(
     new ToriiQueryBuilder<SchemaType>()
       .withClause(
-        KeysClause<SchemaType>(
-          [ModelsMapping.MatchRecord],
-          [playerAddress ?? undefined],
-          "VariableLen",
-        ).build(),
+        KeysClause<SchemaType>([ModelsMapping.MatchRecord], [playerAddress ?? undefined], "VariableLen").build(),
       )
       .includeHashedKeys(),
   );

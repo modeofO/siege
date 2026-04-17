@@ -10,10 +10,7 @@ interface VaultDisplayProps {
 export function VaultDisplay({ label, hp, maxHp = 100, isEnemy = false }: VaultDisplayProps) {
   const pct = Math.max(0, Math.min(100, (hp / maxHp) * 100));
 
-  const barColor =
-    pct > 50 ? "bg-green-500" :
-    pct > 20 ? "bg-yellow-500" :
-    "bg-red-500";
+  const barColor = pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500";
 
   const pulseClass = pct < 10 ? "animate-pulse-red" : "";
   const borderColor = isEnemy ? "border-[#ff3344]/30" : "border-[#00d4ff]/30";

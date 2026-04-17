@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useAccount } from "@/app/providers";
 import {
@@ -15,21 +16,14 @@ import {
   MODIFIER_DESCRIPTIONS,
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1 } from "@/lib/gameState1v1";
-import {
-  generateSalt,
-  computeCommitment1v1,
-  storeSalt1v1,
-  storeMove1v1,
-  getSalt1v1,
-  getMove1v1,
-} from "@/lib/crypto";
-import { commitMove1v1, revealMove1v1 } from "@/lib/contracts1v1";
+import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1 } from "@/lib/crypto";
+import { commitMove1v1, revealMove1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
+import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
 import { useMatchStakes1v1 } from "@/lib/gameState1v1";
-import Link from "next/link";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -43,7 +37,11 @@ export default function Match1v1Page() {
   // Role detection
   const addrMatch = (a: string | undefined, b: string | undefined) => {
     if (!a || !b) return false;
-    try { return BigInt(a) === BigInt(b); } catch { return false; }
+    try {
+      return BigInt(a) === BigInt(b);
+    } catch {
+      return false;
+    }
   };
 
   let isPlayerA = false;
@@ -57,12 +55,7 @@ export default function Match1v1Page() {
   const roleFound = isPlayerA || isPlayerB;
 
   // Commitment status from chain — refreshKey ensures these re-fetch when match state updates
-  const { committed, revealed } = useCommitmentStatus1v1(
-    matchId,
-    state?.round ?? 1,
-    role,
-    refreshKey,
-  );
+  const { committed, revealed } = useCommitmentStatus1v1(matchId, state?.round ?? 1, role, refreshKey);
 
   // Round status for polling commit/reveal counts
   const roundStatus = useRoundStatus1v1(matchId, state?.round ?? 1, refreshKey);
@@ -74,12 +67,7 @@ export default function Match1v1Page() {
   const [selectedAbility, setSelectedAbility] = useState(0);
   const [selectedTarget, setSelectedTarget] = useState(0);
 
-  const matchAbilities = useMatchAbilities1v1(
-    matchId,
-    address || null,
-    state?.playerA || null,
-    refreshKey,
-  );
+  const matchAbilities = useMatchAbilities1v1(matchId, address || null, state?.playerA || null, refreshKey);
 
   // Stakes for the match header (#4) — both sides' wagered abilities.
   const matchStakes = useMatchStakes1v1(matchId, refreshKey);
@@ -110,10 +98,7 @@ export default function Match1v1Page() {
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
-
-  const budget = state
-    ? isPlayerA ? state.budgetA : state.budgetB
-    : 10;
+  const budget = state ? (isPlayerA ? state.budgetA : state.budgetB) : 10;
 
   // Reset state on round change
   useEffect(() => {
@@ -133,19 +118,6 @@ export default function Match1v1Page() {
   useEffect(() => {
     console.log("[siege] match-1v1 page loaded — reveal gate diagnostics v1");
   }, []);
-
-  // Extract error message from Cartridge's structured errors
-  function extractErrorMsg(e: unknown): string {
-    if (e instanceof Error) return e.message;
-    if (typeof e === "object" && e !== null) {
-      const obj = e as Record<string, unknown>;
-      // Cartridge error: {code, message, data: {execution_error: "..."}}
-      const execErr = (obj.data as Record<string, unknown>)?.execution_error;
-      if (typeof execErr === "string") return execErr;
-      if (typeof obj.message === "string") return obj.message;
-    }
-    return String(e);
-  }
 
   // Check if an error is a known recoverable case
   const isAlreadyRevealed = (msg: string) =>
@@ -167,10 +139,7 @@ export default function Match1v1Page() {
       status: autoRevealStatus,
     });
 
-    if (
-      !account || !state || !committed || revealed ||
-      roundStatus.commitCount < 2 || autoRevealLock.current
-    ) return;
+    if (!account || !state || !committed || revealed || roundStatus.commitCount < 2 || autoRevealLock.current) return;
 
     // Claim the lock BEFORE the salt check so this effect doesn't busy-spin
     // across poll refreshes when local data is missing.
@@ -181,35 +150,46 @@ export default function Match1v1Page() {
     if (!salt || !move) {
       console.warn(
         `[auto-reveal] No local commit data for match ${matchId} round ${state.round}. ` +
-        `This browser/tab did not store the salt — likely committed from a different device.`,
+          `This browser/tab did not store the salt — likely committed from a different device.`,
       );
       setAutoRevealStatus("error");
       setAutoRevealError(
         "Local commit data not found in this browser. Commits must be revealed from " +
-        "the same browser they were made in. If you committed in another tab or device, " +
-        "reopen the match there to reveal.",
+          "the same browser they were made in. If you committed in another tab or device, " +
+          "reopen the match there to reveal.",
       );
       return;
     }
 
     setAutoRevealStatus("pending");
-    console.log(`[auto-reveal] starting reveal for match ${matchId} round ${state.round} (revealCount=${roundStatus.revealCount})`);
+    console.log(
+      `[auto-reveal] starting reveal for match ${matchId} round ${state.round} (revealCount=${roundStatus.revealCount})`,
+    );
 
     const abilityData = localStorage.getItem(`siege_1v1_ability_${matchId}_${state.round}`);
-    const parsedAbility = abilityData
-      ? JSON.parse(abilityData)
-      : { abilityId: 0, abilityTarget: 0 };
+    const parsedAbility = abilityData ? JSON.parse(abilityData) : { abilityId: 0, abilityTarget: 0 };
 
     const attemptReveal = async (includeVrf: boolean, alreadyFlipped = false): Promise<void> => {
       try {
         await revealMove1v1(
-          account, matchId, salt,
-          move[0].toString(), move[1].toString(), move[2].toString(),
-          move[3].toString(), move[4].toString(), move[5].toString(),
+          account,
+          matchId,
+          salt,
+          move[0].toString(),
+          move[1].toString(),
+          move[2].toString(),
+          move[3].toString(),
+          move[4].toString(),
+          move[5].toString(),
           move[6].toString(),
-          move[7].toString(), move[8].toString(), move[9].toString(),
-          move[10].toString(), move[11].toString(), move[12].toString(),
-          parsedAbility.abilityId.toString(), parsedAbility.abilityTarget.toString(),
+          move[7].toString(),
+          move[8].toString(),
+          move[9].toString(),
+          move[10].toString(),
+          move[11].toString(),
+          move[12].toString(),
+          parsedAbility.abilityId.toString(),
+          parsedAbility.abilityTarget.toString(),
           includeVrf,
         );
       } catch (e) {
@@ -222,7 +202,9 @@ export default function Match1v1Page() {
         // submit time, but chain state at inclusion can differ. Flip and
         // retry once.
         if (!alreadyFlipped) {
-          console.log(`[auto-reveal] reveal failed with includeVrf=${includeVrf}, retrying with includeVrf=${!includeVrf}. Reason: ${msg}`);
+          console.log(
+            `[auto-reveal] reveal failed with includeVrf=${includeVrf}, retrying with includeVrf=${!includeVrf}. Reason: ${msg}`,
+          );
           return attemptReveal(!includeVrf, true);
         }
         throw e;
@@ -245,7 +227,18 @@ export default function Match1v1Page() {
         void refresh();
       })();
     }, delay);
-  }, [account, state, matchId, committed, revealed, roundStatus.commitCount, roundStatus.revealCount, refresh, revealRetry, autoRevealStatus]);
+  }, [
+    account,
+    state,
+    matchId,
+    committed,
+    revealed,
+    roundStatus.commitCount,
+    roundStatus.revealCount,
+    refresh,
+    revealRetry,
+    autoRevealStatus,
+  ]);
 
   const handleRetryReveal = useCallback(() => {
     autoRevealLock.current = false;
@@ -271,12 +264,21 @@ export default function Match1v1Page() {
 
       const commitment = computeCommitment1v1(
         salt,
-        allocations[0], allocations[1], allocations[2],
-        allocations[3], allocations[4], allocations[5],
+        allocations[0],
+        allocations[1],
+        allocations[2],
+        allocations[3],
+        allocations[4],
+        allocations[5],
         allocations[6],
-        allocations[7], allocations[8], allocations[9],
-        allocations[10], allocations[11], allocations[12],
-        selectedAbility, selectedTarget,
+        allocations[7],
+        allocations[8],
+        allocations[9],
+        allocations[10],
+        allocations[11],
+        allocations[12],
+        selectedAbility,
+        selectedTarget,
       );
 
       await commitMove1v1(account, matchId, commitment);
@@ -292,7 +294,7 @@ export default function Match1v1Page() {
       void refresh();
     } catch (e) {
       console.error("Commit failed:", e);
-      setError(e instanceof Error ? e.message : "Commit failed");
+      setError(extractErrorMsg(e));
       commitLock.current = false;
       setSubmitting(false);
     }
@@ -322,8 +324,12 @@ export default function Match1v1Page() {
           Your address: <span className="font-mono text-[#d4cfc6]">{address}</span>
         </div>
         <div className="text-[#7a7060] text-xs space-y-1">
-          <div>Player A: <span className="font-mono">{state.playerA}</span></div>
-          <div>Player B: <span className="font-mono">{state.playerB}</span></div>
+          <div>
+            Player A: <span className="font-mono">{state.playerA}</span>
+          </div>
+          <div>
+            Player B: <span className="font-mono">{state.playerB}</span>
+          </div>
         </div>
       </div>
     );
@@ -331,32 +337,19 @@ export default function Match1v1Page() {
 
   // End screen
   if (state.phase === "finished" && state.winner !== null) {
-    const didWin = (state.winner === 1 && isPlayerA) || (state.winner === 2 && isPlayerB);
-    const isDraw = state.winner === 0;
+    const winnerNum = (state.winner === 0 || state.winner === 1 || state.winner === 2 ? state.winner : 0) as 0 | 1 | 2;
     return (
-      <div className="fixed inset-0 bg-[#0d0b0a]/95 z-50 flex items-center justify-center">
-        <div className="text-center space-y-8 max-w-md">
-          <div className="space-y-2">
-            <div className={`text-6xl font-bold tracking-widest font-serif ${isDraw ? "text-[#daa520]" : didWin ? "text-[#c8a44e]" : "text-[#ff3344]"}`}>
-              {isDraw ? "DRAW" : didWin ? "VICTORY" : "DEFEAT"}
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div className="border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-              <div className="text-[#7a7060] text-xs mb-1">Your Vault</div>
-              <div className="text-xl font-bold">{isPlayerA ? state.vaultAHp : state.vaultBHp} HP</div>
-            </div>
-            <div className="border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-              <div className="text-[#7a7060] text-xs mb-1">Enemy Vault</div>
-              <div className="text-xl font-bold">{isPlayerA ? state.vaultBHp : state.vaultAHp} HP</div>
-            </div>
-          </div>
-          <div className="text-[#7a7060] text-xs">{history.length} rounds played</div>
-          <Link href="/" className="inline-block px-8 py-3 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] rounded hover:bg-[#c8a44e]/20 transition-colors tracking-wider text-sm">
-            RETURN HOME
-          </Link>
-        </div>
-      </div>
+      <MatchEndActions
+        matchId={matchId}
+        winner={winnerNum}
+        isPlayerA={isPlayerA}
+        isPlayerB={isPlayerB}
+        playerAAddr={state.playerA || ""}
+        playerBAddr={state.playerB || ""}
+        vaultAHp={state.vaultAHp}
+        vaultBHp={state.vaultBHp}
+        roundsPlayed={history.length}
+      />
     );
   }
 
@@ -364,8 +357,7 @@ export default function Match1v1Page() {
   const enemyVault = isPlayerA ? state.vaultBHp : state.vaultAHp;
   const yourPct = Math.max(0, Math.min(100, (yourVault / 50) * 100));
   const enemyPct = Math.max(0, Math.min(100, (enemyVault / 50) * 100));
-  const hpBarColor = (pct: number) =>
-    pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500";
+  const hpBarColor = (pct: number) => (pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500");
 
   // Phase status text
   let phaseText = "";
@@ -386,7 +378,7 @@ export default function Match1v1Page() {
   }
 
   const toggleRound = (round: number) => {
-    setExpandedRounds(prev => {
+    setExpandedRounds((prev) => {
       const next = new Set(prev);
       if (next.has(round)) next.delete(round);
       else next.add(round);
@@ -396,14 +388,15 @@ export default function Match1v1Page() {
 
   return (
     <div className="space-y-2 max-w-4xl mx-auto">
-
       {/* ===== 1. HEADER BANNER ===== */}
       <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] space-y-0 panel-header">
         {/* Row 1: Title, round, match ID, budget, player badge */}
         <div className="flex items-center justify-between px-4 pt-3 pb-2">
           <div className="flex items-baseline gap-3">
             <span className="text-3xl font-bold tracking-wider font-serif">SIEGE</span>
-            <span className="text-sm font-bold text-[#d4cfc6] bg-[#252019] px-2 py-0.5 rounded">Round {state.round}</span>
+            <span className="text-sm font-bold text-[#d4cfc6] bg-[#252019] px-2 py-0.5 rounded">
+              Round {state.round}
+            </span>
             <span className="text-xs text-[#7a7060]">#{matchId}</span>
           </div>
           <div className="flex items-center gap-3">
@@ -418,11 +411,19 @@ export default function Match1v1Page() {
         <div className="grid grid-cols-2 gap-6 px-4 pb-3">
           {/* Your Citadel */}
           <div className="flex flex-col items-center">
-            <img src="/sprites/citadel.png" alt="Your Citadel" className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]" />
+            <Image
+              src="/sprites/citadel.png"
+              alt="Your Citadel"
+              width={128}
+              height={128}
+              className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]"
+            />
             <span className="text-xs tracking-wider text-[#c8a44e] uppercase font-bold mt-1">Your Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
-                <span className={`text-sm font-bold ${yourPct < 10 ? "animate-pulse text-red-400" : "text-[#d4cfc6]"}`}>{yourVault} / 50</span>
+                <span className={`text-sm font-bold ${yourPct < 10 ? "animate-pulse text-red-400" : "text-[#d4cfc6]"}`}>
+                  {yourVault} / 50
+                </span>
                 <span className="text-[10px] text-[#7a7060]">{Math.round(yourPct)}%</span>
               </div>
               <div className="w-full h-3 bg-[#252019] rounded-full overflow-hidden">
@@ -435,11 +436,22 @@ export default function Match1v1Page() {
           </div>
           {/* Enemy Citadel */}
           <div className="flex flex-col items-center">
-            <img src="/sprites/citadel.png" alt="Enemy Citadel" className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]" style={{ filter: "hue-rotate(340deg) saturate(1.5)" }} />
+            <Image
+              src="/sprites/citadel.png"
+              alt="Enemy Citadel"
+              width={128}
+              height={128}
+              className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]"
+              style={{ filter: "hue-rotate(340deg) saturate(1.5)" }}
+            />
             <span className="text-xs tracking-wider text-[#ff3344] uppercase font-bold mt-1">Enemy Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
-                <span className={`text-sm font-bold ${enemyPct < 10 ? "animate-pulse text-red-400" : "text-[#d4cfc6]"}`}>{enemyVault} / 50</span>
+                <span
+                  className={`text-sm font-bold ${enemyPct < 10 ? "animate-pulse text-red-400" : "text-[#d4cfc6]"}`}
+                >
+                  {enemyVault} / 50
+                </span>
                 <span className="text-[10px] text-[#7a7060]">{Math.round(enemyPct)}%</span>
               </div>
               <div className="w-full h-3 bg-[#252019] rounded-full overflow-hidden">
@@ -455,12 +467,7 @@ export default function Match1v1Page() {
 
       {/* ===== 1b. STAKES + HOLD STATUS ===== */}
       <MatchStakesHeader stakes={matchStakes} isPlayerA={isPlayerA} />
-      <HoldStatusStrip
-        playerA={state.playerA}
-        playerB={state.playerB}
-        isPlayerA={isPlayerA}
-        refreshKey={refreshKey}
-      />
+      <HoldStatusStrip playerA={state.playerA} playerB={state.playerB} isPlayerA={isPlayerA} refreshKey={refreshKey} />
 
       {/* ===== 2. BATTLEFIELD PANEL ===== */}
       <div className="border border-[#3d3428] rounded-lg p-3 bg-[#1a1714]">
@@ -479,27 +486,55 @@ export default function Match1v1Page() {
                 const mod = modifiers[idx];
                 const modName = MODIFIER_NAMES[mod] || "Normal";
                 const modDesc = MODIFIER_DESCRIPTIONS[mod] || "";
-                const modColor = mod === 0 ? "text-[#7a7060]"
-                  : mod === 1 ? "text-[#daa520]"
-                  : mod === 2 ? "text-[#c8a44e]"
-                  : mod === 3 ? "text-[#ff3344]"
-                  : "text-[#ff8800]";
-                const modBorder = mod === 0 ? "border-[#3d3428]"
-                  : mod === 1 ? "border-[#daa520]/30"
-                  : mod === 2 ? "border-[#c8a44e]/30"
-                  : mod === 3 ? "border-[#ff3344]/30"
-                  : "border-[#ff8800]/30";
-                const modGlow = mod === 0 ? ""
-                  : mod === 1 ? "shadow-[inset_0_0_12px_rgba(255,215,0,0.08)]"
-                  : mod === 2 ? "shadow-[inset_0_0_12px_rgba(200,164,78,0.08)]"
-                  : mod === 3 ? "shadow-[inset_0_0_12px_rgba(255,51,68,0.08)]"
-                  : "shadow-[inset_0_0_12px_rgba(255,136,0,0.08)]";
+                const modColor =
+                  mod === 0
+                    ? "text-[#7a7060]"
+                    : mod === 1
+                      ? "text-[#daa520]"
+                      : mod === 2
+                        ? "text-[#c8a44e]"
+                        : mod === 3
+                          ? "text-[#ff3344]"
+                          : "text-[#ff8800]";
+                const modBorder =
+                  mod === 0
+                    ? "border-[#3d3428]"
+                    : mod === 1
+                      ? "border-[#daa520]/30"
+                      : mod === 2
+                        ? "border-[#c8a44e]/30"
+                        : mod === 3
+                          ? "border-[#ff3344]/30"
+                          : "border-[#ff8800]/30";
+                const modGlow =
+                  mod === 0
+                    ? ""
+                    : mod === 1
+                      ? "shadow-[inset_0_0_12px_rgba(255,215,0,0.08)]"
+                      : mod === 2
+                        ? "shadow-[inset_0_0_12px_rgba(200,164,78,0.08)]"
+                        : mod === 3
+                          ? "shadow-[inset_0_0_12px_rgba(255,51,68,0.08)]"
+                          : "shadow-[inset_0_0_12px_rgba(255,136,0,0.08)]";
                 const isMain = idx === 2;
                 const hasModifier = mod !== 0;
                 return (
-                  <div key={idx} className={`rounded-lg text-center flex flex-col items-center justify-end gap-1 p-2 ${hasModifier ? `bg-[#252019]/50 border border-[#3d3428] ${modGlow}` : ""}`}>
-                    <img src={sprite} alt={name} className={`object-contain rounded-xl ${isMain ? "w-44 h-44" : "w-32 h-32"}`} />
-                    <div className={`font-bold font-serif ${isMain ? "text-sm text-[#d4cfc6]" : "text-xs text-[#d4cfc6]"}`}>{name}</div>
+                  <div
+                    key={idx}
+                    className={`rounded-lg text-center flex flex-col items-center justify-end gap-1 p-2 ${hasModifier ? `bg-[#252019]/50 border border-[#3d3428] ${modGlow}` : ""}`}
+                  >
+                    <Image
+                      src={sprite}
+                      alt={name}
+                      width={isMain ? 176 : 128}
+                      height={isMain ? 176 : 128}
+                      className={`object-contain rounded-xl ${isMain ? "w-44 h-44" : "w-32 h-32"}`}
+                    />
+                    <div
+                      className={`font-bold font-serif ${isMain ? "text-sm text-[#d4cfc6]" : "text-xs text-[#d4cfc6]"}`}
+                    >
+                      {name}
+                    </div>
                     <div className={`text-xs font-bold ${modColor}`}>{modName}</div>
                     {modDesc && <div className="text-[10px] text-[#7a7060] leading-tight">{modDesc}</div>}
                   </div>
@@ -508,7 +543,6 @@ export default function Match1v1Page() {
             </div>
           );
         })()}
-
       </div>
 
       {/* ===== 3. RESOURCES BAR ===== */}
@@ -551,7 +585,11 @@ export default function Match1v1Page() {
         ) : (
           <div className="p-3 flex flex-col items-center justify-center gap-2">
             {phaseText ? (
-              <span className={`text-sm tracking-wide ${autoRevealStatus === "error" ? "text-[#ff9944]" : "text-[#7a7060] animate-pulse"}`}>{phaseText}</span>
+              <span
+                className={`text-sm tracking-wide ${autoRevealStatus === "error" ? "text-[#ff9944]" : "text-[#7a7060] animate-pulse"}`}
+              >
+                {phaseText}
+              </span>
             ) : (
               <span className="text-[#7a7060] text-xs">Awaiting next phase...</span>
             )}
@@ -592,8 +630,8 @@ export default function Match1v1Page() {
               const gateDmgTaken = isPlayerA ? r.damageToA : r.damageToB;
               const myTraps = isPlayerA ? r.aTraps : r.bTraps;
               const theirTraps = isPlayerA ? r.bTraps : r.aTraps;
-              const myTrapDmg = myTraps.filter(t => t > 0).length * 5;
-              const theirTrapDmg = theirTraps.filter(t => t > 0).length * 5;
+              const myTrapDmg = myTraps.filter((t) => t > 0).length * 5;
+              const theirTrapDmg = theirTraps.filter((t) => t > 0).length * 5;
               const dmgDealt = gateDmgDealt + myTrapDmg;
               const dmgTaken = gateDmgTaken + theirTrapDmg;
               const isExpanded = expandedRounds.has(r.round);
@@ -625,26 +663,31 @@ export default function Match1v1Page() {
                       <div className="grid grid-cols-3 gap-2">
                         {r.gateBreakdown.map((gate, i) => {
                           const modName = MODIFIER_NAMES[gate.modifier] || "Normal";
-                          const modColor = gate.modifier === 0 ? "text-[#7a7060]"
-                            : gate.modifier === 1 ? "text-[#daa520]"
-                            : gate.modifier === 2 ? "text-[#c8a44e]"
-                            : gate.modifier === 3 ? "text-[#ff3344]"
-                            : "text-[#ff8800]";
+                          const modColor =
+                            gate.modifier === 0
+                              ? "text-[#7a7060]"
+                              : gate.modifier === 1
+                                ? "text-[#daa520]"
+                                : gate.modifier === 2
+                                  ? "text-[#c8a44e]"
+                                  : gate.modifier === 3
+                                    ? "text-[#ff3344]"
+                                    : "text-[#ff8800]";
                           const myDmgDealt = isPlayerA ? gate.dmgToB : gate.dmgToA;
                           const myDmgTaken = isPlayerA ? gate.dmgToA : gate.dmgToB;
                           return (
                             <div key={i} className="bg-[#252019] rounded p-2 space-y-1 text-xs">
                               <div className="flex justify-between items-center">
                                 <span className="text-[#d4cfc6] font-bold">{gateNames[i]}</span>
-                                {gate.modifier !== 0 && (
-                                  <span className={`${modColor} text-[10px]`}>{modName}</span>
-                                )}
+                                {gate.modifier !== 0 && <span className={`${modColor} text-[10px]`}>{modName}</span>}
                               </div>
                               <div className="text-[#7a7060]">
-                                You: {isPlayerA ? gate.attackA : gate.attackB} atk / {isPlayerA ? gate.defenseA : gate.defenseB} def
+                                You: {isPlayerA ? gate.attackA : gate.attackB} atk /{" "}
+                                {isPlayerA ? gate.defenseA : gate.defenseB} def
                               </div>
                               <div className="text-[#7a7060]">
-                                Them: {isPlayerA ? gate.attackB : gate.attackA} atk / {isPlayerA ? gate.defenseB : gate.defenseA} def
+                                Them: {isPlayerA ? gate.attackB : gate.attackA} atk /{" "}
+                                {isPlayerA ? gate.defenseB : gate.defenseA} def
                               </div>
                               <div>
                                 {myDmgDealt > 0 && <span className="text-green-400">+{myDmgDealt} </span>}
@@ -655,25 +698,27 @@ export default function Match1v1Page() {
                           );
                         })}
                       </div>
-                      {(r.aTraps.some(t => t > 0) || r.bTraps.some(t => t > 0)) && (
+                      {(r.aTraps.some((t) => t > 0) || r.bTraps.some((t) => t > 0)) && (
                         <div className="text-xs border-t border-[#3d3428] pt-2 space-y-1">
                           <div className="text-[10px] tracking-wider text-[#7a7060] uppercase">Node Traps</div>
                           {(() => {
                             const nodeNames = ["Forge", "Quarry", "Grove"];
-                            return [0, 1, 2].map(ni => {
+                            return [0, 1, 2].map((ni) => {
                               const myTrap = isPlayerA ? r.aTraps[ni] : r.bTraps[ni];
                               const theirTrap = isPlayerA ? r.bTraps[ni] : r.aTraps[ni];
                               if (myTrap) {
                                 return (
                                   <div key={`mt${ni}`} className="text-[#daa520]">
-                                    You trapped {nodeNames[ni]} — opponent takes <span className="text-[#ff3344] font-bold">5 damage</span> if they captured it
+                                    You trapped {nodeNames[ni]} — opponent takes{" "}
+                                    <span className="text-[#ff3344] font-bold">5 damage</span> if they captured it
                                   </div>
                                 );
                               }
                               if (theirTrap) {
                                 return (
                                   <div key={`tt${ni}`} className="text-[#ff3344]">
-                                    Enemy trapped {nodeNames[ni]}! You take <span className="font-bold">5 damage</span> if you captured it
+                                    Enemy trapped {nodeNames[ni]}! You take <span className="font-bold">5 damage</span>{" "}
+                                    if you captured it
                                   </div>
                                 );
                               }

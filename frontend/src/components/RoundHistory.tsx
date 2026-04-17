@@ -30,10 +30,15 @@ export function RoundHistory({ history, yourTeam }: RoundHistoryProps) {
             <div key={r.round} className="flex justify-between text-xs py-1 border-b border-[#1a1a26]">
               <span className="text-[#6a6a7a]">R{r.round}</span>
               <span>
-                {yourAtk
-                  ? <span className="text-[#00d4ff]">You attacked {yourAtk.join("/")} → dealt <span className="text-green-400">{yourDmgDealt}</span> dmg</span>
-                  : <span className="text-[#ff3344]">Enemy attacked → dealt <span className="text-red-400">{yourDmgTaken}</span> dmg to you</span>
-                }
+                {yourAtk ? (
+                  <span className="text-[#00d4ff]">
+                    You attacked {yourAtk.join("/")} → dealt <span className="text-green-400">{yourDmgDealt}</span> dmg
+                  </span>
+                ) : (
+                  <span className="text-[#ff3344]">
+                    Enemy attacked → dealt <span className="text-red-400">{yourDmgTaken}</span> dmg to you
+                  </span>
+                )}
               </span>
             </div>
           );

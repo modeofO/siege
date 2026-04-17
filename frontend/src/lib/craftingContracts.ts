@@ -4,8 +4,7 @@ import { RESOURCE_TOKENS } from "./useResourceBalances";
 
 // Crafting contract address — set via NEXT_PUBLIC_CRAFTING_1V1_ADDRESS in .env.local
 export const CRAFTING_1V1_ADDRESS =
-  process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS ||
-  "0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7";
+  process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS || "0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7";
 
 export type AbilityCost = Record<string, number>;
 
@@ -22,27 +21,85 @@ export interface AbilityDef {
 // 10 abilities: IDs 1-5 are T1, 6-10 are T2
 export const ABILITIES: readonly AbilityDef[] = [
   // T1
-  { id: 1, type: 1, tier: 1, name: "Siege Sword", effect: "Set attack on target gate to 5",
-    cost: { iron: 3, wood: 2 } },
-  { id: 2, type: 2, tier: 1, name: "Stone Cloak", effect: "Halve all gate damage taken",
-    cost: { stone: 3, linen: 2 } },
-  { id: 3, type: 3, tier: 1, name: "Ember Blast", effect: "Deal 2 direct damage bypassing gates",
-    cost: { ember: 3, seeds: 2 } },
-  { id: 4, type: 4, tier: 1, name: "Hex", effect: "Reduce opponent total damage by 3",
-    cost: { iron: 2, stone: 2, ember: 1 } },
-  { id: 5, type: 5, tier: 1, name: "Fortify", effect: "Add 1 to defense at all gates",
-    cost: { stone: 2, linen: 2, wood: 1 } },
+  {
+    id: 1,
+    type: 1,
+    tier: 1,
+    name: "Siege Sword",
+    effect: "Set attack on target gate to 5",
+    cost: { iron: 3, wood: 2 },
+  },
+  { id: 2, type: 2, tier: 1, name: "Stone Cloak", effect: "Halve all gate damage taken", cost: { stone: 3, linen: 2 } },
+  {
+    id: 3,
+    type: 3,
+    tier: 1,
+    name: "Ember Blast",
+    effect: "Deal 2 direct damage bypassing gates",
+    cost: { ember: 3, seeds: 2 },
+  },
+  {
+    id: 4,
+    type: 4,
+    tier: 1,
+    name: "Hex",
+    effect: "Reduce opponent total damage by 3",
+    cost: { iron: 2, stone: 2, ember: 1 },
+  },
+  {
+    id: 5,
+    type: 5,
+    tier: 1,
+    name: "Fortify",
+    effect: "Add 1 to defense at all gates",
+    cost: { stone: 2, linen: 2, wood: 1 },
+  },
   // T2
-  { id: 6, type: 1, tier: 2, name: "Siege Sword (T2)", effect: "Set attack on target gate to 10",
-    cost: { iron: 30, wood: 20, ember: 10 }, requiresT1: true },
-  { id: 7, type: 2, tier: 2, name: "Stone Cloak (T2)", effect: "Zero all gate damage taken",
-    cost: { stone: 30, linen: 20, seeds: 10 }, requiresT1: true },
-  { id: 8, type: 3, tier: 2, name: "Ember Blast (T2)", effect: "Deal 6 direct damage bypassing gates",
-    cost: { ember: 30, seeds: 20, iron: 10 }, requiresT1: true },
-  { id: 9, type: 4, tier: 2, name: "Hex (T2)", effect: "Reduce opponent total damage by 8",
-    cost: { iron: 20, stone: 20, ember: 10, wood: 10 }, requiresT1: true },
-  { id: 10, type: 5, tier: 2, name: "Fortify (T2)", effect: "Double defense at all gates",
-    cost: { stone: 20, linen: 20, wood: 10 }, requiresT1: true },
+  {
+    id: 6,
+    type: 1,
+    tier: 2,
+    name: "Siege Sword (T2)",
+    effect: "Set attack on target gate to 10",
+    cost: { iron: 30, wood: 20, ember: 10 },
+    requiresT1: true,
+  },
+  {
+    id: 7,
+    type: 2,
+    tier: 2,
+    name: "Stone Cloak (T2)",
+    effect: "Zero all gate damage taken",
+    cost: { stone: 30, linen: 20, seeds: 10 },
+    requiresT1: true,
+  },
+  {
+    id: 8,
+    type: 3,
+    tier: 2,
+    name: "Ember Blast (T2)",
+    effect: "Deal 6 direct damage bypassing gates",
+    cost: { ember: 30, seeds: 20, iron: 10 },
+    requiresT1: true,
+  },
+  {
+    id: 9,
+    type: 4,
+    tier: 2,
+    name: "Hex (T2)",
+    effect: "Reduce opponent total damage by 8",
+    cost: { iron: 20, stone: 20, ember: 10, wood: 10 },
+    requiresT1: true,
+  },
+  {
+    id: 10,
+    type: 5,
+    tier: 2,
+    name: "Fortify (T2)",
+    effect: "Double defense at all gates",
+    cost: { stone: 20, linen: 20, wood: 10 },
+    requiresT1: true,
+  },
 ] as const;
 
 // Helpers matching the Cairo versions
@@ -59,17 +116,11 @@ export function tokenIdFrom(type: number, tier: number): number {
 }
 
 export function canAfford(cost: AbilityCost, balances: Record<string, number>): boolean {
-  return Object.entries(cost).every(
-    ([resource, amount]) => (balances[resource] || 0) >= amount,
-  );
+  return Object.entries(cost).every(([resource, amount]) => (balances[resource] || 0) >= amount);
 }
 
 // Approve required tokens then craft a T1 ability in one multicall.
-export async function craftAbility(
-  account: AccountInterface,
-  abilityId: number,
-  cost: AbilityCost,
-): Promise<string> {
+export async function craftAbility(account: AccountInterface, abilityId: number, cost: AbilityCost): Promise<string> {
   const calls: Call[] = [];
 
   for (const [resource, amount] of Object.entries(cost)) {

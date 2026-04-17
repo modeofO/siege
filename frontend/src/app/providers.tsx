@@ -3,14 +3,9 @@
 import React, { createContext, useContext, useState, useMemo } from "react";
 import { RpcProvider, Account, type AccountInterface } from "starknet";
 import { sepolia } from "@starknet-react/chains";
-import {
-  StarknetConfig,
-  jsonRpcProvider,
-  cartridge,
-  useAccount as useStarknetAccount,
-} from "@starknet-react/core";
+import { StarknetConfig, jsonRpcProvider, cartridge, useAccount as useStarknetAccount } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
-import type { SessionPolicies } from "@cartridge/controller";
+import type { SessionPolicies } from "@cartridge/presets";
 import { DojoProvider } from "@/lib/dojoSdk";
 import { CONTRACTS } from "@/lib/contracts";
 import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
@@ -18,6 +13,7 @@ import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
 import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/pillage";
 import { CONQUEST_ADDRESS } from "@/lib/conquest";
+import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
 
 // ---------- Network mode ----------
 
@@ -113,9 +109,7 @@ const SESSION_POLICIES: SessionPolicies = {
   contracts: {
     // --- Legacy 2v2 match flow ---
     [CONTRACTS.ACTIONS]: {
-      methods: [
-        { name: "Create Match", entrypoint: "create_match" },
-      ],
+      methods: [{ name: "Create Match", entrypoint: "create_match" }],
     },
     [CONTRACTS.COMMIT_REVEAL]: {
       methods: [
@@ -127,9 +121,7 @@ const SESSION_POLICIES: SessionPolicies = {
 
     // --- 1v1 match flow ---
     [CONTRACTS_1V1.ACTIONS]: {
-      methods: [
-        { name: "Create 1v1 Match", entrypoint: "create_match_1v1" },
-      ],
+      methods: [{ name: "Create 1v1 Match", entrypoint: "create_match_1v1" }],
     },
     [CONTRACTS_1V1.COMMIT_REVEAL]: {
       methods: [
@@ -140,9 +132,7 @@ const SESSION_POLICIES: SessionPolicies = {
 
     // --- Cartridge vRF ---
     [VRF_PROVIDER_ADDRESS]: {
-      methods: [
-        { name: "Request Random", entrypoint: "request_random" },
-      ],
+      methods: [{ name: "Request Random", entrypoint: "request_random" }],
     },
 
     // --- Crafting (both tiers + approvals for each resource token) ---
@@ -153,10 +143,7 @@ const SESSION_POLICIES: SessionPolicies = {
       ],
     },
     ...Object.fromEntries(
-      Object.values(RESOURCE_TOKENS).map((addr) => [
-        addr,
-        { methods: [{ name: "Approve", entrypoint: "approve" }] },
-      ]),
+      Object.values(RESOURCE_TOKENS).map((addr) => [addr, { methods: [{ name: "Approve", entrypoint: "approve" }] }]),
     ),
 
     // --- World metagame (kingdom, staked matches, parcels, drip, pillage, factions) ---
@@ -186,6 +173,11 @@ const SESSION_POLICIES: SessionPolicies = {
         { name: "Set Preset Defense", entrypoint: "set_preset_defense" },
         { name: "Initiate Conquest", entrypoint: "initiate_conquest" },
       ],
+    },
+
+    // --- AbilityToken: world_system needs operator approval to escrow staked abilities ---
+    [ABILITY_TOKEN_ADDRESS]: {
+      methods: [{ name: "Approve Ability Operator", entrypoint: "set_approval_for_all" }],
     },
   },
 };
@@ -236,10 +228,6 @@ function SepoliaProvider({ children }: { children: React.ReactNode }) {
 // ---------- Exported provider ----------
 
 export function StarknetProvider({ children }: { children: React.ReactNode }) {
-  const inner = IS_DEVNET ? (
-    <DevProvider>{children}</DevProvider>
-  ) : (
-    <SepoliaProvider>{children}</SepoliaProvider>
-  );
+  const inner = IS_DEVNET ? <DevProvider>{children}</DevProvider> : <SepoliaProvider>{children}</SepoliaProvider>;
   return <DojoProvider>{inner}</DojoProvider>;
 }

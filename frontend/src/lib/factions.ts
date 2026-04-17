@@ -107,9 +107,16 @@ export function useFaction(factionId: number | null): FactionData | null {
       });
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [factionId]);
 
   return data;
@@ -159,8 +166,13 @@ export function usePlayerFaction(playerAddress: string | null): {
       if (member && member.factionId > 0) {
         const factionResult = await toriiQuery<{
           siegeDojoFactionModels: GraphEdges<{
-            faction_id: string; leader: string; name: string; tag: string;
-            member_count: string; created_at: string; dissolved: boolean;
+            faction_id: string;
+            leader: string;
+            name: string;
+            tag: string;
+            member_count: string;
+            created_at: string;
+            dissolved: boolean;
           }>;
         }>(`
           query {
@@ -184,16 +196,22 @@ export function usePlayerFaction(playerAddress: string | null): {
       }
 
       const now = Math.floor(Date.now() / 1000);
-      const cooldownRemaining = member && member.lastLeaveTime > 0
-        ? Math.max(0, (member.lastLeaveTime + 86400) - now)
-        : 0;
+      const cooldownRemaining =
+        member && member.lastLeaveTime > 0 ? Math.max(0, member.lastLeaveTime + 86400 - now) : 0;
 
       setState({ member, faction, cooldownRemaining });
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [playerAddress]);
 
   return state;
@@ -235,9 +253,16 @@ export function usePendingInvites(playerAddress: string | null): FactionInviteDa
       setData(entries);
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [playerAddress]);
 
   return data;
@@ -250,8 +275,13 @@ export function useAllFactions(): FactionData[] {
     const doFetch = async () => {
       const result = await toriiQuery<{
         siegeDojoFactionModels: GraphEdges<{
-          faction_id: string; leader: string; name: string; tag: string;
-          member_count: string; created_at: string; dissolved: boolean;
+          faction_id: string;
+          leader: string;
+          name: string;
+          tag: string;
+          member_count: string;
+          created_at: string;
+          dissolved: boolean;
         }>;
       }>(`
         query {
@@ -277,9 +307,16 @@ export function useAllFactions(): FactionData[] {
       setData(entries);
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, []);
 
   return data;
@@ -320,9 +357,16 @@ export function useFactionMembers(factionId: number | null): FactionMemberData[]
       setData(entries);
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [factionId]);
 
   return data;
@@ -336,11 +380,7 @@ function strToFelt(s: string): string {
   return "0x" + (hex || "0");
 }
 
-export async function createFaction(
-  account: AccountInterface,
-  name: string,
-  tag: string,
-): Promise<string> {
+export async function createFaction(account: AccountInterface, name: string, tag: string): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "create_faction",
@@ -349,10 +389,7 @@ export async function createFaction(
   return result.transaction_hash;
 }
 
-export async function inviteMember(
-  account: AccountInterface,
-  target: string,
-): Promise<string> {
+export async function inviteMember(account: AccountInterface, target: string): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "invite_member",
@@ -361,10 +398,7 @@ export async function inviteMember(
   return result.transaction_hash;
 }
 
-export async function acceptInvite(
-  account: AccountInterface,
-  factionId: number,
-): Promise<string> {
+export async function acceptInvite(account: AccountInterface, factionId: number): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "accept_invite",
@@ -373,9 +407,7 @@ export async function acceptInvite(
   return result.transaction_hash;
 }
 
-export async function leaveFaction(
-  account: AccountInterface,
-): Promise<string> {
+export async function leaveFaction(account: AccountInterface): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "leave_faction",
@@ -384,10 +416,7 @@ export async function leaveFaction(
   return result.transaction_hash;
 }
 
-export async function kickMember(
-  account: AccountInterface,
-  target: string,
-): Promise<string> {
+export async function kickMember(account: AccountInterface, target: string): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "kick_member",
@@ -396,10 +425,7 @@ export async function kickMember(
   return result.transaction_hash;
 }
 
-export async function setFactionReinforcement(
-  account: AccountInterface,
-  enabled: boolean,
-): Promise<string> {
+export async function setFactionReinforcement(account: AccountInterface, enabled: boolean): Promise<string> {
   const result = await account.execute({
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "set_faction_reinforcement",

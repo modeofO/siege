@@ -99,11 +99,7 @@ export function computeDamage(
   def1: number,
   def2: number,
 ): number {
-  return (
-    Math.max(0, atk0 - def0) +
-    Math.max(0, atk1 - def1) +
-    Math.max(0, atk2 - def2)
-  );
+  return Math.max(0, atk0 - def0) + Math.max(0, atk1 - def1) + Math.max(0, atk2 - def2);
 }
 
 async function toriiQuery<T>(query: string): Promise<T | null> {
@@ -370,22 +366,8 @@ export function useRoundHistory(matchId: string | null) {
           team1Defense: t1Defense,
           team2Attack: t2Attack,
           team2Defense: t2Defense,
-          damageToTeam1: computeDamage(
-            t2Attack[0],
-            t2Attack[1],
-            t2Attack[2],
-            t1Defense[0],
-            t1Defense[1],
-            t1Defense[2],
-          ),
-          damageToTeam2: computeDamage(
-            t1Attack[0],
-            t1Attack[1],
-            t1Attack[2],
-            t2Defense[0],
-            t2Defense[1],
-            t2Defense[2],
-          ),
+          damageToTeam1: computeDamage(t2Attack[0], t2Attack[1], t2Attack[2], t1Defense[0], t1Defense[1], t1Defense[2]),
+          damageToTeam2: computeDamage(t1Attack[0], t1Attack[1], t1Attack[2], t2Defense[0], t2Defense[1], t2Defense[2]),
         };
       });
 
@@ -457,8 +439,12 @@ export function useCommitmentStatus(
       }
     };
 
-    const initTimer = setTimeout(() => { void fetchStatus(); }, 0);
-    const interval = setInterval(() => { void fetchStatus(); }, POLL_INTERVAL);
+    const initTimer = setTimeout(() => {
+      void fetchStatus();
+    }, 0);
+    const interval = setInterval(() => {
+      void fetchStatus();
+    }, POLL_INTERVAL);
     return () => {
       clearTimeout(initTimer);
       clearInterval(interval);

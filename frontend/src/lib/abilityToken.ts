@@ -3,8 +3,7 @@ import { byteArray, type RpcProvider } from "starknet";
 
 // Deployed ability token address — override via NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS
 export const ABILITY_TOKEN_ADDRESS =
-  process.env.NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS ||
-  "0xe1f7c5fd7bd557ff5c69db03b49a62e40f3cc01ee11524ef862a71952ddcfe";
+  process.env.NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS || "0xe1f7c5fd7bd557ff5c69db03b49a62e40f3cc01ee11524ef862a71952ddcfe";
 
 export type AbilityInventory = {
   siege_sword: number;
@@ -27,8 +26,8 @@ const ABILITY_FIELD_BY_ID: (keyof AbilityInventory)[] = [
   "siege_sword", // id 1
   "stone_cloak", // id 2
   "ember_blast", // id 3
-  "hex",         // id 4
-  "fortify",     // id 5
+  "hex", // id 4
+  "fortify", // id 5
 ];
 
 /**
@@ -38,10 +37,7 @@ const ABILITY_FIELD_BY_ID: (keyof AbilityInventory)[] = [
  *   [accounts_len, ...accounts, token_ids_len, ...token_ids_flat_u256]
  * where each u256 is two felts (low, high).
  */
-export async function fetchAbilityBalances(
-  provider: RpcProvider,
-  playerAddress: string,
-): Promise<AbilityInventory> {
+export async function fetchAbilityBalances(provider: RpcProvider, playerAddress: string): Promise<AbilityInventory> {
   try {
     // Build calldata: 5 accounts (all the same player), 5 token ids (1..5)
     const accountsLen = "5";
@@ -84,28 +80,23 @@ export async function fetchAllAbilityBalances(
   provider: RpcProvider,
   playerAddress: string,
 ): Promise<Record<number, number>> {
+  const ids = Array.from({ length: 10 }, (_, i) => i + 1);
+  const accounts = ids.map(() => playerAddress);
+  const tokenIdsFlat: string[] = [];
+  for (const id of ids) tokenIdsFlat.push(id.toString(), "0");
+
+  const result = await provider.callContract({
+    contractAddress: ABILITY_TOKEN_ADDRESS,
+    entrypoint: "balance_of_batch",
+    calldata: [accounts.length.toString(), ...accounts, ids.length.toString(), ...tokenIdsFlat],
+  });
+
   const balances: Record<number, number> = {};
   for (let i = 1; i <= 10; i++) balances[i] = 0;
-
-  try {
-    const ids = Array.from({ length: 10 }, (_, i) => i + 1);
-    const accounts = ids.map(() => playerAddress);
-    const tokenIdsFlat: string[] = [];
-    for (const id of ids) tokenIdsFlat.push(id.toString(), "0");
-
-    const result = await provider.callContract({
-      contractAddress: ABILITY_TOKEN_ADDRESS,
-      entrypoint: "balance_of_batch",
-      calldata: [accounts.length.toString(), ...accounts, ids.length.toString(), ...tokenIdsFlat],
-    });
-
-    // Layout: [array_len, bal1_low, bal1_high, ...]
-    for (let i = 0; i < 10 && 1 + i * 2 < result.length; i++) {
-      const low = result[1 + i * 2];
-      balances[i + 1] = Number(BigInt(low || 0));
-    }
-  } catch {
-    // Keep zeros
+  // Layout: [array_len, bal1_low, bal1_high, ...]
+  for (let i = 0; i < 10 && 1 + i * 2 < result.length; i++) {
+    const low = result[1 + i * 2];
+    balances[i + 1] = Number(BigInt(low || 0));
   }
   return balances;
 }
@@ -138,10 +129,7 @@ const inflight = new Map<number, Promise<AbilityMetadata | null>>();
  * Read AbilityToken.uri(id) and return parsed metadata. Decodes the returned
  * ByteArray → base64 JSON data-URI → JSON. Caches the result in-memory.
  */
-export async function fetchAbilityMetadata(
-  provider: RpcProvider,
-  tokenId: number,
-): Promise<AbilityMetadata | null> {
+export async function fetchAbilityMetadata(provider: RpcProvider, tokenId: number): Promise<AbilityMetadata | null> {
   const cached = metadataCache.get(tokenId);
   if (cached) return cached;
   const existing = inflight.get(tokenId);
@@ -159,7 +147,9 @@ export async function fetchAbilityMetadata(
       const commaIdx = uri.indexOf(",");
       if (commaIdx < 0) return null;
       const base64 = uri.slice(commaIdx + 1);
-      const json = JSON.parse(typeof atob !== "undefined" ? atob(base64) : Buffer.from(base64, "base64").toString("utf-8"));
+      const json = JSON.parse(
+        typeof atob !== "undefined" ? atob(base64) : Buffer.from(base64, "base64").toString("utf-8"),
+      );
       const meta: AbilityMetadata = {
         name: json.name ?? "",
         description: json.description ?? "",

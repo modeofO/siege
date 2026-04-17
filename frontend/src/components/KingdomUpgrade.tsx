@@ -41,9 +41,7 @@ export function KingdomUpgrade({ tier, totalWins }: KingdomUpgradeProps) {
 
   return (
     <div className="border border-[#3d3428] rounded-lg p-4 bg-[#1a1510]">
-      <div className="text-xs text-[#7a7060] tracking-wider uppercase mb-2">
-        Next: {tierName(nextTier)}
-      </div>
+      <div className="text-xs text-[#7a7060] tracking-wider uppercase mb-2">Next: {tierName(nextTier)}</div>
       <div className="text-[10px] text-[#7a7060] space-y-1 mb-3">
         <div>Ability Slots: {info.abilitySlots}</div>
         <div>Parcel Cap: {info.parcelCap}</div>
@@ -56,11 +54,11 @@ export function KingdomUpgrade({ tier, totalWins }: KingdomUpgradeProps) {
       </div>
       {cost && (
         <div className="text-[10px] text-[#7a7060] mb-3 space-y-0.5">
-          {"iron" in cost && <div>Iron: {cost.iron}</div>}
-          {"stone" in cost && <div>Stone: {cost.stone}</div>}
-          {"wood" in cost && <div>Wood: {cost.wood}</div>}
-          {"ember" in cost && <div>Ember: {(cost as any).ember}</div>}
-          {"seeds" in cost && <div>Seeds: {(cost as any).seeds}</div>}
+          <div>Iron: {cost.iron}</div>
+          <div>Stone: {cost.stone}</div>
+          <div>Wood: {cost.wood}</div>
+          {cost.ember !== undefined && <div>Ember: {cost.ember}</div>}
+          {cost.seeds !== undefined && <div>Seeds: {cost.seeds}</div>}
         </div>
       )}
       <button

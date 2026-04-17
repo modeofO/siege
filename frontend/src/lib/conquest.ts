@@ -53,14 +53,30 @@ export function usePresetDefense(playerAddress: string | null): PresetDefenseDat
     const doFetch = async () => {
       const result = await toriiQuery<{
         siegeDojoPresetDefenseModels: GraphEdges<{
-          p0_p0: string; p0_p1: string; p0_p2: string;
-          p0_g0: string; p0_g1: string; p0_g2: string;
-          p1_p0: string; p1_p1: string; p1_p2: string;
-          p1_g0: string; p1_g1: string; p1_g2: string;
-          p2_p0: string; p2_p1: string; p2_p2: string;
-          p2_g0: string; p2_g1: string; p2_g2: string;
-          p3_p0: string; p3_p1: string; p3_p2: string;
-          p3_g0: string; p3_g1: string; p3_g2: string;
+          p0_p0: string;
+          p0_p1: string;
+          p0_p2: string;
+          p0_g0: string;
+          p0_g1: string;
+          p0_g2: string;
+          p1_p0: string;
+          p1_p1: string;
+          p1_p2: string;
+          p1_g0: string;
+          p1_g1: string;
+          p1_g2: string;
+          p2_p0: string;
+          p2_p1: string;
+          p2_p2: string;
+          p2_g0: string;
+          p2_g1: string;
+          p2_g2: string;
+          p3_p0: string;
+          p3_p1: string;
+          p3_p2: string;
+          p3_g0: string;
+          p3_g1: string;
+          p3_g2: string;
           preset_count: string;
         }>;
       }>(`
@@ -84,22 +100,53 @@ export function usePresetDefense(playerAddress: string | null): PresetDefenseDat
       }
 
       const slots: PresetSlot[] = [
-        { p0: toNum(node.p0_p0), p1: toNum(node.p0_p1), p2: toNum(node.p0_p2),
-          g0: toNum(node.p0_g0), g1: toNum(node.p0_g1), g2: toNum(node.p0_g2) },
-        { p0: toNum(node.p1_p0), p1: toNum(node.p1_p1), p2: toNum(node.p1_p2),
-          g0: toNum(node.p1_g0), g1: toNum(node.p1_g1), g2: toNum(node.p1_g2) },
-        { p0: toNum(node.p2_p0), p1: toNum(node.p2_p1), p2: toNum(node.p2_p2),
-          g0: toNum(node.p2_g0), g1: toNum(node.p2_g1), g2: toNum(node.p2_g2) },
-        { p0: toNum(node.p3_p0), p1: toNum(node.p3_p1), p2: toNum(node.p3_p2),
-          g0: toNum(node.p3_g0), g1: toNum(node.p3_g1), g2: toNum(node.p3_g2) },
+        {
+          p0: toNum(node.p0_p0),
+          p1: toNum(node.p0_p1),
+          p2: toNum(node.p0_p2),
+          g0: toNum(node.p0_g0),
+          g1: toNum(node.p0_g1),
+          g2: toNum(node.p0_g2),
+        },
+        {
+          p0: toNum(node.p1_p0),
+          p1: toNum(node.p1_p1),
+          p2: toNum(node.p1_p2),
+          g0: toNum(node.p1_g0),
+          g1: toNum(node.p1_g1),
+          g2: toNum(node.p1_g2),
+        },
+        {
+          p0: toNum(node.p2_p0),
+          p1: toNum(node.p2_p1),
+          p2: toNum(node.p2_p2),
+          g0: toNum(node.p2_g0),
+          g1: toNum(node.p2_g1),
+          g2: toNum(node.p2_g2),
+        },
+        {
+          p0: toNum(node.p3_p0),
+          p1: toNum(node.p3_p1),
+          p2: toNum(node.p3_p2),
+          g0: toNum(node.p3_g0),
+          g1: toNum(node.p3_g1),
+          g2: toNum(node.p3_g2),
+        },
       ];
 
       setData({ slots, presetCount: toNum(node.preset_count) });
     };
 
-    const t = setTimeout(() => { void doFetch(); }, 0);
-    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void doFetch();
+    }, 0);
+    const i = setInterval(() => {
+      void doFetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [playerAddress]);
 
   return data;
@@ -108,16 +155,24 @@ export function usePresetDefense(playerAddress: string | null): PresetDefenseDat
 export async function setPresetDefense(
   account: AccountInterface,
   index: number,
-  p0: number, p1: number, p2: number,
-  g0: number, g1: number, g2: number,
+  p0: number,
+  p1: number,
+  p2: number,
+  g0: number,
+  g1: number,
+  g2: number,
 ): Promise<string> {
   const result = await account.execute({
     contractAddress: CONQUEST_ADDRESS,
     entrypoint: "set_preset_defense",
     calldata: [
       index.toString(),
-      p0.toString(), p1.toString(), p2.toString(),
-      g0.toString(), g1.toString(), g2.toString(),
+      p0.toString(),
+      p1.toString(),
+      p2.toString(),
+      g0.toString(),
+      g1.toString(),
+      g2.toString(),
     ],
   });
   return result.transaction_hash;
@@ -126,8 +181,12 @@ export async function setPresetDefense(
 export async function initiateConquest(
   account: AccountInterface,
   targetParcelId: number,
-  p0: number, p1: number, p2: number,
-  g0: number, g1: number, g2: number,
+  p0: number,
+  p1: number,
+  p2: number,
+  g0: number,
+  g1: number,
+  g2: number,
   abilityId: number,
   abilityTarget: number,
 ): Promise<string> {
@@ -136,8 +195,12 @@ export async function initiateConquest(
     entrypoint: "initiate_conquest",
     calldata: [
       targetParcelId.toString(),
-      p0.toString(), p1.toString(), p2.toString(),
-      g0.toString(), g1.toString(), g2.toString(),
+      p0.toString(),
+      p1.toString(),
+      p2.toString(),
+      g0.toString(),
+      g1.toString(),
+      g2.toString(),
       abilityId.toString(),
       abilityTarget.toString(),
     ],

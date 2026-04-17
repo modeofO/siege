@@ -4,8 +4,7 @@ import { useEffect, useState } from "react";
 import { RpcProvider } from "starknet";
 import { fetchAbilityMetadata, type AbilityMetadata } from "@/lib/abilityToken";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
 
 let sharedProvider: RpcProvider | null = null;
 function getProvider(): RpcProvider {
@@ -43,11 +42,7 @@ export function AbilityIcon({ tokenId, count, size = 40 }: AbilityIconProps) {
     >
       {meta?.image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={meta.image}
-          alt={meta.name}
-          className="w-full h-full object-contain p-1"
-        />
+        <img src={meta.image} alt={meta.name} className="w-full h-full object-contain p-1" />
       ) : (
         <div className="text-[8px] text-[#7a7060] animate-pulse">…</div>
       )}

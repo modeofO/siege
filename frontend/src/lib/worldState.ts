@@ -20,9 +20,7 @@ function safeNum(v: unknown): number {
 }
 
 function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store)
-    ? store
-    : Object.values(store as Record<string, unknown>);
+  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
   const out: T[] = [];
   for (const entry of iter) {
     if (!entry || typeof entry !== "object") continue;
@@ -62,7 +60,7 @@ export interface ParcelData {
   col: number;
   row: number;
   parcelType: number; // 0=Forge, 1=Quarry, 2=Grove
-  owner: string;      // hex address, "0x0" = unclaimed
+  owner: string; // hex address, "0x0" = unclaimed
   isHome: boolean;
 }
 
@@ -107,9 +105,16 @@ export function useWorldParcels(refreshKey?: number) {
       setLoading(false);
     };
 
-    const t = setTimeout(() => { void fetch(); }, 0);
-    const i = setInterval(() => { void fetch(); }, POLL_INTERVAL);
-    return () => { clearTimeout(t); clearInterval(i); };
+    const t = setTimeout(() => {
+      void fetch();
+    }, 0);
+    const i = setInterval(() => {
+      void fetch();
+    }, POLL_INTERVAL);
+    return () => {
+      clearTimeout(t);
+      clearInterval(i);
+    };
   }, [refreshKey]);
 
   return { parcels, loading };
@@ -131,7 +136,9 @@ export interface PlayerKingdomData {
 
 const EMPTY_KINGDOM: PlayerKingdomData = {
   registered: false,
-  home0: 0, home1: 0, home2: 0,
+  home0: 0,
+  home1: 0,
+  home2: 0,
   parcelCount: 0,
   freeCraftUsed: false,
   tier: 0,
@@ -143,11 +150,7 @@ export function usePlayerKingdom(playerAddress: string | null, _refreshKey?: num
   useEntityQuery(
     new ToriiQueryBuilder<SchemaType>()
       .withClause(
-        KeysClause<SchemaType>(
-          [ModelsMapping.PlayerKingdom],
-          [playerAddress ?? undefined],
-          "VariableLen",
-        ).build(),
+        KeysClause<SchemaType>([ModelsMapping.PlayerKingdom], [playerAddress ?? undefined], "VariableLen").build(),
       )
       .includeHashedKeys(),
   );
@@ -157,9 +160,7 @@ export function usePlayerKingdom(playerAddress: string | null, _refreshKey?: num
   return useMemo<PlayerKingdomData>(() => {
     if (!playerAddress) return EMPTY_KINGDOM;
     const addr = playerAddress.toLowerCase();
-    const k = flatModels<PlayerKingdomModel>(kingdoms).find(
-      (x) => String(x.player).toLowerCase() === addr,
-    );
+    const k = flatModels<PlayerKingdomModel>(kingdoms).find((x) => String(x.player).toLowerCase() === addr);
     if (!k) return EMPTY_KINGDOM;
     return {
       registered: !!k.registered,

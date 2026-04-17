@@ -42,9 +42,7 @@ export function DojoProvider({ children }: { children: React.ReactNode }) {
   if (error) {
     return (
       <div style={{ padding: 24, fontFamily: "monospace", color: "#fbb" }}>
-        <div style={{ color: "#f88", fontWeight: "bold", marginBottom: 8 }}>
-          Dojo SDK failed to initialize
-        </div>
+        <div style={{ color: "#f88", fontWeight: "bold", marginBottom: 8 }}>Dojo SDK failed to initialize</div>
         <div>{error.message}</div>
         <div style={{ marginTop: 12, fontSize: 12, color: "#888" }}>
           World: {WORLD_ADDRESS}
@@ -56,11 +54,7 @@ export function DojoProvider({ children }: { children: React.ReactNode }) {
   }
 
   if (!sdk) {
-    return (
-      <div style={{ padding: 24, fontFamily: "monospace", color: "#888" }}>
-        Connecting to Torii…
-      </div>
-    );
+    return <div style={{ padding: 24, fontFamily: "monospace", color: "#888" }}>Connecting to Torii…</div>;
   }
 
   return (

@@ -13,13 +13,7 @@ interface AbilitySelectorProps {
 
 const GATE_NAMES = ["East", "Under.", "West"];
 
-export function AbilitySelector({
-  abilities,
-  used,
-  selectedAbility,
-  selectedTarget,
-  onSelect,
-}: AbilitySelectorProps) {
+export function AbilitySelector({ abilities, used, selectedAbility, selectedTarget, onSelect }: AbilitySelectorProps) {
   const hasAny = abilities.some((a) => a > 0);
   if (!hasAny) return null;
 
@@ -41,7 +35,16 @@ export function AbilitySelector({
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-1.5 text-[10px] tracking-wider text-[#b8860b] uppercase font-bold border-b border-[#b8860b]/20 pb-0.5 mb-1 font-serif">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
         </svg>
         ABILITY

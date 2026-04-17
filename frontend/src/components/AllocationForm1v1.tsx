@@ -2,6 +2,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import type { NodeOwner } from "@/lib/gameState1v1";
 import { AbilitySelector } from "./AbilitySelector";
 
@@ -38,8 +39,20 @@ const NODE_RESOURCES = ["Iron + Linen", "Stone + Wood", "Ember + Seeds"];
 const NODE_SPRITES = ["/sprites/node-forge.png", "/sprites/node-quarry.png", "/sprites/node-grove.png"];
 
 export function AllocationForm1v1({
-  budget, allocations, onChange, onCommit, submitting, confirming, error, nodes, isPlayerA,
-  abilities, abilitiesUsed, selectedAbility, selectedTarget, onAbilitySelect,
+  budget,
+  allocations,
+  onChange,
+  onCommit,
+  submitting,
+  confirming,
+  error,
+  nodes,
+  isPlayerA,
+  abilities,
+  abilitiesUsed,
+  selectedAbility,
+  selectedTarget,
+  onAbilitySelect,
 }: AllocationForm1v1Props) {
   const busy = submitting || confirming;
   const trapCost = ((allocations[10] || 0) + (allocations[11] || 0) + (allocations[12] || 0)) * 2;
@@ -82,7 +95,9 @@ export function AllocationForm1v1({
       {/* Budget header */}
       <div className="flex justify-between items-center">
         <span className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Deploy Orders</span>
-        <span className={`text-sm font-bold ${remaining === 0 ? "text-green-400" : remaining < 0 ? "text-red-400" : "text-[#daa520]"}`}>
+        <span
+          className={`text-sm font-bold ${remaining === 0 ? "text-green-400" : remaining < 0 ? "text-red-400" : "text-[#daa520]"}`}
+        >
           {remaining === 0 ? "BUDGET SPENT" : `${remaining} pts left`}
         </span>
       </div>
@@ -100,13 +115,33 @@ export function AllocationForm1v1({
       <div className="grid grid-cols-2 gap-x-4 gap-y-1">
         {/* Column headers */}
         <div className="flex items-center gap-1.5 text-[10px] tracking-wider text-[#ff8800] uppercase font-bold border-b border-[#ff8800]/20 pb-0.5 mb-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M14.5 17.5L3 6V3h3l11.5 11.5" /><path d="M13 7l4-4 4 4-4 4" /><path d="M8 12l-4 4 4 4 4-4" />
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5" />
+            <path d="M13 7l4-4 4 4-4 4" />
+            <path d="M8 12l-4 4 4 4 4-4" />
           </svg>
           ATTACK
         </div>
         <div className="flex items-center gap-1.5 text-[10px] tracking-wider text-[#6b8cae] uppercase font-bold border-b border-[#6b8cae]/20 pb-0.5 mb-1">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
           </svg>
           DEFENSE
@@ -117,21 +152,41 @@ export function AllocationForm1v1({
           <React.Fragment key={gi}>
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#d4cfc6] w-10 shrink-0">{name}</span>
-              <input type="range" min={0} max={budget} value={allocations[gi] || 0}
+              <input
+                type="range"
+                min={0}
+                max={budget}
+                value={allocations[gi] || 0}
                 onChange={(e) => handleChange(gi, parseInt(e.target.value))}
-                className="flex-1 accent-[#ff8800] text-[#ff8800] h-2 cursor-pointer" />
-              <input type="number" min={0} max={budget} value={allocations[gi] || 0}
+                className="flex-1 accent-[#ff8800] text-[#ff8800] h-2 cursor-pointer"
+              />
+              <input
+                type="number"
+                min={0}
+                max={budget}
+                value={allocations[gi] || 0}
                 onChange={(e) => handleChange(gi, Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#ff8800]" />
+                className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#ff8800]"
+              />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#d4cfc6] w-10 shrink-0">{name}</span>
-              <input type="range" min={0} max={budget} value={allocations[3 + gi] || 0}
+              <input
+                type="range"
+                min={0}
+                max={budget}
+                value={allocations[3 + gi] || 0}
                 onChange={(e) => handleChange(3 + gi, parseInt(e.target.value))}
-                className="flex-1 accent-[#6b8cae] text-[#6b8cae] h-2 cursor-pointer" />
-              <input type="number" min={0} max={budget} value={allocations[3 + gi] || 0}
+                className="flex-1 accent-[#6b8cae] text-[#6b8cae] h-2 cursor-pointer"
+              />
+              <input
+                type="number"
+                min={0}
+                max={budget}
+                value={allocations[3 + gi] || 0}
                 onChange={(e) => handleChange(3 + gi, Math.max(0, parseInt(e.target.value) || 0))}
-                className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#6b8cae]" />
+                className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#6b8cae]"
+              />
             </div>
           </React.Fragment>
         ))}
@@ -141,17 +196,36 @@ export function AllocationForm1v1({
       <div className="border-t border-[#3d3428] pt-2">
         <div className="flex items-center gap-2">
           <span className="flex items-center gap-1 text-[10px] tracking-wider text-[#66cc66] uppercase w-16 shrink-0">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
               <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
             </svg>
             Repair
           </span>
-          <input type="range" min={0} max={3} value={allocations[6] || 0}
+          <input
+            type="range"
+            min={0}
+            max={3}
+            value={allocations[6] || 0}
             onChange={(e) => handleChange(6, parseInt(e.target.value))}
-            className="flex-1 accent-[#66cc66] text-[#66cc66] h-2 cursor-pointer" />
-          <input type="number" min={0} max={3} value={allocations[6] || 0}
+            className="flex-1 accent-[#66cc66] text-[#66cc66] h-2 cursor-pointer"
+          />
+          <input
+            type="number"
+            min={0}
+            max={3}
+            value={allocations[6] || 0}
             onChange={(e) => handleChange(6, Math.max(0, parseInt(e.target.value) || 0))}
-            className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#66cc66]" />
+            className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#66cc66]"
+          />
           <span className="text-[10px] text-[#7a7060]">max 3</span>
         </div>
       </div>
@@ -159,8 +233,19 @@ export function AllocationForm1v1({
       {/* Nodes — 3-column grid with integrated traps */}
       <div className="border-t border-[#3d3428] pt-2">
         <div className="flex items-center gap-1.5 text-[10px] tracking-wider text-[#daa520] uppercase font-bold mb-2 font-serif">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10" /><path d="M2 12h20" /><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <path d="M2 12h20" />
+            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
           </svg>
           CONTESTED NODES
         </div>
@@ -173,19 +258,35 @@ export function AllocationForm1v1({
 
             return (
               <div key={ni} className="bg-[#252019] rounded-lg p-2 space-y-1.5 flex flex-col items-center">
-                <img src={NODE_SPRITES[ni]} alt={name} className="w-20 h-20 object-contain rounded-lg" />
+                <Image
+                  src={NODE_SPRITES[ni]}
+                  alt={name}
+                  width={80}
+                  height={80}
+                  className="w-20 h-20 object-contain rounded-lg"
+                />
                 <div className="text-xs text-[#d4cfc6] font-bold text-center">{name}</div>
                 <div className="text-[10px] text-[#7a7060] text-center">{NODE_RESOURCES[ni]}</div>
                 {isTrapped ? (
                   <div className="text-center text-[10px] text-[#ff3344] font-bold py-1">TRAPPED (2 pts)</div>
                 ) : (
                   <div className="flex items-center gap-1 px-1">
-                    <input type="range" min={0} max={budget} value={allocations[nodeIdx] || 0}
+                    <input
+                      type="range"
+                      min={0}
+                      max={budget}
+                      value={allocations[nodeIdx] || 0}
                       onChange={(e) => handleChange(nodeIdx, parseInt(e.target.value))}
-                      className="flex-1 accent-[#daa520] text-[#daa520] h-2 cursor-pointer" />
-                    <input type="number" min={0} max={budget} value={allocations[nodeIdx] || 0}
+                      className="flex-1 accent-[#daa520] text-[#daa520] h-2 cursor-pointer"
+                    />
+                    <input
+                      type="number"
+                      min={0}
+                      max={budget}
+                      value={allocations[nodeIdx] || 0}
                       onChange={(e) => handleChange(nodeIdx, Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-8 text-center bg-[#0d0b0a] border border-[#3d3428] rounded text-xs py-0.5" />
+                      className="w-8 text-center bg-[#0d0b0a] border border-[#3d3428] rounded text-xs py-0.5"
+                    />
                   </div>
                 )}
                 {canTrap && (
@@ -211,9 +312,7 @@ export function AllocationForm1v1({
         <span>
           Points: {allocationTotal} + Traps: {trapCost} = {total} / {budget}
         </span>
-        {remaining !== 0 && (
-          <span className="text-[#daa520]">Must use all {budget}</span>
-        )}
+        {remaining !== 0 && <span className="text-[#daa520]">Must use all {budget}</span>}
       </div>
 
       {/* Commit button — full-width, prominent */}
@@ -244,9 +343,7 @@ export function AllocationForm1v1({
           "\u2694 COMMIT ORDERS \u2694"
         )}
       </button>
-      {error && (
-        <div className="text-[#ff3344] text-xs text-center">{error}</div>
-      )}
+      {error && <div className="text-[#ff3344] text-xs text-center">{error}</div>}
     </div>
   );
 }
