@@ -73,7 +73,7 @@
     },
     {
       "address": "0x31ff951f7405f24e69f42dc3009ff20702fca8079d6551733fc39da90ab1e81",
-      "class_hash": "0x43d5493ee6c9c3dd34fc402266f4acf85c39aa9b50cf46cba6db59dd8135709",
+      "class_hash": "0x3dd1f12de2042719c8ac66d803e20fb13a9ad1ee08408e45069c6839995bc86",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal_1v1",
       "selector": "0x495013ee20d528ad6f0e109874e37a33ef3e258c7ed8c446cfb8389f7a94143",
@@ -132,7 +132,7 @@
     },
     {
       "address": "0x2d7d0a53f6a4e24f62b33ae7e0203f5c155476ff7fdb53b10a5fffa48d84064",
-      "class_hash": "0x6f0a516c26e5d34921b703c8e5c73b03bb119d16876e3e8f71ae875d45c14c9",
+      "class_hash": "0x72c3a19d147f711d559c26bef22bae0ca365dfc78994a015aa01c73ac946397",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
@@ -6558,10 +6558,6 @@
             {
               "name": "rows",
               "type": "core::array::Array::<core::integer::u16>"
-            },
-            {
-              "name": "types",
-              "type": "core::array::Array::<core::integer::u8>"
             }
           ],
           "outputs": [],
@@ -6650,6 +6646,10 @@
             {
               "name": "parcel_id",
               "type": "core::integer::u32"
+            },
+            {
+              "name": "parcel_type",
+              "type": "core::integer::u8"
             }
           ],
           "outputs": [],
