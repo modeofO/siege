@@ -263,8 +263,7 @@ mod tests {
         starknet::testing::set_contract_address(contract_address_const::<0>());
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        world_sys.initialize_world(cols, rows, types);
+        world_sys.initialize_world(cols, rows);
 
         // Register a player
         let player = deploy_user();
@@ -402,8 +401,7 @@ mod tests {
         starknet::testing::set_contract_address(contract_address_const::<0>());
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        world_sys.initialize_world(cols, rows, types);
+        world_sys.initialize_world(cols, rows);
 
         // Register player A (tier 0 by default)
         let player_a = deploy_user();

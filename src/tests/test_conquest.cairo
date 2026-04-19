@@ -148,14 +148,16 @@ mod tests {
             i += 1;
         };
 
-        // Claim the desired homes
+        // Claim the desired homes and assign types (0=Forge, 1=Quarry, 2=Grove)
         let desired: Array<u32> = array![h0, h1, h2];
+        let types: Array<u8> = array![0, 1, 2];
         let mut i: u32 = 0;
         while i < 3 {
             let pid = *desired.at(i);
             let mut p: Parcel = world.read_model(pid);
             p.owner = player;
             p.is_home = true;
+            p.parcel_type = *types.at(i);
             world.write_model_test(@p);
             i += 1;
         };
@@ -251,8 +253,7 @@ mod tests {
         // parcels 0-4: (0,0)..(4,0)  parcels 5-9: (0,1)..(4,1)
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        world_sys.initialize_world(cols, rows, types);
+        world_sys.initialize_world(cols, rows);
 
         // Register player_a, then force the home layout to the legacy
         // first-unclaimed-per-type layout (parcels 0/1/2). The new spatial

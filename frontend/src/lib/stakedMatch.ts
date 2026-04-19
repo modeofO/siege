@@ -90,12 +90,12 @@ export async function settleMatch(account: AccountInterface, matchId: string) {
   return tx;
 }
 
-export async function claimParcel(account: AccountInterface, matchId: string, parcelId: number) {
+export async function claimParcel(account: AccountInterface, matchId: string, parcelId: number, parcelType: number) {
   const tx = await account.execute(
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
       entrypoint: "claim_parcel",
-      calldata: [matchId, parcelId.toString()],
+      calldata: [matchId, parcelId.toString(), parcelType.toString()],
     },
     TX_OPTS,
   );

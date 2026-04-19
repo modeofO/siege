@@ -22,12 +22,14 @@ interface MatchEndActionsProps {
 }
 
 const PARCEL_TYPE_LABELS = ["Forge", "Quarry", "Grove"] as const;
+const PARCEL_TYPE_COLORS = ["#b87333", "#8a8a9a", "#4a7c59"] as const;
 
 function ParcelBadge({ type, col, row }: { type: number; col: number; row: number }) {
-  const label = PARCEL_TYPE_LABELS[type] ?? `Type ${type}`;
+  const isUntyped = type === 255;
+  const label = isUntyped ? "Unclaimed" : (PARCEL_TYPE_LABELS[type] ?? `Type ${type}`);
   return (
     <div className="flex flex-col items-center gap-0.5 border border-[#3d3428] rounded px-2 py-1.5 bg-[#1a1714] min-w-[72px]">
-      <span className="text-[10px] text-[#c8a44e] font-serif tracking-wider">{label}</span>
+      <span className={`text-[10px] font-serif tracking-wider ${isUntyped ? "text-[#7a7060]" : "text-[#c8a44e]"}`}>{label}</span>
       <span className="text-[10px] text-[#7a7060] font-mono">
         ({col},{row})
       </span>
@@ -82,6 +84,8 @@ export function MatchEndActions({
   const [settling, setSettling] = useState(false);
   const [claiming, setClaiming] = useState<number | null>(null);
   const [claimed, setClaimed] = useState<number | null>(null);
+  const [selectedCandidate, setSelectedCandidate] = useState<number | null>(null);
+  const [selectedType, setSelectedType] = useState<number | null>(null);
   const [txError, setTxError] = useState("");
 
   const onSettle = async () => {
@@ -97,13 +101,13 @@ export function MatchEndActions({
     }
   };
 
-  const onClaim = async (parcelId: number) => {
-    if (!account) return;
-    setClaiming(parcelId);
+  const onClaim = async () => {
+    if (!account || selectedCandidate === null || selectedType === null) return;
+    setClaiming(selectedCandidate);
     setTxError("");
     try {
-      await claimParcel(account, matchId, parcelId);
-      setClaimed(parcelId);
+      await claimParcel(account, matchId, selectedCandidate, selectedType);
+      setClaimed(selectedCandidate);
     } catch (e) {
       setTxError(extractErrorMsg(e));
     } finally {
@@ -184,19 +188,54 @@ export function MatchEndActions({
               </div>
             ) : (
               <>
+                <div className="text-[10px] text-[#7a7060] mb-1">Select a parcel location:</div>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {candidates.map((p) => (
                     <button
                       key={p.parcelId}
-                      onClick={() => onClaim(p.parcelId)}
+                      onClick={() => { setSelectedCandidate(p.parcelId); setSelectedType(null); }}
                       disabled={claiming !== null}
-                      className="disabled:opacity-40 hover:scale-105 transition-transform disabled:cursor-not-allowed"
+                      className={`disabled:opacity-40 hover:scale-105 transition-transform disabled:cursor-not-allowed rounded ${
+                        selectedCandidate === p.parcelId ? "ring-2 ring-[#c8a44e]" : ""
+                      }`}
                     >
                       <ParcelBadge type={p.parcelType} col={p.col} row={p.row} />
                     </button>
                   ))}
                 </div>
-                {claiming !== null && <div className="text-[11px] text-[#c8a44e]">Claiming parcel {claiming}...</div>}
+
+                {selectedCandidate !== null && (
+                  <div className="space-y-2 mt-3">
+                    <div className="text-[10px] text-[#7a7060]">Choose parcel type:</div>
+                    <div className="flex gap-2 justify-center">
+                      {PARCEL_TYPE_LABELS.map((label, i) => (
+                        <button
+                          key={i}
+                          onClick={() => setSelectedType(i)}
+                          disabled={claiming !== null}
+                          className={`px-3 py-1.5 rounded border text-[11px] tracking-wider font-serif transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
+                            selectedType === i
+                              ? "border-[#c8a44e] bg-[#c8a44e]/20 text-[#c8a44e]"
+                              : "border-[#3d3428] bg-[#1a1714] text-[#7a7060] hover:border-[#5a5040]"
+                          }`}
+                          style={selectedType === i ? { borderColor: PARCEL_TYPE_COLORS[i] } : undefined}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedCandidate !== null && selectedType !== null && (
+                  <button
+                    onClick={onClaim}
+                    disabled={claiming !== null}
+                    className="w-full py-2 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] rounded hover:bg-[#c8a44e]/20 transition-colors tracking-wider text-[11px] font-serif disabled:opacity-30 disabled:cursor-not-allowed mt-2"
+                  >
+                    {claiming !== null ? "CLAIMING..." : `CLAIM AS ${PARCEL_TYPE_LABELS[selectedType].toUpperCase()}`}
+                  </button>
+                )}
               </>
             )}
           </div>

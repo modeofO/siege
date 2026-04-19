@@ -176,12 +176,10 @@ mod tests {
     fn test_initialize_world() {
         let (mut world, ws) = setup();
 
-        // Init with 4 parcels: (col, row, type)
-        // (0,0,0), (1,0,1), (0,1,2), (1,1,0)
+        // Init with 4 parcels: (col, row) — all untyped (255)
         ws.initialize_world(
             array![0_u16, 1_u16, 0_u16, 1_u16],
             array![0_u16, 0_u16, 1_u16, 1_u16],
-            array![0_u8, 1_u8, 2_u8, 0_u8],
         );
 
         let config: WorldConfig = world.read_model(0_u8);
@@ -191,18 +189,17 @@ mod tests {
         let parcel_0: Parcel = world.read_model(0_u32);
         assert(parcel_0.col == 0, 'parcel 0 col wrong');
         assert(parcel_0.row == 0, 'parcel 0 row wrong');
-        assert(parcel_0.parcel_type == 0, 'parcel 0 type wrong');
+        assert(parcel_0.parcel_type == 255, 'parcel 0 should be untyped');
     }
 
     #[test]
     fn test_register_player() {
         let (mut world, ws) = setup();
 
-        // Init world with 10 parcels (2 rows of 5, types cycling 0,1,2,0,1,2,0,1,2,0)
+        // Init world with 10 parcels (2 rows of 5, all untyped)
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        ws.initialize_world(cols, rows, types);
+        ws.initialize_world(cols, rows);
 
         // Deploy AbilityToken
         let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
@@ -226,7 +223,7 @@ mod tests {
         // Deploy a mock user account
         let player = deploy_user();
 
-        // Register from the player's address
+        // Register from the player's address — player chooses types 0, 1, 2
         starknet::testing::set_contract_address(player);
         ws.register_player(array![0_u8, 1_u8, 2_u8]);
 
@@ -235,7 +232,7 @@ mod tests {
         assert(kingdom.registered, 'Player should be registered');
         assert(kingdom.parcel_count == 3, 'parcel_count should be 3');
 
-        // Verify the first home parcel (type 0) is owned, is_home, correct type
+        // Verify the first home parcel is owned, is_home, and typed by the player's choice
         let home_parcel: Parcel = world.read_model(kingdom.home_0);
         assert(home_parcel.owner == player, 'home_0 owner wrong');
         assert(home_parcel.is_home, 'home_0 should be home');
@@ -251,8 +248,7 @@ mod tests {
 
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        ws.initialize_world(cols, rows, types);
+        ws.initialize_world(cols, rows);
 
         let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
         let ability_token = deploy_ability_token(admin);
@@ -328,8 +324,7 @@ mod tests {
         // Init world with 10 parcels
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        ws.initialize_world(cols, rows, types);
+        ws.initialize_world(cols, rows);
 
         // Deploy AbilityToken
         let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();

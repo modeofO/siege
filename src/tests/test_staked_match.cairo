@@ -159,8 +159,7 @@ mod tests {
         // Init world with 10 parcels (2 rows of 5)
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        let types: Array<u8> = array![0, 1, 2, 0, 1, 2, 0, 1, 2, 0];
-        world_sys.initialize_world(cols, rows, types);
+        world_sys.initialize_world(cols, rows);
 
         // Register player A
         let player_a = deploy_user();
@@ -436,7 +435,7 @@ mod tests {
             }
             p += 1;
         };
-        world_sys.claim_parcel(match_id, claim_id);
+        world_sys.claim_parcel(match_id, claim_id, 0);
 
         let kingdom_a_after: PlayerKingdom = world.read_model(player_a);
         assert(kingdom_a_after.parcel_count == before_count + 1, 'a should gain a parcel');

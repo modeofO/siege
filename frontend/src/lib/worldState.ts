@@ -59,7 +59,7 @@ export interface ParcelData {
   parcelId: number;
   col: number;
   row: number;
-  parcelType: number; // 0=Forge, 1=Quarry, 2=Grove
+  parcelType: number; // 0=Forge, 1=Quarry, 2=Grove, 255=Untyped
   owner: string; // hex address, "0x0" = unclaimed
   isHome: boolean;
 }

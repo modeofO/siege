@@ -14,12 +14,14 @@ const PARCEL_TYPE_COLORS: Record<number, string> = {
   0: "#b87333", // Forge — copper
   1: "#8a8a9a", // Quarry — grey
   2: "#4a7c59", // Grove — green
+  255: "#4a4a4a", // Untyped — neutral dark grey
 };
 
 const PARCEL_TYPE_NAMES: Record<number, string> = {
   0: "Forge",
   1: "Quarry",
   2: "Grove",
+  255: "Untyped",
 };
 
 const HEX_SIZE = 36; // radius in pixels
@@ -144,11 +146,11 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
                   y={y + 2}
                   textAnchor="middle"
                   dominantBaseline="central"
-                  fontSize="8"
-                  fill="#d4cfc6"
+                  fontSize={parcel.parcelType === 255 ? "6" : "8"}
+                  fill={parcel.parcelType === 255 ? "#6a6a6a" : "#d4cfc6"}
                   fillOpacity={0.6}
                 >
-                  {PARCEL_TYPE_NAMES[parcel.parcelType]?.[0]}
+                  {parcel.parcelType === 255 ? "?" : PARCEL_TYPE_NAMES[parcel.parcelType]?.[0]}
                 </text>
               )}
             </g>

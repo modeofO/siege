@@ -2,13 +2,13 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IWorldSystem<T> {
-    fn initialize_world(ref self: T, cols: Array<u16>, rows: Array<u16>, types: Array<u8>);
+    fn initialize_world(ref self: T, cols: Array<u16>, rows: Array<u16>);
     fn register_player(ref self: T, home_types: Array<u8>);
     fn set_ability_token(ref self: T, ability_token: ContractAddress);
     fn create_staked_match(ref self: T, opponent: ContractAddress, abilities: Array<u8>) -> u64;
     fn join_staked_match(ref self: T, match_id: u64, abilities: Array<u8>);
     fn settle_match(ref self: T, match_id: u64);
-    fn claim_parcel(ref self: T, match_id: u64, parcel_id: u32);
+    fn claim_parcel(ref self: T, match_id: u64, parcel_id: u32, parcel_type: u8);
     fn claim_drip(ref self: T);
     fn upgrade_kingdom(ref self: T);
     fn initiate_pillage(ref self: T, match_id: u64, home_parcel_id: u32);
@@ -191,14 +191,12 @@ pub mod world_system {
             ref self: ContractState,
             cols: Array<u16>,
             rows: Array<u16>,
-            types: Array<u8>,
         ) {
             let mut world = self.world_default();
             let config: WorldConfig = world.read_model(0_u8);
             assert(!config.initialized, 'Already initialized');
             let n = cols.len();
             assert(rows.len() == n, 'Array length mismatch');
-            assert(types.len() == n, 'Array length mismatch');
 
             let mut i: u32 = 0;
             while i < n {
@@ -206,7 +204,7 @@ pub mod world_system {
                     parcel_id: i,
                     col: *cols.at(i),
                     row: *rows.at(i),
-                    parcel_type: *types.at(i),
+                    parcel_type: 255,
                     owner: 0.try_into().unwrap(),
                     is_home: false,
                 });
@@ -272,7 +270,7 @@ pub mod world_system {
             let mut p_idx: u32 = 0;
             while p_idx < config.total_parcels {
                 let parcel: Parcel = world.read_model(p_idx);
-                if parcel.owner == zero_addr && parcel.parcel_type == first_type {
+                if parcel.owner == zero_addr {
                     // Min-distance to any already-claimed parcel (sentinel if empty).
                     let score: u16 = if n_claimed == 0 {
                         65535_u16
@@ -317,7 +315,7 @@ pub mod world_system {
                 let mut p: u32 = 0;
                 while p < config.total_parcels {
                     let parcel: Parcel = world.read_model(p);
-                    if parcel.owner == zero_addr && parcel.parcel_type == wanted_type {
+                    if parcel.owner == zero_addr {
                         let mut already_used = false;
                         let mut j: u32 = 0;
                         while j < home_ids.len() {
@@ -356,6 +354,7 @@ pub mod world_system {
                 let mut parcel: Parcel = world.read_model(pid);
                 parcel.owner = caller;
                 parcel.is_home = true;
+                parcel.parcel_type = *home_types.at(i);
                 world.write_model(@parcel);
                 i += 1;
             };
@@ -731,9 +730,11 @@ pub mod world_system {
             world.write_model(@stakes);
         }
 
-        fn claim_parcel(ref self: ContractState, match_id: u64, parcel_id: u32) {
+        fn claim_parcel(ref self: ContractState, match_id: u64, parcel_id: u32, parcel_type: u8) {
             let mut world = self.world_default();
             let caller = get_caller_address();
+
+            assert(parcel_type <= 2, 'Invalid parcel type');
 
             let state: MatchState1v1 = world.read_model(match_id);
             assert(state.status == MatchStatus::Finished, 'Match not finished');
@@ -767,6 +768,7 @@ pub mod world_system {
 
             let mut claim = parcel;
             claim.owner = caller;
+            claim.parcel_type = parcel_type;
             world.write_model(@claim);
 
             let mut kingdom: PlayerKingdom = world.read_model(caller);
@@ -1129,6 +1131,11 @@ pub mod world_system {
             to: ContractAddress,
             amount: u256,
         ) {
+            // Skip untyped parcels (sentinel 255)
+            if parcel_type == 255 {
+                return;
+            }
+
             let (token_a_addr, token_b_addr) = if parcel_type == 0 {
                 (*rc.iron, *rc.linen)     // Forge
             } else if parcel_type == 1 {
