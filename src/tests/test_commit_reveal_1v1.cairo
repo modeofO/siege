@@ -39,7 +39,7 @@ mod tests {
 
     use siege_dojo::systems::actions_1v1::{actions_1v1, IActions1v1Dispatcher, IActions1v1DispatcherTrait};
     use siege_dojo::systems::commit_reveal_1v1::{commit_reveal_1v1, ICommitReveal1v1Dispatcher, ICommitReveal1v1DispatcherTrait};
-    use siege_dojo::systems::resolution_1v1::resolution_1v1;
+    use siege_dojo::systems::resolution_1v1::{resolution_1v1, IResolution1v1Dispatcher, IResolution1v1DispatcherTrait};
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::{m_MatchState1v1};
     use siege_dojo::models::node_state::{m_NodeState};
@@ -191,6 +191,11 @@ mod tests {
         testing::set_contract_address(contract_address_const::<0x2>());
         cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
 
+        // Explicitly call resolve_round after both reveals
+        let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
+        let res_sys = IResolution1v1Dispatcher { contract_address: res_addr };
+        res_sys.resolve_round(match_id);
+
         let state: siege_dojo::models::match_state_1v1::MatchState1v1 = world.read_model(match_id);
         // Damage to B: max(0,3-2)+max(0,2-1)+max(0,1-0) = 1+1+1 = 3
         // Damage to A: max(0,2-2)+max(0,2-1)+max(0,2-0) = 0+1+2 = 3
@@ -298,5 +303,81 @@ mod tests {
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+    }
+
+    #[test]
+    fn test_reveal_does_not_resolve() {
+        let (mut world, _, cr_sys, match_id) = setup();
+
+        let salt: felt252 = 42;
+        // Player A: atk [3,2,1], def [2,1,0], repair 1, nodes [0,0,0] = total 10
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        // Player B: atk [2,2,2], def [2,1,0], repair 1, nodes [0,0,0] = total 10
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.commit(match_id, h_a);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.commit(match_id, h_b);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        // After both reveals, the round should NOT have advanced — resolve_round was not called.
+        let state: siege_dojo::models::match_state_1v1::MatchState1v1 = world.read_model(match_id);
+        assert(state.current_round == 1, 'round should still be 1');
+    }
+
+    #[test]
+    fn test_resolve_round_advances() {
+        let (mut world, _, cr_sys, match_id) = setup();
+
+        let salt: felt252 = 42;
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.commit(match_id, h_a);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.commit(match_id, h_b);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        // Explicitly call resolve_round — this should advance the round.
+        let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
+        let res_sys = IResolution1v1Dispatcher { contract_address: res_addr };
+        res_sys.resolve_round(match_id);
+
+        let state: siege_dojo::models::match_state_1v1::MatchState1v1 = world.read_model(match_id);
+        assert(state.current_round == 2, 'should advance to round 2');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Not all revealed', 'ENTRYPOINT_FAILED'))]
+    fn test_resolve_round_before_both_reveals_reverts() {
+        let (mut world, _, cr_sys, match_id) = setup();
+
+        let salt: felt252 = 42;
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.commit(match_id, h_a);
+        testing::set_contract_address(contract_address_const::<0x2>());
+        cr_sys.commit(match_id, h_b);
+
+        // Only player A reveals
+        testing::set_contract_address(contract_address_const::<0x1>());
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+
+        // Calling resolve_round with only one reveal should panic
+        let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
+        let res_sys = IResolution1v1Dispatcher { contract_address: res_addr };
+        res_sys.resolve_round(match_id);
     }
 }

@@ -252,12 +252,6 @@ pub mod commit_reveal_1v1 {
             world.write_model(@traps);
 
             world.emit_event(@MoveRevealed { match_id, round, role });
-
-            if rm.reveal_count == 2 {
-                let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
-                let res = IResolution1v1Dispatcher { contract_address: res_addr };
-                res.resolve_round(match_id);
-            }
         }
 
         fn force_timeout(ref self: ContractState, match_id: u64) {

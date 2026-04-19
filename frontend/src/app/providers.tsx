@@ -129,6 +129,9 @@ const SESSION_POLICIES: SessionPolicies = {
         { name: "Reveal 1v1", entrypoint: "reveal" },
       ],
     },
+    [CONTRACTS_1V1.RESOLUTION]: {
+      methods: [{ name: "Resolve Round", entrypoint: "resolve_round" }],
+    },
 
     // --- Cartridge vRF ---
     [VRF_PROVIDER_ADDRESS]: {

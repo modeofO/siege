@@ -109,44 +109,50 @@ export async function revealMove1v1(
   trap2: string,
   abilityId: string,
   abilityTarget: string,
-  includeVrf: boolean,
 ) {
-  // VRF gating is racy but necessary: the 1st reveal must NOT include
-  // request_random (Cartridge VRF rejects a 2nd request before the 1st is
-  // consumed, with "VrfProvider: not consumed"), and the 2nd reveal MUST
-  // include it (resolve_round fires and calls consume_random, needing a
-  // pending random). Who's "1st" vs "2nd" can flip between submit and
-  // inclusion — the caller handles that revert with a retry. Issue #16
-  // tracks the Cairo-side fix that eliminates this race.
-  const revealCall = {
-    contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
-    entrypoint: "reveal",
-    calldata: [
-      matchId,
-      salt,
-      p0,
-      p1,
-      p2,
-      g0,
-      g1,
-      g2,
-      repair,
-      nc0,
-      nc1,
-      nc2,
-      trap0,
-      trap1,
-      trap2,
-      abilityId,
-      abilityTarget,
-    ],
-  };
-
-  const calls = includeVrf ? [vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION), revealCall] : [revealCall];
-
-  const tx = await account.execute(calls, TX_OPTS);
-  // Reveal can race another reveal + revert silently — surface via receipt.
+  const tx = await account.execute(
+    {
+      contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
+      entrypoint: "reveal",
+      calldata: [
+        matchId,
+        salt,
+        p0,
+        p1,
+        p2,
+        g0,
+        g1,
+        g2,
+        repair,
+        nc0,
+        nc1,
+        nc2,
+        trap0,
+        trap1,
+        trap2,
+        abilityId,
+        abilityTarget,
+      ],
+    },
+    TX_OPTS,
+  );
   await waitForReceiptOrThrow(account, tx.transaction_hash, "Reveal");
+  return tx;
+}
+
+export async function resolveRound1v1(account: AccountInterface, matchId: string) {
+  const tx = await account.execute(
+    [
+      vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION),
+      {
+        contractAddress: CONTRACTS_1V1.RESOLUTION,
+        entrypoint: "resolve_round",
+        calldata: [matchId],
+      },
+    ],
+    TX_OPTS,
+  );
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
   return tx;
 }
 

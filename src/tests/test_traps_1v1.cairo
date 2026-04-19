@@ -11,7 +11,7 @@ mod tests {
 
     use siege_dojo::systems::actions_1v1::actions_1v1;
     use siege_dojo::systems::commit_reveal_1v1::{commit_reveal_1v1, ICommitReveal1v1Dispatcher, ICommitReveal1v1DispatcherTrait};
-    use siege_dojo::systems::resolution_1v1::resolution_1v1;
+    use siege_dojo::systems::resolution_1v1::{resolution_1v1, IResolution1v1Dispatcher, IResolution1v1DispatcherTrait};
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::{MatchState1v1, m_MatchState1v1};
     use siege_dojo::models::node_state::{NodeState, m_NodeState, NodeOwner};
@@ -134,6 +134,11 @@ mod tests {
         cr_sys.reveal(match_id, salt, ap0, ap1, ap2, ag0, ag1, ag2, ar, anc0, anc1, anc2, at0, at1, at2, 0, 0);
         testing::set_contract_address(pb);
         cr_sys.reveal(match_id, salt, bp0, bp1, bp2, bg0, bg1, bg2, br, bnc0, bnc1, bnc2, bt0, bt1, bt2, 0, 0);
+
+        // Explicitly call resolve_round after both reveals
+        let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
+        let res_sys = IResolution1v1Dispatcher { contract_address: res_addr };
+        res_sys.resolve_round(match_id);
 
         (world, match_id)
     }

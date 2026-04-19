@@ -17,7 +17,7 @@ import {
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1 } from "@/lib/gameState1v1";
 import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1 } from "@/lib/crypto";
-import { commitMove1v1, revealMove1v1, extractErrorMsg } from "@/lib/contracts1v1";
+import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
@@ -94,6 +94,7 @@ export default function Match1v1Page() {
   const [autoRevealError, setAutoRevealError] = useState("");
   const [revealRetry, setRevealRetry] = useState(0);
   const autoRevealLock = useRef(false);
+  const autoResolveLock = useRef(false);
   const commitLock = useRef(false);
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
@@ -107,6 +108,7 @@ export default function Match1v1Page() {
     setAutoRevealError("");
     setRevealRetry(0);
     autoRevealLock.current = false;
+    autoResolveLock.current = false;
     commitLock.current = false;
     setSubmitting(false);
     setConfirming(false);
@@ -123,10 +125,9 @@ export default function Match1v1Page() {
   const isAlreadyRevealed = (msg: string) =>
     msg.includes("Already revealed") || msg.includes("416c72656164792072657665616c6564");
 
-  // Auto-reveal: when both committed & we haven't revealed yet
+  // Auto-reveal: when both committed & we haven't revealed yet.
+  // No VRF needed — reveal no longer triggers resolution (issue #16).
   useEffect(() => {
-    // Unconditional gate-state log so we can see WHY this effect returns early.
-    // If no `[auto-reveal]` log appears at all, the code isn't loaded (stale bundle).
     console.log("[auto-reveal] gate check", {
       hasAccount: !!account,
       hasState: !!state,
@@ -134,15 +135,12 @@ export default function Match1v1Page() {
       committed,
       revealed,
       commitCount: roundStatus.commitCount,
-      revealCount: roundStatus.revealCount,
       locked: autoRevealLock.current,
       status: autoRevealStatus,
     });
 
     if (!account || !state || !committed || revealed || roundStatus.commitCount < 2 || autoRevealLock.current) return;
 
-    // Claim the lock BEFORE the salt check so this effect doesn't busy-spin
-    // across poll refreshes when local data is missing.
     autoRevealLock.current = true;
 
     const salt = getSalt1v1(matchId, state.round);
@@ -162,14 +160,12 @@ export default function Match1v1Page() {
     }
 
     setAutoRevealStatus("pending");
-    console.log(
-      `[auto-reveal] starting reveal for match ${matchId} round ${state.round} (revealCount=${roundStatus.revealCount})`,
-    );
+    console.log(`[auto-reveal] starting reveal for match ${matchId} round ${state.round}`);
 
     const abilityData = localStorage.getItem(`siege_1v1_ability_${matchId}_${state.round}`);
     const parsedAbility = abilityData ? JSON.parse(abilityData) : { abilityId: 0, abilityTarget: 0 };
 
-    const attemptReveal = async (includeVrf: boolean, alreadyFlipped = false): Promise<void> => {
+    (async () => {
       try {
         await revealMove1v1(
           account,
@@ -190,43 +186,23 @@ export default function Match1v1Page() {
           move[12].toString(),
           parsedAbility.abilityId.toString(),
           parsedAbility.abilityTarget.toString(),
-          includeVrf,
         );
+        setAutoRevealStatus("done");
+        setAutoRevealError("");
+        console.log("[auto-reveal] reveal submitted");
       } catch (e) {
         const msg = extractErrorMsg(e);
         if (isAlreadyRevealed(msg)) {
           console.log("[auto-reveal] Already revealed — round progressed normally.");
+          setAutoRevealStatus("done");
           return;
         }
-        // Race: we picked includeVrf based on the observed revealCount at
-        // submit time, but chain state at inclusion can differ. Flip and
-        // retry once.
-        if (!alreadyFlipped) {
-          console.log(
-            `[auto-reveal] reveal failed with includeVrf=${includeVrf}, retrying with includeVrf=${!includeVrf}. Reason: ${msg}`,
-          );
-          return attemptReveal(!includeVrf, true);
-        }
-        throw e;
+        console.error("[auto-reveal] failed:", msg);
+        setAutoRevealStatus("error");
+        setAutoRevealError(msg);
       }
-    };
-
-    const delay = 1000 + Math.random() * 2000;
-    setTimeout(() => {
-      (async () => {
-        try {
-          const isSecondReveal = roundStatus.revealCount >= 1;
-          await attemptReveal(isSecondReveal);
-          setAutoRevealStatus("done");
-          setAutoRevealError("");
-        } catch (e) {
-          console.error("Auto-reveal failed:", e);
-          setAutoRevealStatus("error");
-          setAutoRevealError(extractErrorMsg(e));
-        }
-        void refresh();
-      })();
-    }, delay);
+      void refresh();
+    })();
   }, [
     account,
     state,
@@ -234,11 +210,61 @@ export default function Match1v1Page() {
     committed,
     revealed,
     roundStatus.commitCount,
-    roundStatus.revealCount,
     refresh,
     revealRetry,
     autoRevealStatus,
   ]);
+
+  // Auto-resolve: when both players have revealed, one player calls
+  // resolve_round (with VRF). Lower address is the elected caller;
+  // higher address waits 5s as fallback in case the elected caller stalls.
+  useEffect(() => {
+    if (
+      !account ||
+      !state ||
+      !address ||
+      roundStatus.revealCount < 2 ||
+      state.phase === "finished" ||
+      autoResolveLock.current
+    )
+      return;
+
+    autoResolveLock.current = true;
+
+    // Lower address resolves immediately; higher waits 5s as fallback.
+    let isElected = true;
+    try {
+      const a = BigInt(state.playerA);
+      const b = BigInt(state.playerB);
+      const me = BigInt(address);
+      const lower = a < b ? a : b;
+      isElected = me === lower;
+    } catch {
+      // If address parsing fails, both try immediately.
+    }
+
+    const delay = isElected ? 500 : 5500;
+    console.log(`[auto-resolve] elected=${isElected}, delay=${delay}ms, round=${state.round}`);
+
+    const timer = setTimeout(() => {
+      (async () => {
+        try {
+          await resolveRound1v1(account, matchId);
+          console.log("[auto-resolve] resolve_round submitted");
+        } catch (e) {
+          const msg = extractErrorMsg(e);
+          if (msg.includes("Not all revealed") || msg.includes("4e6f7420616c6c2072657665616c6564")) {
+            console.log("[auto-resolve] round already resolved by other player");
+          } else {
+            console.error("[auto-resolve] failed:", msg);
+          }
+        }
+        void refresh();
+      })();
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [account, state, address, matchId, roundStatus.revealCount, refresh]);
 
   const handleRetryReveal = useCallback(() => {
     autoRevealLock.current = false;
