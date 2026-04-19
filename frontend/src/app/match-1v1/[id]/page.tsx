@@ -111,7 +111,7 @@ export default function Match1v1Page() {
     setSubmitting(false);
     setConfirming(false);
     setError("");
-  }, [state?.round]);
+  }, [state?.round, setAllocations, setAutoRevealStatus, setAutoRevealError, setRevealRetry, setSubmitting, setConfirming, setError]);
 
   // One-shot mount log — if this never appears in console after reload, the
   // page is serving a stale bundle and a hard refresh is needed.
@@ -304,7 +304,7 @@ export default function Match1v1Page() {
   // 5-10s indexing lag where the button was previously re-enabling).
   useEffect(() => {
     if (committed && confirming) setConfirming(false);
-  }, [committed, confirming]);
+  }, [committed, confirming, setConfirming]);
 
   // Loading
   if (loading || !state) {

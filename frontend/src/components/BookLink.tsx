@@ -45,7 +45,7 @@ export function BookLink() {
 
   useEffect(() => {
     if (pathname !== "/craft") setPhase("idle");
-  }, [pathname]);
+  }, [pathname, setPhase]);
 
   if (pathname === "/craft") return null;
 

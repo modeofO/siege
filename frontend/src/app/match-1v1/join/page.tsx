@@ -99,9 +99,15 @@ export default function Join1v1Page() {
       </div>
 
       {/* Match info (once loaded) */}
-      {matchId && escrow.loaded && !escrow.exists && (
+      {matchId && escrow.loaded && !escrow.exists && !escrow.timedOut && (
         <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
           No staked match with this ID. If it&apos;s a practice match, you can proceed — the join is implicit.
+        </div>
+      )}
+
+      {escrow.timedOut && !escrow.exists && (
+        <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
+          Could not load match data — Torii may be unreachable. Check your connection and refresh.
         </div>
       )}
 

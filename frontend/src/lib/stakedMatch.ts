@@ -108,7 +108,8 @@ export async function claimParcel(account: AccountInterface, matchId: string, pa
 function safeBigIntEq(a: unknown, b: bigint): boolean {
   try {
     return BigInt(a as string | number | bigint) === b;
-  } catch {
+  } catch (e) {
+    if (process.env.NODE_ENV === "development") console.warn("[stakedMatch] safeBigIntEq coercion failed:", a, e);
     return false;
   }
 }
@@ -116,7 +117,11 @@ function safeBigIntEq(a: unknown, b: bigint): boolean {
 function safeNum(v: unknown): number {
   if (v === undefined || v === null) return 0;
   const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+  if (!Number.isFinite(n)) {
+    if (process.env.NODE_ENV === "development") console.warn("[stakedMatch] safeNum coerced to 0:", v);
+    return 0;
+  }
+  return n;
 }
 
 function flatModels<T extends object>(store: unknown): T[] {
@@ -139,6 +144,7 @@ export interface MatchEscrowData {
   isStaked: boolean;
   exists: boolean;
   loaded: boolean;
+  timedOut: boolean;
 }
 
 const EMPTY_ESCROW: MatchEscrowData = {
@@ -149,7 +155,10 @@ const EMPTY_ESCROW: MatchEscrowData = {
   isStaked: false,
   exists: false,
   loaded: false,
+  timedOut: false,
 };
+
+const ESCROW_TIMEOUT_MS = 8_000;
 
 // Reads MatchStakes1v1 (escrow + settled). gameState1v1.useMatchStakes1v1 reads MatchAbilities1v1 — different model.
 export function useMatchEscrow(matchId: string | null): MatchEscrowData {
@@ -167,11 +176,27 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
 
   const stakes = useModels(ModelsMapping.MatchStakes1v1);
 
+  // Timeout: if subscription yields no data after ESCROW_TIMEOUT_MS, surface it.
+  const escrowFound = useMemo(() => {
+    if (!matchId) return false;
+    const idBig = BigInt(matchId);
+    return flatModels<MatchStakes1v1Model>(stakes).some((m) => safeBigIntEq(m.match_id, idBig));
+  }, [matchId, stakes]);
+
+  const [timeoutTick, setTimeoutTick] = useState(0);
+  useEffect(() => {
+    if (!matchId || escrowFound) return;
+    const timer = setTimeout(() => setTimeoutTick((t) => t + 1), ESCROW_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [matchId, escrowFound]);
+  // Derived: timed out when we've ticked at least once and still no data.
+  const timedOut = timeoutTick > 0 && !escrowFound && !!matchId;
+
   return useMemo<MatchEscrowData>(() => {
     if (!matchId) return EMPTY_ESCROW;
     const idBig = BigInt(matchId);
     const node = flatModels<MatchStakes1v1Model>(stakes).find((m) => safeBigIntEq(m.match_id, idBig));
-    if (!node) return { ...EMPTY_ESCROW, loaded: true };
+    if (!node) return { ...EMPTY_ESCROW, loaded: true, timedOut };
     const a: [number, number, number] = [safeNum(node.a_stake_1), safeNum(node.a_stake_2), safeNum(node.a_stake_3)];
     const b: [number, number, number] = [safeNum(node.b_stake_1), safeNum(node.b_stake_2), safeNum(node.b_stake_3)];
     return {
@@ -182,8 +207,9 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
       isStaked: a.some((x) => x > 0) || b.some((x) => x > 0),
       exists: true,
       loaded: true,
+      timedOut: false,
     };
-  }, [matchId, stakes]);
+  }, [matchId, stakes, timedOut]);
 }
 
 // ---------- Claim candidates ----------
@@ -239,7 +265,7 @@ export function useClaimCandidates(
 
     const candidates = parcels.filter((p) => {
       if (ownerBig(p.owner) !== BigInt(0)) return false;
-      return winnerParcels.some((w) => isNeighbor(w.col, w.row, p.col, p.row));
+      return winnerParcels.some((w) => isNeighbor(w, p));
     });
 
     return { candidates, atCap, nonHomeCount, parcelCap, loading };

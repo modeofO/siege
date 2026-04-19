@@ -21,7 +21,8 @@ function safeBigIntEq(v: unknown, target: bigint): boolean {
   if (v === undefined || v === null) return false;
   try {
     return BigInt(v as string | number | bigint) === target;
-  } catch {
+  } catch (e) {
+    if (process.env.NODE_ENV === "development") console.warn("[gameState1v1] safeBigIntEq coercion failed:", v, e);
     return false;
   }
 }
@@ -35,7 +36,11 @@ function safeNumEq(v: unknown, target: number): boolean {
 function safeNum(v: unknown): number {
   if (v === undefined || v === null) return 0;
   const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+  if (!Number.isFinite(n)) {
+    if (process.env.NODE_ENV === "development") console.warn("[gameState1v1] safeNum coerced to 0:", v);
+    return 0;
+  }
+  return n;
 }
 
 /**
@@ -47,7 +52,8 @@ export function toFeltHex(v: string | null | undefined): string | undefined {
   if (!v) return undefined;
   try {
     return "0x" + BigInt(v).toString(16).padStart(64, "0");
-  } catch {
+  } catch (e) {
+    if (process.env.NODE_ENV === "development") console.warn("[gameState1v1] toFeltHex failed to parse:", v, e);
     return undefined;
   }
 }

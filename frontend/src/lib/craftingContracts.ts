@@ -2,6 +2,8 @@
 import type { AccountInterface, Call } from "starknet";
 import { RESOURCE_TOKENS } from "./useResourceBalances";
 
+export type AbilityId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+
 // Crafting contract address — set via NEXT_PUBLIC_CRAFTING_1V1_ADDRESS in .env.local
 export const CRAFTING_1V1_ADDRESS =
   process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS || "0x12ceed12ca0a5ecc3590ec4a4833204df56f808e340b6950b432958252634e7";
@@ -9,9 +11,9 @@ export const CRAFTING_1V1_ADDRESS =
 export type AbilityCost = Record<string, number>;
 
 export interface AbilityDef {
-  id: number;
+  id: AbilityId;
   type: number; // 1-5
-  tier: number; // 1 or 2
+  tier: 1 | 2;
   name: string;
   effect: string;
   cost: AbilityCost;
@@ -111,8 +113,8 @@ export function abilityTier(id: number): number {
   return Math.floor((id - 1) / 5) + 1;
 }
 
-export function tokenIdFrom(type: number, tier: number): number {
-  return (tier - 1) * 5 + type;
+export function tokenIdFrom(type: number, tier: number): AbilityId {
+  return ((tier - 1) * 5 + type) as AbilityId;
 }
 
 export function canAfford(cost: AbilityCost, balances: Record<string, number>): boolean {
