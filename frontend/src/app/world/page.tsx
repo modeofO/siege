@@ -43,6 +43,87 @@ function TorchOverlay() {
   );
 }
 
+function SnowEffect() {
+  const flakes = Array.from({ length: 40 }, (_, i) => ({
+    "--x": `${((i * 37 + 13) % 100)}%`,
+    "--size": `${2 + ((i * 53 + 7) % 30) / 10}px`,
+    "--opacity": `${0.5 + ((i * 71 + 3) % 40) / 100}`,
+    "--dur": `${3.5 + ((i * 43 + 17) % 50) / 10}s`,
+    "--del": `${-((i * 67 + 11) % 80) / 10}s`,
+    "--drift": `${-20 + ((i * 29 + 5) % 40)}px`,
+  }) as React.CSSProperties);
+
+  return (
+    <div className={styles.snowZone}>
+      {flakes.map((style, i) => (
+        <span key={i} className={styles.snowflake} style={style} />
+      ))}
+    </div>
+  );
+}
+
+function RainEffect() {
+  const drops = Array.from({ length: 40 }, (_, i) => ({
+    "--x": `${((i * 41 + 7) % 100)}%`,
+    "--len": `${8 + ((i * 59 + 13) % 14)}px`,
+    "--opacity": `${0.3 + ((i * 37 + 19) % 40) / 100}`,
+    "--dur": `${0.7 + ((i * 47 + 3) % 40) / 25}s`,
+    "--del": `${-((i * 73 + 11) % 60) / 20}s`,
+  }) as React.CSSProperties);
+
+  return (
+    <div className={styles.rainZone}>
+      {drops.map((style, i) => (
+        <span key={i} className={styles.raindrop} style={style} />
+      ))}
+    </div>
+  );
+}
+
+function WindEffect() {
+  const streaks = Array.from({ length: 15 }, (_, i) => ({
+    "--y": `${8 + ((i * 47 + 13) % 84)}%`,
+    "--len": `${10 + ((i * 53 + 7) % 16)}%`,
+    "--opacity": `${0.25 + ((i * 31 + 3) % 25) / 100}`,
+    "--dur": `${4 + ((i * 41 + 17) % 50) / 10}s`,
+    "--del": `${-((i * 67 + 5) % 80) / 10}s`,
+    "--wave": `${3 + ((i * 29 + 11) % 8)}px`,
+    "--thick": `${1.5 + ((i * 43 + 3) % 20) / 10}px`,
+  }) as React.CSSProperties);
+
+  return (
+    <div className={styles.windZone}>
+      {streaks.map((style, i) => (
+        <span key={i} className={styles.windStreak} style={style} />
+      ))}
+    </div>
+  );
+}
+
+function DustEffect() {
+  const motes = Array.from({ length: 45 }, (_, i) => ({
+    "--y": `${3 + ((i * 43 + 11) % 94)}%`,
+    "--rx": `${-2 + ((i * 61 + 7) % 40)}%`,
+    "--size": `${2 + ((i * 59 + 7) % 40) / 10}px`,
+    "--opacity": `${0.5 + ((i * 37 + 13) % 40) / 100}`,
+    "--dur": `${4 + ((i * 47 + 3) % 60) / 10}s`,
+    "--del": `${-((i * 71 + 17) % 90) / 10}s`,
+    "--dx": `${-5 - ((i * 31 + 5) % 12)}vw`,
+    "--dy": `${-20 + ((i * 53 + 19) % 40)}px`,
+    "--dx2": `${-12 - ((i * 29 + 7) % 14)}vw`,
+    "--dy2": `${-15 + ((i * 67 + 3) % 30)}px`,
+    "--glow": `${2 + ((i * 41 + 9) % 4)}px`,
+  }) as React.CSSProperties);
+
+  return (
+    <div className={styles.dustZone}>
+      {motes.map((style, i) => (
+        <span key={i} className={styles.dustMote} style={style} />
+      ))}
+    </div>
+  );
+}
+
 function CloudDrift() {
   const clouds = [
     { top: "30%", duration: "45s", delay: "0s", scale: 1.0 },
@@ -140,6 +221,10 @@ export default function WorldPage() {
       {/* Hex grid — parchment frame */}
       <div className={styles.parchmentFrame}>
         <Image src="/sprites/parchment-map.png" alt="" fill priority sizes="100vw" className={styles.parchmentImage} />
+        <SnowEffect />
+        <RainEffect />
+        <WindEffect />
+        <DustEffect />
         <div className={styles.hexGridWrapper}>
           {parcels.length === 0 ? (
             <div className="text-center text-[#7a7060] py-12">World not initialized. No parcels found.</div>
