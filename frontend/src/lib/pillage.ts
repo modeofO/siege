@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
+import { toriiSql, toNum } from "./toriiSql";
 
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 const POLL_INTERVAL = 4000;
 
 export const WORLD_SYSTEM_ADDRESS = process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "";
@@ -25,30 +25,6 @@ export interface PillageEligibilityData {
   used: boolean;
 }
 
-type GraphEdges<T> = { edges: Array<{ node: T }> };
-
-function toNum(v: number | string | null | undefined): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return Number(v);
-  return 0;
-}
-
-async function toriiQuery<T>(query: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${TORII_URL}/graphql`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.errors) return null;
-    return (data?.data as T) || null;
-  } catch {
-    return null;
-  }
-}
-
 export function useActivePillages(playerAddress: string | null): {
   asPillager: PillageData[];
   asTarget: PillageData[];
@@ -62,36 +38,26 @@ export function useActivePillages(playerAddress: string | null): {
     if (!playerAddress) return;
 
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoPillageModels: GraphEdges<{
-          home_parcel_id: string;
-          pillager: string;
-          target: string;
-          start_time: string;
-          expires_at: string;
-          last_claim_time: string;
-          active: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoPillageModels {
-            edges { node {
-              home_parcel_id pillager target start_time expires_at last_claim_time active
-            } }
-          }
-        }
-      `);
+      const rows = await toriiSql<{
+        home_parcel_id: number;
+        pillager: string;
+        target: string;
+        start_time: number;
+        expires_at: number;
+        last_claim_time: number;
+        active: number | boolean;
+      }>('SELECT home_parcel_id, pillager, target, start_time, expires_at, last_claim_time, active FROM "siege_dojo-Pillage"');
 
       const now = Math.floor(Date.now() / 1000);
-      const entries = (result?.siegeDojoPillageModels?.edges || [])
-        .map((e) => ({
-          homeParcelId: toNum(e.node.home_parcel_id),
-          pillager: e.node.pillager,
-          target: e.node.target,
-          startTime: toNum(e.node.start_time),
-          expiresAt: toNum(e.node.expires_at),
-          lastClaimTime: toNum(e.node.last_claim_time),
-          active: e.node.active,
+      const entries = rows
+        .map((r) => ({
+          homeParcelId: toNum(r.home_parcel_id),
+          pillager: r.pillager,
+          target: r.target,
+          startTime: toNum(r.start_time),
+          expiresAt: toNum(r.expires_at),
+          lastClaimTime: toNum(r.last_claim_time),
+          active: !!r.active,
         }))
         .filter((p) => p.active && p.expiresAt > now);
 
@@ -124,32 +90,24 @@ export function usePillageEligibilities(playerAddress: string | null): PillageEl
     if (!playerAddress) return;
 
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoPillageEligibilityModels: GraphEdges<{
-          winner: string;
-          match_id: string;
-          loser: string;
-          granted_at: string;
-          expires_at: string;
-          used: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoPillageEligibilityModels(where: { winner: "${playerAddress}" }) {
-            edges { node { winner match_id loser granted_at expires_at used } }
-          }
-        }
-      `);
+      const rows = await toriiSql<{
+        winner: string;
+        match_id: number;
+        loser: string;
+        granted_at: number;
+        expires_at: number;
+        used: number | boolean;
+      }>(`SELECT winner, match_id, loser, granted_at, expires_at, used FROM "siege_dojo-PillageEligibility" WHERE winner = '${playerAddress}'`);
 
       const now = Math.floor(Date.now() / 1000);
-      const entries = (result?.siegeDojoPillageEligibilityModels?.edges || [])
-        .map((e) => ({
-          winner: e.node.winner,
-          matchId: toNum(e.node.match_id),
-          loser: e.node.loser,
-          grantedAt: toNum(e.node.granted_at),
-          expiresAt: toNum(e.node.expires_at),
-          used: e.node.used,
+      const entries = rows
+        .map((r) => ({
+          winner: r.winner,
+          matchId: toNum(r.match_id),
+          loser: r.loser,
+          grantedAt: toNum(r.granted_at),
+          expiresAt: toNum(r.expires_at),
+          used: !!r.used,
         }))
         .filter((eli) => !eli.used && eli.expiresAt > now);
 

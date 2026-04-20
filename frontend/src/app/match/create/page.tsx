@@ -6,28 +6,15 @@ import { createMatch } from "@/lib/contracts";
 import { lookupUsernames } from "@cartridge/controller";
 import Link from "next/link";
 
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
+import { toriiSql } from "@/lib/toriiSql";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function fetchLatestMatchId(): Promise<string | null> {
-  const res = await fetch(`${TORII_URL}/graphql`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      query: `{
-        siegeDojoMatchCounterModels(first: 1) {
-          edges {
-            node { count }
-          }
-        }
-      }`,
-    }),
-  });
-  const data = await res.json();
-  const count = data?.data?.siegeDojoMatchCounterModels?.edges?.[0]?.node?.count;
+  const rows = await toriiSql<{ count: number | string }>('SELECT count FROM "siege_dojo-MatchCounter" LIMIT 1');
+  const count = rows[0]?.count;
   if (count == null) return null;
   return String(typeof count === "string" && count.startsWith("0x") ? parseInt(count, 16) : Number(count));
 }

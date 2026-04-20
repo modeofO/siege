@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { toriiSql } from "./toriiSql";
 
 export interface MatchState {
   matchId: string;
@@ -24,14 +25,9 @@ export interface RoundResult {
   damageToTeam2: number;
 }
 
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 const POLL_INTERVAL = 4000;
 
-type GraphEdges<T> = {
-  edges: Array<{ node: T }>;
-};
-
-type MatchStateNode = {
+type MatchStateRow = {
   match_id: number | string;
   team_a_attacker: string;
   team_a_defender: string;
@@ -40,15 +36,15 @@ type MatchStateNode = {
   vault_a_hp: number | string;
   vault_b_hp: number | string;
   current_round: number | string;
-  status: "Pending" | "Active" | "Finished" | string;
+  status: string;
 };
 
-type NodeStateNode = {
+type NodeStateRow = {
   node_index: number | string;
-  owner: "None" | "TeamA" | "TeamB" | string;
+  owner: string;
 };
 
-type RoundMovesNode = {
+type RoundMovesRow = {
   round: number | string;
   commit_count: number | string;
   reveal_count: number | string;
@@ -102,67 +98,28 @@ export function computeDamage(
   return Math.max(0, atk0 - def0) + Math.max(0, atk1 - def1) + Math.max(0, atk2 - def2);
 }
 
-async function toriiQuery<T>(query: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${TORII_URL}/graphql`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) return null;
-
-    const data = await res.json();
-    if (data?.errors) return null;
-    return (data?.data as T) || null;
-  } catch {
-    return null;
-  }
-}
-
 async function fetchMatchState(matchId: string): Promise<MatchState | null> {
   const id = parseMatchId(matchId);
   if (id == null) return null;
 
-  const stateData = await toriiQuery<{
-    siegeDojoMatchStateModels: GraphEdges<MatchStateNode>;
-    siegeDojoNodeStateModels: GraphEdges<NodeStateNode>;
-  }>(`
-    query {
-      siegeDojoMatchStateModels(where: { match_id: "${id}" }) {
-        edges {
-          node {
-            match_id
-            vault_a_hp
-            vault_b_hp
-            current_round
-            status
-          }
-        }
-      }
-      siegeDojoNodeStateModels(where: { match_id: "${id}" }) {
-        edges {
-          node {
-            node_index
-            owner
-          }
-        }
-      }
-    }
-  `);
+  const matchRows = await toriiSql<MatchStateRow>(
+    `SELECT match_id, vault_a_hp, vault_b_hp, current_round, status FROM "siege_dojo-MatchState" WHERE match_id = ${id}`,
+  );
+  const matchRow = matchRows[0];
+  if (!matchRow) return null;
 
-  const matchNode = stateData?.siegeDojoMatchStateModels?.edges?.[0]?.node;
-  if (!matchNode) return null;
+  const round = toNum(matchRow.current_round);
+  const team1Vault = toNum(matchRow.vault_a_hp);
+  const team2Vault = toNum(matchRow.vault_b_hp);
 
-  const round = toNum(matchNode.current_round);
-  const team1Vault = toNum(matchNode.vault_a_hp);
-  const team2Vault = toNum(matchNode.vault_b_hp);
-
+  const nodeRows = await toriiSql<NodeStateRow>(
+    `SELECT node_index, owner FROM "siege_dojo-NodeState" WHERE match_id = ${id}`,
+  );
   const nodes: [NodeOwner, NodeOwner, NodeOwner] = ["neutral", "neutral", "neutral"];
-  const nodeEdges = stateData?.siegeDojoNodeStateModels?.edges || [];
-  for (const edge of nodeEdges) {
-    const idx = toNum(edge.node.node_index);
+  for (const row of nodeRows) {
+    const idx = toNum(row.node_index);
     if (idx >= 0 && idx < 3) {
-      nodes[idx] = ownerToNode(edge.node.owner);
+      nodes[idx] = ownerToNode(String(row.owner));
     }
   }
 
@@ -170,28 +127,16 @@ async function fetchMatchState(matchId: string): Promise<MatchState | null> {
   const team2Budget = computeBudget(nodes, "team2");
 
   let phase: MatchState["phase"] = "committing";
-  if (matchNode.status === "Finished") {
+  if (String(matchRow.status) === "Finished") {
     phase = "finished";
   } else {
-    const roundData = await toriiQuery<{
-      siegeDojoRoundMovesModels: GraphEdges<Pick<RoundMovesNode, "commit_count" | "reveal_count">>;
-    }>(`
-      query {
-        siegeDojoRoundMovesModels(where: { match_id: "${id}", round: ${round} }) {
-          edges {
-            node {
-              commit_count
-              reveal_count
-            }
-          }
-        }
-      }
-    `);
-
-    const roundNode = roundData?.siegeDojoRoundMovesModels?.edges?.[0]?.node;
-    if (roundNode) {
-      const commitCount = toNum(roundNode.commit_count);
-      const revealCount = toNum(roundNode.reveal_count);
+    const roundRows = await toriiSql<{ commit_count: number; reveal_count: number }>(
+      `SELECT commit_count, reveal_count FROM "siege_dojo-RoundMoves" WHERE match_id = ${id} AND round = ${round}`,
+    );
+    const roundRow = roundRows[0];
+    if (roundRow) {
+      const commitCount = toNum(roundRow.commit_count);
+      const revealCount = toNum(roundRow.reveal_count);
       if (commitCount >= 4) {
         phase = revealCount >= 4 ? "resolving" : "revealing";
       }
@@ -199,13 +144,13 @@ async function fetchMatchState(matchId: string): Promise<MatchState | null> {
   }
 
   let winner: number | null = null;
-  if (matchNode.status === "Finished") {
+  if (String(matchRow.status) === "Finished") {
     if (team1Vault === 0 && team2Vault > 0) winner = 2;
     if (team2Vault === 0 && team1Vault > 0) winner = 1;
   }
 
   return {
-    matchId: String(matchNode.match_id),
+    matchId: String(matchRow.match_id),
     round,
     phase,
     team1Vault,
@@ -263,31 +208,17 @@ export function useMatchPlayers(matchId: string | null): MatchPlayers | null {
     }
 
     const fetchPlayers = async () => {
-      const data = await toriiQuery<{
-        siegeDojoMatchStateModels: GraphEdges<MatchStateNode>;
-      }>(`
-        query {
-          siegeDojoMatchStateModels(where: { match_id: "${id}" }) {
-            edges {
-              node {
-                team_a_attacker
-                team_a_defender
-                team_b_attacker
-                team_b_defender
-              }
-            }
-          }
-        }
-      `);
-
-      const node = data?.siegeDojoMatchStateModels?.edges?.[0]?.node;
-      if (!node) return;
+      const rows = await toriiSql<MatchStateRow>(
+        `SELECT team_a_attacker, team_a_defender, team_b_attacker, team_b_defender FROM "siege_dojo-MatchState" WHERE match_id = ${id}`,
+      );
+      const row = rows[0];
+      if (!row) return;
 
       setPlayers({
-        teamAAttacker: node.team_a_attacker,
-        teamADefender: node.team_a_defender,
-        teamBAttacker: node.team_b_attacker,
-        teamBDefender: node.team_b_defender,
+        teamAAttacker: row.team_a_attacker,
+        teamADefender: row.team_a_defender,
+        teamBAttacker: row.team_b_attacker,
+        teamBDefender: row.team_b_defender,
       });
     };
 
@@ -318,43 +249,13 @@ export function useRoundHistory(matchId: string | null) {
     }
 
     const fetchHistory = async () => {
-      const data = await toriiQuery<{
-        siegeDojoRoundMovesModels: GraphEdges<RoundMovesNode>;
-      }>(`
-        query {
-          siegeDojoRoundMovesModels(where: { match_id: "${id}" }) {
-            edges {
-              node {
-                round
-                commit_count
-                reveal_count
-                atk_a_p0
-                atk_a_p1
-                atk_a_p2
-                atk_b_p0
-                atk_b_p1
-                atk_b_p2
-                def_a_g0
-                def_a_g1
-                def_a_g2
-                def_b_g0
-                def_b_g1
-                def_b_g2
-                def_a_repair
-                def_b_repair
-              }
-            }
-          }
-        }
-      `);
+      const rows = await toriiSql<RoundMovesRow>(
+        `SELECT round, commit_count, reveal_count, atk_a_p0, atk_a_p1, atk_a_p2, atk_b_p0, atk_b_p1, atk_b_p2, def_a_g0, def_a_g1, def_a_g2, def_b_g0, def_b_g1, def_b_g2, def_a_repair, def_b_repair FROM "siege_dojo-RoundMoves" WHERE match_id = ${id} ORDER BY round DESC`,
+      );
 
-      const roundNodes = (data?.siegeDojoRoundMovesModels?.edges || [])
-        .map((edge) => edge.node)
-        .filter((node) => toNum(node.reveal_count) >= 4)
-        .sort((a, b) => toNum(b.round) - toNum(a.round))
-        .slice(0, 10);
+      const revealed = rows.filter((r) => toNum(r.reveal_count) >= 4).slice(0, 10);
 
-      const parsed: RoundResult[] = roundNodes.map((node) => {
+      const parsed: RoundResult[] = revealed.map((node) => {
         const t1Attack = [toNum(node.atk_a_p0), toNum(node.atk_a_p1), toNum(node.atk_a_p2)];
         const t2Attack = [toNum(node.atk_b_p0), toNum(node.atk_b_p1), toNum(node.atk_b_p2)];
         const t1Defense = [toNum(node.def_a_g0), toNum(node.def_a_g1), toNum(node.def_a_g2)];
@@ -418,24 +319,12 @@ export function useCommitmentStatus(
     const rIdx = roleIndex(team, role);
 
     const fetchStatus = async () => {
-      const data = await toriiQuery<{
-        siegeDojoCommitmentModels: GraphEdges<{ committed: boolean; revealed: boolean }>;
-      }>(`
-        query {
-          siegeDojoCommitmentModels(where: { match_id: "${id}", round: ${round}, role: ${rIdx} }) {
-            edges {
-              node {
-                committed
-                revealed
-              }
-            }
-          }
-        }
-      `);
-
-      const node = data?.siegeDojoCommitmentModels?.edges?.[0]?.node;
-      if (node) {
-        setStatus({ committed: node.committed, revealed: node.revealed });
+      const rows = await toriiSql<{ committed: number | boolean; revealed: number | boolean }>(
+        `SELECT committed, revealed FROM "siege_dojo-Commitment" WHERE match_id = ${id} AND round = ${round} AND role = ${rIdx}`,
+      );
+      const row = rows[0];
+      if (row) {
+        setStatus({ committed: !!row.committed, revealed: !!row.revealed });
       }
     };
 

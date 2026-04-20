@@ -96,6 +96,8 @@ export default function Match1v1Page() {
   const autoRevealLock = useRef(false);
   const autoResolveLock = useRef(false);
   const commitLock = useRef(false);
+  const [autoResolveError, setAutoResolveError] = useState("");
+  const [resolveRetryCount, setResolveRetryCount] = useState(0);
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
@@ -107,6 +109,8 @@ export default function Match1v1Page() {
     setAutoRevealStatus("idle");
     setAutoRevealError("");
     setRevealRetry(0);
+    setAutoResolveError("");
+    setResolveRetryCount(0);
     autoRevealLock.current = false;
     autoResolveLock.current = false;
     commitLock.current = false;
@@ -215,6 +219,16 @@ export default function Match1v1Page() {
     autoRevealStatus,
   ]);
 
+  // Refs for values the auto-resolve timer callback needs, so the
+  // effect itself doesn't depend on `state` or `refresh` (which get
+  // new references on every subscription tick and would cancel the timer).
+  const accountRef = useRef(account);
+  accountRef.current = account;
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
   // Auto-resolve: when both players have revealed, one player calls
   // resolve_round (with VRF). Lower address is the elected caller;
   // higher address waits 5s as fallback in case the elected caller stalls.
@@ -231,7 +245,6 @@ export default function Match1v1Page() {
 
     autoResolveLock.current = true;
 
-    // Lower address resolves immediately; higher waits 5s as fallback.
     let isElected = true;
     try {
       const a = BigInt(state.playerA);
@@ -244,27 +257,37 @@ export default function Match1v1Page() {
     }
 
     const delay = isElected ? 500 : 5500;
-    console.log(`[auto-resolve] elected=${isElected}, delay=${delay}ms, round=${state.round}`);
+    const currentRound = state.round;
+    console.log(`[auto-resolve] elected=${isElected}, delay=${delay}ms, round=${currentRound}`);
 
     const timer = setTimeout(() => {
+      const acc = accountRef.current;
+      if (!acc) return;
       (async () => {
         try {
-          await resolveRound1v1(account, matchId);
+          await resolveRound1v1(acc, matchId);
           console.log("[auto-resolve] resolve_round submitted");
+          setAutoResolveError("");
         } catch (e) {
           const msg = extractErrorMsg(e);
           if (msg.includes("Not all revealed") || msg.includes("4e6f7420616c6c2072657665616c6564")) {
             console.log("[auto-resolve] round already resolved by other player");
           } else {
             console.error("[auto-resolve] failed:", msg);
+            setAutoResolveError(msg);
+            setResolveRetryCount((c) => c + 1);
+            autoResolveLock.current = false;
           }
         }
-        void refresh();
+        void refreshRef.current();
       })();
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [account, state, address, matchId, roundStatus.revealCount, refresh]);
+    // Intentionally narrow deps — state/refresh accessed via refs so
+    // subscription-driven re-renders don't cancel the pending timer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, matchId, roundStatus.revealCount, resolveRetryCount]);
 
   const handleRetryReveal = useCallback(() => {
     autoRevealLock.current = false;
@@ -400,7 +423,7 @@ export default function Match1v1Page() {
   } else if (committed && revealed && roundStatus.revealCount < 2) {
     phaseText = "Waiting for opponent to reveal...";
   } else if (state.phase === "resolving") {
-    phaseText = "Resolving round...";
+    phaseText = autoResolveError ? "Resolve failed — retry below" : "Resolving round...";
   }
 
   const toggleRound = (round: number) => {
@@ -633,6 +656,40 @@ export default function Match1v1Page() {
                   RETRY REVEAL
                 </button>
               </>
+            )}
+            {autoResolveError && (
+              <>
+                <span className="text-[10px] text-[#7a7060] font-mono max-w-full truncate px-2">
+                  {autoResolveError}
+                </span>
+                <button
+                  onClick={() => {
+                    autoResolveLock.current = false;
+                    setAutoResolveError("");
+                    setResolveRetryCount((c) => c + 1);
+                  }}
+                  className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors"
+                >
+                  RETRY RESOLVE
+                </button>
+              </>
+            )}
+            {state.phase === "resolving" && !autoResolveError && roundStatus.revealCount >= 2 && (
+              <button
+                onClick={async () => {
+                  if (!account) return;
+                  try {
+                    await resolveRound1v1(account, matchId);
+                    setAutoResolveError("");
+                  } catch (e) {
+                    setAutoResolveError(extractErrorMsg(e));
+                  }
+                  void refresh();
+                }}
+                className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors mt-1"
+              >
+                RESOLVE MANUALLY
+              </button>
             )}
           </div>
         )}

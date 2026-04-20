@@ -9,8 +9,8 @@ import {
   type SchemaType,
   type PlayerKingdom as PlayerKingdomModel,
 } from "@/bindings/typescript/models.gen";
+import { toriiSql, toNum } from "./toriiSql";
 
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 const POLL_INTERVAL = 4000;
 
 function safeNum(v: unknown): number {
@@ -31,28 +31,6 @@ function flatModels<T extends object>(store: unknown): T[] {
   return out;
 }
 
-type GraphEdges<T> = { edges: Array<{ node: T }> };
-
-function toNum(v: number | string | null | undefined): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return Number(v);
-  return 0;
-}
-
-async function toriiQuery<T>(query: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${TORII_URL}/graphql`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    const json = await res.json();
-    return json.data ?? null;
-  } catch {
-    return null;
-  }
-}
-
 // --- Parcel data ---
 
 export interface ParcelData {
@@ -69,36 +47,25 @@ export function useWorldParcels(refreshKey?: number) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetch = async () => {
-      const data = await toriiQuery<{
-        siegeDojoParcelModels: GraphEdges<{
-          parcel_id: string;
-          col: string;
-          row: string;
-          parcel_type: string;
-          owner: string;
-          is_home: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoParcelModels(first: 500) {
-            edges { node {
-              parcel_id col row parcel_type owner is_home
-            } }
-          }
-        }
-      `);
+    const doFetch = async () => {
+      const rows = await toriiSql<{
+        parcel_id: number;
+        col: number;
+        row: number;
+        parcel_type: number;
+        owner: string;
+        is_home: number;
+      }>('SELECT parcel_id, col, row, parcel_type, owner, is_home FROM "siege_dojo-Parcel"');
 
-      const edges = data?.siegeDojoParcelModels?.edges;
-      if (edges) {
+      if (rows.length > 0) {
         setParcels(
-          edges.map((e) => ({
-            parcelId: toNum(e.node.parcel_id),
-            col: toNum(e.node.col),
-            row: toNum(e.node.row),
-            parcelType: toNum(e.node.parcel_type),
-            owner: e.node.owner || "0x0",
-            isHome: !!e.node.is_home,
+          rows.map((r) => ({
+            parcelId: toNum(r.parcel_id),
+            col: toNum(r.col),
+            row: toNum(r.row),
+            parcelType: toNum(r.parcel_type),
+            owner: r.owner || "0x0",
+            isHome: !!r.is_home,
           })),
         );
       }
@@ -106,10 +73,10 @@ export function useWorldParcels(refreshKey?: number) {
     };
 
     const t = setTimeout(() => {
-      void fetch();
+      void doFetch();
     }, 0);
     const i = setInterval(() => {
-      void fetch();
+      void doFetch();
     }, POLL_INTERVAL);
     return () => {
       clearTimeout(t);

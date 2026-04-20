@@ -25,7 +25,17 @@ Don't rename backend models or function names — only update the UI copy. When 
 
 ## Open work tracker
 
-Current playtest bug backlog + upcoming features are tracked as GitHub issues #1–#10 on `modeofO/siege`. Issue #10 is the "dogfood the stack" meta-audit, blocked on all the others. Check the issue list for priorities before starting new work.
+Current playtest bug backlog + upcoming features are tracked as GitHub issues on `modeofO/siege`. Issue #10 is the "dogfood the stack" meta-audit. Check the issue list for priorities before starting new work.
+
+### Known Sepolia playtest bugs (2026-04-19)
+
+| Issue | Summary |
+|-------|---------|
+| #20 | Ability token images 404 — SVGs not set on v3 AbilityToken contract |
+| #21 | Auto-resolve triggers Controller "Review Transactions" prompt instead of using session — possibly stale session or simulation-revert safety |
+| #22 | One player gets spurious Cartridge signer prompt after every round (dismissible, non-blocking) |
+
+All three surfaced during the first multi-round Sepolia playtest on the v3 world. #21 and #22 may share a root cause (session policy pinning or auto-resolve race between both players).
 
 ## Toolchain
 
@@ -150,11 +160,14 @@ Defined in `providers.tsx`. Covers gameplay entrypoints for gasless, no-prompt t
 - `BigInt(0)` not `0n` (tsconfig targets ES2017)
 - `cd frontend && npm run test` runs vitest; `npm run lint` runs eslint; `npm run dev` uses `next dev --experimental-https`
 
-## Torii GraphQL Quirks
+## Torii Query Layer
 
-- `match_id` must be a quoted string: `where: { match_id: "3" }`
-- `round` must be an unquoted integer: `where: { round: 1 }`
-- Mixing these up causes silent query failures (returns null, no error)
+Frontend queries use two transports:
+
+1. **Torii SQL** (`/sql?query=...`) — used by all polling hooks (`worldState.ts`, `gameState.ts`, `conquest.ts`, `pillage.ts`, `factions.ts`, match create pages). Shared utility: `frontend/src/lib/toriiSql.ts` exports `toriiSql<T>()`, `toNum()`, `feltToStr()`. Table names are double-quoted model paths like `"siege_dojo-Parcel"`.
+2. **Dojo SDK gRPC** — used by `gameState1v1.ts` for real-time subscriptions (`useEntityQuery`, `useModels`). These still work with Torii v1.8.15+.
+
+GraphQL was removed in the Torii v1.8.15 migration (2026-04-19). Do not use `toriiQuery` or write new GraphQL queries.
 
 ## Gameplay Testing
 

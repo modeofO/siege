@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
+import { toriiSql, toNum, feltToStr } from "./toriiSql";
 
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 const POLL_INTERVAL = 4000;
 
 export const WORLD_SYSTEM_ADDRESS = process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "";
@@ -31,40 +31,6 @@ export interface FactionInviteData {
   used: boolean;
 }
 
-type GraphEdges<T> = { edges: Array<{ node: T }> };
-
-function toNum(v: number | string | null | undefined): number {
-  if (typeof v === "number") return v;
-  if (typeof v === "string") return Number(v);
-  return 0;
-}
-
-function feltToStr(felt: string): string {
-  if (!felt || felt === "0x0" || felt === "0") return "";
-  const hex = felt.startsWith("0x") ? felt.slice(2) : BigInt(felt).toString(16);
-  const bytes: number[] = [];
-  for (let i = 0; i < hex.length; i += 2) {
-    bytes.push(parseInt(hex.slice(i, i + 2), 16));
-  }
-  return String.fromCharCode(...bytes.filter((b) => b > 0));
-}
-
-async function toriiQuery<T>(query: string): Promise<T | null> {
-  try {
-    const res = await fetch(`${TORII_URL}/graphql`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query }),
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.errors) return null;
-    return (data?.data as T) || null;
-  } catch {
-    return null;
-  }
-}
-
 export function useFaction(factionId: number | null): FactionData | null {
   const [data, setData] = useState<FactionData | null>(null);
 
@@ -72,38 +38,30 @@ export function useFaction(factionId: number | null): FactionData | null {
     if (!factionId) return;
 
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoFactionModels: GraphEdges<{
-          faction_id: string;
-          leader: string;
-          name: string;
-          tag: string;
-          member_count: string;
-          created_at: string;
-          dissolved: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoFactionModels(where: { faction_id: ${factionId} }) {
-            edges { node { faction_id leader name tag member_count created_at dissolved } }
-          }
-        }
-      `);
+      const rows = await toriiSql<{
+        faction_id: number;
+        leader: string;
+        name: string;
+        tag: string;
+        member_count: number;
+        created_at: number;
+        dissolved: number | boolean;
+      }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${factionId}`);
 
-      const node = result?.siegeDojoFactionModels?.edges?.[0]?.node;
-      if (!node) {
+      const row = rows[0];
+      if (!row) {
         setData(null);
         return;
       }
 
       setData({
-        factionId: toNum(node.faction_id),
-        leader: node.leader,
-        name: feltToStr(node.name),
-        tag: feltToStr(node.tag),
-        memberCount: toNum(node.member_count),
-        createdAt: toNum(node.created_at),
-        dissolved: node.dissolved,
+        factionId: toNum(row.faction_id),
+        leader: row.leader,
+        name: feltToStr(row.name),
+        tag: feltToStr(row.tag),
+        memberCount: toNum(row.member_count),
+        createdAt: toNum(row.created_at),
+        dissolved: !!row.dissolved,
       });
     };
 
@@ -137,51 +95,35 @@ export function usePlayerFaction(playerAddress: string | null): {
     if (!playerAddress) return;
 
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoFactionMemberModels: GraphEdges<{
-          player: string;
-          faction_id: string;
-          joined_at: string;
-          last_leave_time: string;
-        }>;
-      }>(`
-        query {
-          siegeDojoFactionMemberModels(where: { player: "${playerAddress}" }) {
-            edges { node { player faction_id joined_at last_leave_time } }
-          }
-        }
-      `);
+      const memberRows = await toriiSql<{
+        player: string;
+        faction_id: number;
+        joined_at: number;
+        last_leave_time: number;
+      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE player = '${playerAddress}'`);
 
-      const memberNode = result?.siegeDojoFactionMemberModels?.edges?.[0]?.node;
-      const member: FactionMemberData | null = memberNode
+      const memberRow = memberRows[0];
+      const member: FactionMemberData | null = memberRow
         ? {
-            player: memberNode.player,
-            factionId: toNum(memberNode.faction_id),
-            joinedAt: toNum(memberNode.joined_at),
-            lastLeaveTime: toNum(memberNode.last_leave_time),
+            player: memberRow.player,
+            factionId: toNum(memberRow.faction_id),
+            joinedAt: toNum(memberRow.joined_at),
+            lastLeaveTime: toNum(memberRow.last_leave_time),
           }
         : null;
 
       let faction: FactionData | null = null;
       if (member && member.factionId > 0) {
-        const factionResult = await toriiQuery<{
-          siegeDojoFactionModels: GraphEdges<{
-            faction_id: string;
-            leader: string;
-            name: string;
-            tag: string;
-            member_count: string;
-            created_at: string;
-            dissolved: boolean;
-          }>;
-        }>(`
-          query {
-            siegeDojoFactionModels(where: { faction_id: ${member.factionId} }) {
-              edges { node { faction_id leader name tag member_count created_at dissolved } }
-            }
-          }
-        `);
-        const fn = factionResult?.siegeDojoFactionModels?.edges?.[0]?.node;
+        const factionRows = await toriiSql<{
+          faction_id: number;
+          leader: string;
+          name: string;
+          tag: string;
+          member_count: number;
+          created_at: number;
+          dissolved: number | boolean;
+        }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${member.factionId}`);
+        const fn = factionRows[0];
         if (fn && !fn.dissolved) {
           faction = {
             factionId: toNum(fn.faction_id),
@@ -190,7 +132,7 @@ export function usePlayerFaction(playerAddress: string | null): {
             tag: feltToStr(fn.tag),
             memberCount: toNum(fn.member_count),
             createdAt: toNum(fn.created_at),
-            dissolved: fn.dissolved,
+            dissolved: !!fn.dissolved,
           };
         }
       }
@@ -224,29 +166,21 @@ export function usePendingInvites(playerAddress: string | null): FactionInviteDa
     if (!playerAddress) return;
 
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoFactionInviteModels: GraphEdges<{
-          target: string;
-          faction_id: string;
-          invited_by: string;
-          invited_at: string;
-          used: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoFactionInviteModels(where: { target: "${playerAddress}" }) {
-            edges { node { target faction_id invited_by invited_at used } }
-          }
-        }
-      `);
+      const rows = await toriiSql<{
+        target: string;
+        faction_id: number;
+        invited_by: string;
+        invited_at: number;
+        used: number | boolean;
+      }>(`SELECT target, faction_id, invited_by, invited_at, used FROM "siege_dojo-FactionInvite" WHERE target = '${playerAddress}'`);
 
-      const entries = (result?.siegeDojoFactionInviteModels?.edges || [])
-        .map((e) => ({
-          target: e.node.target,
-          factionId: toNum(e.node.faction_id),
-          invitedBy: e.node.invited_by,
-          invitedAt: toNum(e.node.invited_at),
-          used: e.node.used,
+      const entries = rows
+        .map((r) => ({
+          target: r.target,
+          factionId: toNum(r.faction_id),
+          invitedBy: r.invited_by,
+          invitedAt: toNum(r.invited_at),
+          used: !!r.used,
         }))
         .filter((inv) => !inv.used);
 
@@ -273,33 +207,25 @@ export function useAllFactions(): FactionData[] {
 
   useEffect(() => {
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoFactionModels: GraphEdges<{
-          faction_id: string;
-          leader: string;
-          name: string;
-          tag: string;
-          member_count: string;
-          created_at: string;
-          dissolved: boolean;
-        }>;
-      }>(`
-        query {
-          siegeDojoFactionModels {
-            edges { node { faction_id leader name tag member_count created_at dissolved } }
-          }
-        }
-      `);
+      const rows = await toriiSql<{
+        faction_id: number;
+        leader: string;
+        name: string;
+        tag: string;
+        member_count: number;
+        created_at: number;
+        dissolved: number | boolean;
+      }>('SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction"');
 
-      const entries = (result?.siegeDojoFactionModels?.edges || [])
-        .map((e) => ({
-          factionId: toNum(e.node.faction_id),
-          leader: e.node.leader,
-          name: feltToStr(e.node.name),
-          tag: feltToStr(e.node.tag),
-          memberCount: toNum(e.node.member_count),
-          createdAt: toNum(e.node.created_at),
-          dissolved: e.node.dissolved,
+      const entries = rows
+        .map((r) => ({
+          factionId: toNum(r.faction_id),
+          leader: r.leader,
+          name: feltToStr(r.name),
+          tag: feltToStr(r.tag),
+          memberCount: toNum(r.member_count),
+          createdAt: toNum(r.created_at),
+          dissolved: !!r.dissolved,
         }))
         .filter((f) => !f.dissolved && f.factionId > 0);
 
@@ -329,29 +255,19 @@ export function useFactionMembers(factionId: number | null): FactionMemberData[]
     if (!factionId || factionId <= 0) return;
 
     const doFetch = async () => {
-      const result = await toriiQuery<{
-        siegeDojoFactionMemberModels: GraphEdges<{
-          player: string;
-          faction_id: string;
-          joined_at: string;
-          last_leave_time: string;
-        }>;
-      }>(`
-        query {
-          siegeDojoFactionMemberModels(first: 1000) {
-            edges { node { player faction_id joined_at last_leave_time } }
-          }
-        }
-      `);
+      const rows = await toriiSql<{
+        player: string;
+        faction_id: number;
+        joined_at: number;
+        last_leave_time: number;
+      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE faction_id = ${factionId}`);
 
-      const entries = (result?.siegeDojoFactionMemberModels?.edges || [])
-        .map((e) => ({
-          player: e.node.player,
-          factionId: toNum(e.node.faction_id),
-          joinedAt: toNum(e.node.joined_at),
-          lastLeaveTime: toNum(e.node.last_leave_time),
-        }))
-        .filter((m) => m.factionId === factionId);
+      const entries = rows.map((r) => ({
+        player: r.player,
+        factionId: toNum(r.faction_id),
+        joinedAt: toNum(r.joined_at),
+        lastLeaveTime: toNum(r.last_leave_time),
+      }));
 
       entries.sort((a, b) => a.joinedAt - b.joinedAt);
       setData(entries);
