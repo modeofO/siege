@@ -229,9 +229,10 @@ export default function Match1v1Page() {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  // Auto-resolve: when both players have revealed, one player calls
-  // resolve_round (with VRF). Lower address is the elected caller;
-  // higher address waits 5s as fallback in case the elected caller stalls.
+  // Auto-resolve: only the elected player (lower address) fires resolve_round.
+  // The non-elected player waits for the subscription to deliver the round
+  // update, with a manual button as fallback. Single-caller avoids competing
+  // transactions that trigger Controller "Review Transactions" prompts (#21/#22).
   useEffect(() => {
     if (
       !account ||
@@ -253,16 +254,21 @@ export default function Match1v1Page() {
       const lower = a < b ? a : b;
       isElected = me === lower;
     } catch {
-      // If address parsing fails, both try immediately.
+      // If address parsing fails, try to resolve.
     }
 
-    const delay = isElected ? 500 : 5500;
+    if (!isElected) {
+      console.log(`[auto-resolve] non-elected, waiting for opponent to resolve round ${state.round}`);
+      return;
+    }
+
     const currentRound = state.round;
-    console.log(`[auto-resolve] elected=${isElected}, delay=${delay}ms, round=${currentRound}`);
+    console.log(`[auto-resolve] elected=true, delay=500ms, round=${currentRound}`);
 
     const timer = setTimeout(() => {
       const acc = accountRef.current;
-      if (!acc) return;
+      const curState = stateRef.current;
+      if (!acc || !curState || curState.round !== currentRound) return;
       (async () => {
         try {
           await resolveRound1v1(acc, matchId);
@@ -271,7 +277,7 @@ export default function Match1v1Page() {
         } catch (e) {
           const msg = extractErrorMsg(e);
           if (msg.includes("Not all revealed") || msg.includes("4e6f7420616c6c2072657665616c6564")) {
-            console.log("[auto-resolve] round already resolved by other player");
+            console.log("[auto-resolve] round already resolved or advanced");
           } else {
             console.error("[auto-resolve] failed:", msg);
             setAutoResolveError(msg);
@@ -281,7 +287,7 @@ export default function Match1v1Page() {
         }
         void refreshRef.current();
       })();
-    }, delay);
+    }, 500);
 
     return () => clearTimeout(timer);
     // Intentionally narrow deps — state/refresh accessed via refs so
