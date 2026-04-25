@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Cinzel } from "next/font/google";
+import { Geist_Mono, Cinzel, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { StarknetProvider } from "./providers";
 import { Navbar } from "@/components/Navbar";
@@ -9,6 +9,7 @@ import { AskToriiChat } from "@/components/AskToriiChat";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 const serif = Cinzel({ variable: "--font-serif", subsets: ["latin"], weight: ["400", "700"] });
+const jetbrains = JetBrains_Mono({ variable: "--font-jetbrains", subsets: ["latin"], weight: ["400", "500"] });
 
 export const metadata: Metadata = {
   title: "Siege",
@@ -25,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark">
       <body
-        className={`${mono.variable} ${serif.variable} font-mono antialiased bg-[#0d0b0a] text-[#d4cfc6] min-h-screen`}
+        className={`${mono.variable} ${serif.variable} ${jetbrains.variable} font-mono antialiased bg-[#0d0b0a] text-[#d4cfc6] min-h-screen`}
       >
         <StarknetProvider>
           <Navbar />

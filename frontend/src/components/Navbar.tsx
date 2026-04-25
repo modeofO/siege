@@ -37,7 +37,10 @@ export function Navbar() {
             SIEGE
           </Link>
           <Link href="/craft" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
-            FORGE
+            CRAFT
+          </Link>
+          <Link href="/forge" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
+            CIRCUIT FORGE
           </Link>
           <Link href="/world" className="text-xs text-[#7a7060] hover:text-[#c8a44e] transition-colors tracking-wider">
             WORLD
