@@ -12,7 +12,7 @@ interface ForgeChromeProps {
 export function ForgeChrome({ children, width = 1280, height = 820 }: ForgeChromeProps) {
   return (
     <div
-      className={`${styles.woodBg} ${styles.woodGrain}`}
+      className={`${styles.forgeBg} ${styles.forgeOverlay}`}
       style={{
         width,
         height,

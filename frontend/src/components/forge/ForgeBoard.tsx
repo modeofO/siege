@@ -127,7 +127,7 @@ export function ForgeBoard({
   placedComponents,
   isLit,
   onDrop,
-  onRemove: _onRemove,
+  onRemove,
   interactive = true,
 }: ForgeBoardProps) {
   const W = COLS * CELL;
@@ -176,9 +176,9 @@ export function ForgeBoard({
         width: W + 32,
         height: H + 32,
         padding: 16,
-        background: "radial-gradient(ellipse at 50% 50%, #3a2818 0%, #1f1208 80%)",
-        border: "1px solid #0a0604",
-        boxShadow: "inset 0 0 40px rgba(0,0,0,0.7), 0 4px 30px rgba(0,0,0,0.6)",
+        background: "radial-gradient(ellipse at 50% 50%, #1a1428 0%, #0d0a14 80%)",
+        border: "1px solid rgba(120, 80, 200, 0.2)",
+        boxShadow: "inset 0 0 40px rgba(0,0,0,0.7), 0 4px 30px rgba(0,0,0,0.6), 0 0 60px rgba(100, 60, 180, 0.08)",
       }}
       onDragOver={interactive ? handleDragOver : undefined}
       onDrop={interactive ? handleDrop : undefined}
@@ -206,6 +206,34 @@ export function ForgeBoard({
             <circle key={`d${r}-${c}`} cx={c * CELL + CELL / 2} cy={r * CELL + CELL / 2} r="2" fill="rgba(255,180,80,0.15)" />
           )),
         )}
+
+        {/* Drop target placeholders for non-locked components */}
+        {circuit.components
+          .filter((c) => !c.locked)
+          .filter((target) => {
+            const occupied = Object.values(placedComponents).some(
+              (p) => p.col === target.col && p.row === target.row,
+            );
+            return !occupied;
+          })
+          .map((target) => {
+            const { x, y } = cellToPx(target.col, target.row);
+            const size = 44;
+            return (
+              <rect
+                key={`placeholder-${target.id}`}
+                x={x - size / 2}
+                y={y - size / 2}
+                width={size}
+                height={size}
+                fill="none"
+                stroke="rgba(120, 80, 200, 0.3)"
+                strokeWidth="1.5"
+                strokeDasharray="6 4"
+                rx={2}
+              />
+            );
+          })}
 
         {/* Carved channel base (always visible) */}
         {circuit.traces.map((t, i) => (
@@ -272,7 +300,8 @@ export function ForgeBoard({
         {Object.entries(placedComponents).map(([instanceId, p]) => (
           <g
             key={instanceId}
-            style={{ cursor: interactive ? "grab" : "default" }}
+            style={{ cursor: interactive ? "pointer" : "default" }}
+            onClick={interactive ? () => onRemove(instanceId) : undefined}
             onDragStart={
               interactive
                 ? (e: React.DragEvent<SVGGElement>) => {

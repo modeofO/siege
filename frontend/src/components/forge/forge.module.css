@@ -1,40 +1,26 @@
-.woodBg {
+.forgeBg {
   background:
-    repeating-linear-gradient(
-      90deg,
-      transparent 0px,
-      transparent 88px,
-      #0a0604 88px,
-      #0a0604 92px
-    ),
-    radial-gradient(ellipse at 30% 40%, rgba(60, 40, 20, 0.4) 0%, transparent 60%),
-    radial-gradient(ellipse at 70% 60%, rgba(50, 30, 15, 0.3) 0%, transparent 50%),
-    linear-gradient(180deg, #1a0f08 0%, #2a190d 50%, #1a0f08 100%);
+    radial-gradient(ellipse at 20% 30%, rgba(100, 60, 180, 0.15) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(60, 100, 200, 0.12) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgba(255, 180, 80, 0.05) 0%, transparent 60%),
+    linear-gradient(180deg, #0a0810 0%, #0d0a14 50%, #0a0810 100%);
 }
 
-.woodGrain {
+.forgeOverlay {
   position: relative;
 }
-.woodGrain::after {
+.forgeOverlay::after {
   content: "";
   position: absolute;
   inset: 0;
   pointer-events: none;
   background:
-    repeating-linear-gradient(
-      2deg,
-      transparent 0px,
-      transparent 3px,
-      rgba(255, 200, 140, 0.015) 3px,
-      rgba(255, 200, 140, 0.015) 4px
+    repeating-conic-gradient(
+      from 0deg at 50% 50%,
+      rgba(120, 80, 200, 0.02) 0deg 10deg,
+      transparent 10deg 20deg
     ),
-    repeating-linear-gradient(
-      178deg,
-      transparent 0px,
-      transparent 5px,
-      rgba(0, 0, 0, 0.04) 5px,
-      rgba(0, 0, 0, 0.04) 6px
-    );
+    radial-gradient(circle at 50% 0%, rgba(255, 180, 80, 0.08) 0%, transparent 30%);
 }
 
 .bracket {
