@@ -28,7 +28,7 @@ interface BoardComponentProps {
   locked?: boolean;
 }
 
-function BoardComponent({ kind, col, row, lit, locked }: BoardComponentProps) {
+function BoardComponent({ kind, col, row, lit }: BoardComponentProps) {
   const { x, y } = cellToPx(col, row);
   const isSource = kind === "origin-crystal";
   const size = 44;
@@ -127,7 +127,7 @@ export function ForgeBoard({
   placedComponents,
   isLit,
   onDrop,
-  onRemove,
+  onRemove: _onRemove,
   interactive = true,
 }: ForgeBoardProps) {
   const W = COLS * CELL;
@@ -168,14 +168,6 @@ export function ForgeBoard({
     [circuit, placedComponents, onDrop],
   );
 
-  const handlePlacedDragStart = useCallback(
-    (e: React.DragEvent, instanceId: string, kind: ComponentKind) => {
-      e.dataTransfer.setData("forge/kind", kind);
-      e.dataTransfer.setData("forge/instanceId", instanceId);
-      e.dataTransfer.effectAllowed = "move";
-    },
-    [],
-  );
 
   return (
     <div
