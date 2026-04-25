@@ -87,34 +87,33 @@ export function useForgeState() {
 
   const placeComponent = useCallback(
     (instanceId: string, kind: ComponentKind, col: number, row: number) => {
+      const isNew = !(instanceId in placedComponents);
       setPlacedComponents((prev) => {
-        const existing = prev[instanceId];
         const next = { ...prev, [instanceId]: { col, row, kind } };
-        if (!existing) {
-          setInventory((inv) => ({
-            ...inv,
-            [kind]: Math.max(0, inv[kind] - 1),
-          }));
-        }
-        const matched = checkTopology(next, circuit);
-        setIsLit(matched);
+        setIsLit(checkTopology(next, circuit));
         return next;
       });
+      if (isNew) {
+        setInventory((inv) => ({
+          ...inv,
+          [kind]: Math.max(0, inv[kind] - 1),
+        }));
+      }
     },
-    [circuit],
+    [circuit, placedComponents],
   );
 
   const removeComponent = useCallback((instanceId: string) => {
+    const comp = placedComponents[instanceId];
+    if (!comp) return;
     setPlacedComponents((prev) => {
-      const comp = prev[instanceId];
-      if (!comp) return prev;
       const next = { ...prev };
       delete next[instanceId];
-      setInventory((inv) => ({ ...inv, [comp.kind]: inv[comp.kind] + 1 }));
-      setIsLit(false);
       return next;
     });
-  }, []);
+    setInventory((inv) => ({ ...inv, [comp.kind]: inv[comp.kind] + 1 }));
+    setIsLit(false);
+  }, [placedComponents]);
 
   const selectCircuit = useCallback((key: CircuitKey) => {
     setActiveCircuitRaw(key);

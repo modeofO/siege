@@ -108,9 +108,7 @@ export function GalleryView({ forgedCircuits, onBack }: GalleryViewProps) {
                 gap: 10,
               }}
             >
-              <div style={{ transform: "scale(0.62)", transformOrigin: "top center", height: 360 * 0.62 + 4 }}>
-                <IlluminatedBanner locked={!unlocked} name={key} circuit={c} />
-              </div>
+              <IlluminatedBanner locked={!unlocked} name={key} circuit={c} scale={0.62} />
               <div style={{ textAlign: "center", marginTop: 6 }}>
                 <div className={styles.labelSmAmber} style={{ fontSize: 9 }}>
                   {c.cosmeticType === "banner" ? "BANNER" : c.cosmeticType === "parcelSkin" ? "PARCEL SKIN" : "HOLD DECOR"}

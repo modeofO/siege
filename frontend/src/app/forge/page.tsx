@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback } from "react";
 import { useForgeState } from "@/lib/forge/forgeState";
 import { ForgeChrome, SectionHeader } from "@/components/forge/ForgeChrome";
 import { ForgeBoard } from "@/components/forge/ForgeBoard";
@@ -14,17 +14,6 @@ import styles from "@/components/forge/forge.module.css";
 
 export default function ForgePage() {
   const state = useForgeState();
-  const confirmForgeRef = useRef(state.confirmForge);
-  confirmForgeRef.current = state.confirmForge;
-
-  useEffect(() => {
-    if (state.isLit && state.currentView === "forge") {
-      const timer = setTimeout(() => {
-        confirmForgeRef.current();
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [state.isLit, state.currentView]);
 
   const handleEquip = useCallback(() => {
     state.equipCosmetic(state.activeCircuit);
