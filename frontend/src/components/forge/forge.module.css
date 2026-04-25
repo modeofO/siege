@@ -1,0 +1,135 @@
+.woodBg {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0px,
+      transparent 88px,
+      #0a0604 88px,
+      #0a0604 92px
+    ),
+    radial-gradient(ellipse at 30% 40%, rgba(60, 40, 20, 0.4) 0%, transparent 60%),
+    radial-gradient(ellipse at 70% 60%, rgba(50, 30, 15, 0.3) 0%, transparent 50%),
+    linear-gradient(180deg, #1a0f08 0%, #2a190d 50%, #1a0f08 100%);
+}
+
+.woodGrain {
+  position: relative;
+}
+.woodGrain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(
+      2deg,
+      transparent 0px,
+      transparent 3px,
+      rgba(255, 200, 140, 0.015) 3px,
+      rgba(255, 200, 140, 0.015) 4px
+    ),
+    repeating-linear-gradient(
+      178deg,
+      transparent 0px,
+      transparent 5px,
+      rgba(0, 0, 0, 0.04) 5px,
+      rgba(0, 0, 0, 0.04) 6px
+    );
+}
+
+.bracket {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  border: 1px solid oklch(0.78 0.13 75);
+  pointer-events: none;
+  z-index: 10;
+}
+.bracketTl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+.bracketTr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+.bracketBl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
+.bracketBr { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+.lantern {
+  position: absolute;
+  width: 14px;
+  height: 18px;
+  background: radial-gradient(circle, rgba(255, 200, 120, 0.9) 0%, rgba(255, 160, 60, 0.4) 50%, transparent 70%);
+  border-radius: 2px;
+  box-shadow: 0 0 18px 4px rgba(255, 180, 80, 0.45), 0 0 40px 12px rgba(255, 160, 60, 0.18);
+  pointer-events: none;
+  z-index: 10;
+}
+
+.emberParticle {
+  position: absolute;
+  width: 3px;
+  height: 3px;
+  background: oklch(0.78 0.13 75);
+  border-radius: 50%;
+  animation: float-up 3s ease-out infinite;
+  pointer-events: none;
+}
+
+.parchmentPanel {
+  background: radial-gradient(ellipse at 50% 50%, #ddc69c 0%, #c4a774 60%, #9c7a44 100%);
+  position: relative;
+}
+.parchmentPanel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 18% 22%, rgba(80, 50, 20, 0.3) 0 5%, transparent 14%),
+    radial-gradient(circle at 82% 78%, rgba(80, 50, 20, 0.25) 0 6%, transparent 16%),
+    radial-gradient(circle at 60% 50%, rgba(80, 50, 20, 0.1) 0 3%, transparent 10%);
+  pointer-events: none;
+}
+
+.btnGhost {
+  background: transparent;
+  border: 1px solid rgba(214, 193, 154, 0.25);
+  color: #b39e74;
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btnGhost:hover {
+  background: rgba(255, 180, 80, 0.06);
+}
+.btnGhostAmber {
+  composes: btnGhost;
+  border-color: oklch(0.78 0.13 75);
+  color: oklch(0.78 0.13 75);
+}
+
+.labelSm {
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #6e5c3d;
+}
+.labelSmAmber {
+  composes: labelSm;
+  color: oklch(0.78 0.13 75);
+}
+
+.fontSerif {
+  font-family: Cinzel, serif;
+}
+.fontMono {
+  font-family: "JetBrains Mono", "Geist Mono", monospace;
+}
+
+.rule {
+  border-color: rgba(214, 193, 154, 0.12);
+}
+.ruleStrong {
+  border-color: rgba(214, 193, 154, 0.25);
+}

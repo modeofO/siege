@@ -154,3 +154,24 @@ input[type="number"]::-webkit-outer-spin-button {
     transform: translateY(-2px);
   }
 }
+
+/* Circuit Forge animations */
+@keyframes pulse-flow {
+  to { stroke-dashoffset: -24px; }
+}
+@keyframes glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(255, 180, 80, 0.3)); }
+  50% { filter: drop-shadow(0 0 10px rgba(255, 180, 80, 0.7)); }
+}
+@keyframes float-up {
+  0% { transform: translateY(0); opacity: 0.7; }
+  100% { transform: translateY(-50px); opacity: 0; }
+}
+@keyframes shimmer {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+@keyframes banner-reveal {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
