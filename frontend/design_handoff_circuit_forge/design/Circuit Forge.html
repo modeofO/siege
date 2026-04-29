@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Circuit Forge — Siege Dojo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --wood-1: #1a0f08;
+    --wood-2: #2a190d;
+    --wood-3: #3a2415;
+    --wood-4: #4a2e1a;
+    --plank-line: #0a0604;
+    --rivet: #1c1209;
+    --parchment: #d6c19a;
+    --parchment-dark: #b39768;
+    --parchment-shadow: #6a5028;
+    --amber: oklch(0.78 0.13 75);
+    --amber-soft: oklch(0.72 0.10 75);
+    --amber-dim: oklch(0.55 0.09 75);
+    --amber-glow: oklch(0.85 0.16 80);
+    --ember: oklch(0.62 0.18 35);
+    --void: oklch(0.55 0.14 290);
+    --ink: #efe3c5;
+    --ink-dim: #b39e74;
+    --ink-faint: #6e5c3d;
+    --rule: rgba(214, 193, 154, 0.12);
+    --rule-strong: rgba(214, 193, 154, 0.25);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #0a0604; color: var(--ink); font-family: 'Inter', system-ui, sans-serif; }
+  body { overflow: hidden; }
+  .font-serif { font-family: 'Cinzel', 'Trajan Pro', serif; letter-spacing: 0.08em; }
+  .font-mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+  .uppercase { text-transform: uppercase; }
+
+  /* shared wood texture */
+  .wood-bg {
+    background:
+      repeating-linear-gradient(180deg,
+        transparent 0 88px,
+        rgba(0,0,0,0.55) 88px 90px,
+        rgba(0,0,0,0.25) 90px 92px),
+      radial-gradient(ellipse 80% 60% at 30% 20%, rgba(90,55,28,0.4), transparent 60%),
+      radial-gradient(ellipse 70% 50% at 80% 80%, rgba(60,35,18,0.5), transparent 60%),
+      linear-gradient(180deg, #1a0f08 0%, #2a190d 50%, #1a0f08 100%);
+    position: relative;
+  }
+  .wood-bg::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(circle at 7% 18%, rgba(0,0,0,0.7) 0 2px, transparent 3px),
+      radial-gradient(circle at 7% 88%, rgba(0,0,0,0.7) 0 2px, transparent 3px),
+      radial-gradient(circle at 93% 18%, rgba(0,0,0,0.7) 0 2px, transparent 3px),
+      radial-gradient(circle at 93% 88%, rgba(0,0,0,0.7) 0 2px, transparent 3px),
+      radial-gradient(circle at 50% 92%, rgba(255,180,90,0.04) 0 60%, transparent 70%);
+    pointer-events: none;
+  }
+  .wood-grain {
+    background-image:
+      repeating-linear-gradient(90deg,
+        rgba(255,200,140,0.02) 0 1px,
+        transparent 1px 4px),
+      repeating-linear-gradient(90deg,
+        rgba(0,0,0,0.06) 0 2px,
+        transparent 2px 9px);
+  }
+
+  /* parchment panel */
+  .parchment-panel {
+    background:
+      radial-gradient(ellipse 70% 100% at 50% 50%, #ddc69c 0%, #c4a774 60%, #9c7a44 100%);
+    color: #2a1a08;
+    position: relative;
+  }
+  .parchment-panel::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(circle at 12% 18%, rgba(80,50,20,0.25) 0 8%, transparent 18%),
+      radial-gradient(circle at 88% 78%, rgba(80,50,20,0.18) 0 6%, transparent 16%),
+      radial-gradient(circle at 60% 30%, rgba(80,50,20,0.12) 0 4%, transparent 12%);
+    pointer-events: none;
+  }
+
+  /* corner brackets for framed panels */
+  .bracket {
+    position: absolute; width: 28px; height: 28px;
+    border: 2px solid var(--amber);
+    pointer-events: none;
+    opacity: 0.85;
+  }
+  .bracket.tl { top: 10px; left: 10px; border-right: none; border-bottom: none; }
+  .bracket.tr { top: 10px; right: 10px; border-left: none; border-bottom: none; }
+  .bracket.bl { bottom: 10px; left: 10px; border-right: none; border-top: none; }
+  .bracket.br { bottom: 10px; right: 10px; border-left: none; border-top: none; }
+
+  /* lantern glow at corners */
+  .lantern {
+    position: absolute; width: 14px; height: 18px;
+    background: radial-gradient(ellipse at 50% 30%, var(--amber-glow), oklch(0.55 0.15 60) 60%, #2a1a08 100%);
+    border-radius: 2px;
+    box-shadow: 0 0 18px 4px rgba(255,180,80,0.45), 0 0 40px 12px rgba(255,160,60,0.18);
+    pointer-events: none;
+  }
+
+  /* chip / pill / button */
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--rule-strong);
+    padding: 6px 12px;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--ink-dim);
+    background: rgba(0,0,0,0.25);
+    border-radius: 2px;
+  }
+  .pill.amber { color: var(--amber); border-color: rgba(255,180,80,0.4); }
+  .btn-ghost {
+    border: 1px solid var(--rule-strong);
+    color: var(--ink); background: transparent;
+    padding: 6px 14px; font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer; border-radius: 2px;
+  }
+  .btn-ghost.amber { border-color: var(--amber); color: var(--amber); }
+  .btn-ghost:hover { background: rgba(255,180,80,0.06); }
+
+  /* trace pulse animation */
+  @keyframes pulse-flow {
+    0% { stroke-dashoffset: 0; }
+    100% { stroke-dashoffset: -24; }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { filter: drop-shadow(0 0 4px var(--amber)) drop-shadow(0 0 10px rgba(255,180,80,0.5)); }
+    50% { filter: drop-shadow(0 0 8px var(--amber-glow)) drop-shadow(0 0 18px rgba(255,180,80,0.8)); }
+  }
+  @keyframes float-up {
+    0% { transform: translateY(0); opacity: 0.6; }
+    100% { transform: translateY(-40px); opacity: 0; }
+  }
+  @keyframes shimmer {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
+  /* ember particle */
+  .ember-particle {
+    position: absolute; width: 3px; height: 3px;
+    background: var(--amber-glow);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--amber);
+    animation: float-up 3s ease-out infinite;
+  }
+
+  /* drag area */
+  .drag-handle { cursor: grab; }
+  .drag-handle:active { cursor: grabbing; }
+
+  /* stop scrollbars from artboards */
+  .artboard-inner { overflow: hidden; }
+
+  /* small caps label */
+  .label-sm {
+    font-size: 10px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--ink-faint); font-family: 'Inter', sans-serif;
+  }
+  .label-sm.amber { color: var(--amber-dim); }
+
+  /* nav strip used on multiple screens */
+  .nav-strip {
+    height: 44px;
+    border-bottom: 1px solid var(--rule);
+    display: flex; align-items: center;
+    padding: 0 24px;
+    background: linear-gradient(180deg, rgba(0,0,0,0.4), transparent);
+    position: relative; z-index: 5;
+  }
+</style>
+</head>
+<body>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<div id="root"></div>
+
+<script type="text/babel" src="design-canvas.jsx"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="components/shared.jsx"></script>
+<script type="text/babel" src="components/circuits.jsx"></script>
+<script type="text/babel" src="components/circuit-art.jsx"></script>
+<script type="text/babel" src="components/forge-board.jsx"></script>
+<script type="text/babel" src="components/screens.jsx"></script>
+<script type="text/babel" src="app.jsx"></script>
+
+</body>
+</html>
