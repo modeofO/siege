@@ -23,7 +23,7 @@ import type {
   ShapeOutput,
   ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import type { Call, WalletAccount } from "starknet";
+import { addAddressPadding, CallData, type Call, type WalletAccount } from "starknet";
 import { z } from "zod";
 
 import type { Config } from "./config.js";
@@ -94,8 +94,55 @@ function phaseFor(
 }
 
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
-  const res = await signer.execute(calls);
+  // The node SessionProvider's WalletAccount.execute tries executeFromOutside
+  // (paymaster path) then silently falls back to direct execute, swallowing
+  // the paymaster error. Call executeFromOutside directly so paymaster
+  // failures surface and we never accidentally pay fees from the agent.
+  const controller = (signer as unknown as { controller?: {
+    executeFromOutside: (calls: Array<{ contractAddress: string; entrypoint: string; calldata: string[] }>) => Promise<{ transaction_hash: string }>;
+  } }).controller;
+  if (!controller?.executeFromOutside) {
+    throw new Error("CartridgeSessionAccount unavailable on signer");
+  }
+  const normalized = calls.map((c) => ({
+    entrypoint: c.entrypoint,
+    contractAddress: addAddressPadding(c.contractAddress),
+    calldata: CallData.toHex(c.calldata),
+  }));
+  const res = await controller.executeFromOutside(normalized);
   return res.transaction_hash;
+}
+
+function safeStringifyError(err: unknown): string {
+  const seen = new WeakSet();
+  const replacer = (_key: string, value: unknown) => {
+    if (typeof value === "function") return `[fn ${(value as { name?: string }).name ?? ""}]`;
+    if (typeof value === "object" && value !== null) {
+      if (seen.has(value as object)) return "[circular]";
+      seen.add(value as object);
+    }
+    if (typeof value === "bigint") return value.toString();
+    return value;
+  };
+  try {
+    const out: Record<string, unknown> = {};
+    if (err && typeof err === "object") {
+      const e = err as Record<string, unknown>;
+      out.name = e.constructor?.constructor === Function ? (e as { constructor: { name?: string } }).constructor.name : undefined;
+      out.message = e.message;
+      out.code = e.code;
+      out.data = e.data;
+      out.cause = e.cause;
+      out.baseError = e.baseError;
+      const full = JSON.stringify(err, replacer);
+      out._raw = full.length > 4000 ? full.slice(0, 4000) + "..." : full;
+    } else {
+      out._raw = String(err);
+    }
+    return JSON.stringify(out, replacer);
+  } catch {
+    return String(err);
+  }
 }
 
 function jsonResult(value: unknown): CallToolResult {
@@ -206,7 +253,11 @@ function makeRegister(reg: RegisterArgs) {
             .join("; ");
           return jsonError({ message: `Invalid arguments: ${detail}` });
         }
-        return jsonError({ message: extractTxError(err) });
+        const message = extractTxError(err);
+        const debug = message === "Transaction execution error" || message.length < 30
+          ? safeStringifyError(err)
+          : undefined;
+        return jsonError(debug ? { message, _debug: debug } : { message });
       }
     }) as ToolCallback<S>;
 
@@ -520,7 +571,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_resolve_round",
     {
       description:
-        "Resolve the current round once both players have revealed. Submits a multicall: vRNG request_random + resolution_1v1.resolve_round.",
+        "Resolve the current round once both players have revealed. Submits resolution_1v1.resolve_round.",
       inputSchema: {
         match_id: z.number().int().nonnegative(),
       },
@@ -528,7 +579,6 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     },
     async ({ match_id }, ctx) => {
       const tx = await execute(ctx.signer!, [
-        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.resolution1v1),
         call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
       ]);
       return { tx_hash: tx, match_id };
