@@ -1,8 +1,4 @@
-# Siege MCP Server v2 — Autonomous Edition
-
-Exposes Siege 1v1 game state and move actions as MCP tools that **sign and
-submit transactions themselves** via a Cartridge Controller session key. The
-agent never sees calldata; it just plays.
+# Siege MCP Server v2
 
 ## Setup
 
@@ -15,16 +11,16 @@ cp .env.example .env
 > ⚠️ **Run under Node, not Bun.** Cartridge's `wasm-bindgen` shims fail
 > under Bun's WASM loader. `bun install` is fine; running uses `tsx`/`node`.
 
-## Run
+## Build
 
 ```bash
-pnpm run dev
+pnpm run build
 ```
 
 ## Wire into Claude Code
 
 ```bash
-claude mcp add siege -- npx tsx /Users/boat/Projects/siege/mcp-server-2/src/index.ts
+claude mcp add siege -- node /Users/boat/Projects/siege/mcp-server-2/dist/index.js
 ```
 
 The server self-locates `.env`, the manifest, and the persisted session via
@@ -37,18 +33,18 @@ session persists to `.cartridge/`, subsequent runs sign silently.
 Read tools work as soon as `TORII_URL` is reachable. Write tools wait on the
 Cartridge session.
 
-| Tool | Kind | Purpose |
-|---|---|---|
-| `siege_whoami` | write | Authenticated agent address |
-| `siege_get_match_state` | read | Phase, HP, nodes, budgets, modifiers |
-| `siege_get_round_history` | read | Recent revealed rounds |
-| `siege_get_round_details` | read | Full snapshot of one round |
-| `siege_get_my_status` | read | Your slot, budget, commit/reveal flags |
-| `siege_create_match` | write | Multicall: VRF + actions_1v1.create_match_1v1 |
-| `siege_commit` | write | Generate salt + hash + submit commit |
-| `siege_reveal` | write | Submit reveal with stored salt + move |
-| `siege_resolve_round` | write | Multicall: VRF + resolution_1v1.resolve_round |
-| `siege_force_timeout` | write | Force timeout when a deadline elapses |
+| Tool                      | Kind  | Purpose                                       |
+| ------------------------- | ----- | --------------------------------------------- |
+| `siege_whoami`            | write | Authenticated agent address                   |
+| `siege_get_match_state`   | read  | Phase, HP, nodes, budgets, modifiers          |
+| `siege_get_round_history` | read  | Recent revealed rounds                        |
+| `siege_get_round_details` | read  | Full snapshot of one round                    |
+| `siege_get_my_status`     | read  | Your slot, budget, commit/reveal flags        |
+| `siege_create_match`      | write | Multicall: VRF + actions_1v1.create_match_1v1 |
+| `siege_commit`            | write | Generate salt + hash + submit commit          |
+| `siege_reveal`            | write | Submit reveal with stored salt + move         |
+| `siege_resolve_round`     | write | Multicall: VRF + resolution_1v1.resolve_round |
+| `siege_force_timeout`     | write | Force timeout when a deadline elapses         |
 
 ## Architecture
 
