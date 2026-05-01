@@ -2,16 +2,23 @@
  * Siege tool registration.
  *
  * Uses the high-level {@link McpServer.registerTool} API: each tool's
- * `inputSchema` is a raw Zod object shape, the SDK derives the JSON Schema
- * (draft 2020-12 compatible) and parses incoming args automatically. We
- * never touch JSON Schema directly here.
+ * `inputSchema` is a raw Zod object shape, the SDK derives JSON Schema
+ * and parses incoming args automatically.
  *
  * Every write tool signs and submits via `ctx.signer` and returns
  * `{ tx_hash, ... }`. Read tools work as soon as Torii is reachable.
  */
 
 import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import { normalizeObjectSchema } from "@modelcontextprotocol/sdk/server/zod-compat.js";
+import { toJsonSchemaCompat } from "@modelcontextprotocol/sdk/server/zod-json-schema-compat.js";
+import { validateToolName } from "@modelcontextprotocol/sdk/shared/toolNameValidation.js";
+import {
+  CallToolResultSchema,
+  ToolSchema,
+  type CallToolResult,
+  type ToolAnnotations,
+} from "@modelcontextprotocol/sdk/types.js";
 import type {
   ShapeOutput,
   ZodRawShapeCompat,
@@ -92,14 +99,27 @@ async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
 }
 
 function jsonResult(value: unknown): CallToolResult {
-  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
+  return validateToolResult({
+    content: [{ type: "text", text: JSON.stringify(value, null, 2) }],
+    ...(isStructuredObject(value) ? { structuredContent: value } : {}),
+  });
 }
 
 function jsonError(value: object): CallToolResult {
-  return {
+  const structuredContent = { error: true, ...value };
+  return validateToolResult({
     content: [{ type: "text", text: JSON.stringify({ error: true, ...value }, null, 2) }],
+    structuredContent,
     isError: true,
-  };
+  });
+}
+
+function isStructuredObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateToolResult(result: CallToolResult): CallToolResult {
+  return CallToolResultSchema.parse(result);
 }
 
 function notReadyMessage(state: NotReadyState): string {
@@ -114,8 +134,32 @@ interface ToolOptions<S extends ZodRawShapeCompat> {
   description: string;
   /** Raw Zod shape. Use `{}` for tools that take no arguments. */
   inputSchema: S;
+  annotations?: ToolAnnotations;
   /** When true, the tool blocks until the Cartridge session is approved. */
   requiresSigner?: boolean;
+}
+
+function validateToolDefinition<S extends ZodRawShapeCompat>(
+  name: string,
+  opts: ToolOptions<S>,
+  annotations: ToolAnnotations,
+): void {
+  const nameValidation = validateToolName(name);
+  if (!nameValidation.isValid) {
+    throw new Error(`Invalid MCP tool name "${name}": ${nameValidation.warnings.join("; ")}`);
+  }
+
+  const inputObjectSchema = normalizeObjectSchema(opts.inputSchema);
+  const inputSchema = inputObjectSchema
+    ? toJsonSchemaCompat(inputObjectSchema, { strictUnions: true, pipeStrategy: "input" })
+    : { type: "object", additionalProperties: false };
+
+  ToolSchema.parse({
+    name,
+    description: opts.description,
+    inputSchema,
+    annotations,
+  });
 }
 
 /**
@@ -134,6 +178,14 @@ function makeRegister(reg: RegisterArgs) {
     opts: ToolOptions<S>,
     handler: (args: ShapeOutput<S>, ctx: ToolContext) => Promise<unknown>,
   ): void {
+    const annotations: ToolAnnotations = {
+      ...(opts.requiresSigner
+        ? { readOnlyHint: false, destructiveHint: false, openWorldHint: true }
+        : { readOnlyHint: true, openWorldHint: true }),
+      ...opts.annotations,
+    };
+    validateToolDefinition(name, opts, annotations);
+
     // The callback's type uses the SDK's own ToolCallback<S> alias — this
     // tells TS exactly what shape the SDK expects, so the deep conditional
     // type in BaseToolCallback resolves cleanly across the generic boundary.
@@ -160,7 +212,7 @@ function makeRegister(reg: RegisterArgs) {
 
     reg.server.registerTool(
       name,
-      { description: opts.description, inputSchema: opts.inputSchema },
+      { description: opts.description, inputSchema: opts.inputSchema, annotations },
       cb,
     );
   };
@@ -491,6 +543,9 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         match_id: z.number().int().nonnegative(),
       },
       requiresSigner: true,
+      annotations: {
+        destructiveHint: true,
+      },
     },
     async ({ match_id }, ctx) => {
       const tx = await execute(ctx.signer!, [

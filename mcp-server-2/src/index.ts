@@ -41,6 +41,13 @@ loadDotenv();
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import {
+  ImplementationSchema,
+  InitializeResultSchema,
+  LATEST_PROTOCOL_VERSION,
+  ServerCapabilitiesSchema,
+  type ServerCapabilities,
+} from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync } from "node:fs";
 import type { WalletAccount } from "starknet";
 import { z } from "zod";
@@ -72,13 +79,13 @@ async function main(): Promise<void> {
   const ctx: ToolContext = {
     config,
     state,
-    get signer() {
+    get signer(): WalletAccount | null {
       return signer;
     },
-    get agentAddress() {
+    get agentAddress(): string {
       return agentAddress;
     },
-  } as unknown as ToolContext;
+  };
 
   const getNotReady = (): NotReadyState | null => {
     if (bootstrapDone) return null;
@@ -86,9 +93,26 @@ async function main(): Promise<void> {
   };
 
   // ── McpServer + registrations ──
-  const server = new McpServer({
+  const serverCapabilities = ServerCapabilitiesSchema.parse({
+    prompts: { listChanged: true },
+    resources: { listChanged: true },
+    tools: { listChanged: true },
+  }) satisfies ServerCapabilities;
+  const serverInfo = ImplementationSchema.parse({
     name: "siege-mcp-server-2",
+    title: "Siege MCP Server 2",
     version: "2.1.0",
+  });
+  InitializeResultSchema.parse({
+    protocolVersion: LATEST_PROTOCOL_VERSION,
+    capabilities: serverCapabilities,
+    serverInfo,
+    instructions: agentPrompt,
+  });
+
+  const server = new McpServer(serverInfo, {
+    capabilities: serverCapabilities,
+    instructions: agentPrompt,
   });
 
   registerSiegeTools({ server, getCtx: () => ctx, getNotReady });
