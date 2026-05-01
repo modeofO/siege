@@ -1,24 +1,28 @@
 /**
- * Tool definitions and registration. Every write tool signs and submits via
- * the Cartridge session in {@link ToolContext.signer} and returns
- * `{ tx_hash, ... }` directly to the agent. Every tool's input schema is
- * declared with Zod and converted to JSON Schema for MCP advertising.
+ * Siege tool registration.
+ *
+ * Uses the high-level {@link McpServer.registerTool} API: each tool's
+ * `inputSchema` is a raw Zod object shape, the SDK derives the JSON Schema
+ * (draft 2020-12 compatible) and parses incoming args automatically. We
+ * never touch JSON Schema directly here.
+ *
+ * Every write tool signs and submits via `ctx.signer` and returns
+ * `{ tx_hash, ... }`. Read tools work as soon as Torii is reachable.
  */
 
-import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
-  type Tool,
-} from "@modelcontextprotocol/sdk/types.js";
-import type { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import type { McpServer, ToolCallback } from "@modelcontextprotocol/sdk/server/mcp.js";
+import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type {
+  ShapeOutput,
+  ZodRawShapeCompat,
+} from "@modelcontextprotocol/sdk/server/zod-compat.js";
 import type { Call, WalletAccount } from "starknet";
-import { z, type ZodTypeAny } from "zod";
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from "zod";
 
 import type { Config } from "./config.js";
 import type { StateClient } from "./state.js";
 import { buildMoveCommitHash1v1, generateSalt, revealCalldata } from "./hash.js";
-import { moveAllocationFromInput, moveSchema, validateMove } from "./move.js";
+import { moveAllocationFromInput, moveShape, validateMove, type MoveInput } from "./move.js";
 import { call, extractTxError, vrfRequestRandom } from "./tx.js";
 
 const ROLE_A = 0;
@@ -39,13 +43,10 @@ export interface NotReadyState {
   bootstrapError: string | null;
 }
 
-interface ToolDef<TIn extends ZodTypeAny> {
-  name: string;
-  description: string;
-  schema: TIn;
-  /** Set when the tool needs a signer. Read tools leave this false. */
-  requiresSigner?: boolean;
-  handler: (input: z.infer<TIn>, ctx: ToolContext) => Promise<unknown>;
+interface RegisterArgs {
+  server: McpServer;
+  getCtx: () => ToolContext;
+  getNotReady: () => NotReadyState | null;
 }
 
 // ── helpers ──────────────────────────────────────────────────────────
@@ -90,31 +91,115 @@ async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
   return res.transaction_hash;
 }
 
-// ── tool definitions ─────────────────────────────────────────────────
+function jsonResult(value: unknown): CallToolResult {
+  return { content: [{ type: "text", text: JSON.stringify(value, null, 2) }] };
+}
 
-const tools: ToolDef<any>[] = [
+function jsonError(value: object): CallToolResult {
+  return {
+    content: [{ type: "text", text: JSON.stringify({ error: true, ...value }, null, 2) }],
+    isError: true,
+  };
+}
+
+function notReadyMessage(state: NotReadyState): string {
+  if (state.bootstrapError) return `Server failed to start: ${state.bootstrapError}`;
+  if (state.authUrl) {
+    return `Cartridge session not approved yet. Open ${state.authUrl} in your browser to approve, then retry.`;
+  }
+  return `Server is ${state.bootstrapPhase}. Try again in a moment.`;
+}
+
+interface ToolOptions<S extends ZodRawShapeCompat> {
+  description: string;
+  /** Raw Zod shape. Use `{}` for tools that take no arguments. */
+  inputSchema: S;
+  /** When true, the tool blocks until the Cartridge session is approved. */
+  requiresSigner?: boolean;
+}
+
+/**
+ * Register a tool with shared not-ready / error-handling boilerplate.
+ *
+ * The handler receives the *parsed* args (Zod has already validated them)
+ * and the live ToolContext. Any thrown error gets routed through
+ * `extractTxError` so contract reverts surface as readable messages.
+ *
+ * Always pass `inputSchema` (even `{}`) — it pins `S` so the SDK's tool
+ * callback overload picks `(args, extra) => Result` instead of `(extra) => Result`.
+ */
+function makeRegister(reg: RegisterArgs) {
+  return function register<S extends ZodRawShapeCompat>(
+    name: string,
+    opts: ToolOptions<S>,
+    handler: (args: ShapeOutput<S>, ctx: ToolContext) => Promise<unknown>,
+  ): void {
+    // The callback's type uses the SDK's own ToolCallback<S> alias — this
+    // tells TS exactly what shape the SDK expects, so the deep conditional
+    // type in BaseToolCallback resolves cleanly across the generic boundary.
+    const cb = (async (args: ShapeOutput<S>, _extra: unknown): Promise<CallToolResult> => {
+      try {
+        if (opts.requiresSigner) {
+          const notReady = reg.getNotReady();
+          if (notReady) {
+            return jsonError({ status: "not_ready", message: notReadyMessage(notReady) });
+          }
+        }
+        const result = await handler(args, reg.getCtx());
+        return jsonResult(result);
+      } catch (err: unknown) {
+        if (err instanceof z.ZodError) {
+          const detail = err.issues
+            .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
+            .join("; ");
+          return jsonError({ message: `Invalid arguments: ${detail}` });
+        }
+        return jsonError({ message: extractTxError(err) });
+      }
+    }) as ToolCallback<S>;
+
+    reg.server.registerTool(
+      name,
+      { description: opts.description, inputSchema: opts.inputSchema },
+      cb,
+    );
+  };
+}
+
+// ── tools ────────────────────────────────────────────────────────────
+
+export function registerSiegeTools(reg: RegisterArgs): void {
+  const register = makeRegister(reg);
+
   // ----- meta -----
-  {
-    name: "siege_whoami",
-    description: "Return the authenticated agent's Starknet address.",
-    schema: z.object({}),
-    requiresSigner: true,
-    handler: async (_input, ctx) => ({ address: ctx.agentAddress }),
-  },
+
+  register(
+    "siege_whoami",
+    {
+      description: "Return the authenticated agent's Starknet address.",
+      inputSchema: {},
+      requiresSigner: true,
+    },
+    async (_args, ctx) => ({ address: ctx.agentAddress }),
+  );
 
   // ----- reads -----
-  {
-    name: "siege_get_match_state",
-    description:
-      "Get current 1v1 match state: players, vault HP, current round, phase, node ownership, gate modifiers, and per-player budgets.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative().describe("1v1 match id"),
-    }),
-    handler: async ({ match_id }, ctx) => {
+
+  register(
+    "siege_get_match_state",
+    {
+      description:
+        "Get current 1v1 match state: players, vault HP, current round, phase, node ownership, gate modifiers, and per-player budgets.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative().describe("1v1 match id"),
+      },
+    },
+    async ({ match_id }, ctx) => {
       const state = await ctx.state.matchState(match_id);
       const nodes = await ctx.state.nodeStates(match_id);
       const round = await ctx.state.roundMoves(match_id, state.current_round).catch(() => undefined);
-      const modifiers = await ctx.state.roundModifiers(match_id, state.current_round)
+      const modifiers = await ctx.state
+        .roundModifiers(match_id, state.current_round)
         .then((m) => m.gates)
         .catch(() => null);
 
@@ -133,15 +218,18 @@ const tools: ToolDef<any>[] = [
         nodes: nodes.map((n) => ({ index: n.node_index, owner: n.owner })),
       };
     },
-  },
-  {
-    name: "siege_get_round_history",
-    description: "Get recent revealed 1v1 rounds (moves, abilities, traps).",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-      num_rounds: z.number().int().positive().default(3),
-    }),
-    handler: async ({ match_id, num_rounds }, ctx) => {
+  );
+
+  register(
+    "siege_get_round_history",
+    {
+      description: "Get recent revealed 1v1 rounds (moves, abilities, traps).",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        num_rounds: z.number().int().positive().default(3),
+      },
+    },
+    async ({ match_id, num_rounds }, ctx) => {
       const state = await ctx.state.matchState(match_id);
       const rounds = [];
       for (let r = Math.max(1, state.current_round - num_rounds + 1); r <= state.current_round; r++) {
@@ -183,15 +271,18 @@ const tools: ToolDef<any>[] = [
         })),
       };
     },
-  },
-  {
-    name: "siege_get_round_details",
-    description: "Get one 1v1 round's moves, modifiers, traps, deadlines, and abilities.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-      round: z.number().int().positive().optional().describe("Defaults to current round"),
-    }),
-    handler: async ({ match_id, round }, ctx) => {
+  );
+
+  register(
+    "siege_get_round_details",
+    {
+      description: "Get one 1v1 round's moves, modifiers, traps, deadlines, and abilities.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        round: z.number().int().positive().optional().describe("Defaults to current round"),
+      },
+    },
+    async ({ match_id, round }, ctx) => {
       const state = await ctx.state.matchState(match_id);
       const r = round ?? state.current_round;
       const moves = await ctx.state.roundMoves(match_id, r);
@@ -223,16 +314,19 @@ const tools: ToolDef<any>[] = [
         },
       };
     },
-  },
-  {
-    name: "siege_get_my_status",
-    description:
-      "Your slot, current budget, commit/reveal status, and phase for a given 1v1 match. Defaults to the authenticated agent's address.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-      player_address: z.string().optional().describe("Defaults to siege_whoami"),
-    }),
-    handler: async ({ match_id, player_address }, ctx) => {
+  );
+
+  register(
+    "siege_get_my_status",
+    {
+      description:
+        "Your slot, current budget, commit/reveal status, and phase for a given 1v1 match. Defaults to the authenticated agent's address.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        player_address: z.string().optional().describe("Defaults to siege_whoami"),
+      },
+    },
+    async ({ match_id, player_address }, ctx) => {
       const address = player_address ?? ctx.agentAddress;
       if (!address) {
         throw new Error("player_address not supplied and the session is not yet authenticated.");
@@ -269,43 +363,50 @@ const tools: ToolDef<any>[] = [
         budget: budgetFor(nodes, role),
       };
     },
-  },
+  );
 
   // ----- writes -----
-  {
-    name: "siege_create_match",
-    description:
-      "Open a 1v1 match between two addresses. Submits a multicall: vRNG request_random + actions_1v1.create_match_1v1.",
-    schema: z.object({
-      player_a: z.string().min(3),
-      player_b: z.string().min(3),
-    }),
-    requiresSigner: true,
-    handler: async ({ player_a, player_b }, ctx) => {
+
+  register(
+    "siege_create_match",
+    {
+      description:
+        "Open a 1v1 match between two addresses. Submits a multicall: vRNG request_random + actions_1v1.create_match_1v1.",
+      inputSchema: {
+        player_a: z.string().min(3),
+        player_b: z.string().min(3),
+      },
+      requiresSigner: true,
+    },
+    async ({ player_a, player_b }, ctx) => {
       const tx = await execute(ctx.signer!, [
         vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.actions1v1),
         call(ctx.config.contracts.actions1v1, "create_match_1v1", [player_a, player_b]),
       ]);
       return { tx_hash: tx, player_a, player_b };
     },
-  },
-  {
-    name: "siege_commit",
-    description:
-      "Generate a salt, hash the move with Poseidon, and submit commit_reveal_1v1.commit. Returns the salt and exact move — store both for the matching siege_reveal call.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-      budget: z.number().int().positive().default(10).describe("Validate against this budget; default 10"),
-    }).merge(moveSchema),
-    requiresSigner: true,
-    handler: async (input, ctx) => {
-      const move = moveAllocationFromInput(input);
-      const total = validateMove(move, input.budget);
+  );
+
+  register(
+    "siege_commit",
+    {
+      description:
+        "Generate a salt, hash the move with Poseidon, and submit commit_reveal_1v1.commit. Returns the salt and exact move — store both for the matching siege_reveal call.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        budget: z.number().int().positive().default(10).describe("Validate against this budget; default 10"),
+        ...moveShape,
+      },
+      requiresSigner: true,
+    },
+    async (args, ctx) => {
+      const move = moveAllocationFromInput(args as unknown as MoveInput);
+      const total = validateMove(move, args.budget);
       const salt = generateSalt();
       const commitmentHash = buildMoveCommitHash1v1(salt, move);
 
       const tx = await execute(ctx.signer!, [
-        call(ctx.config.contracts.commitReveal1v1, "commit", [String(input.match_id), commitmentHash]),
+        call(ctx.config.contracts.commitReveal1v1, "commit", [String(args.match_id), commitmentHash]),
       ]);
 
       return {
@@ -313,7 +414,7 @@ const tools: ToolDef<any>[] = [
         salt,
         commitment_hash: commitmentHash,
         total_allocated: total,
-        budget: input.budget,
+        budget: args.budget,
         move: {
           attack: move.attack,
           defense: move.defense,
@@ -326,27 +427,31 @@ const tools: ToolDef<any>[] = [
         warning: "Save salt + move. They are required for siege_reveal — any mismatch will fail on-chain.",
       };
     },
-  },
-  {
-    name: "siege_reveal",
-    description:
-      "Submit commit_reveal_1v1.reveal using the salt and the exact move passed to siege_commit. Recomputes the commitment hash for verification.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-      salt: z.string().describe("Salt returned by siege_commit"),
-      budget: z.number().int().positive().default(10),
-    }).merge(moveSchema),
-    requiresSigner: true,
-    handler: async (input, ctx) => {
-      const move = moveAllocationFromInput(input);
-      const total = validateMove(move, input.budget);
-      const commitmentHash = buildMoveCommitHash1v1(input.salt, move);
+  );
+
+  register(
+    "siege_reveal",
+    {
+      description:
+        "Submit commit_reveal_1v1.reveal using the salt and the exact move passed to siege_commit. Recomputes the commitment hash for verification.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        salt: z.string().describe("Salt returned by siege_commit"),
+        budget: z.number().int().positive().default(10),
+        ...moveShape,
+      },
+      requiresSigner: true,
+    },
+    async (args, ctx) => {
+      const move = moveAllocationFromInput(args as unknown as MoveInput);
+      const total = validateMove(move, args.budget);
+      const commitmentHash = buildMoveCommitHash1v1(args.salt, move);
 
       const tx = await execute(ctx.signer!, [
         call(
           ctx.config.contracts.commitReveal1v1,
           "reveal",
-          revealCalldata(input.match_id, input.salt, move),
+          revealCalldata(args.match_id, args.salt, move),
         ),
       ]);
 
@@ -354,101 +459,44 @@ const tools: ToolDef<any>[] = [
         tx_hash: tx,
         commitment_hash: commitmentHash,
         total_allocated: total,
-        budget: input.budget,
+        budget: args.budget,
       };
     },
-  },
-  {
-    name: "siege_resolve_round",
-    description:
-      "Resolve the current round once both players have revealed. Submits a multicall: vRNG request_random + resolution_1v1.resolve_round.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-    }),
-    requiresSigner: true,
-    handler: async ({ match_id }, ctx) => {
+  );
+
+  register(
+    "siege_resolve_round",
+    {
+      description:
+        "Resolve the current round once both players have revealed. Submits a multicall: vRNG request_random + resolution_1v1.resolve_round.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+    },
+    async ({ match_id }, ctx) => {
       const tx = await execute(ctx.signer!, [
         vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.resolution1v1),
         call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
       ]);
       return { tx_hash: tx, match_id };
     },
-  },
-  {
-    name: "siege_force_timeout",
-    description: "Force timeout for a 1v1 match whose commit or reveal deadline has elapsed.",
-    schema: z.object({
-      match_id: z.number().int().nonnegative(),
-    }),
-    requiresSigner: true,
-    handler: async ({ match_id }, ctx) => {
+  );
+
+  register(
+    "siege_force_timeout",
+    {
+      description: "Force timeout for a 1v1 match whose commit or reveal deadline has elapsed.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+    },
+    async ({ match_id }, ctx) => {
       const tx = await execute(ctx.signer!, [
         call(ctx.config.contracts.commitReveal1v1, "force_timeout", [String(match_id)]),
       ]);
       return { tx_hash: tx, match_id };
     },
-  },
-];
-
-// ── registration ─────────────────────────────────────────────────────
-
-function jsonResult(value: unknown, isError = false) {
-  return {
-    content: [{ type: "text" as const, text: JSON.stringify(value, null, 2) }],
-    isError,
-  };
-}
-
-function notReadyMessage(state: NotReadyState): string {
-  if (state.bootstrapError) return `Server failed to start: ${state.bootstrapError}`;
-  if (state.authUrl) {
-    return `Cartridge session not approved yet. Open ${state.authUrl} in your browser to approve, then retry.`;
-  }
-  return `Server is ${state.bootstrapPhase}. Try again in a moment.`;
-}
-
-export function registerTools(
-  server: Server,
-  getCtx: () => ToolContext,
-  getNotReady: () => NotReadyState | null,
-): void {
-  const lookup = new Map(tools.map((t) => [t.name, t]));
-
-  const advertised: Tool[] = tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: zodToJsonSchema(t.schema, { target: "openApi3" }) as Tool["inputSchema"],
-  }));
-
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: advertised }));
-
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
-    const tool = lookup.get(request.params.name);
-    if (!tool) return jsonResult({ error: true, message: `Unknown tool: ${request.params.name}` }, true);
-
-    try {
-      // Block writes until the session is ready. Reads work as long as Torii is up.
-      if (tool.requiresSigner) {
-        const notReady = getNotReady();
-        if (notReady) {
-          return jsonResult(
-            { error: true, status: "not_ready", message: notReadyMessage(notReady) },
-            true,
-          );
-        }
-      }
-
-      const parsed = tool.schema.parse(request.params.arguments ?? {});
-      const result = await tool.handler(parsed, getCtx());
-      return jsonResult(result);
-    } catch (err: unknown) {
-      if (err instanceof z.ZodError) {
-        const detail = err.issues
-          .map((i) => `${i.path.join(".") || "(root)"}: ${i.message}`)
-          .join("; ");
-        return jsonResult({ error: true, message: `Invalid arguments: ${detail}` }, true);
-      }
-      return jsonResult({ error: true, message: extractTxError(err) }, true);
-    }
-  });
+  );
 }

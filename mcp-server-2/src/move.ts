@@ -1,43 +1,66 @@
 /**
- * Move allocation Zod schema + budget validation. The move shape and budget
- * rules mirror the Cairo `commit_reveal_1v1` system; if those change the
- * Cairo side, update both here and the Poseidon hash chain in hash.ts.
+ * Move allocation Zod shape + budget validation. The shape mirrors the Cairo
+ * `commit_reveal_1v1` system; if those change Cairo-side, update both here
+ * and the Poseidon hash chain in hash.ts.
+ *
+ * NOTE: arrays are length-pinned with `.length(3)` rather than `z.tuple([..])`.
+ * Zod tuples emit `items: [{...}, {...}]` which is valid in JSON Schema draft 7
+ * but invalid in draft 2020-12 (Anthropic's required spec) — there `items` must
+ * be a single schema, with tuples expressed via `prefixItems`. The constrained
+ * array form `{type: "array", items: {...}, minItems: 3, maxItems: 3}` is valid
+ * in every draft and round-trips identically.
  */
 
-import { z } from "zod";
+import { z, type ZodRawShape } from "zod";
 import type { MoveAllocation1v1 } from "./hash.js";
 
-const triple = z.tuple([
-  z.number().int().nonnegative(),
-  z.number().int().nonnegative(),
-  z.number().int().nonnegative(),
-]);
+const tripleNonNeg = z.array(z.number().int().nonnegative()).length(3);
+const tripleBinary = z.array(z.number().int().min(0).max(1)).length(3);
 
-const trapTriple = z.tuple([
-  z.number().int().min(0).max(1),
-  z.number().int().min(0).max(1),
-  z.number().int().min(0).max(1),
-]);
-
-export const moveSchema = z.object({
-  attack: triple.describe("[p0, p1, p2] — pressure on each gate"),
-  defense: triple.describe("[g0, g1, g2] — garrison on each gate"),
+/** Raw Zod shape for the move fields. Re-spread into tool inputSchemas. */
+export const moveShape = {
+  attack: tripleNonNeg.describe("[p0, p1, p2] — pressure on each gate"),
+  defense: tripleNonNeg.describe("[g0, g1, g2] — garrison on each gate"),
   repair: z.number().int().min(0).max(3).default(0).describe("Repair allocation, max 3"),
-  nodes: triple.describe("[nc0, nc1, nc2] — node contest pressure"),
-  traps: trapTriple.default([0, 0, 0]).describe("[trap0, trap1, trap2], 0 or 1 each. 2 budget per trap."),
-  ability_id: z.number().int().min(0).max(10).default(0).describe("Activated ability token id, 0 for none"),
-  ability_target: z.number().int().min(0).max(2).default(0).describe("Ability target gate 0..2"),
-});
+  nodes: tripleNonNeg.describe("[nc0, nc1, nc2] — node contest pressure"),
+  traps: tripleBinary
+    .default([0, 0, 0])
+    .describe("[trap0, trap1, trap2], 0 or 1 each. 2 budget per trap."),
+  ability_id: z
+    .number()
+    .int()
+    .min(0)
+    .max(10)
+    .default(0)
+    .describe("Activated ability token id, 0 for none"),
+  ability_target: z
+    .number()
+    .int()
+    .min(0)
+    .max(2)
+    .default(0)
+    .describe("Ability target gate 0..2"),
+} satisfies ZodRawShape;
 
-export type MoveInput = z.infer<typeof moveSchema>;
+export interface MoveInput {
+  attack: number[];
+  defense: number[];
+  repair: number;
+  nodes: number[];
+  traps: number[];
+  ability_id: number;
+  ability_target: number;
+}
 
+/** Convert parsed move input into the structural form the hash + reveal expect. */
 export function moveAllocationFromInput(input: MoveInput): MoveAllocation1v1 {
+  // .length(3) on the schema guarantees these casts are safe at runtime.
   return {
-    attack: input.attack,
-    defense: input.defense,
+    attack: input.attack as [number, number, number],
+    defense: input.defense as [number, number, number],
     repair: input.repair,
-    nodes: input.nodes,
-    traps: input.traps,
+    nodes: input.nodes as [number, number, number],
+    traps: input.traps as [number, number, number],
     abilityId: input.ability_id,
     abilityTarget: input.ability_target,
   };
