@@ -592,8 +592,20 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         const tx = await execute(ctx.signer!, calls);
         return { tx_hash: tx, match_id, skip_vrf };
       } catch (err) {
-        const reason = extractTxError(err);
-        if (!skip_vrf && /not consumed/i.test(reason)) {
+        const isNotConsumed = (() => {
+          const e = err as { __wbg_ptr?: unknown; data?: unknown };
+          let raw = "";
+          if (e.__wbg_ptr) {
+            try {
+              raw = typeof e.data === "function" ? (e as { data: () => string }).data() : String(e.data ?? "");
+            } catch {
+              /* ignore */
+            }
+          }
+          if (!raw) raw = safeStringifyError(err);
+          return /not consumed/i.test(raw);
+        })();
+        if (!skip_vrf && isNotConsumed) {
           const tx = await execute(ctx.signer!, [
             call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
           ]);
