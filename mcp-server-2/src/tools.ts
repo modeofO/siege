@@ -124,6 +124,52 @@ function describeModifiers(gates: number[] | null | undefined): Array<{
   }));
 }
 
+const MOD_NARROW_PASS = 1;
+const MOD_MIRROR = 2;
+const MAX_VAULT_HP = 50;
+const MAX_ROUNDS = 10;
+
+const min3 = (n: number) => (n > 3 ? 3 : n);
+
+interface MovePerGate {
+  attack: number;
+  defense: number;
+}
+
+/**
+ * Apply Narrow Pass clamp + Mirror swap per gate, mirroring
+ * `resolution_1v1.cairo:122-144`. Deadlock and Reflection don't mutate the
+ * inputs (they change how the inputs get used), so effective values for
+ * those gates equal raw values. Returns null if any input is missing
+ * (e.g. round not yet revealed).
+ */
+function effectiveMoves(
+  gates: number[] | null | undefined,
+  a: { attack: number[]; defense: number[] } | null | undefined,
+  b: { attack: number[]; defense: number[] } | null | undefined,
+): { player_a: MovePerGate[]; player_b: MovePerGate[] } | null {
+  if (!gates || !a || !b) return null;
+  const out_a: MovePerGate[] = [];
+  const out_b: MovePerGate[] = [];
+  for (let g = 0; g < 3; g++) {
+    let aa = a.attack[g];
+    let ad = a.defense[g];
+    let ba = b.attack[g];
+    let bd = b.defense[g];
+    const m = gates[g];
+    if (m === MOD_NARROW_PASS) {
+      aa = min3(aa); ad = min3(ad); ba = min3(ba); bd = min3(bd);
+    }
+    if (m === MOD_MIRROR) {
+      [aa, ad] = [ad, aa];
+      [ba, bd] = [bd, ba];
+    }
+    out_a.push({ attack: aa, defense: ad });
+    out_b.push({ attack: ba, defense: bd });
+  }
+  return { player_a: out_a, player_b: out_b };
+}
+
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
   // The node SessionProvider's WalletAccount.execute tries executeFromOutside
   // (paymaster path) then silently falls back to direct execute, swallowing
@@ -342,6 +388,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         status: state.status,
         phase: phaseFor(state, round),
         current_round: state.current_round,
+        rounds_remaining: Math.max(0, MAX_ROUNDS - state.current_round),
         vault_a_hp: state.vault_a_hp,
         vault_b_hp: state.vault_b_hp,
         player_a: { address: state.player_a, budget: budgetFor(nodes, ROLE_A) },
@@ -423,6 +470,18 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       const moves = await ctx.state.roundMoves(match_id, r);
       const modifiers = await ctx.state.roundModifiers(match_id, r).catch(() => null);
       const traps = await ctx.state.roundTraps(match_id, r).catch(() => null);
+      const a_move = {
+        attack: [moves.a_p0, moves.a_p1, moves.a_p2],
+        defense: [moves.a_g0, moves.a_g1, moves.a_g2],
+      };
+      const b_move = {
+        attack: [moves.b_p0, moves.b_p1, moves.b_p2],
+        defense: [moves.b_g0, moves.b_g1, moves.b_g2],
+      };
+      const both_revealed = moves.reveal_count >= 2;
+      const effective = both_revealed
+        ? effectiveMoves(modifiers?.gates, a_move, b_move)
+        : null;
       return {
         match_id,
         round: r,
@@ -431,17 +490,19 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         commit_deadline: moves.commit_deadline,
         reveal_deadline: moves.reveal_deadline,
         modifiers: modifiers?.gates ?? null,
+        modifier_details: describeModifiers(modifiers?.gates),
+        effective_moves: effective,
         player_a: {
-          attack: [moves.a_p0, moves.a_p1, moves.a_p2],
-          defense: [moves.a_g0, moves.a_g1, moves.a_g2],
+          attack: a_move.attack,
+          defense: a_move.defense,
           repair: moves.a_repair,
           nodes: [moves.a_nc0, moves.a_nc1, moves.a_nc2],
           traps: traps?.player_a ?? null,
           ability: { id: moves.a_ability_id, target: moves.a_ability_target },
         },
         player_b: {
-          attack: [moves.b_p0, moves.b_p1, moves.b_p2],
-          defense: [moves.b_g0, moves.b_g1, moves.b_g2],
+          attack: b_move.attack,
+          defense: b_move.defense,
           repair: moves.b_repair,
           nodes: [moves.b_nc0, moves.b_nc1, moves.b_nc2],
           traps: traps?.player_b ?? null,
@@ -486,16 +547,20 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         round = undefined;
       }
 
+      const vault_hp = role === ROLE_A ? state.vault_a_hp : state.vault_b_hp;
       return {
         match_id,
         player_address: address,
         role,
         role_name: roleName(role),
         current_round: state.current_round,
+        rounds_remaining: Math.max(0, MAX_ROUNDS - state.current_round),
         phase: phaseFor(state, round),
         committed,
         revealed,
         budget: budgetFor(nodes, role),
+        vault_hp,
+        max_useful_repair: Math.min(3, Math.max(0, MAX_VAULT_HP - vault_hp)),
       };
     },
   );
