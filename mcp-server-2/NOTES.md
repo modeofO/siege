@@ -317,9 +317,9 @@ Listed by which call should grow the field:
 ### `siege_get_match_state`
 - ✅ **`modifier_details`**: array of `{ gate, code, name, effect }` objects (upstream `083da27`).
 - ✅ **`rounds_remaining`**: `10 - current_round`.
-- **`my_role`**: A or B. Currently in `siege_get_my_status` only — duplicating it here saves a call.
-- **`commit_deadline` / `reveal_deadline`**: pulled from round details; useful for pacing without a separate call.
-- **`status_reason`** when finished: which player won, by what (vault zero / round-10 timeout / draw).
+- ✅ **`my_role`** / **`my_role_name`**: derived from `ctx.agentAddress`; null if the agent isn't a player.
+- ✅ **`commit_deadline` / `reveal_deadline`**: pulled from the current round.
+- ✅ **`status_reason`**: human string when finished — vault destruction with winner / round-10 timeout / draw.
 
 ### `siege_get_my_status`
 - ✅ **`vault_hp`** for the caller's role.
@@ -329,7 +329,8 @@ Listed by which call should grow the field:
 ### `siege_get_round_details` (after reveal)
 - ✅ **`modifier_details`**: same shape as on match-state.
 - ✅ **`effective_moves`**: `{player_a, player_b}` arrays of `{attack, defense}` per gate after Narrow Pass clamp + Mirror swap. Populated only when both players have revealed.
-- **Predicted damage** per gate (computed client-side from the commit data once both reveal). Saves a contract-grep at every endgame turn. *(Not yet built.)*
+- ✅ **`predicted_damage`**: per-gate + total damage to each player computed from `effective_moves` + modifiers, including Reflection redistribution. Excludes ability effects — exact when both `ability_id == 0` (most rounds).
+- ✅ **`ability_details`** per player: decodes raw `ability.id` to `{name, tier, effect}`.
 
 ### `siege_create_match`
 - ✅ **`match_id`** in the response (upstream `083da27`). Polls Torii for ~20s after the tx until the new row indexes, so the caller doesn't need a follow-up `siege_get_match_state` to discover the assigned id.
@@ -338,8 +339,8 @@ Listed by which call should grow the field:
 - ✅ **Phase precheck** (upstream `083da27`). Refuses to submit if the current round isn't yet in `"resolving"` phase, returning a clear error instead of submitting a tx that will revert.
 
 ### `siege_commit`
-- Reject `traps[i] = 1` if node `i` isn't owned by the caller. Currently a bad trap probably reverts on reveal.
-- Show effective allocations after Narrow Pass clamp at commit time, so the agent doesn't waste budget on capped gates.
+- ✅ **Trap ownership validation**: rejects `traps[i] = 1` on un-owned nodes client-side, mirroring `commit_reveal_1v1.cairo:167-181` so the failure surfaces with a useful message instead of an on-chain revert.
+- ✅ **`effective_allocation_preview`**: returns the agent's own `{attack, defense}` per gate after Narrow Pass clamp + Mirror swap, so the agent can spot wasted budget (e.g. 5 attack at a Narrow Pass gate clamps to 3) before the move becomes immutable.
 
 ### Errors
 - See `TODO.md`: `execute()` doesn't surface on-chain reverts when tx is `ACCEPTED_ON_L2 / REVERTED`. The first two `siege_resolve_round` calls in this match looked successful but had silently reverted on-chain.

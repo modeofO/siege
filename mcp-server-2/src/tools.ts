@@ -170,6 +170,163 @@ function effectiveMoves(
   return { player_a: out_a, player_b: out_b };
 }
 
+const MOD_DEADLOCK = 3;
+const MOD_OVERFLOW = 4;
+
+interface DamageBreakdown {
+  per_gate_to_a: [number, number, number];
+  per_gate_to_b: [number, number, number];
+  unused_def_a: [number, number, number];
+  unused_def_b: [number, number, number];
+  total_to_a: number;
+  total_to_b: number;
+  note: string;
+}
+
+/**
+ * Mirror `resolution_1v1.cairo:122-322` to predict per-gate and total
+ * damage from already-effective (post-modifier) moves. Excludes ability
+ * effects (Fortify defense boost, Stone Cloak halving, Hex reduction,
+ * Ember Blast direct damage, Siege Sword attack override). For most rounds
+ * where neither side activates an ability, the prediction is exact.
+ */
+function predictedDamage(
+  gates: number[],
+  eff_a: MovePerGate[],
+  eff_b: MovePerGate[],
+): DamageBreakdown {
+  const dmg_a: [number, number, number] = [0, 0, 0];
+  const dmg_b: [number, number, number] = [0, 0, 0];
+  const unused_a: [number, number, number] = [0, 0, 0];
+  const unused_b: [number, number, number] = [0, 0, 0];
+  const ovf_to_a: [number, number, number] = [0, 0, 0];
+  const ovf_to_b: [number, number, number] = [0, 0, 0];
+
+  for (let g = 0; g < 3; g++) {
+    const aa = eff_a[g].attack;
+    const ad = eff_a[g].defense;
+    const ba = eff_b[g].attack;
+    const bd = eff_b[g].defense;
+    const m = gates[g];
+
+    if (m === MOD_DEADLOCK) {
+      unused_a[g] = ad;
+      unused_b[g] = bd;
+    } else if (m === MOD_OVERFLOW) {
+      ovf_to_b[g] = Math.max(aa - bd, 0);
+      ovf_to_a[g] = Math.max(ba - ad, 0);
+      unused_a[g] = Math.max(ad - ba, 0);
+      unused_b[g] = Math.max(bd - aa, 0);
+    } else {
+      dmg_b[g] = Math.max(aa - bd, 0);
+      dmg_a[g] = Math.max(ba - ad, 0);
+      unused_a[g] = Math.max(ad - ba, 0);
+      unused_b[g] = Math.max(bd - aa, 0);
+    }
+  }
+
+  for (let g = 0; g < 3; g++) {
+    if (ovf_to_b[g] > 0) {
+      const per = Math.floor(ovf_to_b[g] / 2);
+      for (let t = 0; t < 3; t++) {
+        if (t !== g && gates[t] !== MOD_DEADLOCK) {
+          const def = unused_b[t];
+          if (per > def) dmg_b[t] += per - def;
+        }
+      }
+    }
+    if (ovf_to_a[g] > 0) {
+      const per = Math.floor(ovf_to_a[g] / 2);
+      for (let t = 0; t < 3; t++) {
+        if (t !== g && gates[t] !== MOD_DEADLOCK) {
+          const def = unused_a[t];
+          if (per > def) dmg_a[t] += per - def;
+        }
+      }
+    }
+  }
+
+  return {
+    per_gate_to_a: dmg_a,
+    per_gate_to_b: dmg_b,
+    unused_def_a: unused_a,
+    unused_def_b: unused_b,
+    total_to_a: dmg_a[0] + dmg_a[1] + dmg_a[2],
+    total_to_b: dmg_b[0] + dmg_b[1] + dmg_b[2],
+    note: "Excludes ability effects (Fortify, Stone Cloak, Hex, Ember Blast, Siege Sword) and trap damage. Exact when both ability_id == 0.",
+  };
+}
+
+const ABILITY_TYPES: Record<number, { name: string; t1: string; t2: string }> = {
+  1: {
+    name: "SiegeSword",
+    t1: "set attack at target gate to 5",
+    t2: "set attack at target gate to 10",
+  },
+  2: {
+    name: "StoneCloak",
+    t1: "halve all gate damage taken",
+    t2: "zero all gate damage taken",
+  },
+  3: {
+    name: "EmberBlast",
+    t1: "+2 direct vault damage to opponent (bypasses defense)",
+    t2: "+6 direct vault damage to opponent (bypasses defense)",
+  },
+  4: {
+    name: "Hex",
+    t1: "reduce opponent total damage by 3",
+    t2: "reduce opponent total damage by 8",
+  },
+  5: {
+    name: "Fortify",
+    t1: "+1 defense at all gates",
+    t2: "double defense at all gates",
+  },
+};
+
+interface AbilityDetails {
+  id: number;
+  target: number;
+  name: string;
+  tier: number;
+  effect: string;
+}
+
+function describeAbility(id: number, target: number): AbilityDetails {
+  if (id === 0) return { id, target, name: "None", tier: 0, effect: "" };
+  const type = ((id - 1) % 5) + 1;
+  const tier = Math.floor((id - 1) / 5) + 1;
+  const info = ABILITY_TYPES[type];
+  return {
+    id,
+    target,
+    name: info?.name ?? `Unknown(type ${type})`,
+    tier,
+    effect: tier === 1 ? info?.t1 ?? "" : info?.t2 ?? "",
+  };
+}
+
+function statusReason(state: {
+  status: string;
+  vault_a_hp: number;
+  vault_b_hp: number;
+  current_round: number;
+}): string | null {
+  if (state.status !== "Finished") return null;
+  const a = state.vault_a_hp;
+  const b = state.vault_b_hp;
+  if (a === 0 && b === 0) return "draw — both vaults reached 0 simultaneously";
+  if (a === 0) return "Player B won by vault destruction";
+  if (b === 0) return "Player A won by vault destruction";
+  if (state.current_round >= MAX_ROUNDS) {
+    if (a > b) return `Player A won by HP at round ${state.current_round} timeout (${a} vs ${b})`;
+    if (b > a) return `Player B won by HP at round ${state.current_round} timeout (${a} vs ${b})`;
+    return `draw — equal HP at round ${state.current_round} timeout`;
+  }
+  return null;
+}
+
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
   // The node SessionProvider's WalletAccount.execute tries executeFromOutside
   // (paymaster path) then silently falls back to direct execute, swallowing
@@ -383,14 +540,20 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         .then((m) => m.gates)
         .catch(() => null);
 
+      const myRole = ctx.agentAddress ? roleFor(state, ctx.agentAddress) : null;
       return {
         match_id,
         status: state.status,
+        status_reason: statusReason(state),
         phase: phaseFor(state, round),
         current_round: state.current_round,
         rounds_remaining: Math.max(0, MAX_ROUNDS - state.current_round),
+        commit_deadline: round?.commit_deadline ?? null,
+        reveal_deadline: round?.reveal_deadline ?? null,
         vault_a_hp: state.vault_a_hp,
         vault_b_hp: state.vault_b_hp,
+        my_role: myRole,
+        my_role_name: myRole === null ? null : roleName(myRole),
         player_a: { address: state.player_a, budget: budgetFor(nodes, ROLE_A) },
         player_b: { address: state.player_b, budget: budgetFor(nodes, ROLE_B) },
         commits: round?.commit_count ?? 0,
@@ -482,6 +645,10 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       const effective = both_revealed
         ? effectiveMoves(modifiers?.gates, a_move, b_move)
         : null;
+      const predicted =
+        both_revealed && effective && modifiers?.gates
+          ? predictedDamage(modifiers.gates, effective.player_a, effective.player_b)
+          : null;
       return {
         match_id,
         round: r,
@@ -492,6 +659,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         modifiers: modifiers?.gates ?? null,
         modifier_details: describeModifiers(modifiers?.gates),
         effective_moves: effective,
+        predicted_damage: predicted,
         player_a: {
           attack: a_move.attack,
           defense: a_move.defense,
@@ -499,6 +667,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           nodes: [moves.a_nc0, moves.a_nc1, moves.a_nc2],
           traps: traps?.player_a ?? null,
           ability: { id: moves.a_ability_id, target: moves.a_ability_target },
+          ability_details: describeAbility(moves.a_ability_id, moves.a_ability_target),
         },
         player_b: {
           attack: b_move.attack,
@@ -507,6 +676,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           nodes: [moves.b_nc0, moves.b_nc1, moves.b_nc2],
           traps: traps?.player_b ?? null,
           ability: { id: moves.b_ability_id, target: moves.b_ability_target },
+          ability_details: describeAbility(moves.b_ability_id, moves.b_ability_target),
         },
       };
     },
@@ -611,6 +781,61 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     async (args, ctx) => {
       const move = moveAllocationFromInput(args as unknown as MoveInput);
       const total = validateMove(move, args.budget);
+
+      // Trap ownership validation. Mirror `commit_reveal_1v1.cairo:167-181` so
+      // a bad trap fails fast client-side instead of reverting on-chain.
+      if (move.traps.some((t) => t > 0)) {
+        if (!ctx.agentAddress) {
+          throw new Error("agent address not yet authenticated; cannot validate trap ownership.");
+        }
+        const matchState = await ctx.state.matchState(args.match_id);
+        const role = roleFor(matchState, ctx.agentAddress);
+        if (role === null) {
+          throw new Error(
+            `Address ${ctx.agentAddress} is not a player in match ${args.match_id}; cannot place traps.`,
+          );
+        }
+        const nodes = await ctx.state.nodeStates(args.match_id);
+        const myTeam = role === ROLE_A ? "TeamA" : "TeamB";
+        for (let i = 0; i < 3; i++) {
+          if (move.traps[i] !== 1) continue;
+          const node = nodes.find((n) => n.node_index === i);
+          if (!node || node.owner !== myTeam) {
+            throw new Error(
+              `Cannot trap node ${i}: owned by ${node?.owner ?? "Unknown"}, not your team (${myTeam}). Contract would revert with 'Cannot trap unowned node'.`,
+            );
+          }
+        }
+      }
+
+      // Effective-allocation preview: show what Narrow Pass / Mirror will do
+      // to the agent's own allocation. Best-effort; missing modifiers leave it null.
+      let effective_allocation_preview: MovePerGate[] | null = null;
+      try {
+        const matchState = await ctx.state.matchState(args.match_id);
+        const mods = await ctx.state
+          .roundModifiers(args.match_id, matchState.current_round)
+          .catch(() => null);
+        if (mods?.gates) {
+          effective_allocation_preview = [];
+          for (let g = 0; g < 3; g++) {
+            let a = move.attack[g];
+            let d = move.defense[g];
+            const m = mods.gates[g];
+            if (m === MOD_NARROW_PASS) {
+              a = min3(a);
+              d = min3(d);
+            }
+            if (m === MOD_MIRROR) {
+              [a, d] = [d, a];
+            }
+            effective_allocation_preview.push({ attack: a, defense: d });
+          }
+        }
+      } catch {
+        // Preview is informational only.
+      }
+
       const salt = generateSalt();
       const commitmentHash = buildMoveCommitHash1v1(salt, move);
 
@@ -624,6 +849,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         commitment_hash: commitmentHash,
         total_allocated: total,
         budget: args.budget,
+        effective_allocation_preview,
         move: {
           attack: move.attack,
           defense: move.defense,
