@@ -551,7 +551,6 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       const commitmentHash = buildMoveCommitHash1v1(args.salt, move);
 
       const tx = await execute(ctx.signer!, [
-        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.commitReveal1v1),
         call(
           ctx.config.contracts.commitReveal1v1,
           "reveal",
