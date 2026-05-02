@@ -93,6 +93,37 @@ function phaseFor(
   return "resolving";
 }
 
+const MODIFIER_INFO: Record<number, { name: string; effect: string }> = {
+  0: { name: "Normal", effect: "No change. Damage = max(attacker_atk - defender_def, 0)." },
+  1: { name: "NarrowPass", effect: "Both attack and defense at this gate are capped at 3." },
+  2: {
+    name: "Mirror",
+    effect:
+      "Attack and defense values swap at this gate for both sides — placing defense effectively becomes attack and vice versa.",
+  },
+  3: { name: "Deadlock", effect: "No damage at this gate, regardless of values. Reflection skips this gate too." },
+  4: {
+    name: "Reflection",
+    effect:
+      "Damage at this gate becomes overflow. Per-gate split = overflow/2 (integer division — odd values lose 1) is added to each other non-deadlock gate, reduced by the target's unused defense at that receiving gate. Defense at this gate still absorbs incoming attack normally.",
+  },
+};
+
+function describeModifiers(gates: number[] | null | undefined): Array<{
+  gate: number;
+  code: number;
+  name: string;
+  effect: string;
+}> | null {
+  if (!gates || gates.length !== 3) return null;
+  return gates.map((code, gate) => ({
+    gate,
+    code,
+    name: MODIFIER_INFO[code]?.name ?? "Unknown",
+    effect: MODIFIER_INFO[code]?.effect ?? "Unknown modifier code.",
+  }));
+}
+
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
   // The node SessionProvider's WalletAccount.execute tries executeFromOutside
   // (paymaster path) then silently falls back to direct execute, swallowing
@@ -318,6 +349,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         commits: round?.commit_count ?? 0,
         reveals: round?.reveal_count ?? 0,
         modifiers,
+        modifier_details: describeModifiers(modifiers),
         nodes: nodes.map((n) => ({ index: n.node_index, owner: n.owner })),
       };
     },
@@ -474,7 +506,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_create_match",
     {
       description:
-        "Open a 1v1 match between two addresses. Submits a multicall: vRNG request_random + actions_1v1.create_match_1v1.",
+        "Open a 1v1 match between two addresses. Submits a multicall: vRNG request_random + actions_1v1.create_match_1v1. After the tx lands, polls Torii for the assigned match_id (up to ~20s).",
       inputSchema: {
         player_a: z.string().min(3),
         player_b: z.string().min(3),
@@ -486,7 +518,16 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.actions1v1),
         call(ctx.config.contracts.actions1v1, "create_match_1v1", [player_a, player_b]),
       ]);
-      return { tx_hash: tx, player_a, player_b };
+      const match_id = await ctx.state.findLatestMatchForPlayers(player_a, player_b);
+      return match_id !== null
+        ? { tx_hash: tx, match_id, player_a, player_b }
+        : {
+            tx_hash: tx,
+            match_id: null,
+            player_a,
+            player_b,
+            warning: "match_id not yet indexed by Torii — query siege_get_match_state by id once it appears",
+          };
     },
   );
 
@@ -582,6 +623,16 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       requiresSigner: true,
     },
     async ({ match_id, skip_vrf }, ctx) => {
+      const state = await ctx.state.matchState(match_id);
+      const round = await ctx.state
+        .roundMoves(match_id, state.current_round)
+        .catch(() => undefined);
+      const phase = phaseFor(state, round);
+      if (phase !== "resolving") {
+        throw new Error(
+          `Round ${state.current_round} is in phase "${phase}" — both players must reveal before resolve_round can land.`,
+        );
+      }
       const calls = skip_vrf
         ? [call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)])]
         : [

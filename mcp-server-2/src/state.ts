@@ -117,6 +117,33 @@ export class StateClient {
     return (await resp.json()) as T[];
   }
 
+  /**
+   * Find the most recently created match between the given players, polling
+   * Torii until it indexes the new row or the deadline passes. Used right after
+   * `create_match_1v1` to surface the assigned match_id without making the
+   * caller query Torii themselves. Addresses are normalized to padded 32-byte
+   * lowercase hex (Torii's storage format).
+   */
+  async findLatestMatchForPlayers(
+    playerA: string,
+    playerB: string,
+    timeoutMs = 20000,
+  ): Promise<number | null> {
+    const norm = (a: string): string =>
+      "0x" + a.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+    const a = norm(playerA);
+    const b = norm(playerB);
+    const deadline = Date.now() + timeoutMs;
+    while (Date.now() < deadline) {
+      const rows = await this.sql<Record<string, unknown>>(
+        `SELECT match_id FROM "siege_dojo-MatchState1v1" WHERE player_a = '${a}' AND player_b = '${b}' ORDER BY internal_created_at DESC LIMIT 1`,
+      );
+      if (rows[0]) return toNum(rows[0].match_id);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    return null;
+  }
+
   async matchState(matchId: number): Promise<MatchStateData> {
     assertSafeInteger(matchId, "match_id");
     const rows = await this.sql<Record<string, unknown>>(
