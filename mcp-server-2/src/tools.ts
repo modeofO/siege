@@ -571,18 +571,36 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_resolve_round",
     {
       description:
-        "Resolve the current round once both players have revealed. Submits resolution_1v1.resolve_round.",
+        "Resolve the current round once both players have revealed. Submits resolution_1v1.resolve_round. Auto-retries without VRF wrap if the contract did not consume_random (happens when the round ends the match — no next-round modifiers to roll).",
       inputSchema: {
         match_id: z.number().int().nonnegative(),
+        skip_vrf: z
+          .boolean()
+          .default(false)
+          .describe("Skip the request_random wrap. Use when the round will end the match (no next-round modifiers needed)."),
       },
       requiresSigner: true,
     },
-    async ({ match_id }, ctx) => {
-      const tx = await execute(ctx.signer!, [
-        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.resolution1v1),
-        call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
-      ]);
-      return { tx_hash: tx, match_id };
+    async ({ match_id, skip_vrf }, ctx) => {
+      const calls = skip_vrf
+        ? [call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)])]
+        : [
+            vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.resolution1v1),
+            call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
+          ];
+      try {
+        const tx = await execute(ctx.signer!, calls);
+        return { tx_hash: tx, match_id, skip_vrf };
+      } catch (err) {
+        const reason = extractTxError(err);
+        if (!skip_vrf && /not consumed/i.test(reason)) {
+          const tx = await execute(ctx.signer!, [
+            call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
+          ]);
+          return { tx_hash: tx, match_id, skip_vrf: true, fallback: "match-ending round, retried without VRF" };
+        }
+        throw err;
+      }
     },
   );
 
