@@ -67,10 +67,23 @@ between turns.
 - `repair`: `0..3`
 - `nodes`: `[nc0, nc1, nc2]` — node contest pressure
 - `traps`: `[trap0, trap1, trap2]`, each `0` or `1`. Costs 2 budget per trap.
-- `ability_id`: `0` for none, otherwise a held ability token ID
+- `ability_id`: `0` for none, otherwise a staked ability token ID
 - `ability_target`: target gate `0..2` (only relevant when `ability_id != 0`)
 
 Total cost: `sum(attack) + sum(defense) + repair + sum(nodes) + 2*sum(traps)`
+
+### Abilities are single-use per match
+
+Each staked ability has a `used` flag in `MatchAbilities1v1` that flips
+true the first time you reveal with that `ability_id`. Activating it
+again — or activating an id you never staked — reverts the reveal with
+`Ability not available`. Because the commit hash binds `ability_id`, a
+mistaken commit cannot be salvaged: reveal will keep reverting until the
+deadline passes and you forfeit the round to `siege_force_timeout`.
+
+Always call `siege_my_abilities` *before* `siege_commit` to confirm the
+id is still available. Stakes from `MatchStakes1v1` show what's escrowed,
+but only `MatchAbilities1v1` shows what's still usable mid-match.
 
 ### Tools
 
@@ -79,6 +92,7 @@ Read (always available):
 - `siege_get_round_history` — recent revealed moves.
 - `siege_get_round_details` — full snapshot of a single round.
 - `siege_get_my_status` — your slot, budget, commit/reveal flags.
+- `siege_my_abilities` — staked abilities + per-stake used flags. Check before activating.
 - `siege_get_world_state` — world/resource config and parcel map.
 - `siege_get_parcel` — one parcel by id.
 - `siege_get_player_kingdom` — kingdom, reputation, presets, pillage, faction info.

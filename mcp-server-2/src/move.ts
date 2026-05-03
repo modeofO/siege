@@ -32,7 +32,9 @@ export const moveShape = {
     .min(0)
     .max(10)
     .default(0)
-    .describe("Activated ability token id, 0 for none"),
+    .describe(
+      "Activated ability token id, 0 for none. Each staked ability is single-use per match — once activated in any round, that id reverts on every subsequent reveal as 'Ability not available'. Call siege_my_abilities first to verify availability; the reveal hash is locked to whatever ability_id you commit, so committing an unavailable id forfeits the round.",
+    ),
   ability_target: z
     .number()
     .int()
