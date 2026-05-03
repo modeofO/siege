@@ -14,6 +14,9 @@ importers:
       '@cartridge/controller-wasm':
         specifier: ^0.9.6
         version: 0.9.6
+      '@dojoengine/torii-client':
+        specifier: ^1.8.2
+        version: 1.8.2
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
@@ -89,6 +92,12 @@ packages:
 
   '@coinbase/cdp-sdk@1.48.2':
     resolution: {integrity: sha512-phsHxF9q4CvF8H1b//aepxy8J/pdORT+btdqv7wbQ1YOi44QYfenima15N8Ok9lZE/XqY81BebsaBkyjqBJgig==}
+
+  '@dojoengine/torii-client@1.8.2':
+    resolution: {integrity: sha512-A1aJFkBXgEcr5oObIMeiYsfkPd2VOFHdSARZ6D2IIc0BARz7rMa395yPbj5s4ZkTvhmdsovna/IJvSk0r4pFUA==}
+
+  '@dojoengine/torii-wasm@1.8.2':
+    resolution: {integrity: sha512-zPbZOGxX6uVU+7uHQ25c2LRGWFg4p/x0wi1YnRPWWXpMOmMBduXUAZlDhSaKBND7Ui3coEoCHSvoVs8S3mj1YQ==}
 
   '@esbuild/aix-ppc64@0.27.7':
     resolution: {integrity: sha512-EKX3Qwmhz1eMdEJokhALr0YiD0lhQNwDqkPYyPhiSwKrh7/4KRjQc04sZ8db+5DVVnZ1LmbNDI1uAMPEUBnQPg==}
@@ -2286,6 +2295,12 @@ snapshots:
       - typescript
       - utf-8-validate
     optional: true
+
+  '@dojoengine/torii-client@1.8.2':
+    dependencies:
+      '@dojoengine/torii-wasm': 1.8.2
+
+  '@dojoengine/torii-wasm@1.8.2': {}
 
   '@esbuild/aix-ppc64@0.27.7':
     optional: true

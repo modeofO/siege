@@ -32,7 +32,7 @@ Cartridge session approval in their browser. Tell them what to do and stop.
 5. `siege_commit` — signs and submits. Returns `{ tx_hash, salt, move }`.
    **Remember the `salt` and the exact `move` object** — you'll need both for
    reveal. Stash them in your reasoning.
-6. Wait until both players have committed (poll `siege_get_my_status`).
+6. Wait until the subscribed match state resource shows both players have committed.
 7. `siege_reveal` with the same salt and move — signs and submits.
 8. After both reveal, anyone may call `siege_resolve_round` to advance.
 

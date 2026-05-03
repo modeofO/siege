@@ -38,6 +38,7 @@ const ROLE_B = 1;
 export interface ToolContext {
   config: Config;
   state: StateClient;
+  watchMatch: (matchId: number) => void;
   /** null until the Cartridge session is approved. Read tools work without it. */
   signer: WalletAccount | null;
   /** Address of the authenticated agent. Empty string until session is ready. */
@@ -532,6 +533,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       },
     },
     async ({ match_id }, ctx) => {
+      ctx.watchMatch(match_id);
       const state = await ctx.state.matchState(match_id);
       const nodes = await ctx.state.nodeStates(match_id);
       const round = await ctx.state.roundMoves(match_id, state.current_round).catch(() => undefined);
@@ -575,6 +577,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       },
     },
     async ({ match_id, num_rounds }, ctx) => {
+      ctx.watchMatch(match_id);
       const state = await ctx.state.matchState(match_id);
       const rounds = [];
       for (let r = Math.max(1, state.current_round - num_rounds + 1); r <= state.current_round; r++) {
@@ -628,6 +631,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       },
     },
     async ({ match_id, round }, ctx) => {
+      ctx.watchMatch(match_id);
       const state = await ctx.state.matchState(match_id);
       const r = round ?? state.current_round;
       const moves = await ctx.state.roundMoves(match_id, r);
@@ -693,6 +697,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       },
     },
     async ({ match_id, player_address }, ctx) => {
+      ctx.watchMatch(match_id);
       const address = player_address ?? ctx.agentAddress;
       if (!address) {
         throw new Error("player_address not supplied and the session is not yet authenticated.");
@@ -754,6 +759,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         call(ctx.config.contracts.actions1v1, "create_match_1v1", [player_a, player_b]),
       ]);
       const match_id = await ctx.state.findLatestMatchForPlayers(player_a, player_b);
+      if (match_id !== null) ctx.watchMatch(match_id);
       return match_id !== null
         ? { tx_hash: tx, match_id, player_a, player_b }
         : {
@@ -779,6 +785,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       requiresSigner: true,
     },
     async (args, ctx) => {
+      ctx.watchMatch(args.match_id);
       const move = moveAllocationFromInput(args as unknown as MoveInput);
       const total = validateMove(move, args.budget);
 
@@ -878,6 +885,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       requiresSigner: true,
     },
     async (args, ctx) => {
+      ctx.watchMatch(args.match_id);
       const move = moveAllocationFromInput(args as unknown as MoveInput);
       const total = validateMove(move, args.budget);
       const commitmentHash = buildMoveCommitHash1v1(args.salt, move);
@@ -914,6 +922,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       requiresSigner: true,
     },
     async ({ match_id, skip_vrf }, ctx) => {
+      ctx.watchMatch(match_id);
       const state = await ctx.state.matchState(match_id);
       const round = await ctx.state
         .roundMoves(match_id, state.current_round)
