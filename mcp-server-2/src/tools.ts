@@ -383,6 +383,46 @@ function shortTextFelt(value: string, label: string): string {
   return shortString.encodeShortString(value);
 }
 
+// Set once by registerSiegeTools so execute() can poll receipts without
+// every callsite having to thread rpcUrl through.
+let rpcUrlForReceipts: string | null = null;
+
+async function pollReceipt(rpcUrl: string, txHash: string): Promise<void> {
+  // Wait up to ~30s for the tx to leave pending and report a finality status.
+  // If execution_status is REVERTED, throw with the revert_reason — this is
+  // the on-chain revert that executeFromOutside silently swallows otherwise.
+  const deadline = Date.now() + 30_000;
+  let delay = 500;
+  while (Date.now() < deadline) {
+    const r = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        method: "starknet_getTransactionReceipt",
+        params: [txHash],
+        id: 1,
+      }),
+    }).catch(() => null);
+    const json = (await r?.json().catch(() => null)) as
+      | { result?: { finality_status?: string; execution_status?: string; revert_reason?: string } }
+      | null;
+    const result = json?.result;
+    if (result?.finality_status && result.finality_status !== "RECEIVED") {
+      if (result.execution_status === "REVERTED") {
+        const reason = result.revert_reason ?? "Transaction reverted on-chain";
+        const err = new Error(reason) as Error & { data?: unknown };
+        err.data = { execution_error: reason };
+        throw err;
+      }
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delay));
+    delay = Math.min(delay * 2, 2000);
+  }
+  // Timed out waiting for receipt — don't fail the call; tx may still land.
+}
+
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
   // The node SessionProvider's WalletAccount.execute tries executeFromOutside
   // (paymaster path) then silently falls back to direct execute, swallowing
@@ -400,6 +440,7 @@ async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
     calldata: CallData.toHex(c.calldata),
   }));
   const res = await controller.executeFromOutside(normalized);
+  if (rpcUrlForReceipts) await pollReceipt(rpcUrlForReceipts, res.transaction_hash);
   return res.transaction_hash;
 }
 
@@ -562,6 +603,7 @@ function makeRegister(reg: RegisterArgs) {
 // ── tools ────────────────────────────────────────────────────────────
 
 export function registerSiegeTools(reg: RegisterArgs): void {
+  rpcUrlForReceipts = reg.getCtx().config.rpcUrl;
   const register = makeRegister(reg);
 
   // ----- meta -----
@@ -791,6 +833,46 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         budget: budgetFor(nodes, role),
         vault_hp,
         max_useful_repair: Math.min(3, Math.max(0, MAX_VAULT_HP - vault_hp)),
+      };
+    },
+  );
+
+  register(
+    "siege_my_abilities",
+    {
+      description:
+        "Get the staked abilities for a player in a 1v1 match, with per-stake used flags. Use this before committing with ability_id != 0 to verify the ability is still available — committing a hash with an ability id you've already used (or never staked) locks you into a reveal that will revert with 'Ability not available'.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        player_address: z.string().optional().describe("Defaults to siege_whoami"),
+      },
+    },
+    async ({ match_id, player_address }, ctx) => {
+      ctx.watchMatch(match_id);
+      const address = player_address ?? ctx.agentAddress;
+      if (!address) {
+        throw new Error("player_address not supplied and the session is not yet authenticated.");
+      }
+      const state = await ctx.state.matchState(match_id);
+      const role = roleFor(state, address);
+      if (role === null) {
+        return { error: true, message: `Address ${address} is not a player in match ${match_id}` };
+      }
+      const ma = await ctx.state.matchAbilities(match_id).catch(() => null);
+      if (!ma) {
+        return { match_id, player_address: address, role, role_name: roleName(role), abilities: [] };
+      }
+      const side = role === ROLE_A ? ma.player_a : ma.player_b;
+      const abilities = side.abilities
+        .map((id, i) => ({ slot: i, id, used: side.used[i] }))
+        .filter((a) => a.id > 0)
+        .map((a) => ({ ...a, ...describeAbility(a.id, 0), available: !a.used }));
+      return {
+        match_id,
+        player_address: address,
+        role,
+        role_name: roleName(role),
+        abilities,
       };
     },
   );
