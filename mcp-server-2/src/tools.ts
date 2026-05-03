@@ -1646,10 +1646,23 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       },
     },
     async ({ match_id }, ctx) => {
-      const tx = await execute(ctx.signer!, [
+      const calls = [
+        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.resolution1v1),
         call(ctx.config.contracts.commitReveal1v1, "force_timeout", [String(match_id)]),
-      ]);
-      return { tx_hash: tx, match_id };
+      ];
+      try {
+        const tx = await execute(ctx.signer!, calls);
+        return { tx_hash: tx, match_id };
+      } catch (err) {
+        const raw = String((err as { data?: unknown })?.data ?? (err as Error)?.message ?? "");
+        if (raw.includes("not consumed")) {
+          const tx = await execute(ctx.signer!, [
+            call(ctx.config.contracts.commitReveal1v1, "force_timeout", [String(match_id)]),
+          ]);
+          return { tx_hash: tx, match_id, skip_vrf: true };
+        }
+        throw err;
+      }
     },
   );
 }
