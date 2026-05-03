@@ -50,13 +50,16 @@ Cartridge session.
 
 ```
 src/
-  index.ts      stdout redirect, .env load, transport, background bootstrap, polling
+  index.ts      stdout redirect, .env load, transport, background bootstrap, live resource notifications
   paths.ts      self-locating PROJECT_ROOT + tiny .env parser
   config.ts     env + manifest loading
   session.ts    Cartridge SessionProvider singleton
   policies.ts   allowed (contract, entrypoint) pairs
   tx.ts         Call helpers + revert-reason extraction
   state.ts      Torii SQL queries
+  torii.ts      generic Torii gRPC/query helpers
+  live.ts       Torii gRPC invalidation bridge
+  match-resource.ts SQL-backed MCP match state resource
   hash.ts       Poseidon move commitment
   move.ts       Zod move schema + budget validation
   tools.ts      tool definitions + registry

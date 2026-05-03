@@ -18,7 +18,6 @@ export interface Config {
   manifest: DojoManifest;
   contracts: SiegeContracts;
   sessionDir: string;
-  pollIntervalMs: number;
   vrfAddress: string;
   agentPromptPath: string;
 }
@@ -76,7 +75,6 @@ export function loadConfig(): Config {
     manifest,
     contracts,
     sessionDir: fromRoot(process.env.SESSION_DIR ?? ".cartridge"),
-    pollIntervalMs: Number(process.env.POLL_INTERVAL_MS ?? "5000"),
     vrfAddress: process.env.VRF_PROVIDER_ADDRESS ?? DEFAULT_VRF,
     agentPromptPath: fromRoot("agent-prompt.md"),
   };

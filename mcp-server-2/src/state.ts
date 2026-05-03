@@ -65,6 +65,26 @@ export interface RoundTrapsData {
   player_b: [number, number, number];
 }
 
+export interface MatchAbilitiesData {
+  match_id: number;
+  player_a: {
+    abilities: [number, number, number];
+    used: [boolean, boolean, boolean];
+  };
+  player_b: {
+    abilities: [number, number, number];
+    used: [boolean, boolean, boolean];
+  };
+}
+
+export interface MatchStakesData {
+  match_id: number;
+  player_a: [number, number, number];
+  player_b: [number, number, number];
+  stake_count: number;
+  settled: boolean;
+}
+
 function assertSafeInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer`);
@@ -256,6 +276,42 @@ export class StateClient {
       round: toNum(row.round),
       player_a: [toNum(row.a_trap0), toNum(row.a_trap1), toNum(row.a_trap2)],
       player_b: [toNum(row.b_trap0), toNum(row.b_trap1), toNum(row.b_trap2)],
+    };
+  }
+
+  async matchAbilities(matchId: number): Promise<MatchAbilitiesData> {
+    assertSafeInteger(matchId, "match_id");
+    const rows = await this.sql<Record<string, unknown>>(
+      `SELECT match_id, a_ability_1, a_ability_2, a_ability_3, b_ability_1, b_ability_2, b_ability_3, a_used_1, a_used_2, a_used_3, b_used_1, b_used_2, b_used_3 FROM "siege_dojo-MatchAbilities1v1" WHERE match_id = ${u64SqlKey(matchId)}`,
+    );
+    const row = rows[0];
+    if (!row) throw new Error(`Match abilities not found for match ${matchId}`);
+    return {
+      match_id: toNum(row.match_id),
+      player_a: {
+        abilities: [toNum(row.a_ability_1), toNum(row.a_ability_2), toNum(row.a_ability_3)],
+        used: [toBool(row.a_used_1), toBool(row.a_used_2), toBool(row.a_used_3)],
+      },
+      player_b: {
+        abilities: [toNum(row.b_ability_1), toNum(row.b_ability_2), toNum(row.b_ability_3)],
+        used: [toBool(row.b_used_1), toBool(row.b_used_2), toBool(row.b_used_3)],
+      },
+    };
+  }
+
+  async matchStakes(matchId: number): Promise<MatchStakesData> {
+    assertSafeInteger(matchId, "match_id");
+    const rows = await this.sql<Record<string, unknown>>(
+      `SELECT match_id, a_stake_1, a_stake_2, a_stake_3, b_stake_1, b_stake_2, b_stake_3, stake_count, settled FROM "siege_dojo-MatchStakes1v1" WHERE match_id = ${u64SqlKey(matchId)}`,
+    );
+    const row = rows[0];
+    if (!row) throw new Error(`Match stakes not found for match ${matchId}`);
+    return {
+      match_id: toNum(row.match_id),
+      player_a: [toNum(row.a_stake_1), toNum(row.a_stake_2), toNum(row.a_stake_3)],
+      player_b: [toNum(row.b_stake_1), toNum(row.b_stake_2), toNum(row.b_stake_3)],
+      stake_count: toNum(row.stake_count),
+      settled: toBool(row.settled),
     };
   }
 }

@@ -11,8 +11,7 @@
  *   4. Connect stdio transport (instant handshake).
  *   5. Bootstrap in background — open the Cartridge session. Auth URL surfaces
  *      via tool errors until the user approves.
- *   6. Optional polling sends notifications/resources/updated when a watched
- *      match advances phase.
+ *   6. Torii gRPC subscriptions invalidate watched match resources.
  */
 
 // ── stdout redirect — must come BEFORE any import that might log ──
@@ -55,6 +54,12 @@ import { z } from "zod";
 import { loadConfig, type Config } from "./config.js";
 import { getAccount } from "./session.js";
 import { StateClient } from "./state.js";
+import { startLiveStateBridge, type LiveStateBridge } from "./live.js";
+import {
+  buildMatchResourceSnapshot,
+  matchStateResourceUri,
+  registerMatchResources,
+} from "./match-resource.js";
 import { registerSiegeTools, type NotReadyState, type ToolContext } from "./tools.js";
 
 const log = (msg: string) => process.stderr.write(`[siege-mcp] ${msg}\n`);
@@ -73,12 +78,14 @@ async function main(): Promise<void> {
   let bootstrapError: string | null = null;
   let bootstrapPhase = "starting";
   let authUrl: string | null = null;
+  const liveBridges: LiveStateBridge[] = [];
 
   // Live ToolContext: getters so tool handlers see the freshest signer/address
   // as bootstrap progresses, without us having to re-register tools later.
   const ctx: ToolContext = {
     config,
     state,
+    watchMatch: (matchId) => watchMatch(state, matchId),
     get signer(): WalletAccount | null {
       return signer;
     },
@@ -95,7 +102,7 @@ async function main(): Promise<void> {
   // ── McpServer + registrations ──
   const serverCapabilities = ServerCapabilitiesSchema.parse({
     prompts: { listChanged: true },
-    resources: { listChanged: true },
+    resources: { listChanged: true, subscribe: true },
     tools: { listChanged: true },
   }) satisfies ServerCapabilities;
   const serverInfo = ImplementationSchema.parse({
@@ -117,11 +124,35 @@ async function main(): Promise<void> {
 
   registerSiegeTools({ server, getCtx: () => ctx, getNotReady });
   registerAgentResources(server, agentPrompt);
+  registerMatchResources({
+    server,
+    state,
+    getWatchedMatches: () => [...watchedMatches],
+    isSubscribed: (uri) => subscribedMatchResourceUris.has(uri),
+    subscribe: (uri) => subscribedMatchResourceUris.add(uri),
+    unsubscribe: (uri) => subscribedMatchResourceUris.delete(uri),
+    watchMatch: (matchId) => watchMatch(state, matchId),
+  });
 
   // ── transport — instant handshake ──
   const transport = new StdioServerTransport();
   await server.connect(transport);
   log("stdio transport connected — tools advertised. Bootstrapping in background.");
+
+  void startLiveStateBridge({
+    server,
+    state,
+    config,
+    isWatched: (matchId) => watchedMatches.has(matchId),
+    notifyMatchChanged,
+    log,
+  })
+    .then((bridge) => {
+      liveBridges.push(bridge);
+    })
+    .catch((err: unknown) => {
+      log(`Torii gRPC subscription unavailable; live match updates will not be pushed: ${errorMessage(err)}`);
+    });
 
   // ── background bootstrap ──
   void (async () => {
@@ -152,8 +183,6 @@ async function main(): Promise<void> {
       bootstrapDone = true;
       bootstrapPhase = "ready";
       log(`session ready — agent address: ${agentAddress}`);
-
-      startPolling(server, state, config);
     } catch (err: any) {
       bootstrapError = err?.message ?? String(err);
       log(`bootstrap failed: ${bootstrapError}`);
@@ -212,60 +241,39 @@ function registerAgentResources(server: McpServer, agentPrompt: string): void {
   );
 }
 
-// ── polling — sends notifications/resources/updated as match phase changes ─
-
-interface PollSnapshot {
-  currentRound: number;
-  commitCount: number;
-  revealCount: number;
-  status: string;
-}
+// ── watched match resource invalidation ─
 
 const watchedMatches = new Set<number>();
-const pollSnapshots = new Map<number, PollSnapshot>();
+const subscribedMatchResourceUris = new Set<string>();
+const matchResourceSnapshots = new Map<number, string>();
 
-function startPolling(server: McpServer, state: StateClient, config: Config): void {
-  setInterval(() => {
-    for (const matchId of watchedMatches) {
-      void pollMatch(server, state, matchId).catch(() => undefined);
-    }
-  }, config.pollIntervalMs);
-}
-
-async function pollMatch(server: McpServer, state: StateClient, matchId: number): Promise<void> {
-  const ms = await state.matchState(matchId);
-  const round = await state.roundMoves(matchId, ms.current_round).catch(() => undefined);
-
-  const next: PollSnapshot = {
-    currentRound: ms.current_round,
-    commitCount: round?.commit_count ?? 0,
-    revealCount: round?.reveal_count ?? 0,
-    status: ms.status,
-  };
-  const prev = pollSnapshots.get(matchId);
-
-  if (prev) {
-    const notify = async (suffix: string) => {
-      // Underlying low-level Server is exposed as `.server` for direct
-      // notification dispatch.
-      await server.server.notification({
-        method: "notifications/resources/updated",
-        params: { uri: `siege://match-1v1/${matchId}/${suffix}` },
-      });
-    };
-
-    if (next.currentRound > prev.currentRound) await notify("round_started");
-    if (next.commitCount === 2 && prev.commitCount < 2) await notify("all_committed");
-    if (next.revealCount === 2 && prev.revealCount < 2) await notify("ready_to_resolve");
-    if (next.status === "Finished" && prev.status !== "Finished") await notify("match_ended");
+export async function notifyMatchChanged(server: McpServer, state: StateClient, matchId: number): Promise<void> {
+  const changed = await updateMatchSnapshot(state, matchId);
+  const uri = matchStateResourceUri(matchId);
+  if (changed && subscribedMatchResourceUris.has(uri)) {
+    await server.server.sendResourceUpdated({ uri });
   }
-
-  pollSnapshots.set(matchId, next);
 }
 
-/** Exposed so future tools can opt a match into polling notifications. */
-export function watchMatch(matchId: number): void {
+/** Exposed so tools/resources can opt a match into live notifications. */
+export function watchMatch(state: StateClient, matchId: number): void {
+  if (watchedMatches.has(matchId)) return;
   watchedMatches.add(matchId);
+  void updateMatchSnapshot(state, matchId).catch((err: unknown) => {
+    log(`failed to seed match ${matchId} snapshot: ${errorMessage(err)}`);
+  });
+}
+
+async function updateMatchSnapshot(state: StateClient, matchId: number): Promise<boolean> {
+  const snapshot = await buildMatchResourceSnapshot(state, matchId);
+  const next = JSON.stringify({ ...snapshot, updated_at: undefined });
+  const prev = matchResourceSnapshots.get(matchId);
+  matchResourceSnapshots.set(matchId, next);
+  return prev !== undefined && prev !== next;
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 main().catch((err) => {
