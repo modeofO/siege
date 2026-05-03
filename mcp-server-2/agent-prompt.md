@@ -85,6 +85,63 @@ Always call `siege_my_abilities` *before* `siege_commit` to confirm the
 id is still available. Stakes from `MatchStakes1v1` show what's escrowed,
 but only `MatchAbilities1v1` shows what's still usable mid-match.
 
+### What's at stake in a staked match
+
+A staked 1v1 is the gateway to land — not just a duel. Read
+`siege_get_player_kingdom` and `siege_get_world_state` *before round 1*
+so you know what victory is for.
+
+If you **win**:
+- Opponent's escrowed ability tokens get re-minted to you on settle.
+- You become eligible to call `siege_claim_parcel` for ONE unclaimed
+  parcel that is hex-adjacent to one of your existing parcels (homes or
+  prior conquered land). You choose the parcel's resource type
+  (`0` Forge / `1` Quarry / `2` Grove). Subject to your tier's parcel cap
+  for non-home parcels (Polis 2, Strategos 5, Hegemonia 8, Basileia 12).
+- `PlayerKingdom.total_wins++` (path to tier upgrade), reputation
+  bracket may shift, head-to-head `MatchRecord` updates.
+- If your territory borders any of the opponent's home parcels, you
+  earn a 24-hour `PillageEligibility` to call `siege_initiate_pillage`
+  on one of those homes and siphon its drip until they break it.
+
+If you **lose**: the opponent gets your escrowed abilities and the same
+parcel / pillage eligibilities against you. A draw returns escrowed
+abilities to both sides and grants neither parcel nor pillage rights.
+
+### After the match — settle, then claim
+
+When `phase="finished"` arrives:
+
+1. Either player calls `siege_settle_match`. Whoever lands first wins
+   the race; the second call reverts with `Already settled` (harmless).
+   Settling transfers staked abilities to the winner and mints a small
+   resource bonus for every parcel each player owns.
+2. If you won and want territory:
+   - `siege_get_world_state` to see the parcel grid and ownership.
+   - `siege_get_player_kingdom` to confirm `parcel_count - 3` is below
+     your tier's cap.
+   - Pick an unclaimed parcel (`owner == 0x0`) hex-adjacent to one of
+     your existing parcels.
+   - Call `siege_claim_parcel(match_id, parcel_id, parcel_type)`.
+     `parcel_type` is your choice — claimed parcels are typed at claim
+     time, not pre-typed on the map.
+3. If `siege_get_player_kingdom` shows a fresh `pillage_eligibility`,
+   call `siege_initiate_pillage(match_id, home_parcel_id)` within the
+   24-hour window, then `siege_claim_pillage_drip` periodically to
+   siphon resources from the targeted home parcel.
+
+### Plan claims at match start, not match end
+
+Don't wait until victory to figure out what to claim. Before round 1:
+- `siege_get_player_kingdom` — your parcels, tier, cap remaining.
+- `siege_get_world_state` — full parcel grid with positions and owners.
+- Identify candidate unclaimed parcels adjacent to your territory and
+  candidate enemy home parcels you'd be eligible to pillage.
+
+If you can't find an adjacent unclaimed parcel, the parcel reward is
+unreachable this match — adjust your risk calculus accordingly. The
+abilities and tier-progression rewards still apply.
+
 ### Tools
 
 Read (always available):
