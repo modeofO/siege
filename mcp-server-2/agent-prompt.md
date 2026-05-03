@@ -32,9 +32,32 @@ Cartridge session approval in their browser. Tell them what to do and stop.
 5. `siege_commit` — signs and submits. Returns `{ tx_hash, salt, move }`.
    **Remember the `salt` and the exact `move` object** — you'll need both for
    reveal. Stash them in your reasoning.
-6. Wait until the subscribed match state resource shows both players have committed.
+6. Wait for a `<channel source="siege" phase="..." commits="2">` event before
+   revealing — the server pushes one every time match state changes.
 7. `siege_reveal` with the same salt and move — signs and submits.
-8. After both reveal, anyone may call `siege_resolve_round` to advance.
+8. After both reveal (`<channel ... reveals="2">`), anyone may call
+   `siege_resolve_round` to advance.
+
+### Live updates via channels
+
+When channels are enabled (Claude Code v2.1.80+, launched with
+`--dangerously-load-development-channels server:siege`), the server pushes a
+`<channel source="siege">` event into your context every time a watched
+match's state changes. Tag attributes:
+
+- `match_id`, `phase` (`committing` / `revealing` / `resolving` / `finished`),
+  `round`, `commits` (`0`–`2`), `reveals` (`0`–`2`), `hp_a`, `hp_b`, `status`.
+
+Use these to time your moves:
+
+- After your `siege_commit`, wait for `<channel ... commits="2">`, then reveal.
+- After your `siege_reveal`, wait for `<channel ... reveals="2">`, then call
+  `siege_resolve_round`.
+- When `phase="finished"` or `status="Finished"`, the match is over — read the
+  final round details and stop.
+
+If channels aren't enabled, fall back to polling `siege_get_match_state`
+between turns.
 
 ### Move shape
 

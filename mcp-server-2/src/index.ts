@@ -59,6 +59,7 @@ import {
   buildMatchResourceSnapshot,
   matchStateResourceUri,
   registerMatchResources,
+  type MatchResourceSnapshot,
 } from "./match-resource.js";
 import { registerSiegeTools, type NotReadyState, type ToolContext } from "./tools.js";
 
@@ -104,6 +105,10 @@ async function main(): Promise<void> {
     prompts: { listChanged: true },
     resources: { listChanged: true, subscribe: true },
     tools: { listChanged: true },
+    // Claude Code channel push: lets the server pump match-state diffs straight
+    // into the conversation as <channel source="siege" ...> tags, since the
+    // host doesn't act on standard MCP `notifications/resources/updated`.
+    experimental: { "claude/channel": {} },
   }) satisfies ServerCapabilities;
   const serverInfo = ImplementationSchema.parse({
     name: "siege-mcp-server-2",
@@ -248,11 +253,17 @@ const subscribedMatchResourceUris = new Set<string>();
 const matchResourceSnapshots = new Map<number, string>();
 
 export async function notifyMatchChanged(server: McpServer, state: StateClient, matchId: number): Promise<void> {
-  const changed = await updateMatchSnapshot(state, matchId);
+  const { changed, snapshot } = await updateMatchSnapshot(state, matchId);
+  if (!changed) return;
+
   const uri = matchStateResourceUri(matchId);
-  if (changed && subscribedMatchResourceUris.has(uri)) {
+  if (subscribedMatchResourceUris.has(uri)) {
     await server.server.sendResourceUpdated({ uri });
   }
+
+  await pushChannelEvent(server, snapshot).catch((err: unknown) => {
+    log(`channel notification failed for match ${matchId}: ${errorMessage(err)}`);
+  });
 }
 
 /** Exposed so tools/resources can opt a match into live notifications. */
@@ -264,12 +275,42 @@ export function watchMatch(state: StateClient, matchId: number): void {
   });
 }
 
-async function updateMatchSnapshot(state: StateClient, matchId: number): Promise<boolean> {
+async function updateMatchSnapshot(
+  state: StateClient,
+  matchId: number,
+): Promise<{ changed: boolean; snapshot: MatchResourceSnapshot }> {
   const snapshot = await buildMatchResourceSnapshot(state, matchId);
   const next = JSON.stringify({ ...snapshot, updated_at: undefined });
   const prev = matchResourceSnapshots.get(matchId);
   matchResourceSnapshots.set(matchId, next);
-  return prev !== undefined && prev !== next;
+  return { changed: prev !== undefined && prev !== next, snapshot };
+}
+
+async function pushChannelEvent(server: McpServer, snapshot: MatchResourceSnapshot): Promise<void> {
+  const content =
+    `match ${snapshot.match_id} round ${snapshot.current_round} ${snapshot.phase}: ` +
+    `${snapshot.commits}/2 committed, ${snapshot.reveals}/2 revealed — ` +
+    `HP ${snapshot.vault_a_hp}/${snapshot.vault_b_hp}`;
+  // Cast: the SDK's notification type union doesn't statically know about the
+  // `notifications/claude/channel` extension method, but the underlying
+  // Protocol.notification accepts any { method, params } and the server's
+  // assertNotificationCapability falls through for unknown methods.
+  await (server.server.notification as (n: unknown) => Promise<void>)({
+    method: "notifications/claude/channel",
+    params: {
+      content,
+      meta: {
+        match_id: String(snapshot.match_id),
+        phase: snapshot.phase,
+        round: String(snapshot.current_round),
+        commits: String(snapshot.commits),
+        reveals: String(snapshot.reveals),
+        hp_a: String(snapshot.vault_a_hp),
+        hp_b: String(snapshot.vault_b_hp),
+        status: snapshot.status,
+      },
+    },
+  });
 }
 
 function errorMessage(err: unknown): string {
