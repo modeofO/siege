@@ -18,6 +18,7 @@ interface SessionConfig {
   chainId: string;
   contracts: SiegeContracts;
   vrfAddress: string;
+  abilityTokenAddress: string | null;
   basePath: string;
 }
 
@@ -33,7 +34,7 @@ const POLL_TIMEOUT_MS = 5 * 60 * 1_000;
 function getProvider(cfg: SessionConfig): SessionProvider {
   if (provider) return provider;
 
-  const policies = buildPolicies(cfg.contracts, cfg.vrfAddress);
+  const policies = buildPolicies(cfg.contracts, cfg.vrfAddress, cfg.abilityTokenAddress);
 
   // The WASM session expects chainId as a felt, not "SN_SEPOLIA".
   const chainIdFelt = shortString.encodeShortString(cfg.chainId);

@@ -30,8 +30,12 @@ const m = (entrypoint: string, description?: string): Method => ({
 
 const DOJO_METHODS: Method[] = [m("dojo_name"), m("world_dispatcher")];
 
-export function buildPolicies(contracts: SiegeContracts, vrfAddress: string): SessionPolicies {
-  return {
+export function buildPolicies(
+  contracts: SiegeContracts,
+  vrfAddress: string,
+  abilityTokenAddress: string | null = null,
+): SessionPolicies {
+  const policies: SessionPolicies = {
     contracts: {
       [contracts.actions1v1]: {
         methods: [
@@ -47,9 +51,36 @@ export function buildPolicies(contracts: SiegeContracts, vrfAddress: string): Se
           ...DOJO_METHODS,
         ],
       },
+      [contracts.conquest]: {
+        methods: [
+          m("set_preset_defense", "Set one preset defense slot for async conquest"),
+          m("initiate_conquest", "Attack an adjacent non-home parcel using preset-defense resolution"),
+          ...DOJO_METHODS,
+        ],
+      },
       [contracts.resolution1v1]: {
         methods: [
           m("resolve_round", "Resolve a round once both players have revealed"),
+          ...DOJO_METHODS,
+        ],
+      },
+      [contracts.worldSystem]: {
+        methods: [
+          m("register_player", "Register a kingdom and claim three home parcels"),
+          m("claim_drip", "Claim resource drip from owned home parcels"),
+          m("upgrade_kingdom", "Upgrade kingdom tier after meeting win and resource requirements"),
+          m("claim_parcel", "Claim an adjacent parcel after a settled staked-match win"),
+          m("create_staked_match", "Create a 1v1 match with ability stakes"),
+          m("join_staked_match", "Join a pending staked match with ability stakes"),
+          m("settle_match", "Settle a finished staked match and distribute rewards"),
+          m("initiate_pillage", "Start pillaging an eligible loser home parcel"),
+          m("claim_pillage_drip", "Claim resource drip from an active pillage"),
+          m("create_faction", "Create a faction"),
+          m("invite_member", "Invite a player to your faction"),
+          m("accept_invite", "Accept a faction invite"),
+          m("leave_faction", "Leave or dissolve your current faction"),
+          m("kick_member", "Kick a member from your faction"),
+          m("set_faction_reinforcement", "Toggle faction reinforcement for defending parcels"),
           ...DOJO_METHODS,
         ],
       },
@@ -58,4 +89,12 @@ export function buildPolicies(contracts: SiegeContracts, vrfAddress: string): Se
       },
     },
   };
+
+  if (abilityTokenAddress) {
+    policies.contracts[abilityTokenAddress] = {
+      methods: [m("set_approval_for_all", "Approve or revoke world_system as ability-token operator")],
+    };
+  }
+
+  return policies;
 }

@@ -1,8 +1,9 @@
-## Siege 1v1 Agent Instructions
+## Siege Agent Instructions
 
-You are playing Siege, a Starknet / Dojo turn-based 1v1 strategy game. This MCP
-server holds a Cartridge session key on your behalf and submits every move
-on-chain itself — you do NOT need a separate wallet tool.
+You are playing Siege, a Starknet / Dojo strategy game with 1v1 match combat
+and an on-chain world metagame for kingdoms, parcels, pillaging, conquest, and
+factions. This MCP server holds a Cartridge session key on your behalf and
+submits transactions on-chain itself — you do NOT need a separate wallet tool.
 
 ### How transactions work
 
@@ -78,6 +79,12 @@ Read (always available):
 - `siege_get_round_history` — recent revealed moves.
 - `siege_get_round_details` — full snapshot of a single round.
 - `siege_get_my_status` — your slot, budget, commit/reveal flags.
+- `siege_get_world_state` — world/resource config and parcel map.
+- `siege_get_parcel` — one parcel by id.
+- `siege_get_player_kingdom` — kingdom, reputation, presets, pillage, faction info.
+- `siege_get_staked_match` — match state plus staked ability escrow.
+- `siege_get_pillage_status` — active pillages and open eligibilities.
+- `siege_get_factions` — factions, members, and pending invites.
 
 Write (require Cartridge session — first run prompts auth in browser):
 - `siege_whoami` — your authenticated address.
@@ -86,6 +93,18 @@ Write (require Cartridge session — first run prompts auth in browser):
 - `siege_reveal` — submit reveal with the salt and move you committed.
 - `siege_resolve_round` — multicall (VRF + resolve_round). Either player may call.
 - `siege_force_timeout` — force timeout once a deadline elapses.
+- `siege_register_player` — register a kingdom and claim three home parcels.
+- `siege_claim_drip` — claim resource drip from home parcels.
+- `siege_upgrade_kingdom` — upgrade tier after meeting win/resource requirements.
+- `siege_set_ability_operator_approval` — approve world_system to escrow abilities.
+- `siege_create_staked_match` / `siege_join_staked_match` — stake abilities into a pending 1v1.
+- `siege_settle_match` — settle finished staked matches.
+- `siege_claim_parcel` — claim adjacent land after a settled win.
+- `siege_set_preset_defense` — configure async conquest defense.
+- `siege_initiate_conquest` — attack adjacent non-home parcels.
+- `siege_initiate_pillage` / `siege_claim_pillage_drip` — use pillage eligibilities.
+- `siege_create_faction`, `siege_invite_faction_member`, `siege_accept_faction_invite`,
+  `siege_leave_faction`, `siege_kick_faction_member`, `siege_set_faction_reinforcement`.
 
 ### Strategy notes
 

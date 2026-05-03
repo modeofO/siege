@@ -19,6 +19,7 @@ export interface Config {
   contracts: SiegeContracts;
   sessionDir: string;
   vrfAddress: string;
+  abilityTokenAddress: string | null;
   agentPromptPath: string;
 }
 
@@ -30,7 +31,9 @@ export interface DojoManifest {
 export interface SiegeContracts {
   actions1v1: string;
   commitReveal1v1: string;
+  conquest: string;
   resolution1v1: string;
+  worldSystem: string;
 }
 
 function required(name: string, value: string | undefined): string {
@@ -64,7 +67,9 @@ export function loadConfig(): Config {
   const contracts: SiegeContracts = {
     actions1v1: findContract(manifest, "siege_dojo-actions_1v1"),
     commitReveal1v1: findContract(manifest, "siege_dojo-commit_reveal_1v1"),
+    conquest: findContract(manifest, "siege_dojo-conquest"),
     resolution1v1: findContract(manifest, "siege_dojo-resolution_1v1"),
+    worldSystem: findContract(manifest, "siege_dojo-world_system"),
   };
 
   return {
@@ -76,6 +81,7 @@ export function loadConfig(): Config {
     contracts,
     sessionDir: fromRoot(process.env.SESSION_DIR ?? ".cartridge"),
     vrfAddress: process.env.VRF_PROVIDER_ADDRESS ?? DEFAULT_VRF,
+    abilityTokenAddress: process.env.ABILITY_TOKEN_ADDRESS ?? null,
     agentPromptPath: fromRoot("agent-prompt.md"),
   };
 }

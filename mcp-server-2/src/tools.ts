@@ -23,7 +23,7 @@ import type {
   ShapeOutput,
   ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import { addAddressPadding, CallData, type Call, type WalletAccount } from "starknet";
+import { addAddressPadding, CallData, shortString, type Call, type WalletAccount } from "starknet";
 import { z } from "zod";
 
 import type { Config } from "./config.js";
@@ -129,6 +129,8 @@ const MOD_NARROW_PASS = 1;
 const MOD_MIRROR = 2;
 const MAX_VAULT_HP = 50;
 const MAX_ROUNDS = 10;
+const DEFENDER_PRESET_BUDGET = 12;
+const CONQUEST_ATTACK_BUDGET = 10;
 
 const min3 = (n: number) => (n > 3 ? 3 : n);
 
@@ -326,6 +328,59 @@ function statusReason(state: {
     return `draw — equal HP at round ${state.current_round} timeout`;
   }
   return null;
+}
+
+const u8Schema = z.number().int().min(0).max(255);
+const parcelTypeSchema = z.number().int().min(0).max(2);
+const abilityIdSchema = z.number().int().min(0).max(10);
+const abilityStakeSchema = z.array(z.number().int().min(1).max(10)).min(1).max(3);
+
+function feltArray(values: number[]): string[] {
+  return [String(values.length), ...values.map(String)];
+}
+
+function validateAllocationBudget(values: number[], budget: number, label: string): number {
+  const total = values.reduce((sum, value) => sum + value, 0);
+  if (total > budget) {
+    throw new Error(`${label} budget exceeded: ${total}/${budget}`);
+  }
+  return total;
+}
+
+function tierAbilitySlots(tier: number): number {
+  if (tier === 0) return 1;
+  if (tier === 1) return 2;
+  if (tier === 2) return 3;
+  if (tier === 3) return 4;
+  return 1;
+}
+
+function tierParcelCap(tier: number): number {
+  if (tier === 0) return 2;
+  if (tier === 1) return 5;
+  if (tier === 2) return 8;
+  if (tier === 3) return 12;
+  return 2;
+}
+
+function tierPresetCount(tier: number): number {
+  if (tier === 0) return 1;
+  if (tier === 1) return 2;
+  if (tier === 2) return 3;
+  if (tier === 3) return 4;
+  return 1;
+}
+
+function tierWinsRequired(tier: number): number {
+  if (tier === 1) return 10;
+  if (tier === 2) return 30;
+  if (tier === 3) return 60;
+  return 0;
+}
+
+function shortTextFelt(value: string, label: string): string {
+  if (value.length > 31) throw new Error(`${label} must be 31 characters or fewer`);
+  return shortString.encodeShortString(value);
 }
 
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
@@ -740,7 +795,618 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     },
   );
 
+  register(
+    "siege_get_world_state",
+    {
+      description:
+        "Get metagame world config, resource-token config, and a parcel list for land/kingdom planning.",
+      inputSchema: {
+        limit: z.number().int().positive().max(500).default(200),
+      },
+    },
+    async ({ limit }, ctx) => {
+      const [world, resources, parcels] = await Promise.all([
+        ctx.state.worldConfig(),
+        ctx.state.resourceConfig().catch(() => null),
+        ctx.state.parcels(limit),
+      ]);
+      return {
+        world,
+        resources,
+        parcels,
+        parcel_type_legend: {
+          0: "Forge: iron + linen",
+          1: "Quarry: stone + wood",
+          2: "Grove: ember + seeds",
+          255: "Untyped/unassigned",
+        },
+      };
+    },
+  );
+
+  register(
+    "siege_get_parcel",
+    {
+      description: "Get one land parcel by id, including position, type, owner, and home flag.",
+      inputSchema: {
+        parcel_id: z.number().int().nonnegative(),
+      },
+    },
+    async ({ parcel_id }, ctx) => ({ parcel: await ctx.state.parcel(parcel_id) }),
+  );
+
+  register(
+    "siege_get_player_kingdom",
+    {
+      description:
+        "Get a player's kingdom, reputation, preset defenses, faction membership, pending invites, active pillages, and pillage eligibility. Defaults to the authenticated agent.",
+      inputSchema: {
+        player_address: z.string().optional().describe("Defaults to siege_whoami"),
+      },
+    },
+    async ({ player_address }, ctx) => {
+      const player = player_address ?? ctx.agentAddress;
+      if (!player) throw new Error("player_address not supplied and the session is not yet authenticated.");
+      const [kingdom, reputation, presets, member, invites, pillages, eligibilities] = await Promise.all([
+        ctx.state.playerKingdom(player),
+        ctx.state.playerReputation(player),
+        ctx.state.presetDefense(player),
+        ctx.state.factionMember(player),
+        ctx.state.factionInvitesFor(player),
+        ctx.state.activePillagesFor(player),
+        ctx.state.pillageEligibilitiesFor(player),
+      ]);
+      const faction = member?.faction_id ? await ctx.state.faction(member.faction_id) : null;
+      const now = Math.floor(Date.now() / 1000);
+      return {
+        player,
+        kingdom,
+        derived: kingdom
+          ? {
+              home_parcels: [kingdom.home_0, kingdom.home_1, kingdom.home_2],
+              non_home_parcel_count: Math.max(0, kingdom.parcel_count - 3),
+              parcel_cap: tierParcelCap(kingdom.tier),
+              ability_slots: tierAbilitySlots(kingdom.tier),
+              preset_slots: tierPresetCount(kingdom.tier),
+              next_tier: kingdom.tier < 3 ? kingdom.tier + 1 : null,
+              wins_required_for_next_tier:
+                kingdom.tier < 3 ? tierWinsRequired(kingdom.tier + 1) : null,
+            }
+          : null,
+        reputation,
+        preset_defense: presets,
+        faction: { member, faction },
+        pending_invites: invites.filter((invite) => !invite.used),
+        active_pillages: pillages.filter((pillage) => pillage.active && pillage.expires_at > now),
+        pillage_eligibilities: eligibilities.filter((eligibility) => !eligibility.used && eligibility.expires_at > now),
+      };
+    },
+  );
+
+  register(
+    "siege_get_staked_match",
+    {
+      description:
+        "Get 1v1 match state plus staked ability escrow state for create/join/settle/claim-parcel workflows.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+      },
+    },
+    async ({ match_id }, ctx) => {
+      ctx.watchMatch(match_id);
+      const [state, stakes, abilities] = await Promise.all([
+        ctx.state.matchState(match_id),
+        ctx.state.matchStakes(match_id).catch(() => null),
+        ctx.state.matchAbilities(match_id).catch(() => null),
+      ]);
+      return {
+        match: {
+          match_id,
+          status: state.status,
+          status_reason: statusReason(state),
+          player_a: state.player_a,
+          player_b: state.player_b,
+          vault_a_hp: state.vault_a_hp,
+          vault_b_hp: state.vault_b_hp,
+          current_round: state.current_round,
+        },
+        stakes,
+        abilities,
+      };
+    },
+  );
+
+  register(
+    "siege_get_pillage_status",
+    {
+      description:
+        "Get pillage state by home parcel or, by default, active pillages and open eligibilities for the authenticated agent.",
+      inputSchema: {
+        home_parcel_id: z.number().int().nonnegative().optional(),
+        player_address: z.string().optional().describe("Defaults to siege_whoami when home_parcel_id is omitted"),
+      },
+    },
+    async ({ home_parcel_id, player_address }, ctx) => {
+      if (home_parcel_id !== undefined) {
+        return { pillage: await ctx.state.pillage(home_parcel_id) };
+      }
+      const player = player_address ?? ctx.agentAddress;
+      if (!player) throw new Error("player_address not supplied and the session is not yet authenticated.");
+      const [pillages, eligibilities] = await Promise.all([
+        ctx.state.activePillagesFor(player),
+        ctx.state.pillageEligibilitiesFor(player),
+      ]);
+      const now = Math.floor(Date.now() / 1000);
+      return {
+        player,
+        active_pillages: pillages.filter((pillage) => pillage.active && pillage.expires_at > now),
+        pillage_eligibilities: eligibilities.filter((eligibility) => !eligibility.used && eligibility.expires_at > now),
+      };
+    },
+  );
+
+  register(
+    "siege_get_factions",
+    {
+      description:
+        "List factions, inspect a faction's members, or inspect a player's faction membership and pending invites.",
+      inputSchema: {
+        faction_id: z.number().int().positive().optional(),
+        player_address: z.string().optional(),
+        limit: z.number().int().positive().max(200).default(50),
+      },
+    },
+    async ({ faction_id, player_address, limit }, ctx) => {
+      if (faction_id !== undefined) {
+        const [faction, members] = await Promise.all([
+          ctx.state.faction(faction_id),
+          ctx.state.factionMembers(faction_id),
+        ]);
+        return { faction_id, faction, members };
+      }
+      if (player_address) {
+        const [member, invites] = await Promise.all([
+          ctx.state.factionMember(player_address),
+          ctx.state.factionInvitesFor(player_address),
+        ]);
+        const faction = member?.faction_id ? await ctx.state.faction(member.faction_id) : null;
+        return { player_address, member, faction, pending_invites: invites.filter((invite) => !invite.used) };
+      }
+      return { factions: await ctx.state.factions(limit) };
+    },
+  );
+
   // ----- writes -----
+
+  register(
+    "siege_register_player",
+    {
+      description:
+        "Register the authenticated agent's kingdom and claim three home parcels. home_types are 0=Forge, 1=Quarry, 2=Grove.",
+      inputSchema: {
+        home_types: z.array(parcelTypeSchema).length(3).default([0, 1, 2]),
+      },
+      requiresSigner: true,
+    },
+    async ({ home_types }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "register_player", feltArray(home_types)),
+      ]);
+      return { tx_hash: tx, home_types };
+    },
+  );
+
+  register(
+    "siege_claim_drip",
+    {
+      description:
+        "Claim resource drip for the authenticated agent's home parcels. Active pillaged homes are skipped by the contract.",
+      inputSchema: {},
+      requiresSigner: true,
+    },
+    async (_args, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "claim_drip", []),
+      ]);
+      return { tx_hash: tx };
+    },
+  );
+
+  register(
+    "siege_upgrade_kingdom",
+    {
+      description:
+        "Upgrade the authenticated agent's kingdom tier if win and resource requirements are met.",
+      inputSchema: {},
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async (_args, ctx) => {
+      const before = ctx.agentAddress ? await ctx.state.playerKingdom(ctx.agentAddress) : null;
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "upgrade_kingdom", []),
+      ]);
+      return {
+        tx_hash: tx,
+        previous_tier: before?.tier ?? null,
+        expected_tier: before ? before.tier + 1 : null,
+      };
+    },
+  );
+
+  register(
+    "siege_create_staked_match",
+    {
+      description:
+        "Create a pending staked 1v1 match against an opponent, escrowing 1-3 ability token IDs. Requires AbilityToken approval for world_system before calling.",
+      inputSchema: {
+        opponent: z.string().min(3),
+        abilities: abilityStakeSchema.describe("Ability token IDs to stake, each 1-10"),
+      },
+      requiresSigner: true,
+    },
+    async ({ opponent, abilities }, ctx) => {
+      const kingdom = ctx.agentAddress ? await ctx.state.playerKingdom(ctx.agentAddress) : null;
+      if (kingdom && abilities.length > tierAbilitySlots(kingdom.tier)) {
+        throw new Error(
+          `Too many abilities for tier ${kingdom.tier}: ${abilities.length}/${tierAbilitySlots(kingdom.tier)}`,
+        );
+      }
+      const tx = await execute(ctx.signer!, [
+        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.actions1v1),
+        call(ctx.config.contracts.worldSystem, "create_staked_match", [
+          opponent,
+          ...feltArray(abilities),
+        ]),
+      ]);
+      const match_id = ctx.agentAddress
+        ? await ctx.state.findLatestMatchForPlayers(ctx.agentAddress, opponent)
+        : null;
+      if (match_id !== null) ctx.watchMatch(match_id);
+      return {
+        tx_hash: tx,
+        match_id,
+        opponent,
+        abilities,
+        warning:
+          match_id === null
+            ? "match_id not yet indexed by Torii — query siege_get_staked_match once it appears"
+            : undefined,
+      };
+    },
+  );
+
+  register(
+    "siege_join_staked_match",
+    {
+      description:
+        "Join a pending staked 1v1 match as player_b, escrowing 1-3 ability token IDs. Requires AbilityToken approval for world_system before calling.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        abilities: abilityStakeSchema.describe("Ability token IDs to stake, each 1-10"),
+      },
+      requiresSigner: true,
+    },
+    async ({ match_id, abilities }, ctx) => {
+      ctx.watchMatch(match_id);
+      const kingdom = ctx.agentAddress ? await ctx.state.playerKingdom(ctx.agentAddress) : null;
+      if (kingdom && abilities.length > tierAbilitySlots(kingdom.tier)) {
+        throw new Error(
+          `Too many abilities for tier ${kingdom.tier}: ${abilities.length}/${tierAbilitySlots(kingdom.tier)}`,
+        );
+      }
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "join_staked_match", [
+          String(match_id),
+          ...feltArray(abilities),
+        ]),
+      ]);
+      return { tx_hash: tx, match_id, abilities };
+    },
+  );
+
+  register(
+    "siege_settle_match",
+    {
+      description:
+        "Settle a finished staked 1v1 match: distributes escrowed abilities, updates wins/reputation, releases loser parcel, and may grant pillage eligibility.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async ({ match_id }, ctx) => {
+      ctx.watchMatch(match_id);
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "settle_match", [String(match_id)]),
+      ]);
+      return { tx_hash: tx, match_id };
+    },
+  );
+
+  register(
+    "siege_claim_parcel",
+    {
+      description:
+        "Claim one adjacent unclaimed parcel after winning and settling a staked match. parcel_type: 0=Forge, 1=Quarry, 2=Grove.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        parcel_id: z.number().int().nonnegative(),
+        parcel_type: parcelTypeSchema,
+      },
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async ({ match_id, parcel_id, parcel_type }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "claim_parcel", [
+          String(match_id),
+          String(parcel_id),
+          String(parcel_type),
+        ]),
+      ]);
+      return { tx_hash: tx, match_id, parcel_id, parcel_type };
+    },
+  );
+
+  register(
+    "siege_set_preset_defense",
+    {
+      description:
+        "Set one async conquest defense preset. Total p0+p1+p2+g0+g1+g2 must be <= 12; available preset slots depend on kingdom tier.",
+      inputSchema: {
+        index: z.number().int().min(0).max(3),
+        p0: u8Schema.default(0),
+        p1: u8Schema.default(0),
+        p2: u8Schema.default(0),
+        g0: u8Schema.default(0),
+        g1: u8Schema.default(0),
+        g2: u8Schema.default(0),
+      },
+      requiresSigner: true,
+    },
+    async ({ index, p0, p1, p2, g0, g1, g2 }, ctx) => {
+      const total = validateAllocationBudget([p0, p1, p2, g0, g1, g2], DEFENDER_PRESET_BUDGET, "Preset defense");
+      const kingdom = ctx.agentAddress ? await ctx.state.playerKingdom(ctx.agentAddress) : null;
+      if (kingdom && index >= tierPresetCount(kingdom.tier)) {
+        throw new Error(`Preset index ${index} exceeds tier ${kingdom.tier} limit (${tierPresetCount(kingdom.tier)})`);
+      }
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.conquest, "set_preset_defense", [
+          String(index),
+          String(p0),
+          String(p1),
+          String(p2),
+          String(g0),
+          String(g1),
+          String(g2),
+        ]),
+      ]);
+      return { tx_hash: tx, index, total_allocated: total, budget: DEFENDER_PRESET_BUDGET };
+    },
+  );
+
+  register(
+    "siege_initiate_conquest",
+    {
+      description:
+        "Attack an adjacent non-home target parcel using async preset defense. Submits VRF request_random + conquest.initiate_conquest.",
+      inputSchema: {
+        target_parcel: z.number().int().nonnegative(),
+        p0: u8Schema.default(0),
+        p1: u8Schema.default(0),
+        p2: u8Schema.default(0),
+        g0: u8Schema.default(0),
+        g1: u8Schema.default(0),
+        g2: u8Schema.default(0),
+        ability_id: abilityIdSchema.default(0),
+        ability_target: z.number().int().min(0).max(2).default(0),
+      },
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async ({ target_parcel, p0, p1, p2, g0, g1, g2, ability_id, ability_target }, ctx) => {
+      const total = validateAllocationBudget([p0, p1, p2, g0, g1, g2], CONQUEST_ATTACK_BUDGET, "Conquest attack");
+      const target = await ctx.state.parcel(target_parcel);
+      if (target.is_home) throw new Error(`Parcel ${target_parcel} is a home parcel; conquest cannot target homes.`);
+      const tx = await execute(ctx.signer!, [
+        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.conquest),
+        call(ctx.config.contracts.conquest, "initiate_conquest", [
+          String(target_parcel),
+          String(p0),
+          String(p1),
+          String(p2),
+          String(g0),
+          String(g1),
+          String(g2),
+          String(ability_id),
+          String(ability_target),
+        ]),
+      ]);
+      return { tx_hash: tx, target_parcel, total_allocated: total, budget: CONQUEST_ATTACK_BUDGET };
+    },
+  );
+
+  register(
+    "siege_initiate_pillage",
+    {
+      description:
+        "Use an open pillage eligibility from a settled staked-match win to begin pillaging one loser home parcel.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+        home_parcel_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async ({ match_id, home_parcel_id }, ctx) => {
+      const parcel = await ctx.state.parcel(home_parcel_id);
+      if (!parcel.is_home) throw new Error(`Parcel ${home_parcel_id} is not a home parcel.`);
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "initiate_pillage", [
+          String(match_id),
+          String(home_parcel_id),
+        ]),
+      ]);
+      return { tx_hash: tx, match_id, home_parcel_id };
+    },
+  );
+
+  register(
+    "siege_claim_pillage_drip",
+    {
+      description:
+        "Claim resources siphoned from an active pillage. If adjacency was lost or the pillage expired, the contract may deactivate it.",
+      inputSchema: {
+        home_parcel_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+    },
+    async ({ home_parcel_id }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "claim_pillage_drip", [String(home_parcel_id)]),
+      ]);
+      return { tx_hash: tx, home_parcel_id };
+    },
+  );
+
+  register(
+    "siege_create_faction",
+    {
+      description:
+        "Create a faction as the authenticated agent. Requires Strategos tier and burns the on-chain formation resources.",
+      inputSchema: {
+        name: z.string().min(1).max(31),
+        tag: z.string().min(1).max(31),
+      },
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async ({ name, tag }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "create_faction", [
+          shortTextFelt(name, "name"),
+          shortTextFelt(tag, "tag"),
+        ]),
+      ]);
+      return { tx_hash: tx, name, tag };
+    },
+  );
+
+  register(
+    "siege_invite_faction_member",
+    {
+      description: "Invite a registered player to the authenticated agent's faction. Caller must be faction leader.",
+      inputSchema: {
+        target: z.string().min(3),
+      },
+      requiresSigner: true,
+    },
+    async ({ target }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "invite_member", [target]),
+      ]);
+      return { tx_hash: tx, target };
+    },
+  );
+
+  register(
+    "siege_accept_faction_invite",
+    {
+      description: "Accept a pending faction invite.",
+      inputSchema: {
+        faction_id: z.number().int().positive(),
+      },
+      requiresSigner: true,
+    },
+    async ({ faction_id }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "accept_invite", [String(faction_id)]),
+      ]);
+      return { tx_hash: tx, faction_id };
+    },
+  );
+
+  register(
+    "siege_leave_faction",
+    {
+      description:
+        "Leave the authenticated agent's faction. If the caller is leader, the faction is dissolved.",
+      inputSchema: {},
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async (_args, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "leave_faction", []),
+      ]);
+      return { tx_hash: tx };
+    },
+  );
+
+  register(
+    "siege_kick_faction_member",
+    {
+      description: "Kick a member from the authenticated agent's faction. Caller must be faction leader.",
+      inputSchema: {
+        target: z.string().min(3),
+      },
+      requiresSigner: true,
+      annotations: { destructiveHint: true },
+    },
+    async ({ target }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "kick_member", [target]),
+      ]);
+      return { tx_hash: tx, target };
+    },
+  );
+
+  register(
+    "siege_set_faction_reinforcement",
+    {
+      description: "Toggle whether faction allies can reinforce the authenticated agent's parcel defenses.",
+      inputSchema: {
+        enabled: z.boolean(),
+      },
+      requiresSigner: true,
+    },
+    async ({ enabled }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "set_faction_reinforcement", [enabled ? "1" : "0"]),
+      ]);
+      return { tx_hash: tx, enabled };
+    },
+  );
+
+  register(
+    "siege_set_ability_operator_approval",
+    {
+      description:
+        "Approve or revoke world_system as operator for the authenticated agent's AbilityToken ERC-1155 inventory. Needed before staking abilities in staked matches. Requires ABILITY_TOKEN_ADDRESS in the MCP server environment before session approval.",
+      inputSchema: {
+        approved: z.boolean().default(true),
+      },
+      requiresSigner: true,
+    },
+    async ({ approved }, ctx) => {
+      const abilityToken = ctx.config.abilityTokenAddress;
+      if (!abilityToken) {
+        const resourceConfig = await ctx.state.resourceConfig().catch(() => null);
+        throw new Error(
+          `ABILITY_TOKEN_ADDRESS is not configured for the session policy. Current ResourceConfig ability_token is ${resourceConfig?.ability_token ?? "unknown"}. Set ABILITY_TOKEN_ADDRESS and re-approve the Cartridge session before using this tool.`,
+        );
+      }
+      const tx = await execute(ctx.signer!, [
+        call(abilityToken, "set_approval_for_all", [
+          ctx.config.contracts.worldSystem,
+          approved ? "1" : "0",
+        ]),
+      ]);
+      return { tx_hash: tx, ability_token: abilityToken, operator: ctx.config.contracts.worldSystem, approved };
+    },
+  );
 
   register(
     "siege_create_match",

@@ -172,6 +172,7 @@ async function main(): Promise<void> {
           chainId: config.chainId,
           contracts: config.contracts,
           vrfAddress: config.vrfAddress,
+          abilityTokenAddress: config.abilityTokenAddress,
           basePath: config.sessionDir,
         },
         {
