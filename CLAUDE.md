@@ -328,7 +328,7 @@ The world layer wraps 1v1 matches in a persistent hex-grid map. Entry points liv
 
 ### Claiming parcels
 
-- `claim_parcel(match_id, parcel_id)` — winner takes a single non-home parcel owned by the loser, gated on: kingdom registered, parcel cap, and hex adjacency to one of the claimer's existing parcels.
+- `claim_parcel(match_id, parcel_id, parcel_type)` — after `settle_match`, the winner claims one **unclaimed** parcel (`owner == 0x0`) hex-adjacent to their existing territory and assigns its `parcel_type` (0 Forge / 1 Quarry / 2 Grove). Gated on: settle done, caller is winner, parcel unclaimed, hex adjacency to claimer's parcels, and `(parcel_count - 3) < tier_parcel_cap(tier)`. Map starts with untyped wilderness (issue #7); claims expand from your borders rather than transferring tiles from the loser.
 
 ### Pillaging
 
