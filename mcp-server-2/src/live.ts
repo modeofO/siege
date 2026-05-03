@@ -58,14 +58,25 @@ export async function startLiveStateBridge({
 
   log(`Torii gRPC subscribing to models: ${SIEGE_LIVE_MODELS.join(", ")}`);
 
-  const subscription = await subscribeEntities(client, worldAddress, clause, (entity) => {
-    for (const matchId of matchIdsFromEntity(entity)) {
-      if (!isWatched(matchId)) continue;
-      void notifyMatchChanged(server, state, matchId).catch((err: unknown) => {
-        log(`live notification failed for match ${matchId}: ${errorMessage(err)}`);
-      });
-    }
-  });
+  let loggedPayloadShape = false;
+  const subscription = await subscribeEntities(
+    client,
+    worldAddress,
+    clause,
+    (entity) => {
+      for (const matchId of matchIdsFromEntity(entity)) {
+        if (!isWatched(matchId)) continue;
+        void notifyMatchChanged(server, state, matchId).catch((err: unknown) => {
+          log(`live notification failed for match ${matchId}: ${errorMessage(err)}`);
+        });
+      }
+    },
+    (payload) => {
+      if (loggedPayloadShape || process.env.TORII_DEBUG_PAYLOADS !== "1") return;
+      loggedPayloadShape = true;
+      log(`Torii gRPC first entity payload shape: ${payloadShape(payload)}`);
+    },
+  );
 
   log(`Torii gRPC subscription active for ${SIEGE_LIVE_MODELS.length} models`);
   return { client, subscription };
@@ -107,4 +118,17 @@ function tyToSafeInteger(value: Ty | unknown): number | null {
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
+}
+
+function payloadShape(payload: unknown): string {
+  if (Array.isArray(payload)) return `array(${payload.length})`;
+  if (payload === null) return "null";
+  if (typeof payload !== "object") return typeof payload;
+
+  const record = payload as Record<string, unknown>;
+  const keys = Object.keys(record).slice(0, 8);
+  const data = record.data;
+  if (Array.isArray(data)) return `object{${keys.join(",")}} data=array(${data.length})`;
+  if (data && typeof data === "object") return `object{${keys.join(",")}} data=object{${Object.keys(data).slice(0, 8).join(",")}}`;
+  return `object{${keys.join(",")}}`;
 }

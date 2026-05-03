@@ -78,8 +78,10 @@ export async function subscribeEntities(
   worldAddress: string,
   clause: Clause,
   onEntity: (entity: Entity) => void | Promise<void>,
+  onPayload?: (payload: unknown) => void,
 ): Promise<Subscription> {
   return await client.onEntityUpdated(clause, [requireNonEmpty(worldAddress, "worldAddress")], (payload: unknown) => {
+    onPayload?.(payload);
     for (const entity of entityPayloads(payload)) {
       onEntity(entity as Entity);
     }
