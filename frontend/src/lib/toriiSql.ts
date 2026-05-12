@@ -10,6 +10,17 @@ export async function toriiSql<T extends Record<string, unknown>>(sql: string): 
   }
 }
 
+export function sqlHex(v: string): string {
+  if (!/^0x[0-9a-fA-F]+$/.test(v)) throw new Error("invalid hex value");
+  return `'${v}'`;
+}
+
+export function sqlInt(v: number | string): string {
+  const n = typeof v === "string" ? parseInt(v, 10) : Math.floor(v);
+  if (!Number.isFinite(n)) throw new Error("invalid integer value");
+  return String(n);
+}
+
 export function toNum(v: unknown): number {
   if (typeof v === "number") return v;
   if (typeof v === "string") return Number(v);

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
-import { toriiSql, toNum } from "./toriiSql";
+import { toriiSql, toNum, sqlHex } from "./toriiSql";
 
 const POLL_INTERVAL = 4000;
 
@@ -97,7 +97,7 @@ export function usePillageEligibilities(playerAddress: string | null): PillageEl
         granted_at: number;
         expires_at: number;
         used: number | boolean;
-      }>(`SELECT winner, match_id, loser, granted_at, expires_at, used FROM "siege_dojo-PillageEligibility" WHERE winner = '${playerAddress}'`);
+      }>(`SELECT winner, match_id, loser, granted_at, expires_at, used FROM "siege_dojo-PillageEligibility" WHERE winner = ${sqlHex(playerAddress)}`);
 
       const now = Math.floor(Date.now() / 1000);
       const entries = rows

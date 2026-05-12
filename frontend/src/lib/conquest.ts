@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
-import { toriiSql, toNum } from "./toriiSql";
+import { toriiSql, toNum, sqlHex } from "./toriiSql";
 
 const POLL_INTERVAL = 4000;
 
@@ -28,7 +28,7 @@ export function usePresetDefense(playerAddress: string | null): PresetDefenseDat
 
     const doFetch = async () => {
       const rows = await toriiSql<Record<string, number | string>>(
-        `SELECT p0_p0, p0_p1, p0_p2, p0_g0, p0_g1, p0_g2, p1_p0, p1_p1, p1_p2, p1_g0, p1_g1, p1_g2, p2_p0, p2_p1, p2_p2, p2_g0, p2_g1, p2_g2, p3_p0, p3_p1, p3_p2, p3_g0, p3_g1, p3_g2, preset_count FROM "siege_dojo-PresetDefense" WHERE player = '${playerAddress}'`,
+        `SELECT p0_p0, p0_p1, p0_p2, p0_g0, p0_g1, p0_g2, p1_p0, p1_p1, p1_p2, p1_g0, p1_g1, p1_g2, p2_p0, p2_p1, p2_p2, p2_g0, p2_g1, p2_g2, p3_p0, p3_p1, p3_p2, p3_g0, p3_g1, p3_g2, preset_count FROM "siege_dojo-PresetDefense" WHERE player = ${sqlHex(playerAddress)}`,
       );
 
       const node = rows[0];

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
-import { toriiSql, toNum, feltToStr } from "./toriiSql";
+import { toriiSql, toNum, feltToStr, sqlHex, sqlInt } from "./toriiSql";
 
 const POLL_INTERVAL = 4000;
 
@@ -46,7 +46,7 @@ export function useFaction(factionId: number | null): FactionData | null {
         member_count: number;
         created_at: number;
         dissolved: number | boolean;
-      }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${factionId}`);
+      }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${sqlInt(factionId)}`);
 
       const row = rows[0];
       if (!row) {
@@ -100,7 +100,7 @@ export function usePlayerFaction(playerAddress: string | null): {
         faction_id: number;
         joined_at: number;
         last_leave_time: number;
-      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE player = '${playerAddress}'`);
+      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE player = ${sqlHex(playerAddress)}`);
 
       const memberRow = memberRows[0];
       const member: FactionMemberData | null = memberRow
@@ -122,7 +122,7 @@ export function usePlayerFaction(playerAddress: string | null): {
           member_count: number;
           created_at: number;
           dissolved: number | boolean;
-        }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${member.factionId}`);
+        }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${sqlInt(member.factionId)}`);
         const fn = factionRows[0];
         if (fn && !fn.dissolved) {
           faction = {
@@ -172,7 +172,7 @@ export function usePendingInvites(playerAddress: string | null): FactionInviteDa
         invited_by: string;
         invited_at: number;
         used: number | boolean;
-      }>(`SELECT target, faction_id, invited_by, invited_at, used FROM "siege_dojo-FactionInvite" WHERE target = '${playerAddress}'`);
+      }>(`SELECT target, faction_id, invited_by, invited_at, used FROM "siege_dojo-FactionInvite" WHERE target = ${sqlHex(playerAddress)}`);
 
       const entries = rows
         .map((r) => ({
@@ -260,7 +260,7 @@ export function useFactionMembers(factionId: number | null): FactionMemberData[]
         faction_id: number;
         joined_at: number;
         last_leave_time: number;
-      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE faction_id = ${factionId}`);
+      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE faction_id = ${sqlInt(factionId)}`);
 
       const entries = rows.map((r) => ({
         player: r.player,

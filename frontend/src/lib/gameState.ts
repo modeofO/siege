@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { toriiSql } from "./toriiSql";
+import { toriiSql, sqlInt } from "./toriiSql";
 
 export interface MatchState {
   matchId: string;
@@ -103,7 +103,7 @@ async function fetchMatchState(matchId: string): Promise<MatchState | null> {
   if (id == null) return null;
 
   const matchRows = await toriiSql<MatchStateRow>(
-    `SELECT match_id, vault_a_hp, vault_b_hp, current_round, status FROM "siege_dojo-MatchState" WHERE match_id = ${id}`,
+    `SELECT match_id, vault_a_hp, vault_b_hp, current_round, status FROM "siege_dojo-MatchState" WHERE match_id = ${sqlInt(id)}`,
   );
   const matchRow = matchRows[0];
   if (!matchRow) return null;
@@ -113,7 +113,7 @@ async function fetchMatchState(matchId: string): Promise<MatchState | null> {
   const team2Vault = toNum(matchRow.vault_b_hp);
 
   const nodeRows = await toriiSql<NodeStateRow>(
-    `SELECT node_index, owner FROM "siege_dojo-NodeState" WHERE match_id = ${id}`,
+    `SELECT node_index, owner FROM "siege_dojo-NodeState" WHERE match_id = ${sqlInt(id)}`,
   );
   const nodes: [NodeOwner, NodeOwner, NodeOwner] = ["neutral", "neutral", "neutral"];
   for (const row of nodeRows) {
@@ -131,7 +131,7 @@ async function fetchMatchState(matchId: string): Promise<MatchState | null> {
     phase = "finished";
   } else {
     const roundRows = await toriiSql<{ commit_count: number; reveal_count: number }>(
-      `SELECT commit_count, reveal_count FROM "siege_dojo-RoundMoves" WHERE match_id = ${id} AND round = ${round}`,
+      `SELECT commit_count, reveal_count FROM "siege_dojo-RoundMoves" WHERE match_id = ${sqlInt(id)} AND round = ${sqlInt(round)}`,
     );
     const roundRow = roundRows[0];
     if (roundRow) {
@@ -209,7 +209,7 @@ export function useMatchPlayers(matchId: string | null): MatchPlayers | null {
 
     const fetchPlayers = async () => {
       const rows = await toriiSql<MatchStateRow>(
-        `SELECT team_a_attacker, team_a_defender, team_b_attacker, team_b_defender FROM "siege_dojo-MatchState" WHERE match_id = ${id}`,
+        `SELECT team_a_attacker, team_a_defender, team_b_attacker, team_b_defender FROM "siege_dojo-MatchState" WHERE match_id = ${sqlInt(id)}`,
       );
       const row = rows[0];
       if (!row) return;
@@ -250,7 +250,7 @@ export function useRoundHistory(matchId: string | null) {
 
     const fetchHistory = async () => {
       const rows = await toriiSql<RoundMovesRow>(
-        `SELECT round, commit_count, reveal_count, atk_a_p0, atk_a_p1, atk_a_p2, atk_b_p0, atk_b_p1, atk_b_p2, def_a_g0, def_a_g1, def_a_g2, def_b_g0, def_b_g1, def_b_g2, def_a_repair, def_b_repair FROM "siege_dojo-RoundMoves" WHERE match_id = ${id} ORDER BY round DESC`,
+        `SELECT round, commit_count, reveal_count, atk_a_p0, atk_a_p1, atk_a_p2, atk_b_p0, atk_b_p1, atk_b_p2, def_a_g0, def_a_g1, def_a_g2, def_b_g0, def_b_g1, def_b_g2, def_a_repair, def_b_repair FROM "siege_dojo-RoundMoves" WHERE match_id = ${sqlInt(id)} ORDER BY round DESC`,
       );
 
       const revealed = rows.filter((r) => toNum(r.reveal_count) >= 4).slice(0, 10);
@@ -320,7 +320,7 @@ export function useCommitmentStatus(
 
     const fetchStatus = async () => {
       const rows = await toriiSql<{ committed: number | boolean; revealed: number | boolean }>(
-        `SELECT committed, revealed FROM "siege_dojo-Commitment" WHERE match_id = ${id} AND round = ${round} AND role = ${rIdx}`,
+        `SELECT committed, revealed FROM "siege_dojo-Commitment" WHERE match_id = ${sqlInt(id)} AND round = ${sqlInt(round)} AND role = ${sqlInt(rIdx)}`,
       );
       const row = rows[0];
       if (row) {
