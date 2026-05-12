@@ -19,12 +19,12 @@ set -euo pipefail
 ABILITY_TOKEN="0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb"
 
 # Resource ERC-20s — order must match set_resource_config(iron, linen, stone, wood, ember, seeds).
-IRON="0x2154b81255def0de319c2310b38eb54484794e64b54a7a9adce583e4079a77b"
-LINEN="0x511a65b969eb95a9e510b7809dff5e9c53ac325002423dea0e35ce0a1880f2b"
-STONE="0x28f46611d132cab82fb0afb6614d95f13dbd20dca76d5d4601fc58acb71552d"
-WOOD="0x1014ccf9475d916d5164b44edc0480a2f0cd4e67b5bef6acd22a40c01e83c27"
-EMBER="0x7e6b21bc243e02e8afac07822d58ec3f8b1c97dedead6849fd96d3026589b4e"
-SEEDS="0x704234ef94400154669e56ac5a490796b7bf2a277092ea2be46e99eedd03a50"
+IRON="0x04443a152ebfe64b834cf7aa904b56ee6a97b9fcf7ee6f4e9ad272596e3d7a73"
+LINEN="0x01b57dd0b9b246bf39185e23cd7c794d2bf6ad7088c8a3325f91809f6c4588c0"
+STONE="0x051769e3c9a978e30d7cacdb2491e057c233fbd99ca36a8bb3c544894b3b3cc2"
+WOOD="0x05dc381b9755ae512fad38462887e2587d17661b833bbd22a32130db8fb20a9b"
+EMBER="0x043415cab3dbd5d07c05da8aa135c92a1e0fd008c7eb0e09cef8be0e5065887d"
+SEEDS="0x077ee09267cf3ded08f68c0c3eb74e2e5e01eae82d7691b48fb586768ea16f47"
 
 echo "→ Setting AbilityToken address on ResourceConfig..."
 sozo -P sepolia execute siege_dojo-actions_1v1 set_ability_token "$ABILITY_TOKEN"
