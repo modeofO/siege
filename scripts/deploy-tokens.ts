@@ -1,13 +1,22 @@
-// Deploy 6 ERC-20 resource token contracts to Sepolia
-// Usage: DOJO_ACCOUNT_ADDRESS=0x... DOJO_PRIVATE_KEY=0x... npx tsx scripts/deploy-tokens.ts
+// Deploy six ERC-20 resource tokens to Sepolia, authorize game systems, and
+// wire ResourceConfig to the new token addresses.
 //
-// Prerequisites: Run `sozo build -P sepolia` first
+// Usage:
+//   DOJO_ACCOUNT_ADDRESS=0x... DOJO_PRIVATE_KEY=0x... npx tsx scripts/deploy-tokens.ts
+//
+// Prerequisites:
+//   sozo build -P sepolia
+//   starkli declare target/sepolia/siege_dojo_ResourceToken.contract_class.json ...
 
-import { Account, RpcProvider, CallData, hash, json, byteArray } from "starknet";
-import { readFileSync } from "fs";
+import { Account, CallData, RpcProvider, byteArray, hash, json } from "starknet";
+import { readFileSync } from "node:fs";
 
-const RPC = "https://api.cartridge.gg/x/starknet/sepolia";
-const MINTER = "0x1b31a6098f1b9081e925e98cd9627c6a5cce39073e92c3f5bf827cb09abe36b"; // resolution_1v1
+const DEFAULT_RPC = "https://api.cartridge.gg/x/starknet/sepolia";
+const RPC = process.env.NEXT_PUBLIC_RPC_URL ?? process.env.STARKNET_RPC_URL ?? DEFAULT_RPC;
+const MANIFEST_PATH = process.env.MANIFEST_PATH ?? "manifest_sepolia.json";
+const ARTIFACT_PATH =
+  process.env.RESOURCE_TOKEN_ARTIFACT ??
+  "target/sepolia/siege_dojo_ResourceToken.contract_class.json";
 
 const ACCOUNT_ADDRESS = process.env.DOJO_ACCOUNT_ADDRESS;
 const PRIVATE_KEY = process.env.DOJO_PRIVATE_KEY;
@@ -17,24 +26,14 @@ if (!ACCOUNT_ADDRESS || !PRIVATE_KEY) {
   process.exit(1);
 }
 
-console.log("Step 1: Connecting to RPC...");
-console.log("  RPC:", RPC);
-console.log("  Account:", ACCOUNT_ADDRESS);
-const provider = new RpcProvider({ nodeUrl: RPC });
-const account = new Account({ provider, address: ACCOUNT_ADDRESS, signer: PRIVATE_KEY });
-console.log("  Connected.");
+type ManifestContract = {
+  address: string;
+  tag: string;
+};
 
-// Read the compiled Sierra contract
-console.log("Step 2: Reading contract artifact...");
-const raw = readFileSync("target/sepolia/siege_dojo_ResourceToken.contract_class.json", "utf-8");
-console.log("  File read, size:", raw.length, "bytes");
-const contractArtifact = json.parse(raw);
-console.log("  Parsed.");
-
-// Compute class hash from Sierra
-console.log("Step 3: Computing class hash (this may take a moment)...");
-const classHash = hash.computeSierraContractClassHash(contractArtifact);
-console.log("  Class hash:", classHash);
+type Manifest = {
+  contracts: ManifestContract[];
+};
 
 const TOKENS = [
   { name: "Iron", symbol: "IRON" },
@@ -45,78 +44,121 @@ const TOKENS = [
   { name: "Seeds", symbol: "SEEDS" },
 ];
 
+function readManifest(): Manifest {
+  return JSON.parse(readFileSync(MANIFEST_PATH, "utf-8")) as Manifest;
+}
+
+function contractAddress(manifest: Manifest, tag: string): string {
+  const contract = manifest.contracts.find((entry) => entry.tag === tag);
+  if (!contract) {
+    throw new Error(`Missing ${tag} in ${MANIFEST_PATH}`);
+  }
+  return contract.address;
+}
+
+function envOrManifest(name: string, manifest: Manifest, tag: string): string {
+  return process.env[name] ?? contractAddress(manifest, tag);
+}
+
+async function wait(provider: RpcProvider, transactionHash: string) {
+  console.log("  tx:", transactionHash);
+  await provider.waitForTransaction(transactionHash);
+}
+
 async function main() {
-  // Check if class is already declared
-  console.log("\nChecking if class is declared...");
+  const manifest = readManifest();
+  const actions1v1 = envOrManifest("ACTIONS_1V1_ADDRESS", manifest, "siege_dojo-actions_1v1");
+  const operators = [
+    envOrManifest("RESOLUTION_1V1_ADDRESS", manifest, "siege_dojo-resolution_1v1"),
+    envOrManifest("WORLD_SYSTEM_ADDRESS", manifest, "siege_dojo-world_system"),
+    envOrManifest("CRAFTING_1V1_ADDRESS", manifest, "siege_dojo-crafting_1v1"),
+  ];
+
+  console.log("Connecting to RPC...");
+  console.log("  RPC:", RPC);
+  console.log("  Account:", ACCOUNT_ADDRESS);
+  const provider = new RpcProvider({ nodeUrl: RPC });
+  const account = new Account({ provider, address: ACCOUNT_ADDRESS, signer: PRIVATE_KEY });
+
+  console.log("\nReading ResourceToken artifact...");
+  const contractArtifact = json.parse(readFileSync(ARTIFACT_PATH, "utf-8"));
+  const classHash = hash.computeSierraContractClassHash(contractArtifact);
+  console.log("  Class hash:", classHash);
+
+  console.log("\nChecking class declaration...");
   try {
     await provider.getClassByHash(classHash);
-    console.log("Class already declared on-chain.");
+    console.log("  Class is declared.");
   } catch {
-    console.error("Class NOT declared on-chain. You need to declare it first.");
-    console.error("Use: /tmp/sozo -P sepolia execute --declare target/sepolia/siege_dojo_ResourceToken.contract_class.json");
-    console.error("Or manually declare via starkli.");
+    console.error("  Class is not declared on-chain.");
+    console.error(`  Declare it first: starkli declare ${ARTIFACT_PATH} --rpc <rpc> ...`);
     process.exit(1);
   }
+
+  console.log("\nOperators to authorize:");
+  console.log("  resolution_1v1:", operators[0]);
+  console.log("  world_system:   ", operators[1]);
+  console.log("  crafting_1v1:   ", operators[2]);
+
+  const saltPrefix =
+    process.env.RESOURCE_TOKEN_SALT_PREFIX ?? `resource-token-${Date.now().toString()}`;
+  console.log("\nSalt prefix:", saltPrefix);
 
   const addresses: string[] = [];
 
   for (const token of TOKENS) {
     console.log(`\nDeploying ${token.name} (${token.symbol})...`);
-
-    // Use UDC (Universal Deployer Contract) via account.deploy
-    // ByteArray args need explicit encoding via byteArray.byteArrayFromString
     const constructorCalldata = [
       ...CallData.compile(byteArray.byteArrayFromString(token.name)),
       ...CallData.compile(byteArray.byteArrayFromString(token.symbol)),
-      MINTER,
+      ACCOUNT_ADDRESS,
     ];
 
     const deployResult = await account.deploy({
       classHash,
       constructorCalldata,
-      salt: hash.computePoseidonHash(classHash, "0x" + Buffer.from(token.symbol).toString("hex")),
+      salt: hash.computePoseidonHash(
+        classHash,
+        `0x${Buffer.from(`${saltPrefix}:${token.symbol}`).toString("hex")}`,
+      ),
     });
+    await wait(provider, deployResult.transaction_hash);
 
-    console.log(`  tx: ${deployResult.transaction_hash}`);
-    await provider.waitForTransaction(deployResult.transaction_hash);
-
-    // Extract deployed address
-    const addr = Array.isArray(deployResult.contract_address)
+    const address = Array.isArray(deployResult.contract_address)
       ? deployResult.contract_address[0]
       : deployResult.contract_address;
-    console.log(`  ${token.name}: ${addr}`);
-    addresses.push(addr as string);
+    if (!address) {
+      throw new Error(`No deployed address returned for ${token.symbol}`);
+    }
+    console.log(`  address: ${address}`);
+    addresses.push(address);
   }
 
-  console.log("\n=== All tokens deployed ===");
-  TOKENS.forEach((t, i) => console.log(`  ${t.symbol}: ${addresses[i]}`));
+  for (const address of addresses) {
+    console.log(`\nAuthorizing operators on ${address}...`);
+    const tx = await account.execute(
+      operators.map((operator) => ({
+        contractAddress: address,
+        entrypoint: "set_authorized_operator",
+        calldata: CallData.compile([operator, 1]),
+      })),
+    );
+    await wait(provider, tx.transaction_hash);
+  }
 
-  // Set resource config
-  console.log("\n=== Setting resource config ===");
-  const ACTIONS_1V1 = "0x7cbd822e0dc535d084dd71b76ba332d76cb370954c83a5ebe5625f36cdfa1c";
-
+  console.log("\nSetting ResourceConfig...");
   const tx = await account.execute({
-    contractAddress: ACTIONS_1V1,
+    contractAddress: actions1v1,
     entrypoint: "set_resource_config",
-    calldata: CallData.compile([
-      addresses[0], // iron
-      addresses[1], // linen
-      addresses[2], // stone
-      addresses[3], // wood
-      addresses[4], // ember
-      addresses[5], // seeds
-    ]),
+    calldata: CallData.compile(addresses),
   });
-  console.log("  set_resource_config tx:", tx.transaction_hash);
-  await provider.waitForTransaction(tx.transaction_hash);
-  console.log("  Done!");
+  await wait(provider, tx.transaction_hash);
 
-  console.log("\n=== Summary ===");
-  console.log("Token addresses (save these):");
-  TOKENS.forEach((t, i) => console.log(`  ${t.symbol}: ${addresses[i]}`));
+  console.log("\nResource tokens deployed and wired:");
+  TOKENS.forEach((token, index) => console.log(`  ${token.symbol}: ${addresses[index]}`));
 }
 
-main().catch((e) => {
-  console.error("\nDeployment failed:", e.message || e);
+main().catch((error) => {
+  console.error("\nDeployment failed:", error);
   process.exit(1);
 });

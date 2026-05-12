@@ -55,6 +55,7 @@ pub mod tests {
     pub mod test_traps_1v1;
     pub mod test_abilities_1v1;
     pub mod test_events;
+    pub mod test_resource_token;
     pub mod test_ability_token;
     pub mod test_hex;
     pub mod test_world;
