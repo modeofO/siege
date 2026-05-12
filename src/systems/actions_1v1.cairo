@@ -155,6 +155,10 @@ pub mod actions_1v1 {
             ember: ContractAddress, seeds: ContractAddress,
         ) {
             let mut world = self.world_default();
+            assert(
+                world.dispatcher.is_owner(world.namespace_hash, get_caller_address()),
+                'Not world owner',
+            );
             // Preserve an already-set ability_token so this method stays single-purpose
             let existing: ResourceConfig = world.read_model(0_u8);
             world.write_model(@ResourceConfig {

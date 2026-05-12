@@ -7,14 +7,8 @@ pub trait ICrafting1v1<T> {
 }
 
 #[starknet::interface]
-pub trait IERC20Transfer<T> {
-    fn transfer_from(
-        ref self: T,
-        sender: ContractAddress,
-        recipient: ContractAddress,
-        amount: u256,
-    ) -> bool;
-    fn balance_of(self: @T, account: ContractAddress) -> u256;
+pub trait IResourceTokenBurn<T> {
+    fn burn(ref self: T, from: ContractAddress, amount: u256);
 }
 
 #[starknet::interface]
@@ -29,11 +23,8 @@ pub mod crafting_1v1 {
     use dojo::model::ModelStorage;
     use siege_dojo::models::resource_config::ResourceConfig;
     use siege_dojo::models::player_kingdom::PlayerKingdom;
-    use super::{IERC20TransferDispatcher, IERC20TransferDispatcherTrait};
+    use super::{IResourceTokenBurnDispatcher, IResourceTokenBurnDispatcherTrait};
     use super::{IAbilityTokenMintDispatcher, IAbilityTokenMintDispatcherTrait};
-
-    // Burn sink for ERC-20 resource tokens — tokens sent here are effectively burned.
-    const BURN_ADDRESS: felt252 = 0x1;
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
@@ -43,11 +34,8 @@ pub mod crafting_1v1 {
     }
 
     fn burn_tokens(token_addr: ContractAddress, from: ContractAddress, amount: u256) {
-        let mut token = IERC20TransferDispatcher { contract_address: token_addr };
-        let balance = token.balance_of(from);
-        assert(balance >= amount, 'Insufficient balance');
-        let burn_addr: ContractAddress = BURN_ADDRESS.try_into().unwrap();
-        token.transfer_from(from, burn_addr, amount);
+        let token = IResourceTokenBurnDispatcher { contract_address: token_addr };
+        token.burn(from, amount);
     }
 
     #[abi(embed_v0)]

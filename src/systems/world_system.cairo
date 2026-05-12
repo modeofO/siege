@@ -79,17 +79,13 @@ pub fn calculate_bracket(total_wins: u32, total_losses: u32) -> u8 {
 }
 
 #[starknet::interface]
-pub trait IERC20Burn<T> {
-    fn transfer_from(ref self: T, sender: starknet::ContractAddress, recipient: starknet::ContractAddress, amount: u256) -> bool;
-    fn balance_of(self: @T, account: starknet::ContractAddress) -> u256;
+pub trait IResourceTokenBurn<T> {
+    fn burn(ref self: T, from: starknet::ContractAddress, amount: u256);
 }
 
 pub fn burn_upgrade_resources(token_addr: starknet::ContractAddress, from: starknet::ContractAddress, amount: u256) {
-    let token = IERC20BurnDispatcher { contract_address: token_addr };
-    let balance = token.balance_of(from);
-    assert(balance >= amount, 'Insufficient resources');
-    let burn_addr: starknet::ContractAddress = 0x1.try_into().unwrap();
-    token.transfer_from(from, burn_addr, amount);
+    let token = IResourceTokenBurnDispatcher { contract_address: token_addr };
+    token.burn(from, amount);
 }
 
 #[dojo::contract]

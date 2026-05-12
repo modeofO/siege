@@ -258,6 +258,8 @@ pub mod commit_reveal_1v1 {
             let mut world = self.world_default();
             let state: MatchState1v1 = world.read_model(match_id);
             assert(state.status == MatchStatus::Active, 'Match not active');
+            let caller = get_caller_address();
+            assert(caller == state.player_a || caller == state.player_b, 'Not a match participant');
 
             let round = state.current_round;
             let now = get_block_timestamp();

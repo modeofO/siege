@@ -210,11 +210,6 @@ mod tests {
         IResourceTokenDispatcher,  // wood
         IResourceTokenDispatcher,  // ember
         IResourceTokenDispatcher,  // seeds
-        IERC20ApproveDispatcher,   // iron approve
-        IERC20ApproveDispatcher,   // stone approve
-        IERC20ApproveDispatcher,   // wood approve
-        IERC20ApproveDispatcher,   // ember approve
-        IERC20ApproveDispatcher,   // seeds approve
         starknet::ContractAddress, // world_sys_addr
     ) {
         let ndef = namespace_def();
@@ -241,12 +236,19 @@ mod tests {
         let test_minter = contract_address_const::<0xBEEF>();
         starknet::testing::set_contract_address(test_minter);
 
-        let (iron_tok, iron_approve, iron_addr) = deploy_resource_token("Iron", "IRON", test_minter);
-        let (stone_tok, stone_approve, stone_addr) = deploy_resource_token("Stone", "STONE", test_minter);
+        let (iron_tok, _iron_approve, iron_addr) = deploy_resource_token("Iron", "IRON", test_minter);
+        let (stone_tok, _stone_approve, stone_addr) = deploy_resource_token("Stone", "STONE", test_minter);
         let (linen_tok, _linen_approve, linen_addr) = deploy_resource_token("Linen", "LINEN", test_minter);
-        let (wood_tok, wood_approve, wood_addr) = deploy_resource_token("Wood", "WOOD", test_minter);
-        let (ember_tok, ember_approve, ember_addr) = deploy_resource_token("Ember", "EMBER", test_minter);
-        let (seeds_tok, seeds_approve, seeds_addr) = deploy_resource_token("Seeds", "SEEDS", test_minter);
+        let (wood_tok, _wood_approve, wood_addr) = deploy_resource_token("Wood", "WOOD", test_minter);
+        let (ember_tok, _ember_approve, ember_addr) = deploy_resource_token("Ember", "EMBER", test_minter);
+        let (seeds_tok, _seeds_approve, seeds_addr) = deploy_resource_token("Seeds", "SEEDS", test_minter);
+
+        // Grant world_system minter2 so it can burn resources
+        iron_tok.set_minter2(world_sys_addr);
+        stone_tok.set_minter2(world_sys_addr);
+        wood_tok.set_minter2(world_sys_addr);
+        ember_tok.set_minter2(world_sys_addr);
+        seeds_tok.set_minter2(world_sys_addr);
 
         // Wire resource config
         let mut rc: ResourceConfig = world.read_model(0_u8);
@@ -279,11 +281,6 @@ mod tests {
             wood_tok,
             ember_tok,
             seeds_tok,
-            iron_approve,
-            stone_approve,
-            wood_approve,
-            ember_approve,
-            seeds_approve,
             world_sys_addr,
         )
     }
@@ -431,12 +428,7 @@ mod tests {
             wood_tok,
             _ember_tok,
             _seeds_tok,
-            iron_approve,
-            stone_approve,
-            wood_approve,
-            _ember_approve,
-            _seeds_approve,
-            world_sys_addr,
+            _world_sys_addr,
         ) = setup_with_resources();
 
         // Give player 10 wins
@@ -451,13 +443,8 @@ mod tests {
         stone_tok.mint(player, 20_u256);
         wood_tok.mint(player, 10_u256);
 
-        // Player approves world_system to spend resources
-        starknet::testing::set_contract_address(player);
-        iron_approve.approve(world_sys_addr, 20_u256);
-        stone_approve.approve(world_sys_addr, 20_u256);
-        wood_approve.approve(world_sys_addr, 10_u256);
-
         // Upgrade
+        starknet::testing::set_contract_address(player);
         world_sys.upgrade_kingdom();
 
         // Verify tier upgraded
@@ -477,12 +464,7 @@ mod tests {
             wood_tok,
             _ember_tok,
             _seeds_tok,
-            iron_approve,
-            stone_approve,
-            wood_approve,
-            _ember_approve,
-            _seeds_approve,
-            world_sys_addr,
+            _world_sys_addr,
         ) = setup_with_resources();
 
         // Only 5 wins (need 10)
@@ -490,19 +472,15 @@ mod tests {
         kingdom.total_wins = 5;
         world.write_model_test(@kingdom);
 
-        // Mint and approve resources anyway
+        // Mint resources anyway
         let test_minter = contract_address_const::<0xBEEF>();
         starknet::testing::set_contract_address(test_minter);
         iron_tok.mint(player, 20_u256);
         stone_tok.mint(player, 20_u256);
         wood_tok.mint(player, 10_u256);
 
-        starknet::testing::set_contract_address(player);
-        iron_approve.approve(world_sys_addr, 20_u256);
-        stone_approve.approve(world_sys_addr, 20_u256);
-        wood_approve.approve(world_sys_addr, 10_u256);
-
         // Should panic
+        starknet::testing::set_contract_address(player);
         world_sys.upgrade_kingdom();
     }
 
@@ -518,11 +496,6 @@ mod tests {
             _wood_tok,
             _ember_tok,
             _seeds_tok,
-            _iron_approve,
-            _stone_approve,
-            _wood_approve,
-            _ember_approve,
-            _seeds_approve,
             _world_sys_addr,
         ) = setup_with_resources();
 

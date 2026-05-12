@@ -1,6 +1,7 @@
 #[starknet::interface]
 pub trait IResourceToken<TContractState> {
     fn mint(ref self: TContractState, to: starknet::ContractAddress, amount: u256);
+    fn burn(ref self: TContractState, from: starknet::ContractAddress, amount: u256);
     fn minter(self: @TContractState) -> starknet::ContractAddress;
     fn set_minter2(ref self: TContractState, new_minter2: starknet::ContractAddress);
     fn minter2(self: @TContractState) -> starknet::ContractAddress;
@@ -59,6 +60,15 @@ pub mod ResourceToken {
                 'Only minter can mint',
             );
             self.erc20.mint(to, amount);
+        }
+
+        fn burn(ref self: ContractState, from: ContractAddress, amount: u256) {
+            let caller = get_caller_address();
+            assert(
+                caller == self.minter_address.read() || caller == self.minter2_address.read(),
+                'Only minter can burn',
+            );
+            self.erc20.burn(from, amount);
         }
 
         fn minter(self: @ContractState) -> ContractAddress {

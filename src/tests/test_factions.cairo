@@ -289,17 +289,11 @@ mod tests {
         stone_tok.mint(player_b, 50);
         wood_tok.mint(player_b, 50);
 
-        // Approve world_system to burn (transfer_from) resources for player_a
-        starknet::testing::set_contract_address(player_a);
-        IERC20ApproveDispatcher { contract_address: iron_addr }.approve(world_sys_addr, 1000);
-        IERC20ApproveDispatcher { contract_address: stone_addr }.approve(world_sys_addr, 1000);
-        IERC20ApproveDispatcher { contract_address: wood_addr }.approve(world_sys_addr, 1000);
-
-        // Approve world_system to burn resources for player_b
-        starknet::testing::set_contract_address(player_b);
-        IERC20ApproveDispatcher { contract_address: iron_addr }.approve(world_sys_addr, 1000);
-        IERC20ApproveDispatcher { contract_address: stone_addr }.approve(world_sys_addr, 1000);
-        IERC20ApproveDispatcher { contract_address: wood_addr }.approve(world_sys_addr, 1000);
+        // Grant world_system minter2 role so it can burn resources
+        starknet::testing::set_contract_address(test_minter);
+        iron_tok.set_minter2(world_sys_addr);
+        stone_tok.set_minter2(world_sys_addr);
+        wood_tok.set_minter2(world_sys_addr);
 
         (world, world_sys, player_a, player_b, erc1155, iron_addr, stone_addr, wood_addr, world_sys_addr)
     }
