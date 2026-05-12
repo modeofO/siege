@@ -25,7 +25,21 @@ const RESOURCE_COLORS: Record<string, string> = {
 export default function CraftPage() {
   const { account, address, status } = useAccount();
   const isConnected = status === "connected";
-  const resources = useResourceBalances(address);
+  const subscribedResources = useResourceBalances(address);
+  const [optimisticDelta, setOptimisticDelta] = useState<Partial<ResourceBalances>>({});
+
+  const resources: ResourceBalances = {
+    iron: Math.max(0, subscribedResources.iron - (optimisticDelta.iron ?? 0)),
+    linen: Math.max(0, subscribedResources.linen - (optimisticDelta.linen ?? 0)),
+    stone: Math.max(0, subscribedResources.stone - (optimisticDelta.stone ?? 0)),
+    wood: Math.max(0, subscribedResources.wood - (optimisticDelta.wood ?? 0)),
+    ember: Math.max(0, subscribedResources.ember - (optimisticDelta.ember ?? 0)),
+    seeds: Math.max(0, subscribedResources.seeds - (optimisticDelta.seeds ?? 0)),
+  };
+
+  useEffect(() => {
+    setOptimisticDelta({});
+  }, [subscribedResources]);
 
   const [inventory, setInventory] = useState<AbilityInventory>(EMPTY_ABILITY_INVENTORY);
   const [crafting, setCrafting] = useState<number | null>(null);
@@ -63,6 +77,14 @@ export default function CraftPage() {
       const provider = new RpcProvider({ nodeUrl: RPC_URL });
       const txHash = await craftAbility(account, abilityId, cost);
       await provider.waitForTransaction(txHash);
+      setOptimisticDelta((prev) => {
+        const next = { ...prev };
+        for (const [resource, amount] of Object.entries(cost)) {
+          const key = resource as keyof ResourceBalances;
+          next[key] = (next[key] ?? 0) + amount;
+        }
+        return next;
+      });
       if (address) {
         const inv = await fetchAbilityBalances(provider, address);
         setInventory(inv);
