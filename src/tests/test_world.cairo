@@ -77,6 +77,7 @@ mod tests {
     use siege_dojo::models::events::{
         e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished,
     };
+    use siege_dojo::models::player_cosmetics::{PlayerCosmetics, m_PlayerCosmetics};
     use siege_dojo::tokens::ability_token::{
         AbilityToken, IAbilityTokenDispatcher, IAbilityTokenDispatcherTrait,
     };
@@ -137,6 +138,7 @@ mod tests {
                 TestResource::Model(m_Parcel::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Model(m_WorldConfig::TEST_CLASS_HASH),
+                TestResource::Model(m_PlayerCosmetics::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
@@ -347,5 +349,95 @@ mod tests {
 
         // Second registration — should panic
         ws.register_player(array![0_u8, 1_u8, 2_u8]);
+    }
+
+    #[test]
+    fn test_set_cosmetic_banner() {
+        let (mut world, ws) = setup();
+
+        let user = deploy_user();
+        let ability_token = deploy_ability_token(user);
+
+        starknet::testing::set_contract_address(user);
+        ws.set_ability_token(ability_token.contract_address);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
+
+        starknet::testing::set_contract_address(user);
+        ws.register_player(array![0, 1, 2]);
+
+        ws.set_cosmetic('banner', 'half-wave-rectifier');
+
+        let cosmetics: PlayerCosmetics = world.read_model(user);
+        assert(cosmetics.banner == 'half-wave-rectifier', 'banner mismatch');
+        assert(cosmetics.parcel_skin == 0, 'skin should be empty');
+        assert(cosmetics.hold_decoration == 0, 'decoration should be empty');
+    }
+
+    #[test]
+    fn test_set_cosmetic_all_types() {
+        let (mut world, ws) = setup();
+
+        let user = deploy_user();
+        let ability_token = deploy_ability_token(user);
+
+        starknet::testing::set_contract_address(user);
+        ws.set_ability_token(ability_token.contract_address);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
+        ws.register_player(array![0, 1, 2]);
+
+        ws.set_cosmetic('banner', 'full-wave-rectifier');
+        ws.set_cosmetic('parcel_skin', 'voltage-divider');
+        ws.set_cosmetic('hold_decoration', 'buck-converter');
+
+        let cosmetics: PlayerCosmetics = world.read_model(user);
+        assert(cosmetics.banner == 'full-wave-rectifier', 'banner');
+        assert(cosmetics.parcel_skin == 'voltage-divider', 'skin');
+        assert(cosmetics.hold_decoration == 'buck-converter', 'decoration');
+    }
+
+    #[test]
+    fn test_set_cosmetic_unequip() {
+        let (mut world, ws) = setup();
+
+        let user = deploy_user();
+        let ability_token = deploy_ability_token(user);
+
+        starknet::testing::set_contract_address(user);
+        ws.set_ability_token(ability_token.contract_address);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
+        ws.register_player(array![0, 1, 2]);
+
+        ws.set_cosmetic('banner', 'lc-tank');
+        let c1: PlayerCosmetics = world.read_model(user);
+        assert(c1.banner == 'lc-tank', 'should be set');
+
+        ws.set_cosmetic('banner', 0);
+        let c2: PlayerCosmetics = world.read_model(user);
+        assert(c2.banner == 0, 'should be unequipped');
+    }
+
+    #[test]
+    #[should_panic(expected: ('Not registered',))]
+    fn test_set_cosmetic_unregistered() {
+        let (_world, ws) = setup();
+        let user = deploy_user();
+        starknet::testing::set_contract_address(user);
+        ws.set_cosmetic('banner', 'lc-tank');
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_set_cosmetic_invalid_type() {
+        let (_world, ws) = setup();
+
+        let user = deploy_user();
+        let ability_token = deploy_ability_token(user);
+
+        starknet::testing::set_contract_address(user);
+        ws.set_ability_token(ability_token.contract_address);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
+        ws.register_player(array![0, 1, 2]);
+
+        ws.set_cosmetic('invalid_type', 'lc-tank');
     }
 }
