@@ -167,6 +167,7 @@ const SESSION_POLICIES: SessionPolicies = {
         { name: "Leave Faction", entrypoint: "leave_faction" },
         { name: "Kick Member", entrypoint: "kick_member" },
         { name: "Toggle Reinforcement", entrypoint: "set_faction_reinforcement" },
+        { name: "Set Cosmetic", entrypoint: "set_cosmetic" },
       ],
     },
 
