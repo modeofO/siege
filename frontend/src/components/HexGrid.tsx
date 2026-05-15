@@ -3,11 +3,25 @@
 
 import { useState } from "react";
 import type { ParcelData } from "@/lib/worldState";
+import type { PlayerCosmeticsData } from "@/lib/cosmetics";
 
 interface HexGridProps {
   parcels: ParcelData[];
   playerAddress: string | null;
   homeParcelIds: number[]; // [home0, home1, home2]
+  cosmeticsMap?: Record<string, PlayerCosmeticsData>;
+}
+
+function parcelSkinStyle(skin: string | null): { strokeDasharray?: string; strokeWidth?: number } {
+  if (!skin) return {};
+  switch (skin) {
+    case "voltage-divider":
+      return { strokeDasharray: "6 3", strokeWidth: 2.5 };
+    case "common-emitter-amp":
+      return { strokeDasharray: "8 2 2 2", strokeWidth: 2.5 };
+    default:
+      return { strokeDasharray: "4 2", strokeWidth: 2.5 };
+  }
 }
 
 const PARCEL_TYPE_COLORS: Record<number, string> = {
@@ -54,7 +68,7 @@ function truncateAddress(addr: string): string {
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
 }
 
-export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps) {
+export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }: HexGridProps) {
   const [hoveredParcel, setHoveredParcel] = useState<ParcelData | null>(null);
   const [selectedParcel, setSelectedParcel] = useState<ParcelData | null>(null);
 
@@ -116,6 +130,9 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
           const { x, y } = hexToPixel(parcel.col, parcel.row);
           const owned = isOwned(parcel);
           const home = isHome(parcel);
+          const unclaimed = isUnclaimed(parcel);
+          const ownerCosmetics = !unclaimed ? cosmeticsMap?.[parcel.owner] : undefined;
+          const skinStyle = parcelSkinStyle(ownerCosmetics?.parcelSkin ?? null);
 
           return (
             <g
@@ -131,7 +148,8 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
                 fill={PARCEL_TYPE_COLORS[parcel.parcelType] || "#555"}
                 fillOpacity={getFillOpacity(parcel)}
                 stroke={getStroke(parcel)}
-                strokeWidth={getStrokeWidth(parcel)}
+                strokeWidth={skinStyle.strokeWidth ?? getStrokeWidth(parcel)}
+                strokeDasharray={skinStyle.strokeDasharray}
               />
               {/* Home parcel marker */}
               {home && (
@@ -152,6 +170,14 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds }: HexGridProps)
                 >
                   {parcel.parcelType === 255 ? "?" : PARCEL_TYPE_NAMES[parcel.parcelType]?.[0]}
                 </text>
+              )}
+              {/* Banner pennant */}
+              {!unclaimed && ownerCosmetics?.banner && (
+                <g transform={`translate(${x + 14}, ${y - 20})`}>
+                  <rect x={-6} y={-8} width={12} height={16} rx={1} fill="rgba(200,164,78,0.25)" stroke="#c8a44e" strokeWidth={0.8} />
+                  <line x1={0} y1={-8} x2={0} y2={-14} stroke="#c8a44e" strokeWidth={0.8} />
+                  <circle cx={0} cy={-14} r={1.2} fill="#c8a44e" />
+                </g>
               )}
             </g>
           );

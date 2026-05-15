@@ -11,6 +11,9 @@ import { RegisterKingdom } from "@/components/RegisterKingdom";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
+import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
+import { IlluminatedBanner } from "@/components/forge/IlluminatedBanner";
+import { CIRCUITS } from "@/lib/forge/circuits";
 import styles from "./parchment.module.css";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
@@ -164,6 +167,9 @@ export default function WorldPage() {
   const { parcels, loading } = useWorldParcels(refreshKey);
   const kingdom = usePlayerKingdom(address || null, refreshKey);
   const [abilities, setAbilities] = useState<Record<number, number>>({});
+  const ownerAddresses = parcels.map((p) => p.owner).filter((o) => o && o !== "0x0");
+  const cosmeticsMap = useBulkPlayerCosmetics(ownerAddresses, refreshKey);
+  const myCosmetics = usePlayerCosmetics(address ?? undefined, refreshKey);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
@@ -233,6 +239,7 @@ export default function WorldPage() {
               parcels={parcels}
               playerAddress={address}
               homeParcelIds={kingdom.registered ? [kingdom.home0, kingdom.home1, kingdom.home2] : []}
+              cosmeticsMap={cosmeticsMap}
             />
           )}
         </div>
@@ -245,7 +252,7 @@ export default function WorldPage() {
         <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
           <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Your Hold</div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             {/* Home parcels */}
             <div className="space-y-1">
               <div className="text-[10px] text-[#7a7060] uppercase tracking-wider">Home Parcels</div>
@@ -262,6 +269,22 @@ export default function WorldPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Hold decoration */}
+            <div className="space-y-1">
+              <div className="text-[10px] text-[#7a7060] uppercase tracking-wider">Hold Crest</div>
+              {myCosmetics?.holdDecoration && CIRCUITS[myCosmetics.holdDecoration] ? (
+                <div className="flex justify-center">
+                  <IlluminatedBanner
+                    circuit={CIRCUITS[myCosmetics.holdDecoration]}
+                    name={CIRCUITS[myCosmetics.holdDecoration].title}
+                    scale={0.5}
+                  />
+                </div>
+              ) : (
+                <div className="text-[10px] text-[#7a7060]">None equipped</div>
+              )}
             </div>
 
             {/* Abilities */}
