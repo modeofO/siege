@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import type { AccountInterface } from "starknet";
 import {
   type CircuitKey,
   type ComponentKind,
@@ -6,6 +7,7 @@ import {
   CIRCUITS,
 } from "./circuits";
 import { checkTopology, type PlacedComponent } from "./topology";
+import { setCosmetic } from "../cosmetics";
 
 export type ForgeView = "forge" | "celebration" | "gallery" | "profile";
 
@@ -62,7 +64,7 @@ const DEFAULT_INVENTORY: Record<ComponentKind, number> = {
   "one-way-valve": 8,
 };
 
-export function useForgeState() {
+export function useForgeState(account?: AccountInterface) {
   const [currentView, setCurrentView] = useState<ForgeView>("forge");
   const [activeCircuit, setActiveCircuitRaw] = useState<CircuitKey>("half-wave-rectifier");
   const [placedComponents, setPlacedComponents] = useState<
@@ -146,8 +148,12 @@ export function useForgeState() {
         },
       };
       persist(next);
+
+      if (account) {
+        setCosmetic(account, cosmeticType, circuitKey).catch(() => {});
+      }
     },
-    [persisted, persist],
+    [persisted, persist, account],
   );
 
   const setView = useCallback((view: ForgeView) => {

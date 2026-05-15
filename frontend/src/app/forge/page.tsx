@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import { useAccount } from "@/app/providers";
 import { useForgeState } from "@/lib/forge/forgeState";
 import { ForgeChrome, SectionHeader } from "@/components/forge/ForgeChrome";
 import { ForgeBoard } from "@/components/forge/ForgeBoard";
@@ -13,7 +14,8 @@ import { EmberField } from "@/components/forge/EmberField";
 import styles from "@/components/forge/forge.module.css";
 
 export default function ForgePage() {
-  const state = useForgeState();
+  const { account } = useAccount();
+  const state = useForgeState(account ?? undefined);
 
   const handleEquip = useCallback(() => {
     state.equipCosmetic(state.activeCircuit);
