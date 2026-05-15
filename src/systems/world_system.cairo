@@ -19,6 +19,7 @@ pub trait IWorldSystem<T> {
     fn leave_faction(ref self: T);
     fn kick_member(ref self: T, target: ContractAddress);
     fn set_faction_reinforcement(ref self: T, enabled: bool);
+    fn set_cosmetic(ref self: T, cosmetic_type: felt252, circuit_key: felt252);
 }
 
 pub fn tier_ability_slots(tier: u8) -> u8 {
@@ -111,6 +112,7 @@ pub mod world_system {
     use siege_dojo::models::faction::{Faction, FactionCounter};
     use siege_dojo::models::faction_member::FactionMember;
     use siege_dojo::models::faction_invite::FactionInvite;
+    use siege_dojo::models::player_cosmetics::PlayerCosmetics;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
     const PILLAGE_WINDOW: u64 = 86400; // 24 hours in seconds
@@ -1115,6 +1117,29 @@ pub mod world_system {
             assert(kingdom.registered, 'Not registered');
             kingdom.faction_reinforcement_enabled = enabled;
             world.write_model(@kingdom);
+        }
+
+        fn set_cosmetic(ref self: ContractState, cosmetic_type: felt252, circuit_key: felt252) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
+
+            let mut cosmetics: PlayerCosmetics = world.read_model(caller);
+            cosmetics.player = caller;
+
+            if cosmetic_type == 'banner' {
+                cosmetics.banner = circuit_key;
+            } else if cosmetic_type == 'parcel_skin' {
+                cosmetics.parcel_skin = circuit_key;
+            } else if cosmetic_type == 'hold_decoration' {
+                cosmetics.hold_decoration = circuit_key;
+            } else {
+                panic!("Invalid cosmetic type");
+            }
+
+            world.write_model(@cosmetics);
         }
     }
 
