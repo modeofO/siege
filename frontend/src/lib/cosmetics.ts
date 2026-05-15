@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
-import { Account, shortString } from "starknet";
-import { toriiSql } from "./toriiSql";
+import { cairo } from "starknet";
+import type { AccountInterface, UniversalDetails } from "starknet";
+import { toriiSql, feltToStr } from "./toriiSql";
 import type { CircuitKey, CosmeticType } from "./forge/circuits";
 
 const WORLD_SYSTEM_ADDRESS =
@@ -8,12 +9,12 @@ const WORLD_SYSTEM_ADDRESS =
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
-const DEVNET_TX_OPTS = {
+const DEVNET_TX_OPTS: UniversalDetails = {
   skipValidate: true,
   resourceBounds: {
-    l1_gas: { max_amount: "0x0", max_price_per_unit: "0x0" },
-    l2_gas: { max_amount: "0x0", max_price_per_unit: "0x0" },
-    l1_data_gas: { max_amount: "0x0", max_price_per_unit: "0x0" },
+    l1_gas: { max_amount: BigInt(0), max_price_per_unit: BigInt(0) },
+    l2_gas: { max_amount: BigInt(0), max_price_per_unit: BigInt(0) },
+    l1_data_gas: { max_amount: BigInt(0), max_price_per_unit: BigInt(0) },
   },
 };
 
@@ -31,12 +32,8 @@ const EMPTY_COSMETICS: PlayerCosmeticsData = {
 
 function feltToCircuitKey(felt: string | null): CircuitKey | null {
   if (!felt || felt === "0x0" || felt === "0") return null;
-  try {
-    const decoded = shortString.decodeShortString(felt);
-    return decoded as CircuitKey;
-  } catch {
-    return null;
-  }
+  const decoded = feltToStr(felt);
+  return decoded ? (decoded as CircuitKey) : null;
 }
 
 export function usePlayerCosmetics(
@@ -135,15 +132,13 @@ const COSMETIC_TYPE_MAP: Record<CosmeticType, string> = {
 };
 
 export async function setCosmetic(
-  account: Account,
+  account: AccountInterface,
   cosmeticType: CosmeticType,
   circuitKey: CircuitKey | null,
 ): Promise<string> {
   const typeStr = COSMETIC_TYPE_MAP[cosmeticType];
-  const typeFelt = shortString.encodeShortString(typeStr);
-  const keyFelt = circuitKey
-    ? shortString.encodeShortString(circuitKey)
-    : "0x0";
+  const typeFelt = cairo.felt(typeStr);
+  const keyFelt = circuitKey ? cairo.felt(circuitKey) : "0x0";
 
   const result = await account.execute(
     [
