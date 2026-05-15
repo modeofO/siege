@@ -355,13 +355,19 @@ mod tests {
     fn test_set_cosmetic_banner() {
         let (mut world, ws) = setup();
 
-        let user = deploy_user();
-        let ability_token = deploy_ability_token(user);
+        let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
+        let ability_token = deploy_ability_token(admin);
+        let (ws_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(admin);
+        ability_token.set_minter(ws_addr);
 
-        starknet::testing::set_contract_address(user);
-        ws.set_ability_token(ability_token.contract_address);
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.ability_token = ability_token.contract_address;
+        world.write_model_test(@rc);
+
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
+        let user = deploy_user();
         starknet::testing::set_contract_address(user);
         ws.register_player(array![0, 1, 2]);
 
@@ -377,12 +383,20 @@ mod tests {
     fn test_set_cosmetic_all_types() {
         let (mut world, ws) = setup();
 
-        let user = deploy_user();
-        let ability_token = deploy_ability_token(user);
+        let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
+        let ability_token = deploy_ability_token(admin);
+        let (ws_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(admin);
+        ability_token.set_minter(ws_addr);
 
-        starknet::testing::set_contract_address(user);
-        ws.set_ability_token(ability_token.contract_address);
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.ability_token = ability_token.contract_address;
+        world.write_model_test(@rc);
+
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
+
+        let user = deploy_user();
+        starknet::testing::set_contract_address(user);
         ws.register_player(array![0, 1, 2]);
 
         ws.set_cosmetic('banner', 'full-wave-rectifier');
@@ -399,12 +413,20 @@ mod tests {
     fn test_set_cosmetic_unequip() {
         let (mut world, ws) = setup();
 
-        let user = deploy_user();
-        let ability_token = deploy_ability_token(user);
+        let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
+        let ability_token = deploy_ability_token(admin);
+        let (ws_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(admin);
+        ability_token.set_minter(ws_addr);
 
-        starknet::testing::set_contract_address(user);
-        ws.set_ability_token(ability_token.contract_address);
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.ability_token = ability_token.contract_address;
+        world.write_model_test(@rc);
+
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
+
+        let user = deploy_user();
+        starknet::testing::set_contract_address(user);
         ws.register_player(array![0, 1, 2]);
 
         ws.set_cosmetic('banner', 'lc-tank');
@@ -417,7 +439,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected: ('Not registered',))]
+    #[should_panic(expected: ('Not registered', 'ENTRYPOINT_FAILED'))]
     fn test_set_cosmetic_unregistered() {
         let (_world, ws) = setup();
         let user = deploy_user();
@@ -428,14 +450,22 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_set_cosmetic_invalid_type() {
-        let (_world, ws) = setup();
+        let (mut world, ws) = setup();
+
+        let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
+        let ability_token = deploy_ability_token(admin);
+        let (ws_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(admin);
+        ability_token.set_minter(ws_addr);
+
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.ability_token = ability_token.contract_address;
+        world.write_model_test(@rc);
+
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
-        let ability_token = deploy_ability_token(user);
-
         starknet::testing::set_contract_address(user);
-        ws.set_ability_token(ability_token.contract_address);
-        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
         ws.register_player(array![0, 1, 2]);
 
         ws.set_cosmetic('invalid_type', 'lc-tank');
