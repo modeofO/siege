@@ -24,6 +24,9 @@ import { MatchStakesHeader } from "@/components/MatchStakesHeader";
 import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
 import { useMatchStakes1v1 } from "@/lib/gameState1v1";
+import { usePlayerCosmetics } from "@/lib/cosmetics";
+import { IlluminatedBanner } from "@/components/forge/IlluminatedBanner";
+import { CIRCUITS } from "@/lib/forge/circuits";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -71,6 +74,9 @@ export default function Match1v1Page() {
 
   // Stakes for the match header (#4) — both sides' wagered abilities.
   const matchStakes = useMatchStakes1v1(matchId, refreshKey);
+
+  const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined, refreshKey);
+  const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined, refreshKey);
 
   const handleAbilitySelect = useCallback((abilityId: number, target: number) => {
     setSelectedAbility(abilityId);
@@ -466,13 +472,22 @@ export default function Match1v1Page() {
         <div className="grid grid-cols-2 gap-6 px-4 pb-3">
           {/* Your Citadel */}
           <div className="flex flex-col items-center">
-            <Image
-              src="/sprites/citadel.png"
-              alt="Your Citadel"
-              width={128}
-              height={128}
-              className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]"
-            />
+            <div className="flex items-end gap-2">
+              {(() => {
+                const yourCosmetics = isPlayerA ? cosmeticsA : cosmeticsB;
+                const bannerKey = yourCosmetics?.banner;
+                return bannerKey && CIRCUITS[bannerKey] ? (
+                  <IlluminatedBanner circuit={CIRCUITS[bannerKey]} name={CIRCUITS[bannerKey].title} scale={0.2} />
+                ) : null;
+              })()}
+              <Image
+                src="/sprites/citadel.png"
+                alt="Your Citadel"
+                width={128}
+                height={128}
+                className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]"
+              />
+            </div>
             <span className="text-xs tracking-wider text-[#c8a44e] uppercase font-bold mt-1">Your Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
@@ -491,14 +506,23 @@ export default function Match1v1Page() {
           </div>
           {/* Enemy Citadel */}
           <div className="flex flex-col items-center">
-            <Image
-              src="/sprites/citadel.png"
-              alt="Enemy Citadel"
-              width={128}
-              height={128}
-              className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]"
-              style={{ filter: "hue-rotate(340deg) saturate(1.5)" }}
-            />
+            <div className="flex items-end gap-2">
+              <Image
+                src="/sprites/citadel.png"
+                alt="Enemy Citadel"
+                width={128}
+                height={128}
+                className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]"
+                style={{ filter: "hue-rotate(340deg) saturate(1.5)" }}
+              />
+              {(() => {
+                const enemyCosmetics = isPlayerA ? cosmeticsB : cosmeticsA;
+                const bannerKey = enemyCosmetics?.banner;
+                return bannerKey && CIRCUITS[bannerKey] ? (
+                  <IlluminatedBanner circuit={CIRCUITS[bannerKey]} name={CIRCUITS[bannerKey].title} scale={0.2} />
+                ) : null;
+              })()}
+            </div>
             <span className="text-xs tracking-wider text-[#ff3344] uppercase font-bold mt-1">Enemy Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
