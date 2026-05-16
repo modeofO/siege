@@ -29,16 +29,16 @@ export const ABILITIES: readonly AbilityDef[] = [
     tier: 1,
     name: "Siege Sword",
     effect: "Set attack on target gate to 5",
-    cost: { iron: 3, wood: 2 },
+    cost: { iron: 8, wood: 5 },
   },
-  { id: 2, type: 2, tier: 1, name: "Stone Cloak", effect: "Halve all gate damage taken", cost: { stone: 3, linen: 2 } },
+  { id: 2, type: 2, tier: 1, name: "Stone Cloak", effect: "Halve all gate damage taken", cost: { stone: 8, linen: 5 } },
   {
     id: 3,
     type: 3,
     tier: 1,
     name: "Ember Blast",
     effect: "Deal 2 direct damage bypassing gates",
-    cost: { ember: 3, seeds: 2 },
+    cost: { ember: 8, seeds: 5 },
   },
   {
     id: 4,
@@ -46,7 +46,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     tier: 1,
     name: "Hex",
     effect: "Reduce opponent total damage by 3",
-    cost: { iron: 2, stone: 2, ember: 1 },
+    cost: { iron: 5, stone: 5, ember: 3 },
   },
   {
     id: 5,
@@ -54,7 +54,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     tier: 1,
     name: "Fortify",
     effect: "Add 1 to defense at all gates",
-    cost: { stone: 2, linen: 2, wood: 1 },
+    cost: { stone: 5, linen: 5, wood: 3 },
   },
   // T2
   {

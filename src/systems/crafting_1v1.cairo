@@ -61,27 +61,27 @@ pub mod crafting_1v1 {
             if !is_free {
                 // Burn resources based on ability recipe
                 if ability_id == 1 {
-                    // Siege Sword: 3 Iron + 2 Wood
-                    burn_tokens(config.iron, caller, 3);
-                    burn_tokens(config.wood, caller, 2);
+                    // Siege Sword: 8 Iron + 5 Wood
+                    burn_tokens(config.iron, caller, 8);
+                    burn_tokens(config.wood, caller, 5);
                 } else if ability_id == 2 {
-                    // Stone Cloak: 3 Stone + 2 Linen
-                    burn_tokens(config.stone, caller, 3);
-                    burn_tokens(config.linen, caller, 2);
+                    // Stone Cloak: 8 Stone + 5 Linen
+                    burn_tokens(config.stone, caller, 8);
+                    burn_tokens(config.linen, caller, 5);
                 } else if ability_id == 3 {
-                    // Ember Blast: 3 Ember + 2 Seeds
-                    burn_tokens(config.ember, caller, 3);
-                    burn_tokens(config.seeds, caller, 2);
+                    // Ember Blast: 8 Ember + 5 Seeds
+                    burn_tokens(config.ember, caller, 8);
+                    burn_tokens(config.seeds, caller, 5);
                 } else if ability_id == 4 {
-                    // Hex: 2 Iron + 2 Stone + 1 Ember
-                    burn_tokens(config.iron, caller, 2);
-                    burn_tokens(config.stone, caller, 2);
-                    burn_tokens(config.ember, caller, 1);
+                    // Hex: 5 Iron + 5 Stone + 3 Ember
+                    burn_tokens(config.iron, caller, 5);
+                    burn_tokens(config.stone, caller, 5);
+                    burn_tokens(config.ember, caller, 3);
                 } else if ability_id == 5 {
-                    // Fortify: 2 Stone + 2 Linen + 1 Wood
-                    burn_tokens(config.stone, caller, 2);
-                    burn_tokens(config.linen, caller, 2);
-                    burn_tokens(config.wood, caller, 1);
+                    // Fortify: 5 Stone + 5 Linen + 3 Wood
+                    burn_tokens(config.stone, caller, 5);
+                    burn_tokens(config.linen, caller, 5);
+                    burn_tokens(config.wood, caller, 3);
                 } else {
                     panic!("Invalid ability ID");
                 }
@@ -170,22 +170,22 @@ pub mod crafting_1v1 {
 
             if burn_qty > 0 {
                 if ability_id == 1 {
-                    burn_tokens(config.iron, caller, 3 * burn_qty);
-                    burn_tokens(config.wood, caller, 2 * burn_qty);
+                    burn_tokens(config.iron, caller, 8 * burn_qty);
+                    burn_tokens(config.wood, caller, 5 * burn_qty);
                 } else if ability_id == 2 {
-                    burn_tokens(config.stone, caller, 3 * burn_qty);
-                    burn_tokens(config.linen, caller, 2 * burn_qty);
+                    burn_tokens(config.stone, caller, 8 * burn_qty);
+                    burn_tokens(config.linen, caller, 5 * burn_qty);
                 } else if ability_id == 3 {
-                    burn_tokens(config.ember, caller, 3 * burn_qty);
-                    burn_tokens(config.seeds, caller, 2 * burn_qty);
+                    burn_tokens(config.ember, caller, 8 * burn_qty);
+                    burn_tokens(config.seeds, caller, 5 * burn_qty);
                 } else if ability_id == 4 {
-                    burn_tokens(config.iron, caller, 2 * burn_qty);
-                    burn_tokens(config.stone, caller, 2 * burn_qty);
-                    burn_tokens(config.ember, caller, 1 * burn_qty);
+                    burn_tokens(config.iron, caller, 5 * burn_qty);
+                    burn_tokens(config.stone, caller, 5 * burn_qty);
+                    burn_tokens(config.ember, caller, 3 * burn_qty);
                 } else {
-                    burn_tokens(config.stone, caller, 2 * burn_qty);
-                    burn_tokens(config.linen, caller, 2 * burn_qty);
-                    burn_tokens(config.wood, caller, 1 * burn_qty);
+                    burn_tokens(config.stone, caller, 5 * burn_qty);
+                    burn_tokens(config.linen, caller, 5 * burn_qty);
+                    burn_tokens(config.wood, caller, 3 * burn_qty);
                 }
             }
 

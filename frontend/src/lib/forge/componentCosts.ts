@@ -6,10 +6,10 @@ export type ComponentCost = Partial<ResourceBalances>;
 export const COMPONENT_COSTS: Record<ComponentKind, ComponentCost | null> = {
   "origin-crystal": null,
   "void-drain": null,
-  "rune-stone": { stone: 15, iron: 8 },
-  "flux-well": { ember: 15, linen: 8 },
-  "spiral-coil": { iron: 15, wood: 8 },
-  "one-way-valve": { stone: 10, ember: 10, seeds: 5 },
+  "rune-stone": { stone: 4, iron: 2 },
+  "flux-well": { ember: 4, linen: 2 },
+  "spiral-coil": { iron: 4, wood: 2 },
+  "one-way-valve": { stone: 3, ember: 3, seeds: 2 },
 };
 
 export const CRAFTABLE_COMPONENTS: ComponentKind[] = [
