@@ -32,16 +32,6 @@ pub fn tier_ability_slots(tier: u8) -> u8 {
     }
 }
 
-pub fn tier_parcel_cap(tier: u8) -> u32 {
-    match tier {
-        0 => 2,
-        1 => 5,
-        2 => 8,
-        3 => 12,
-        _ => 2,
-    }
-}
-
 pub fn tier_wins_required(tier: u8) -> u32 {
     match tier {
         1 => 10,
@@ -749,11 +739,6 @@ pub mod world_system {
                 panic!("Draw: no parcel to claim")
             };
             assert(caller == winner, 'Not the winner');
-
-            let kingdom: PlayerKingdom = world.read_model(caller);
-            let non_home_parcels = if kingdom.parcel_count > 3 { kingdom.parcel_count - 3 } else { 0 };
-            let cap = super::tier_parcel_cap(kingdom.tier);
-            assert(non_home_parcels < cap, 'Parcel cap reached');
 
             // Verify target parcel is unclaimed and adjacent to winner's territory
             let zero_addr: ContractAddress = 0.try_into().unwrap();

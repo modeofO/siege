@@ -33,7 +33,11 @@ function Spinner() {
   );
 }
 
-const GATE_NAMES = ["East", "West", "Under."];
+const GATE_ORDER = [
+  { di: 0, name: "East" },
+  { di: 2, name: "Under." },
+  { di: 1, name: "West" },
+];
 const NODE_NAMES = ["Forge", "Quarry", "Grove"];
 const NODE_RESOURCES = ["Iron + Linen", "Stone + Wood", "Ember + Seeds"];
 const NODE_SPRITES = ["/sprites/node-forge.png", "/sprites/node-quarry.png", "/sprites/node-grove.png"];
@@ -148,43 +152,43 @@ export function AllocationForm1v1({
         </div>
 
         {/* Gate rows: attack (0,1,2) paired with defense (3,4,5) */}
-        {GATE_NAMES.map((name, gi) => (
-          <React.Fragment key={gi}>
+        {GATE_ORDER.map((gate) => (
+          <React.Fragment key={gate.di}>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[#d4cfc6] w-10 shrink-0">{name}</span>
+              <span className="text-xs text-[#d4cfc6] w-10 shrink-0">{gate.name}</span>
               <input
                 type="range"
                 min={0}
                 max={budget}
-                value={allocations[gi] || 0}
-                onChange={(e) => handleChange(gi, parseInt(e.target.value))}
+                value={allocations[gate.di] || 0}
+                onChange={(e) => handleChange(gate.di, parseInt(e.target.value))}
                 className="flex-1 accent-[#ff8800] text-[#ff8800] h-2 cursor-pointer"
               />
               <input
                 type="number"
                 min={0}
                 max={budget}
-                value={allocations[gi] || 0}
-                onChange={(e) => handleChange(gi, Math.max(0, parseInt(e.target.value) || 0))}
+                value={allocations[gate.di] || 0}
+                onChange={(e) => handleChange(gate.di, Math.max(0, parseInt(e.target.value) || 0))}
                 className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#ff8800]"
               />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-[#d4cfc6] w-10 shrink-0">{name}</span>
+              <span className="text-xs text-[#d4cfc6] w-10 shrink-0">{gate.name}</span>
               <input
                 type="range"
                 min={0}
                 max={budget}
-                value={allocations[3 + gi] || 0}
-                onChange={(e) => handleChange(3 + gi, parseInt(e.target.value))}
+                value={allocations[3 + gate.di] || 0}
+                onChange={(e) => handleChange(3 + gate.di, parseInt(e.target.value))}
                 className="flex-1 accent-[#6b8cae] text-[#6b8cae] h-2 cursor-pointer"
               />
               <input
                 type="number"
                 min={0}
                 max={budget}
-                value={allocations[3 + gi] || 0}
-                onChange={(e) => handleChange(3 + gi, Math.max(0, parseInt(e.target.value) || 0))}
+                value={allocations[3 + gate.di] || 0}
+                onChange={(e) => handleChange(3 + gate.di, Math.max(0, parseInt(e.target.value) || 0))}
                 className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#6b8cae]"
               />
             </div>

@@ -7,8 +7,8 @@ interface AllocatorProps {
   onChange: (allocations: number[]) => void;
 }
 
-const ATTACKER_LABELS = ["East Gate", "West Gate", "Underground", "Node 1", "Node 2", "Node 3"];
-const DEFENDER_LABELS = ["East Gate", "West Gate", "Underground", "Repair", "Node 1", "Node 2", "Node 3"];
+const ATTACKER_LABELS = ["East Gate", "Underground", "West Gate", "Node 1", "Node 2", "Node 3"];
+const DEFENDER_LABELS = ["East Gate", "Underground", "West Gate", "Repair", "Node 1", "Node 2", "Node 3"];
 
 export function PressurePointAllocator({ role, budget, allocations, onChange }: AllocatorProps) {
   const labels = role === "attacker" ? ATTACKER_LABELS : DEFENDER_LABELS;

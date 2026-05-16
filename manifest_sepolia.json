@@ -86,7 +86,7 @@
     },
     {
       "address": "0x40ba55faef2a5e49a2bbb6c6a9a602d7040102b688c632039ac445bed558b00",
-      "class_hash": "0x6b1f384492abf1c1fb008b512d13db1cfa20f73e8a4be91935702252f8ceca7",
+      "class_hash": "0x282ca794ab43175781cd403fb754b019de48bc981546976d54c298cbb453507",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
       "selector": "0x2164fd7acc93a3de55c3bcb974b18eebe85614770b9c22881e53ffc80174a90",
@@ -134,7 +134,7 @@
     },
     {
       "address": "0x727c57716a650660de0466efb0572ccab13dfebb1e5bf854a38acd36cda4681",
-      "class_hash": "0x589224a6802fb14d44aa4723a2ff3451ab74fda40f74609375cec9885b7a2d4",
+      "class_hash": "0x28dccd10459d417350d35aa8e6b066fc188c5d672fe8eb3ef0bff3ddd16b55f",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",

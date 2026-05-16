@@ -14,7 +14,6 @@ import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityTok
 import { toFeltHex } from "@/lib/gameState1v1";
 import { useWorldParcels, type ParcelData } from "@/lib/worldState";
 import { isNeighbor } from "@/lib/hex";
-import { TIER_INFO } from "@/lib/tiers";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
@@ -217,37 +216,24 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
 export interface ClaimCandidatesResult {
   /** Unclaimed parcels adjacent to any of the winner's existing parcels. */
   candidates: ParcelData[];
-  /** True when winner's non-home parcel count has hit tier_parcel_cap. */
-  atCap: boolean;
-  /** Winner's current non-home parcel count. */
-  nonHomeCount: number;
-  /** Winner's tier-specific parcel cap. */
-  parcelCap: number;
   loading: boolean;
 }
 
 export function useClaimCandidates(
   winnerAddress: string | null | undefined,
-  winnerTier: number,
-  winnerParcelCount: number,
 ): ClaimCandidatesResult {
   const { parcels, loading } = useWorldParcels();
 
   return useMemo<ClaimCandidatesResult>(() => {
-    const parcelCap = TIER_INFO[winnerTier]?.parcelCap ?? TIER_INFO[0].parcelCap;
-    // non-home count = parcel_count - 3 (3 homes always counted first).
-    const nonHomeCount = winnerParcelCount > 3 ? winnerParcelCount - 3 : 0;
-    const atCap = nonHomeCount >= parcelCap;
-
-    if (!winnerAddress || loading || atCap) {
-      return { candidates: [], atCap, nonHomeCount, parcelCap, loading };
+    if (!winnerAddress || loading) {
+      return { candidates: [], loading };
     }
 
     let winnerBig: bigint;
     try {
       winnerBig = BigInt(winnerAddress);
     } catch {
-      return { candidates: [], atCap, nonHomeCount, parcelCap, loading };
+      return { candidates: [], loading };
     }
 
     const ownerBig = (addr: string): bigint | null => {
@@ -260,7 +246,7 @@ export function useClaimCandidates(
 
     const winnerParcels = parcels.filter((p) => ownerBig(p.owner) === winnerBig);
     if (winnerParcels.length === 0) {
-      return { candidates: [], atCap, nonHomeCount, parcelCap, loading };
+      return { candidates: [], loading };
     }
 
     const candidates = parcels.filter((p) => {
@@ -268,8 +254,8 @@ export function useClaimCandidates(
       return winnerParcels.some((w) => isNeighbor(w, p));
     });
 
-    return { candidates, atCap, nonHomeCount, parcelCap, loading };
-  }, [parcels, loading, winnerAddress, winnerTier, winnerParcelCount]);
+    return { candidates, loading };
+  }, [parcels, loading, winnerAddress]);
 }
 
 // ---------- Ability balances hook ----------

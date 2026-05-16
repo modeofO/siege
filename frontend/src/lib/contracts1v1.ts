@@ -141,19 +141,37 @@ export async function revealMove1v1(
 }
 
 export async function resolveRound1v1(account: AccountInterface, matchId: string) {
-  const tx = await account.execute(
-    [
-      vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION),
-      {
-        contractAddress: CONTRACTS_1V1.RESOLUTION,
-        entrypoint: "resolve_round",
-        calldata: [matchId],
-      },
-    ],
-    TX_OPTS,
-  );
-  await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
-  return tx;
+  try {
+    const tx = await account.execute(
+      [
+        vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION),
+        {
+          contractAddress: CONTRACTS_1V1.RESOLUTION,
+          entrypoint: "resolve_round",
+          calldata: [matchId],
+        },
+      ],
+      TX_OPTS,
+    );
+    await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
+    return tx;
+  } catch (e) {
+    const errMsg = extractErrorMsg(e);
+    if (/not consumed/i.test(errMsg)) {
+      // Game-ending round: contract doesn't call consume_random, so retry without VRF wrap
+      const tx = await account.execute(
+        {
+          contractAddress: CONTRACTS_1V1.RESOLUTION,
+          entrypoint: "resolve_round",
+          calldata: [matchId],
+        },
+        TX_OPTS,
+      );
+      await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
+      return tx;
+    }
+    throw e;
+  }
 }
 
 export const CONTRACTS_WORLD = {

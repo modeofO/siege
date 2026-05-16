@@ -354,14 +354,6 @@ mod tests {
         assert(siege_dojo::systems::world_system::tier_ability_slots(3) == 4, 'basileia: 4 slots');
     }
 
-    #[test]
-    fn test_tier_parcel_cap() {
-        assert(siege_dojo::systems::world_system::tier_parcel_cap(0) == 2, 'polis: 2 parcels');
-        assert(siege_dojo::systems::world_system::tier_parcel_cap(1) == 5, 'strategos: 5 parcels');
-        assert(siege_dojo::systems::world_system::tier_parcel_cap(2) == 8, 'hegemonia: 8 parcels');
-        assert(siege_dojo::systems::world_system::tier_parcel_cap(3) == 12, 'basileia: 12 parcels');
-    }
-
     // Full setup with two players and ability token for staking tests.
     fn full_setup_for_staking() -> (
         dojo::world::WorldStorage,

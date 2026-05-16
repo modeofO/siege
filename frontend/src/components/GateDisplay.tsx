@@ -8,12 +8,10 @@ interface GateDisplayProps {
   lastRound: RoundResult | null;
 }
 
-// Order: West Gate (index 1), Underground (index 2), East Gate (index 0)
-// Maps visual position to the original data index
 const GATE_LAYOUT = [
-  { dataIndex: 1, name: "WEST GATE", glyph: "╣", desc: "Flanking approach" },
-  { dataIndex: 2, name: "UNDERGROUND", glyph: "▽", desc: "Subterranean breach" },
   { dataIndex: 0, name: "EAST GATE", glyph: "╠", desc: "Main approach" },
+  { dataIndex: 2, name: "UNDERGROUND", glyph: "▽", desc: "Subterranean breach" },
+  { dataIndex: 1, name: "WEST GATE", glyph: "╣", desc: "Flanking approach" },
 ];
 
 export function GateDisplay({ yourTeam, yourRole, lastRound }: GateDisplayProps) {

@@ -27,6 +27,8 @@ import { useMatchStakes1v1 } from "@/lib/gameState1v1";
 import { usePlayerCosmetics } from "@/lib/cosmetics";
 import { IlluminatedBanner } from "@/components/forge/IlluminatedBanner";
 import { CIRCUITS } from "@/lib/forge/circuits";
+import { toriiSql, sqlInt, toNum } from "@/lib/toriiSql";
+import { ABILITIES } from "@/lib/craftingContracts";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -107,6 +109,123 @@ export default function Match1v1Page() {
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
 
+  // --- Polling fallback for stale gRPC subscription state ---
+  // After a user's own commit/reveal tx, we poll Torii SQL for a short window
+  // to detect the state change faster than the gRPC subscription delivers it.
+  const [pollCommitCount, setPollCommitCount] = useState<number | null>(null);
+  const [pollRevealCount, setPollRevealCount] = useState<number | null>(null);
+  const [pollCommitted, setPollCommitted] = useState<boolean | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Effective values: max of subscription data and poll data
+  const effectiveCommitCount = Math.max(roundStatus.commitCount, pollCommitCount ?? 0);
+  const effectiveRevealCount = Math.max(roundStatus.revealCount, pollRevealCount ?? 0);
+  const effectiveCommitted = committed || pollCommitted === true;
+
+  // Cleanup polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Stop polling once subscription catches up (poll data becomes redundant)
+  useEffect(() => {
+    const allCaughtUp =
+      (pollCommitCount === null || roundStatus.commitCount >= pollCommitCount) &&
+      (pollRevealCount === null || roundStatus.revealCount >= pollRevealCount) &&
+      (pollCommitted === null || committed);
+    if (allCaughtUp && pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+      setPollCommitCount(null);
+      setPollRevealCount(null);
+      setPollCommitted(null);
+    }
+  }, [roundStatus.commitCount, roundStatus.revealCount, committed, pollCommitCount, pollRevealCount, pollCommitted]);
+
+  /**
+   * Start polling Torii SQL for commit/reveal counts + committed flag.
+   * Polls every 2s for up to 30s then stops.
+   */
+  const startPostTxPoll = useCallback(
+    (opts: { expectCommitCount?: number; expectRevealCount?: number; expectCommitted?: boolean }) => {
+      // Clear any existing poll
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+
+      const currentMatchId = matchId;
+      const currentRound = state?.round;
+      const currentRole = role;
+      if (!currentMatchId || !currentRound) return;
+
+      let elapsed = 0;
+      const INTERVAL = 2000;
+      const MAX_DURATION = 30000;
+
+      const doPoll = async () => {
+        elapsed += INTERVAL;
+        if (elapsed > MAX_DURATION) {
+          if (pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+          return;
+        }
+
+        try {
+          // Poll RoundMoves1v1 for commit_count / reveal_count
+          const rmRows = await toriiSql<{ commit_count: unknown; reveal_count: unknown }>(
+            `SELECT commit_count, reveal_count FROM "siege_dojo-RoundMoves1v1" WHERE match_id = ${sqlInt(currentMatchId)} AND round = ${sqlInt(currentRound)}`,
+          );
+          let cc = 0;
+          let rc = 0;
+          if (rmRows.length > 0) {
+            cc = toNum(rmRows[0].commit_count);
+            rc = toNum(rmRows[0].reveal_count);
+            setPollCommitCount(cc);
+            setPollRevealCount(rc);
+          }
+
+          // Poll Commitment for our committed flag
+          let isCommittedNow = false;
+          if (opts.expectCommitted) {
+            const cRows = await toriiSql<{ committed: unknown }>(
+              `SELECT committed FROM "siege_dojo-Commitment" WHERE match_id = ${sqlInt(currentMatchId)} AND round = ${sqlInt(currentRound)} AND role = ${sqlInt(currentRole)}`,
+            );
+            if (cRows.length > 0 && toNum(cRows[0].committed)) {
+              isCommittedNow = true;
+              setPollCommitted(true);
+            }
+          }
+
+          // Check if we've reached the expected state and can stop early
+          let done = true;
+          if (opts.expectCommitCount !== undefined && cc < opts.expectCommitCount) done = false;
+          if (opts.expectRevealCount !== undefined && rc < opts.expectRevealCount) done = false;
+          if (opts.expectCommitted && !isCommittedNow) done = false;
+
+          if (done && pollTimerRef.current) {
+            clearInterval(pollTimerRef.current);
+            pollTimerRef.current = null;
+          }
+        } catch (e) {
+          console.warn("[post-tx-poll] error:", e);
+        }
+      };
+
+      pollTimerRef.current = setInterval(doPoll, INTERVAL);
+      // Fire immediately (don't wait 2s for first check)
+      void doPoll();
+    },
+    [matchId, state?.round, role],
+  );
+
   const budget = state ? (isPlayerA ? state.budgetA : state.budgetB) : 10;
 
   // Reset state on round change
@@ -123,6 +242,14 @@ export default function Match1v1Page() {
     setSubmitting(false);
     setConfirming(false);
     setError("");
+    // Reset poll state on round change
+    setPollCommitCount(null);
+    setPollRevealCount(null);
+    setPollCommitted(null);
+    if (pollTimerRef.current) {
+      clearInterval(pollTimerRef.current);
+      pollTimerRef.current = null;
+    }
   }, [state?.round, setAllocations, setAutoRevealStatus, setAutoRevealError, setRevealRetry, setSubmitting, setConfirming, setError]);
 
   // One-shot mount log — if this never appears in console after reload, the
@@ -142,14 +269,14 @@ export default function Match1v1Page() {
       hasAccount: !!account,
       hasState: !!state,
       round: state?.round,
-      committed,
+      committed: effectiveCommitted,
       revealed,
-      commitCount: roundStatus.commitCount,
+      commitCount: effectiveCommitCount,
       locked: autoRevealLock.current,
       status: autoRevealStatus,
     });
 
-    if (!account || !state || !committed || revealed || roundStatus.commitCount < 2 || autoRevealLock.current) return;
+    if (!account || !state || !effectiveCommitted || revealed || effectiveCommitCount < 2 || autoRevealLock.current) return;
 
     autoRevealLock.current = true;
 
@@ -200,11 +327,14 @@ export default function Match1v1Page() {
         setAutoRevealStatus("done");
         setAutoRevealError("");
         console.log("[auto-reveal] reveal submitted");
+        // Start polling for reveal_count to reach 2 (bridges gRPC lag for auto-resolve)
+        startPostTxPoll({ expectRevealCount: 2 });
       } catch (e) {
         const msg = extractErrorMsg(e);
         if (isAlreadyRevealed(msg)) {
           console.log("[auto-reveal] Already revealed — round progressed normally.");
           setAutoRevealStatus("done");
+          startPostTxPoll({ expectRevealCount: 2 });
           return;
         }
         console.error("[auto-reveal] failed:", msg);
@@ -217,12 +347,13 @@ export default function Match1v1Page() {
     account,
     state,
     matchId,
-    committed,
+    effectiveCommitted,
     revealed,
-    roundStatus.commitCount,
+    effectiveCommitCount,
     refresh,
     revealRetry,
     autoRevealStatus,
+    startPostTxPoll,
   ]);
 
   // Refs for values the auto-resolve timer callback needs, so the
@@ -244,7 +375,7 @@ export default function Match1v1Page() {
       !account ||
       !state ||
       !address ||
-      roundStatus.revealCount < 2 ||
+      effectiveRevealCount < 2 ||
       state.phase === "finished" ||
       autoResolveLock.current
     )
@@ -299,7 +430,7 @@ export default function Match1v1Page() {
     // Intentionally narrow deps — state/refresh accessed via refs so
     // subscription-driven re-renders don't cancel the pending timer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address, matchId, roundStatus.revealCount, resolveRetryCount]);
+  }, [address, matchId, effectiveRevealCount, resolveRetryCount]);
 
   const handleRetryReveal = useCallback(() => {
     autoRevealLock.current = false;
@@ -352,6 +483,8 @@ export default function Match1v1Page() {
       // useEffect below flips `confirming` off.
       setSubmitting(false);
       setConfirming(true);
+      // Start polling to bridge the gRPC subscription lag
+      startPostTxPoll({ expectCommitted: true, expectCommitCount: roundStatus.commitCount + 1 });
       void refresh();
     } catch (e) {
       console.error("Commit failed:", e);
@@ -359,13 +492,13 @@ export default function Match1v1Page() {
       commitLock.current = false;
       setSubmitting(false);
     }
-  }, [account, state, allocations, budget, matchId, refresh, selectedAbility, selectedTarget]);
+  }, [account, state, allocations, budget, matchId, refresh, selectedAbility, selectedTarget, startPostTxPoll, roundStatus.commitCount]);
 
   // Clear confirming once Torii reports the commit on-chain (ends the
   // 5-10s indexing lag where the button was previously re-enabling).
   useEffect(() => {
-    if (committed && confirming) setConfirming(false);
-  }, [committed, confirming, setConfirming]);
+    if (effectiveCommitted && confirming) setConfirming(false);
+  }, [effectiveCommitted, confirming, setConfirming]);
 
   // Loading
   if (loading || !state) {
@@ -422,9 +555,9 @@ export default function Match1v1Page() {
 
   // Phase status text
   let phaseText = "";
-  if (committed && !revealed && roundStatus.commitCount < 2) {
+  if (effectiveCommitted && !revealed && effectiveCommitCount < 2) {
     phaseText = "Waiting for opponent to commit...";
-  } else if (committed && !revealed && roundStatus.commitCount >= 2) {
+  } else if (effectiveCommitted && !revealed && effectiveCommitCount >= 2) {
     if (autoRevealStatus === "error") {
       phaseText = "Reveal failed — retry below";
     } else if (autoRevealStatus === "pending") {
@@ -432,7 +565,7 @@ export default function Match1v1Page() {
     } else {
       phaseText = "Preparing to reveal...";
     }
-  } else if (committed && revealed && roundStatus.revealCount < 2) {
+  } else if (effectiveCommitted && revealed && effectiveRevealCount < 2) {
     phaseText = "Waiting for opponent to reveal...";
   } else if (state.phase === "resolving") {
     phaseText = autoResolveError ? "Resolve failed — retry below" : "Resolving round...";
@@ -644,7 +777,7 @@ export default function Match1v1Page() {
 
       {/* ===== 4. DEPLOYMENT PANEL ===== */}
       <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">
-        {state.phase === "committing" && (!committed || confirming) ? (
+        {state.phase === "committing" && (!effectiveCommitted || confirming) ? (
           <AllocationForm1v1
             budget={budget}
             allocations={allocations}
@@ -704,7 +837,7 @@ export default function Match1v1Page() {
                 </button>
               </>
             )}
-            {state.phase === "resolving" && !autoResolveError && roundStatus.revealCount >= 2 && (
+            {state.phase === "resolving" && !autoResolveError && effectiveRevealCount >= 2 && (
               <button
                 onClick={async () => {
                   if (!account) return;
@@ -837,6 +970,35 @@ export default function Match1v1Page() {
                               }
                               return null;
                             });
+                          })()}
+                        </div>
+                      )}
+                      {(r.aAbilityId > 0 || r.bAbilityId > 0) && (
+                        <div className="text-xs border-t border-[#3d3428] pt-2 space-y-1">
+                          <div className="text-[10px] tracking-wider text-[#7a7060] uppercase">Abilities Used</div>
+                          {(() => {
+                            const myAbilityId = isPlayerA ? r.aAbilityId : r.bAbilityId;
+                            const myAbilityTarget = isPlayerA ? r.aAbilityTarget : r.bAbilityTarget;
+                            const theirAbilityId = isPlayerA ? r.bAbilityId : r.aAbilityId;
+                            const theirAbilityTarget = isPlayerA ? r.bAbilityTarget : r.aAbilityTarget;
+                            const abilityGateNames = ["East Gate", "West Gate", "Underground Gate"];
+                            const getAbilityName = (id: number) => ABILITIES[id - 1]?.name || `Ability #${id}`;
+                            return (
+                              <>
+                                {myAbilityId > 0 && (
+                                  <div className="text-[#c8a44e]">
+                                    You used <span className="font-bold">{getAbilityName(myAbilityId)}</span>
+                                    {myAbilityTarget > 0 && ` on ${abilityGateNames[myAbilityTarget - 1] || `target ${myAbilityTarget}`}`}
+                                  </div>
+                                )}
+                                {theirAbilityId > 0 && (
+                                  <div className="text-[#ff8800]">
+                                    Opponent used <span className="font-bold">{getAbilityName(theirAbilityId)}</span>
+                                    {theirAbilityTarget > 0 && ` on ${abilityGateNames[theirAbilityTarget - 1] || `target ${theirAbilityTarget}`}`}
+                                  </div>
+                                )}
+                              </>
+                            );
                           })()}
                         </div>
                       )}

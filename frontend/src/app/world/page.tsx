@@ -167,11 +167,32 @@ export default function WorldPage() {
   const { parcels, loading } = useWorldParcels(refreshKey);
   const kingdom = usePlayerKingdom(address || null, refreshKey);
   const [abilities, setAbilities] = useState<Record<number, number>>({});
+  const [claiming, setClaiming] = useState(false);
+  const [claimError, setClaimError] = useState("");
   const ownerAddresses = parcels.map((p) => p.owner).filter((o) => o && o !== "0x0");
   const cosmeticsMap = useBulkPlayerCosmetics(ownerAddresses, refreshKey);
   const myCosmetics = usePlayerCosmetics(address ?? undefined, refreshKey);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+
+  const claimDrip = useCallback(async () => {
+    if (!account) return;
+    setClaiming(true);
+    setClaimError("");
+    try {
+      await account.execute({
+        contractAddress: WORLD_SYSTEM_ADDRESS,
+        entrypoint: "claim_drip",
+        calldata: [],
+      });
+      refresh();
+    } catch (e) {
+      console.error("Claim drip failed:", e);
+      setClaimError(e instanceof Error ? e.message : "Claim failed");
+    } finally {
+      setClaiming(false);
+    }
+  }, [account, refresh]);
 
   // Fetch ability balances (all 10 token IDs — T1 1..5, T2 6..10)
   useEffect(() => {
@@ -301,6 +322,20 @@ export default function WorldPage() {
                 )}
               </div>
             </div>
+          </div>
+
+          {/* Claim drip button */}
+          <div className="pt-2 border-t border-[#3d3428]">
+            <button
+              onClick={claimDrip}
+              disabled={claiming}
+              className="w-full px-4 py-2 bg-[#daa520]/10 border border-[#daa520]/50 text-[#daa520] rounded font-bold tracking-wider text-xs font-serif hover:bg-[#daa520]/20 hover:border-[#daa520] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {claiming ? "CLAIMING..." : "CLAIM RESOURCES"}
+            </button>
+            {claimError && (
+              <div className="mt-1 text-[10px] text-red-400">{claimError}</div>
+            )}
           </div>
         </div>
       )}

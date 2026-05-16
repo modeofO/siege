@@ -355,13 +355,6 @@ function tierAbilitySlots(tier: number): number {
   return 1;
 }
 
-function tierParcelCap(tier: number): number {
-  if (tier === 0) return 2;
-  if (tier === 1) return 5;
-  if (tier === 2) return 8;
-  if (tier === 3) return 12;
-  return 2;
-}
 
 function tierPresetCount(tier: number): number {
   if (tier === 0) return 1;
@@ -947,7 +940,6 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           ? {
               home_parcels: [kingdom.home_0, kingdom.home_1, kingdom.home_2],
               non_home_parcel_count: Math.max(0, kingdom.parcel_count - 3),
-              parcel_cap: tierParcelCap(kingdom.tier),
               ability_slots: tierAbilitySlots(kingdom.tier),
               preset_slots: tierPresetCount(kingdom.tier),
               next_tier: kingdom.tier < 3 ? kingdom.tier + 1 : null,

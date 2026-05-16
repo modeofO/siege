@@ -44,7 +44,6 @@ export function KingdomUpgrade({ tier, totalWins }: KingdomUpgradeProps) {
       <div className="text-xs text-[#7a7060] tracking-wider uppercase mb-2">Next: {tierName(nextTier)}</div>
       <div className="text-[10px] text-[#7a7060] space-y-1 mb-3">
         <div>Ability Slots: {info.abilitySlots}</div>
-        <div>Parcel Cap: {info.parcelCap}</div>
         <div>Defense Presets: {info.defensePresets}</div>
       </div>
       <div className="text-[10px] text-[#7a7060] mb-2">

@@ -129,6 +129,10 @@ export interface RoundResult1v1 {
   bTraps: [number, number, number];
   trapDmgToA: number;
   trapDmgToB: number;
+  aAbilityId: number;
+  aAbilityTarget: number;
+  bAbilityId: number;
+  bAbilityTarget: number;
 }
 
 function ownerToNode(owner: string): NodeOwner {
@@ -264,7 +268,6 @@ export function useMatchState1v1(matchId: string | null) {
             ModelsMapping.RoundTraps1v1,
             ModelsMapping.Commitment,
             ModelsMapping.MatchAbilities1v1,
-            ModelsMapping.MatchStakes1v1,
           ],
           [toFeltHex(matchId)],
           "VariableLen",
@@ -441,6 +444,10 @@ export function useRoundHistory1v1(matchId: string | null): RoundResult1v1[] {
           bTraps: traps.b,
           trapDmgToA: 0,
           trapDmgToB: 0,
+          aAbilityId: safeNum(n.a_ability_id),
+          aAbilityTarget: safeNum(n.a_ability_target),
+          bAbilityId: safeNum(n.b_ability_id),
+          bAbilityTarget: safeNum(n.b_ability_target),
         };
       });
   }, [matchId, roundMoves, roundMods, roundTraps]);

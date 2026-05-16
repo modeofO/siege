@@ -144,14 +144,10 @@ pub mod conquest {
                 panic!("Cannot conquest faction ally");
             }
 
-            // Attacker kingdom for adjacency + parcel cap check
+            // Attacker kingdom for adjacency check
             let atk_kingdom: PlayerKingdom = world.read_model(attacker);
             assert(atk_kingdom.registered, 'Not registered');
 
-            // Tier-based parcel cap check
-            let non_home = if atk_kingdom.parcel_count > 3 { atk_kingdom.parcel_count - 3 } else { 0 };
-            let cap = siege_dojo::systems::world_system::tier_parcel_cap(atk_kingdom.tier);
-            assert(non_home < cap, 'Parcel cap reached');
             let config: WorldConfig = world.read_model(0_u8);
             let mut has_adjacent = false;
 

@@ -2,10 +2,10 @@ export const TIER_NAMES = ["Polis", "Strategos", "Hegemonia", "Basileia"] as con
 export type TierName = (typeof TIER_NAMES)[number];
 
 export const TIER_INFO = [
-  { name: "Polis", abilitySlots: 1, parcelCap: 2, defensePresets: 1 },
-  { name: "Strategos", abilitySlots: 2, parcelCap: 5, defensePresets: 2 },
-  { name: "Hegemonia", abilitySlots: 3, parcelCap: 8, defensePresets: 3 },
-  { name: "Basileia", abilitySlots: 4, parcelCap: 12, defensePresets: 4 },
+  { name: "Polis", abilitySlots: 1, defensePresets: 1 },
+  { name: "Strategos", abilitySlots: 2, defensePresets: 2 },
+  { name: "Hegemonia", abilitySlots: 3, defensePresets: 3 },
+  { name: "Basileia", abilitySlots: 4, defensePresets: 4 },
 ] as const;
 
 export interface UpgradeCost {

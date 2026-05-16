@@ -297,7 +297,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                 </text>
               )}
               {/* Banner pennant */}
-              {!unclaimed && ownerCosmetics?.banner && (() => {
+              {!unclaimed && home && ownerCosmetics?.banner && (() => {
                 const bs = getBannerStyle(ownerCosmetics.banner);
                 if (!bs) return null;
                 return (

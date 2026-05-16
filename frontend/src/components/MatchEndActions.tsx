@@ -75,11 +75,8 @@ export function MatchEndActions({
   const winnerKingdom = usePlayerKingdom(didWin ? (address ?? null) : null);
   const {
     candidates,
-    atCap,
-    nonHomeCount,
-    parcelCap,
     loading: candidatesLoading,
-  } = useClaimCandidates(didWin ? winnerAddr : null, winnerKingdom.tier, winnerKingdom.parcelCount);
+  } = useClaimCandidates(didWin ? winnerAddr : null);
 
   const [settling, setSettling] = useState(false);
   const [claiming, setClaiming] = useState<number | null>(null);
@@ -176,11 +173,7 @@ export function MatchEndActions({
         {didWin && escrow.loaded && escrow.settled && claimed === null && (
           <div className="space-y-2">
             <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">Claim a Parcel</div>
-            {atCap ? (
-              <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-                Parcel cap reached ({nonHomeCount}/{parcelCap}). Upgrade your Hold to claim more.
-              </div>
-            ) : candidatesLoading ? (
+            {candidatesLoading ? (
               <div className="text-[11px] text-[#7a7060]">Scanning Marches...</div>
             ) : candidates.length === 0 ? (
               <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
