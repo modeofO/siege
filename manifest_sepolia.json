@@ -98,7 +98,7 @@
     },
     {
       "address": "0x5d46148c9a4ec5e3e06dfc7efb6d28f4148c684d2811543d7b787cf4de3843",
-      "class_hash": "0x2c9b1c45ebb432aa901cbca94a6cccf015eabcfd4ffe662782a7ac3796c0686",
+      "class_hash": "0x3f23c6803def2a038919d7a2dbe621c0298fe39c7a3f7b33a8780419423e4ad",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
       "selector": "0x48ced6417f88e7c589f1f67c5e7c6a5b74d4c4cc465d50b11d54b4095a42747",

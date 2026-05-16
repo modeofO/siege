@@ -8,6 +8,7 @@ import { useAccount } from "@/app/providers";
 import { useResourceBalances, RESOURCE_TOKENS, type ResourceBalances } from "@/lib/useResourceBalances";
 import { ABILITIES, canAfford, maxAffordable, craftAbility, craftAbilityTier2, abilityType, type AbilityCost } from "@/lib/craftingContracts";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
+import { toriiSql, sqlHex, toNum } from "@/lib/toriiSql";
 import { LAST_MATCH_KEY } from "@/components/Navbar";
 import { useForgeState } from "@/lib/forge/forgeState";
 import type { ComponentKind } from "@/lib/forge/circuits";
@@ -113,6 +114,8 @@ export default function CraftPage() {
   const [error, setError] = useState("");
   const [lastMatch, setLastMatch] = useState<string | null>(null);
 
+  const [playerTier, setPlayerTier] = useState(0);
+
   // Per-item quantity selections
   const [abilityQtys, setAbilityQtys] = useState<Record<number, number>>({});
   const [partQtys, setPartQtys] = useState<Record<string, number>>({});
@@ -132,6 +135,15 @@ export default function CraftPage() {
     const provider = new RpcProvider({ nodeUrl: RPC_URL });
     fetchAllAbilityBalances(provider, address).then((bal) => {
       if (!cancelled) setAbilityBalances(bal);
+    });
+    return () => { cancelled = true; };
+  }, [address]);
+
+  useEffect(() => {
+    if (!address) { setPlayerTier(0); return; }
+    let cancelled = false;
+    toriiSql<{ tier: number }>(`SELECT tier FROM "siege_dojo-PlayerKingdom" WHERE player = ${sqlHex(address)}`).then((rows) => {
+      if (!cancelled) setPlayerTier(rows[0] ? toNum(rows[0].tier) : 0);
     });
     return () => { cancelled = true; };
   }, [address]);
@@ -254,6 +266,7 @@ export default function CraftPage() {
     const isT2 = ability.tier === 2;
     const t1Owned = isT2 ? (abilityBalances[abilityType(ability.id)] ?? 0) : 0;
     const needsT1 = isT2 && t1Owned < qty;
+    const tierLocked = isT2 && playerTier < 1;
     const { baseTransform, bg } = cardStyle(side, "ability");
 
     const bgT2 = isT2
@@ -325,17 +338,22 @@ export default function CraftPage() {
             );
           })}
         </div>
-        <div className="flex items-center gap-2">
+        {tierLocked && (
+          <div className="text-[10px] text-center py-1 rounded-sm" style={{ background: "rgba(74,48,22,0.1)", border: "1px solid rgba(74,48,22,0.3)", color: "#5a3b1e" }}>
+            Requires Strategos rank (10 wins)
+          </div>
+        )}
+        {!tierLocked && <div className="flex items-center gap-2">
           <QtySelector qty={qty} max={Math.max(1, max)} onChange={(n) => setAbilityQtys((p) => ({ ...p, [ability.id]: n }))} disabled={isBusy} />
           <button
             onClick={() => isT2 ? handleCraftTier2(ability) : handleCraftAbility(ability.id, cost)}
-            disabled={!isConnected || !affordable || (isT2 && needsT1) || isBusy}
+            disabled={!isConnected || !affordable || needsT1 || isBusy}
             className="flex-1 py-1.5 rounded-sm font-bold tracking-wider text-xs font-serif transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={btnStyle}
           >
             {isBusy ? "CRAFTING..." : qty > 1 ? `CRAFT x${qty}` : "CRAFT"}
           </button>
-        </div>
+        </div>}
       </div>
     );
   };

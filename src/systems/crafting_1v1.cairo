@@ -102,6 +102,9 @@ pub mod crafting_1v1 {
             let caller = get_caller_address();
             assert(ability_type >= 1 && ability_type <= 5, 'Invalid ability type');
 
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.tier >= 1, 'Requires Strategos rank');
+
             let config: ResourceConfig = world.read_model(0_u8);
 
             // Burn T2 recipe resources (the T1 ability is burned separately below)
@@ -197,6 +200,9 @@ pub mod crafting_1v1 {
             let mut world = self.world_default();
             let caller = get_caller_address();
             assert(ability_type >= 1 && ability_type <= 5, 'Invalid ability type');
+
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.tier >= 1, 'Requires Strategos rank');
 
             let config: ResourceConfig = world.read_model(0_u8);
             let qty: u256 = quantity.into();
