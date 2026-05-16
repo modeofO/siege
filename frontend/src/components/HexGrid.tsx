@@ -66,33 +66,56 @@ interface SkinDecor {
   innerRingColor: string;
   innerRingOpacity: number;
   cornerMarks: boolean;
+  ringDash: string;
 }
 
 const SKIN_DECOR: Record<string, SkinDecor> = {
   "voltage-divider": {
-    patternId: "skin-diagonal",
+    patternId: "skin-divider",
     innerRingColor: "#c8a44e",
-    innerRingOpacity: 0.5,
+    innerRingOpacity: 0.55,
     cornerMarks: true,
+    ringDash: "4 3",
   },
   "common-emitter-amp": {
-    patternId: "skin-crosshatch",
-    innerRingColor: "#8a8a9a",
-    innerRingOpacity: 0.45,
+    patternId: "skin-emitter",
+    innerRingColor: "#a0c4e8",
+    innerRingOpacity: 0.5,
     cornerMarks: true,
+    ringDash: "2 2 6 2",
   },
-};
-
-const DEFAULT_SKIN_DECOR: SkinDecor = {
-  patternId: "skin-dots",
-  innerRingColor: "#c8a44e",
-  innerRingOpacity: 0.4,
-  cornerMarks: false,
 };
 
 function getSkinDecor(skin: string | null): SkinDecor | null {
   if (!skin) return null;
-  return SKIN_DECOR[skin] ?? DEFAULT_SKIN_DECOR;
+  return SKIN_DECOR[skin] ?? null;
+}
+
+interface BannerStyle {
+  fill: string;
+  stroke: string;
+  shape: "rect" | "pennant" | "pointed" | "swallow";
+}
+
+const BANNER_STYLES: Record<string, BannerStyle> = {
+  "half-wave-rectifier": { fill: "rgba(200,164,78,0.3)", stroke: "#c8a44e", shape: "rect" },
+  "full-wave-rectifier": { fill: "rgba(180,80,80,0.3)", stroke: "#c44332", shape: "pennant" },
+  "rc-low-pass": { fill: "rgba(120,160,200,0.3)", stroke: "#6a9cc8", shape: "pointed" },
+  "lc-tank": { fill: "rgba(160,200,120,0.3)", stroke: "#7ab456", shape: "swallow" },
+};
+
+function getBannerStyle(banner: string | null): BannerStyle | null {
+  if (!banner) return null;
+  return BANNER_STYLES[banner] ?? null;
+}
+
+function bannerPath(shape: BannerStyle["shape"]): string {
+  switch (shape) {
+    case "rect": return "M-5,-7 L5,-7 L5,8 L-5,8 Z";
+    case "pennant": return "M-5,-7 L5,-7 L5,5 L0,8 L-5,5 Z";
+    case "pointed": return "M-5,-7 L5,-7 L5,4 L0,9 L-5,4 Z";
+    case "swallow": return "M-5,-7 L5,-7 L5,6 L0,3 L-5,6 Z";
+  }
 }
 
 export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }: HexGridProps) {
@@ -150,16 +173,14 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
             </feMerge>
           </filter>
 
-          {/* Parcel skin patterns */}
-          <pattern id="skin-diagonal" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+          {/* Parcel skin: Bleeder's Mark — gold diagonal slashes */}
+          <pattern id="skin-divider" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="8" stroke="#c8a44e" strokeWidth="1.5" strokeOpacity="0.4" />
           </pattern>
-          <pattern id="skin-crosshatch" patternUnits="userSpaceOnUse" width="8" height="8">
-            <line x1="0" y1="0" x2="8" y2="8" stroke="#8a8a9a" strokeWidth="0.8" strokeOpacity="0.35" />
-            <line x1="8" y1="0" x2="0" y2="8" stroke="#8a8a9a" strokeWidth="0.8" strokeOpacity="0.35" />
-          </pattern>
-          <pattern id="skin-dots" patternUnits="userSpaceOnUse" width="10" height="10">
-            <circle cx="5" cy="5" r="1.2" fill="#c8a44e" fillOpacity="0.35" />
+          {/* Parcel skin: Herald's Voice — blue concentric rings */}
+          <pattern id="skin-emitter" patternUnits="userSpaceOnUse" width="16" height="16">
+            <circle cx="8" cy="8" r="3" fill="none" stroke="#6a9cc8" strokeWidth="0.8" strokeOpacity="0.35" />
+            <circle cx="8" cy="8" r="7" fill="none" stroke="#6a9cc8" strokeWidth="0.6" strokeOpacity="0.25" />
           </pattern>
         </defs>
 
@@ -205,7 +226,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                     stroke={skinDecor.innerRingColor}
                     strokeWidth={1}
                     strokeOpacity={skinDecor.innerRingOpacity}
-                    strokeDasharray="4 3"
+                    strokeDasharray={skinDecor.ringDash}
                   />
                   {/* Corner marks at hex vertices */}
                   {skinDecor.cornerMarks && Array.from({ length: 6 }).map((_, i) => {
@@ -250,13 +271,17 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                 </text>
               )}
               {/* Banner pennant */}
-              {!unclaimed && ownerCosmetics?.banner && (
-                <g transform={`translate(${x + 14}, ${y - 20})`}>
-                  <rect x={-6} y={-8} width={12} height={16} rx={1} fill="rgba(200,164,78,0.25)" stroke="#c8a44e" strokeWidth={0.8} />
-                  <line x1={0} y1={-8} x2={0} y2={-14} stroke="#c8a44e" strokeWidth={0.8} />
-                  <circle cx={0} cy={-14} r={1.2} fill="#c8a44e" />
-                </g>
-              )}
+              {!unclaimed && ownerCosmetics?.banner && (() => {
+                const bs = getBannerStyle(ownerCosmetics.banner);
+                if (!bs) return null;
+                return (
+                  <g transform={`translate(${x + 14}, ${y - 20})`}>
+                    <path d={bannerPath(bs.shape)} fill={bs.fill} stroke={bs.stroke} strokeWidth={0.8} />
+                    <line x1={0} y1={-7} x2={0} y2={-13} stroke={bs.stroke} strokeWidth={0.8} />
+                    <circle cx={0} cy={-13} r={1.2} fill={bs.stroke} />
+                  </g>
+                );
+              })()}
             </g>
           );
         })}
