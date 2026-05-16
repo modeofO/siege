@@ -72,18 +72,23 @@ between turns.
 
 Total cost: `sum(attack) + sum(defense) + repair + sum(nodes) + 2*sum(traps)`
 
-### Abilities are single-use per match
+### Abilities are single-use per battle — once used, gone for the match
 
-Each staked ability has a `used` flag in `MatchAbilities1v1` that flips
-true the first time you reveal with that `ability_id`. Activating it
-again — or activating an id you never staked — reverts the reveal with
-`Ability not available`. Because the commit hash binds `ability_id`, a
-mistaken commit cannot be salvaged: reveal will keep reverting until the
-deadline passes and you forfeit the round to `siege_force_timeout`.
+Each staked ability can only be activated **once per match**. The moment
+you reveal with a given `ability_id`, its `used` flag in
+`MatchAbilities1v1` flips true permanently for that battle. You cannot
+use the same ability again in any later round — it is consumed.
+Activating an already-used id, or one you never staked, reverts the
+reveal with `Ability not available`. Because the commit hash binds
+`ability_id`, a mistaken commit cannot be salvaged: reveal will keep
+reverting until the deadline passes and you forfeit the round to
+`siege_force_timeout`.
 
-Always call `siege_my_abilities` *before* `siege_commit` to confirm the
-id is still available. Stakes from `MatchStakes1v1` show what's escrowed,
-but only `MatchAbilities1v1` shows what's still usable mid-match.
+**Before every commit**, call `siege_my_abilities` to confirm the id is
+still available. Stakes from `MatchStakes1v1` show what's escrowed, but
+only `MatchAbilities1v1` shows what's still usable mid-match. Plan your
+ability usage carefully — burning your strongest ability in round 1
+leaves you without it for the rest of the battle.
 
 ### What's at stake in a staked match
 
@@ -96,8 +101,8 @@ If you **win**:
 - You become eligible to call `siege_claim_parcel` for ONE unclaimed
   parcel that is hex-adjacent to one of your existing parcels (homes or
   prior conquered land). You choose the parcel's resource type
-  (`0` Forge / `1` Quarry / `2` Grove). Subject to your tier's parcel cap
-  for non-home parcels (Polis 2, Strategos 5, Hegemonia 8, Basileia 12).
+  (`0` Forge / `1` Quarry / `2` Grove). There is no cap — claim as many
+  parcels as you can win.
 - `PlayerKingdom.total_wins++` (path to tier upgrade), reputation
   bracket may shift, head-to-head `MatchRecord` updates.
 - If your territory borders any of the opponent's home parcels, you
@@ -108,32 +113,36 @@ If you **lose**: the opponent gets your escrowed abilities and the same
 parcel / pillage eligibilities against you. A draw returns escrowed
 abilities to both sides and grants neither parcel nor pillage rights.
 
-### After the match — settle, then claim
+### After the match — always settle, claim, and drip
 
-When `phase="finished"` arrives:
+When `phase="finished"` arrives, **always do all of the following**:
 
-1. Either player calls `siege_settle_match`. Whoever lands first wins
-   the race; the second call reverts with `Already settled` (harmless).
-   Settling transfers staked abilities to the winner and mints a small
-   resource bonus for every parcel each player owns.
-2. If you won and want territory:
+1. **Settle** — call `siege_settle_match`. Either player can call it;
+   the second call reverts with `Already settled` (harmless). Settling
+   transfers staked abilities to the winner.
+2. **Claim resource drip** — call `siege_claim_drip` **regardless of
+   whether you won or lost**. This mints resources for every non-pillaged
+   home parcel you own. Always do this after every match.
+3. **If you won — claim a parcel**:
    - `siege_get_world_state` to see the parcel grid and ownership.
-   - `siege_get_player_kingdom` to confirm `parcel_count - 3` is below
-     your tier's cap.
    - Pick an unclaimed parcel (`owner == 0x0`) hex-adjacent to one of
      your existing parcels.
    - Call `siege_claim_parcel(match_id, parcel_id, parcel_type)`.
      `parcel_type` is your choice — claimed parcels are typed at claim
-     time, not pre-typed on the map.
-3. If `siege_get_player_kingdom` shows a fresh `pillage_eligibility`,
+     time, not pre-typed on the map. There is no parcel cap.
+4. If `siege_get_player_kingdom` shows a fresh `pillage_eligibility`,
    call `siege_initiate_pillage(match_id, home_parcel_id)` within the
    24-hour window, then `siege_claim_pillage_drip` periodically to
    siphon resources from the targeted home parcel.
 
+**Do not skip steps 1–3.** Settling collects your won abilities, drip
+collects your resources, and claiming expands your territory. All three
+are essential after every match.
+
 ### Plan claims at match start, not match end
 
 Don't wait until victory to figure out what to claim. Before round 1:
-- `siege_get_player_kingdom` — your parcels, tier, cap remaining.
+- `siege_get_player_kingdom` — your parcels and tier.
 - `siege_get_world_state` — full parcel grid with positions and owners.
 - Identify candidate unclaimed parcels adjacent to your territory and
   candidate enemy home parcels you'd be eligible to pillage.
