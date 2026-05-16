@@ -72,15 +72,15 @@ interface SkinDecor {
 const SKIN_DECOR: Record<string, SkinDecor> = {
   "voltage-divider": {
     patternId: "skin-divider",
-    innerRingColor: "#c8a44e",
-    innerRingOpacity: 0.55,
+    innerRingColor: "#daa520",
+    innerRingOpacity: 0.7,
     cornerMarks: true,
     ringDash: "4 3",
   },
   "common-emitter-amp": {
     patternId: "skin-emitter",
-    innerRingColor: "#a0c4e8",
-    innerRingOpacity: 0.5,
+    innerRingColor: "#7ab8e0",
+    innerRingOpacity: 0.65,
     cornerMarks: true,
     ringDash: "2 2 6 2",
   },
@@ -98,10 +98,10 @@ interface BannerStyle {
 }
 
 const BANNER_STYLES: Record<string, BannerStyle> = {
-  "half-wave-rectifier": { fill: "rgba(200,164,78,0.3)", stroke: "#c8a44e", shape: "rect" },
-  "full-wave-rectifier": { fill: "rgba(180,80,80,0.3)", stroke: "#c44332", shape: "pennant" },
-  "rc-low-pass": { fill: "rgba(120,160,200,0.3)", stroke: "#6a9cc8", shape: "pointed" },
-  "lc-tank": { fill: "rgba(160,200,120,0.3)", stroke: "#7ab456", shape: "swallow" },
+  "half-wave-rectifier": { fill: "rgba(200,164,78,0.5)", stroke: "#daa520", shape: "rect" },
+  "full-wave-rectifier": { fill: "rgba(180,80,80,0.5)", stroke: "#c44332", shape: "pennant" },
+  "rc-low-pass": { fill: "rgba(100,150,200,0.5)", stroke: "#5a8cb8", shape: "pointed" },
+  "lc-tank": { fill: "rgba(140,190,100,0.5)", stroke: "#6aa046", shape: "swallow" },
 };
 
 function getBannerStyle(banner: string | null): BannerStyle | null {
@@ -111,10 +111,10 @@ function getBannerStyle(banner: string | null): BannerStyle | null {
 
 function bannerPath(shape: BannerStyle["shape"]): string {
   switch (shape) {
-    case "rect": return "M-5,-7 L5,-7 L5,8 L-5,8 Z";
-    case "pennant": return "M-5,-7 L5,-7 L5,5 L0,8 L-5,5 Z";
-    case "pointed": return "M-5,-7 L5,-7 L5,4 L0,9 L-5,4 Z";
-    case "swallow": return "M-5,-7 L5,-7 L5,6 L0,3 L-5,6 Z";
+    case "rect": return "M-6,-8 L6,-8 L6,10 L-6,10 Z";
+    case "pennant": return "M-6,-8 L6,-8 L6,6 L0,10 L-6,6 Z";
+    case "pointed": return "M-6,-8 L6,-8 L6,5 L0,11 L-6,5 Z";
+    case "swallow": return "M-6,-8 L6,-8 L6,8 L0,4 L-6,8 Z";
   }
 }
 
@@ -174,13 +174,13 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
           </filter>
 
           {/* Parcel skin: Bleeder's Mark — gold diagonal slashes */}
-          <pattern id="skin-divider" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="8" stroke="#c8a44e" strokeWidth="1.5" strokeOpacity="0.4" />
+          <pattern id="skin-divider" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="7" stroke="#daa520" strokeWidth="2" strokeOpacity="0.7" />
           </pattern>
           {/* Parcel skin: Herald's Voice — blue concentric rings */}
-          <pattern id="skin-emitter" patternUnits="userSpaceOnUse" width="16" height="16">
-            <circle cx="8" cy="8" r="3" fill="none" stroke="#6a9cc8" strokeWidth="0.8" strokeOpacity="0.35" />
-            <circle cx="8" cy="8" r="7" fill="none" stroke="#6a9cc8" strokeWidth="0.6" strokeOpacity="0.25" />
+          <pattern id="skin-emitter" patternUnits="userSpaceOnUse" width="14" height="14">
+            <circle cx="7" cy="7" r="3" fill="none" stroke="#7ab8e0" strokeWidth="1.2" strokeOpacity="0.6" />
+            <circle cx="7" cy="7" r="6" fill="none" stroke="#7ab8e0" strokeWidth="0.8" strokeOpacity="0.4" />
           </pattern>
         </defs>
 
@@ -275,10 +275,10 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                 const bs = getBannerStyle(ownerCosmetics.banner);
                 if (!bs) return null;
                 return (
-                  <g transform={`translate(${x + 14}, ${y - 20})`}>
-                    <path d={bannerPath(bs.shape)} fill={bs.fill} stroke={bs.stroke} strokeWidth={0.8} />
-                    <line x1={0} y1={-7} x2={0} y2={-13} stroke={bs.stroke} strokeWidth={0.8} />
-                    <circle cx={0} cy={-13} r={1.2} fill={bs.stroke} />
+                  <g transform={`translate(${x + 16}, ${y - 22})`}>
+                    <path d={bannerPath(bs.shape)} fill={bs.fill} stroke={bs.stroke} strokeWidth={1} />
+                    <line x1={0} y1={-8} x2={0} y2={-15} stroke={bs.stroke} strokeWidth={1} />
+                    <circle cx={0} cy={-15} r={1.5} fill={bs.stroke} />
                   </g>
                 );
               })()}
