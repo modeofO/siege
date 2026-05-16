@@ -39,6 +39,7 @@ const EMPTY_BALANCES: Record<number, number> = {};
 for (let i = 1; i <= 10; i++) EMPTY_BALANCES[i] = 0;
 
 type CraftTab = "abilities" | "parts";
+type AbilityTier = 1 | 2;
 
 function QtySelector({
   qty,
@@ -93,6 +94,7 @@ export default function CraftPage() {
   const subscribedResources = useResourceBalances(address);
   const [optimisticDelta, setOptimisticDelta] = useState<Partial<ResourceBalances>>({});
   const [activeTab, setActiveTab] = useState<CraftTab>("abilities");
+  const [abilityTier, setAbilityTier] = useState<AbilityTier>(1);
   const forgeState = useForgeState(account ?? undefined);
 
   const resources: ResourceBalances = {
@@ -427,8 +429,9 @@ export default function CraftPage() {
     );
   };
 
-  const t1Abilities = ABILITIES.filter((a) => a.tier === 1);
-  const t2Abilities = ABILITIES.filter((a) => a.tier === 2);
+  const shownAbilities = ABILITIES.filter((a) => a.tier === abilityTier);
+  const leftAbilities = shownAbilities.slice(0, 2);
+  const rightAbilities = shownAbilities.slice(2);
   const leftParts = CRAFTABLE_COMPONENTS.slice(0, 2);
   const rightParts = CRAFTABLE_COMPONENTS.slice(2);
 
@@ -496,6 +499,33 @@ export default function CraftPage() {
                 </button>
               </div>
 
+              {activeTab === "abilities" && (
+                <div className="flex justify-center gap-1">
+                  <button
+                    onClick={() => setAbilityTier(1)}
+                    className="px-2.5 py-0.5 rounded-sm text-[9px] tracking-wider font-serif transition-colors"
+                    style={{
+                      background: abilityTier === 1 ? "rgba(74,48,22,0.7)" : "rgba(74,48,22,0.08)",
+                      border: "1px solid rgba(74,48,22,0.4)",
+                      color: abilityTier === 1 ? "#e8d6aa" : "#5a3b1e",
+                    }}
+                  >
+                    TIER 1
+                  </button>
+                  <button
+                    onClick={() => setAbilityTier(2)}
+                    className="px-2.5 py-0.5 rounded-sm text-[9px] tracking-wider font-serif transition-colors"
+                    style={{
+                      background: abilityTier === 2 ? "rgba(178,134,60,0.8)" : "rgba(74,48,22,0.08)",
+                      border: abilityTier === 2 ? "1px solid rgba(178,134,60,0.6)" : "1px solid rgba(74,48,22,0.4)",
+                      color: abilityTier === 2 ? "#fff8e7" : "#5a3b1e",
+                    }}
+                  >
+                    TIER 2
+                  </button>
+                </div>
+              )}
+
               {lastMatch && (
                 <div className="flex justify-center">
                   <Link
@@ -525,7 +555,7 @@ export default function CraftPage() {
             </div>
 
             {activeTab === "abilities"
-              ? <div className="space-y-3 mt-1">{t1Abilities.map((a) => renderAbilityCard(a, "left"))}</div>
+              ? <div className="space-y-3 mt-1">{leftAbilities.map((a) => renderAbilityCard(a, "left"))}</div>
               : <div className="space-y-3 mt-1">{leftParts.map((k) => renderPartCard(k, "left"))}</div>}
 
             {error && <div className="text-[10px] text-center" style={{ color: "#8b1a2a" }}>{error}</div>}
@@ -534,7 +564,7 @@ export default function CraftPage() {
           {/* RIGHT PAGE */}
           <div className="flex-1 flex flex-col gap-3 min-w-0" style={{ padding: "0 6% 0 5%" }}>
             {activeTab === "abilities"
-              ? <div className="space-y-3">{t2Abilities.map((a) => renderAbilityCard(a, "right"))}</div>
+              ? <div className="space-y-3">{rightAbilities.map((a) => renderAbilityCard(a, "right"))}</div>
               : <div className="space-y-3">{rightParts.map((k) => renderPartCard(k, "right"))}</div>}
 
             <div className="text-center mt-auto pt-2" style={{ transform: "rotateX(14deg) rotateY(-6deg)", transformOrigin: "center top", transformStyle: "preserve-3d" }}>
