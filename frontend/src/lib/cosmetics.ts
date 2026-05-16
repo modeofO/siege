@@ -30,6 +30,14 @@ const EMPTY_COSMETICS: PlayerCosmeticsData = {
   holdDecoration: null,
 };
 
+function normalizeAddr(a: string): string {
+  try {
+    return "0x" + BigInt(a).toString(16);
+  } catch {
+    return a.toLowerCase();
+  }
+}
+
 function feltToCircuitKey(felt: string | null): CircuitKey | null {
   if (!felt || felt === "0x0" || felt === "0") return null;
   const decoded = feltToStr(felt);
@@ -105,7 +113,7 @@ export function useBulkPlayerCosmetics(
 
       const map: Record<string, PlayerCosmeticsData> = {};
       for (const row of rows) {
-        map[row.player] = {
+        map[normalizeAddr(row.player)] = {
           banner: feltToCircuitKey(row.banner),
           parcelSkin: feltToCircuitKey(row.parcel_skin),
           holdDecoration: feltToCircuitKey(row.hold_decoration),

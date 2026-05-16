@@ -12,18 +12,6 @@ interface HexGridProps {
   cosmeticsMap?: Record<string, PlayerCosmeticsData>;
 }
 
-function parcelSkinStyle(skin: string | null): { strokeDasharray?: string; strokeWidth?: number } {
-  if (!skin) return {};
-  switch (skin) {
-    case "voltage-divider":
-      return { strokeDasharray: "6 3", strokeWidth: 2.5 };
-    case "common-emitter-amp":
-      return { strokeDasharray: "8 2 2 2", strokeWidth: 2.5 };
-    default:
-      return { strokeDasharray: "4 2", strokeWidth: 2.5 };
-  }
-}
-
 const PARCEL_TYPE_COLORS: Record<number, string> = {
   0: "#b87333", // Forge — copper
   1: "#8a8a9a", // Quarry — grey
@@ -38,34 +26,73 @@ const PARCEL_TYPE_NAMES: Record<number, string> = {
   255: "Untyped",
 };
 
-const HEX_SIZE = 36; // radius in pixels
+const HEX_SIZE = 36;
 
-// Pointy-top hex: width = sqrt(3) * size, height = 2 * size
 const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
 const HEX_HEIGHT = 2 * HEX_SIZE;
 
-// Even-row offset to pixel position (pointy-top hex)
 function hexToPixel(col: number, row: number): { x: number; y: number } {
   const x = col * HEX_WIDTH + (row % 2 === 1 ? HEX_WIDTH / 2 : 0);
   const y = row * (HEX_HEIGHT * 0.75);
   return { x, y };
 }
 
-// Pointy-top hexagon points (vertices at top/bottom, flat edges left/right)
-function hexPoints(cx: number, cy: number): string {
+function hexPoints(cx: number, cy: number, size = HEX_SIZE): string {
   const points: string[] = [];
   for (let i = 0; i < 6; i++) {
     const angle = (Math.PI / 180) * (60 * i + 30);
-    const px = cx + HEX_SIZE * Math.cos(angle);
-    const py = cy + HEX_SIZE * Math.sin(angle);
+    const px = cx + size * Math.cos(angle);
+    const py = cy + size * Math.sin(angle);
     points.push(`${px},${py}`);
   }
   return points.join(" ");
 }
 
+function normalizeAddr(a: string): string {
+  try {
+    return "0x" + BigInt(a).toString(16);
+  } catch {
+    return a.toLowerCase();
+  }
+}
+
 function truncateAddress(addr: string): string {
   if (!addr || addr === "0x0" || addr.length < 10) return "Unclaimed";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+
+interface SkinDecor {
+  patternId: string;
+  innerRingColor: string;
+  innerRingOpacity: number;
+  cornerMarks: boolean;
+}
+
+const SKIN_DECOR: Record<string, SkinDecor> = {
+  "voltage-divider": {
+    patternId: "skin-diagonal",
+    innerRingColor: "#c8a44e",
+    innerRingOpacity: 0.5,
+    cornerMarks: true,
+  },
+  "common-emitter-amp": {
+    patternId: "skin-crosshatch",
+    innerRingColor: "#8a8a9a",
+    innerRingOpacity: 0.45,
+    cornerMarks: true,
+  },
+};
+
+const DEFAULT_SKIN_DECOR: SkinDecor = {
+  patternId: "skin-dots",
+  innerRingColor: "#c8a44e",
+  innerRingOpacity: 0.4,
+  cornerMarks: false,
+};
+
+function getSkinDecor(skin: string | null): SkinDecor | null {
+  if (!skin) return null;
+  return SKIN_DECOR[skin] ?? DEFAULT_SKIN_DECOR;
 }
 
 export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }: HexGridProps) {
@@ -74,7 +101,6 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
 
   if (parcels.length === 0) return null;
 
-  // Calculate bounds for SVG viewBox
   const positions = parcels.map((p) => hexToPixel(p.col, p.row));
   const padding = HEX_SIZE * 2;
   const minX = Math.min(...positions.map((p) => p.x)) - padding;
@@ -113,7 +139,6 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
   return (
     <div className="relative">
       <svg viewBox={viewBox} className="w-full max-h-[60vh]" style={{ background: "transparent" }}>
-        {/* Glow filter for owned parcels */}
         <defs>
           <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -124,6 +149,18 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
               <feMergeNode in="SourceGraphic" />
             </feMerge>
           </filter>
+
+          {/* Parcel skin patterns */}
+          <pattern id="skin-diagonal" patternUnits="userSpaceOnUse" width="8" height="8" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#c8a44e" strokeWidth="1.5" strokeOpacity="0.4" />
+          </pattern>
+          <pattern id="skin-crosshatch" patternUnits="userSpaceOnUse" width="8" height="8">
+            <line x1="0" y1="0" x2="8" y2="8" stroke="#8a8a9a" strokeWidth="0.8" strokeOpacity="0.35" />
+            <line x1="8" y1="0" x2="0" y2="8" stroke="#8a8a9a" strokeWidth="0.8" strokeOpacity="0.35" />
+          </pattern>
+          <pattern id="skin-dots" patternUnits="userSpaceOnUse" width="10" height="10">
+            <circle cx="5" cy="5" r="1.2" fill="#c8a44e" fillOpacity="0.35" />
+          </pattern>
         </defs>
 
         {parcels.map((parcel) => {
@@ -131,8 +168,8 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
           const owned = isOwned(parcel);
           const home = isHome(parcel);
           const unclaimed = isUnclaimed(parcel);
-          const ownerCosmetics = !unclaimed ? cosmeticsMap?.[parcel.owner] : undefined;
-          const skinStyle = parcelSkinStyle(ownerCosmetics?.parcelSkin ?? null);
+          const ownerCosmetics = !unclaimed ? cosmeticsMap?.[normalizeAddr(parcel.owner)] : undefined;
+          const skinDecor = getSkinDecor(ownerCosmetics?.parcelSkin ?? null);
 
           return (
             <g
@@ -143,14 +180,55 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
               className="cursor-pointer"
               filter={owned ? "url(#glow-gold)" : undefined}
             >
+              {/* Base hex fill */}
               <polygon
                 points={hexPoints(x, y)}
                 fill={PARCEL_TYPE_COLORS[parcel.parcelType] || "#555"}
                 fillOpacity={getFillOpacity(parcel)}
                 stroke={getStroke(parcel)}
-                strokeWidth={skinStyle.strokeWidth ?? getStrokeWidth(parcel)}
-                strokeDasharray={skinStyle.strokeDasharray}
+                strokeWidth={getStrokeWidth(parcel)}
               />
+
+              {/* Parcel skin overlay */}
+              {skinDecor && (
+                <>
+                  {/* Pattern fill overlay */}
+                  <polygon
+                    points={hexPoints(x, y, HEX_SIZE - 3)}
+                    fill={`url(#${skinDecor.patternId})`}
+                    stroke="none"
+                  />
+                  {/* Inner decorative ring */}
+                  <polygon
+                    points={hexPoints(x, y, HEX_SIZE - 6)}
+                    fill="none"
+                    stroke={skinDecor.innerRingColor}
+                    strokeWidth={1}
+                    strokeOpacity={skinDecor.innerRingOpacity}
+                    strokeDasharray="4 3"
+                  />
+                  {/* Corner marks at hex vertices */}
+                  {skinDecor.cornerMarks && Array.from({ length: 6 }).map((_, i) => {
+                    const angle = (Math.PI / 180) * (60 * i + 30);
+                    const r1 = HEX_SIZE - 4;
+                    const r2 = HEX_SIZE - 8;
+                    const x1 = x + r1 * Math.cos(angle);
+                    const y1 = y + r1 * Math.sin(angle);
+                    const x2 = x + r2 * Math.cos(angle);
+                    const y2 = y + r2 * Math.sin(angle);
+                    return (
+                      <line
+                        key={i}
+                        x1={x1} y1={y1} x2={x2} y2={y2}
+                        stroke={skinDecor.innerRingColor}
+                        strokeWidth={1.2}
+                        strokeOpacity={skinDecor.innerRingOpacity + 0.15}
+                      />
+                    );
+                  })}
+                </>
+              )}
+
               {/* Home parcel marker */}
               {home && (
                 <text x={x} y={y + 2} textAnchor="middle" dominantBaseline="central" fontSize="14" fill="#daa520">

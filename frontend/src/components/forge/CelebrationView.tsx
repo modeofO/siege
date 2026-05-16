@@ -1,6 +1,6 @@
 "use client";
 
-import type { Circuit, CircuitKey } from "@/lib/forge/circuits";
+import type { Circuit, CircuitKey, CosmeticType } from "@/lib/forge/circuits";
 import type { PlacedComponent } from "@/lib/forge/topology";
 import { ForgeChrome, SectionHeader } from "./ForgeChrome";
 import { ForgeBoard } from "./ForgeBoard";
@@ -8,6 +8,18 @@ import { IlluminatedBanner } from "./IlluminatedBanner";
 import { CircuitSchematic } from "./CircuitSchematic";
 import { EmberField } from "./EmberField";
 import styles from "./forge.module.css";
+
+const EQUIP_LABELS: Record<CosmeticType, string> = {
+  banner: "Equip Banner",
+  parcelSkin: "Equip Parcel Skin",
+  holdDecoration: "Equip Hold Crest",
+};
+
+const FORGE_LABELS: Record<CosmeticType, string> = {
+  banner: "A BANNER FORGED FROM THE OLD CRAFT",
+  parcelSkin: "A PARCEL SKIN INSCRIBED IN AETHER",
+  holdDecoration: "A HOLD CREST SHAPED BY THE FORGE",
+};
 
 interface CelebrationViewProps {
   circuitKey: CircuitKey;
@@ -75,7 +87,7 @@ export function CelebrationView({
           {circuit.title.toUpperCase()}
         </div>
         <div style={{ fontSize: 12, color: "#b39e74", letterSpacing: "0.2em", marginTop: 6 }}>
-          A BANNER FORGED FROM THE OLD CRAFT
+          {FORGE_LABELS[circuit.cosmeticType]}
         </div>
 
         <div style={{ display: "flex", gap: 60, marginTop: 30, alignItems: "center" }}>
@@ -136,7 +148,7 @@ export function CelebrationView({
         </div>
 
         <div style={{ display: "flex", gap: 12, marginTop: 22 }}>
-          <button className={styles.btnGhostAmber} onClick={onEquip}>Equip Banner</button>
+          <button className={styles.btnGhostAmber} onClick={onEquip}>{EQUIP_LABELS[circuit.cosmeticType]}</button>
           <button className={styles.btnGhost} onClick={onGallery}>To Gallery</button>
           <button className={styles.btnGhost} onClick={onForgeAgain}>Forge Again</button>
         </div>

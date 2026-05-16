@@ -1,6 +1,6 @@
 "use client";
 
-import { CIRCUITS, CIRCUIT_KEYS, type CircuitKey } from "@/lib/forge/circuits";
+import { CIRCUITS, CIRCUIT_KEYS, type CircuitKey, type CosmeticType } from "@/lib/forge/circuits";
 import { ForgeChrome } from "./ForgeChrome";
 import { IlluminatedBanner } from "./IlluminatedBanner";
 import { EmberField } from "./EmberField";
@@ -15,6 +15,50 @@ interface ProfileCardProps {
   forgedCircuits: CircuitKey[];
   onChangeBanner: () => void;
   onBack: () => void;
+  highlightSlot?: CosmeticType;
+}
+
+const SLOT_LABELS: Record<CosmeticType, string> = {
+  banner: "EQUIPPED BANNER",
+  parcelSkin: "EQUIPPED PARCEL SKIN",
+  holdDecoration: "EQUIPPED HOLD CREST",
+};
+
+function CosmeticSlot({
+  label,
+  circuitKey,
+  highlight,
+}: {
+  label: string;
+  circuitKey: CircuitKey | null;
+  highlight?: boolean;
+}) {
+  const circuit = circuitKey ? CIRCUITS[circuitKey] : null;
+  return (
+    <div
+      style={{
+        padding: "10px 0",
+        borderBottom: "1px solid rgba(214,193,154,0.08)",
+        background: highlight ? "rgba(255,180,80,0.06)" : undefined,
+      }}
+    >
+      <div className={styles.labelSm}>{label}</div>
+      <div style={{ marginTop: 4 }}>
+        {circuit ? (
+          <>
+            <div className={styles.fontSerif} style={{ fontSize: 14, color: "oklch(0.78 0.13 75)" }}>
+              {circuit.title}
+            </div>
+            <div style={{ fontSize: 10, color: "#b39e74", marginTop: 2, fontStyle: "italic" }}>
+              {circuit.realName}
+            </div>
+          </>
+        ) : (
+          <div style={{ fontSize: 10, color: "#6e5c3d" }}>None equipped</div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export function ProfileCard({
@@ -22,12 +66,13 @@ export function ProfileCard({
   forgedCircuits,
   onChangeBanner,
   onBack,
+  highlightSlot,
 }: ProfileCardProps) {
   const bannerKey = equippedCosmetics.banner;
   const bannerCircuit = bannerKey ? CIRCUITS[bannerKey] : null;
 
   return (
-    <ForgeChrome width={720} height={540}>
+    <ForgeChrome width={720} height={580}>
       <EmberField count={6} />
 
       <div
@@ -78,25 +123,25 @@ export function ProfileCard({
             0x0502_13a0 · joined wk.124
           </div>
 
-          <div style={{ marginTop: 20, padding: "14px 0", borderTop: "1px solid rgba(214,193,154,0.12)", borderBottom: "1px solid rgba(214,193,154,0.12)" }}>
-            <div className={styles.labelSm}>EQUIPPED BANNER</div>
-            <div style={{ marginTop: 6 }}>
-              {bannerCircuit ? (
-                <>
-                  <div className={styles.fontSerif} style={{ fontSize: 16, color: "oklch(0.78 0.13 75)" }}>
-                    {bannerCircuit.title}
-                  </div>
-                  <div style={{ fontSize: 11, color: "#b39e74", marginTop: 4, fontStyle: "italic" }}>
-                    {bannerCircuit.realName} · forged
-                  </div>
-                </>
-              ) : (
-                <div style={{ fontSize: 11, color: "#6e5c3d" }}>None equipped</div>
-              )}
-            </div>
+          <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 0 }}>
+            <CosmeticSlot
+              label={SLOT_LABELS.banner}
+              circuitKey={equippedCosmetics.banner}
+              highlight={highlightSlot === "banner"}
+            />
+            <CosmeticSlot
+              label={SLOT_LABELS.parcelSkin}
+              circuitKey={equippedCosmetics.parcelSkin}
+              highlight={highlightSlot === "parcelSkin"}
+            />
+            <CosmeticSlot
+              label={SLOT_LABELS.holdDecoration}
+              circuitKey={equippedCosmetics.holdDecoration}
+              highlight={highlightSlot === "holdDecoration"}
+            />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 18 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginTop: 14 }}>
             <div>
               <div className={styles.labelSm}>CIRCUITS FORGED</div>
               <div className={styles.fontMono} style={{ fontSize: 22, color: "oklch(0.78 0.13 75)", marginTop: 4 }}>
@@ -111,9 +156,9 @@ export function ProfileCard({
             </div>
           </div>
 
-          <div style={{ marginTop: "auto", display: "flex", gap: 8, paddingTop: 16 }}>
+          <div style={{ marginTop: "auto", display: "flex", gap: 8, paddingTop: 12 }}>
             <button className={styles.btnGhostAmber} style={{ flex: 1 }} onClick={onChangeBanner}>
-              Change Banner
+              Change Cosmetics
             </button>
             <button className={styles.btnGhost} onClick={onBack}>
               Back

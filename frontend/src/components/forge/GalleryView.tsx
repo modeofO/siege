@@ -12,15 +12,28 @@ const TABS: { label: string; filter: TabFilter }[] = [
   { label: "ALL", filter: "all" },
   { label: "BANNERS", filter: "banner" },
   { label: "PARCEL SKINS", filter: "parcelSkin" },
-  { label: "HOLD DECORATIONS", filter: "holdDecoration" },
+  { label: "HOLD CRESTS", filter: "holdDecoration" },
 ];
 
 interface GalleryViewProps {
   forgedCircuits: CircuitKey[];
+  equippedCosmetics: {
+    banner: CircuitKey | null;
+    parcelSkin: CircuitKey | null;
+    holdDecoration: CircuitKey | null;
+  };
+  onEquip: (key: CircuitKey) => void;
+  onUnequip: (type: CosmeticType) => void;
   onBack: () => void;
 }
 
-export function GalleryView({ forgedCircuits, onBack }: GalleryViewProps) {
+export function GalleryView({
+  forgedCircuits,
+  equippedCosmetics,
+  onEquip,
+  onUnequip,
+  onBack,
+}: GalleryViewProps) {
   const [activeTab, setActiveTab] = useState<TabFilter>("all");
 
   const items = CIRCUIT_KEYS.filter(
@@ -28,6 +41,11 @@ export function GalleryView({ forgedCircuits, onBack }: GalleryViewProps) {
   );
 
   const forgedCount = forgedCircuits.length;
+
+  function isEquipped(key: CircuitKey): boolean {
+    const type = CIRCUITS[key].cosmeticType;
+    return equippedCosmetics[type] === key;
+  }
 
   return (
     <ForgeChrome>
@@ -98,6 +116,7 @@ export function GalleryView({ forgedCircuits, onBack }: GalleryViewProps) {
         {items.map((key) => {
           const c = CIRCUITS[key];
           const unlocked = forgedCircuits.includes(key);
+          const equipped = isEquipped(key);
           return (
             <div
               key={key}
@@ -106,12 +125,15 @@ export function GalleryView({ forgedCircuits, onBack }: GalleryViewProps) {
                 flexDirection: "column",
                 alignItems: "center",
                 gap: 10,
+                padding: 8,
+                border: equipped ? "1px solid oklch(0.78 0.13 75)" : "1px solid transparent",
+                background: equipped ? "rgba(255,180,80,0.06)" : undefined,
               }}
             >
               <IlluminatedBanner locked={!unlocked} name={key} circuit={c} scale={0.62} />
               <div style={{ textAlign: "center", marginTop: 6 }}>
                 <div className={styles.labelSmAmber} style={{ fontSize: 9 }}>
-                  {c.cosmeticType === "banner" ? "BANNER" : c.cosmeticType === "parcelSkin" ? "PARCEL SKIN" : "HOLD DECOR"}
+                  {c.cosmeticType === "banner" ? "BANNER" : c.cosmeticType === "parcelSkin" ? "PARCEL SKIN" : "HOLD CREST"}
                 </div>
                 <div
                   className={styles.fontSerif}
@@ -128,6 +150,25 @@ export function GalleryView({ forgedCircuits, onBack }: GalleryViewProps) {
                   {unlocked ? c.realName : "???"}
                 </div>
               </div>
+              {unlocked && (
+                equipped ? (
+                  <button
+                    className={styles.btnGhostAmber}
+                    style={{ fontSize: 9, padding: "4px 14px" }}
+                    onClick={() => onUnequip(c.cosmeticType)}
+                  >
+                    EQUIPPED
+                  </button>
+                ) : (
+                  <button
+                    className={styles.btnGhost}
+                    style={{ fontSize: 9, padding: "4px 14px" }}
+                    onClick={() => onEquip(key)}
+                  >
+                    EQUIP
+                  </button>
+                )
+              )}
             </div>
           );
         })}

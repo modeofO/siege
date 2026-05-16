@@ -146,7 +146,7 @@ const SESSION_POLICIES: SessionPolicies = {
       ],
     },
     ...Object.fromEntries(
-      Object.values(RESOURCE_TOKENS).map((addr) => [addr, { methods: [{ name: "Approve", entrypoint: "approve" }] }]),
+      Object.values(RESOURCE_TOKENS).map((addr) => [addr, { methods: [{ name: "Approve", entrypoint: "approve" }, { name: "Transfer", entrypoint: "transfer" }] }]),
     ),
 
     // --- World metagame (kingdom, staked matches, parcels, drip, pillage, factions) ---

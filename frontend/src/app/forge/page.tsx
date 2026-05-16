@@ -1,8 +1,10 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import Link from "next/link";
 import { useAccount } from "@/app/providers";
 import { useForgeState } from "@/lib/forge/forgeState";
+import { CIRCUITS, type CosmeticType } from "@/lib/forge/circuits";
 import { ForgeChrome, SectionHeader } from "@/components/forge/ForgeChrome";
 import { ForgeBoard } from "@/components/forge/ForgeBoard";
 import { ComponentTray } from "@/components/forge/ComponentTray";
@@ -16,9 +18,12 @@ import styles from "@/components/forge/forge.module.css";
 export default function ForgePage() {
   const { account } = useAccount();
   const state = useForgeState(account ?? undefined);
+  const [lastEquippedSlot, setLastEquippedSlot] = useState<CosmeticType | undefined>();
 
-  const handleEquip = useCallback(() => {
-    state.equipCosmetic(state.activeCircuit);
+  const handleEquip = useCallback(async () => {
+    const slot = CIRCUITS[state.activeCircuit].cosmeticType;
+    setLastEquippedSlot(slot);
+    await state.equipCosmetic(state.activeCircuit);
     state.setView("profile");
   }, [state]);
 
@@ -42,6 +47,9 @@ export default function ForgePage() {
       <div style={{ display: "flex", justifyContent: "center", paddingTop: 20 }}>
         <GalleryView
           forgedCircuits={state.forgedCircuits}
+          equippedCosmetics={state.equippedCosmetics}
+          onEquip={(key) => state.equipCosmetic(key)}
+          onUnequip={(type) => state.unequipCosmetic(type)}
           onBack={() => state.setView("forge")}
         />
       </div>
@@ -50,12 +58,18 @@ export default function ForgePage() {
 
   if (state.currentView === "profile") {
     return (
-      <div style={{ display: "flex", justifyContent: "center", paddingTop: 20 }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 20, gap: 8 }}>
+        {state.equipError && (
+          <div style={{ color: "#c44332", fontSize: 11, letterSpacing: "0.06em", maxWidth: 600, textAlign: "center" }}>
+            Equip failed: {state.equipError}
+          </div>
+        )}
         <ProfileCard
           equippedCosmetics={state.equippedCosmetics}
           forgedCircuits={state.forgedCircuits}
           onChangeBanner={() => state.setView("gallery")}
           onBack={() => state.setView("forge")}
+          highlightSlot={lastEquippedSlot}
         />
       </div>
     );
@@ -67,7 +81,18 @@ export default function ForgePage() {
         <SectionHeader title="THE CIRCUIT FORGE" meta={`bench · ${state.forgedCircuits.length} / 7`} />
 
         <div style={{ display: "flex", gap: 20, padding: "0 32px", position: "relative", zIndex: 3 }}>
-          <ComponentTray inventory={state.inventory} />
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <ComponentTray inventory={state.inventory} />
+            {Object.values(state.inventory).every((v) => v === 0) && (
+              <Link
+                href="/craft"
+                className={styles.btnGhost}
+                style={{ fontSize: 10, textAlign: "center", display: "block" }}
+              >
+                Craft Parts →
+              </Link>
+            )}
+          </div>
 
           <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", position: "relative" }}>
             <div style={{ position: "relative", padding: 20 }}>

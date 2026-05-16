@@ -18,13 +18,24 @@ interface PersistedState {
     parcelSkin: CircuitKey | null;
     holdDecoration: CircuitKey | null;
   };
+  componentInventory: Record<ComponentKind, number>;
 }
 
 const STORAGE_KEY = "siege:forgeState";
 
+const EMPTY_INVENTORY: Record<ComponentKind, number> = {
+  "origin-crystal": 0,
+  "void-drain": 0,
+  "rune-stone": 0,
+  "flux-well": 0,
+  "spiral-coil": 0,
+  "one-way-valve": 0,
+};
+
 const DEFAULT_PERSISTED: PersistedState = {
   forgedCircuits: [],
   equippedCosmetics: { banner: null, parcelSkin: null, holdDecoration: null },
+  componentInventory: { ...EMPTY_INVENTORY },
 };
 
 function loadPersisted(): PersistedState {
@@ -41,6 +52,10 @@ function loadPersisted(): PersistedState {
         parcelSkin: parsed.equippedCosmetics?.parcelSkin ?? null,
         holdDecoration: parsed.equippedCosmetics?.holdDecoration ?? null,
       },
+      componentInventory: {
+        ...EMPTY_INVENTORY,
+        ...(parsed.componentInventory ?? {}),
+      },
     };
   } catch {
     return DEFAULT_PERSISTED;
@@ -55,15 +70,6 @@ function savePersisted(state: PersistedState) {
   }
 }
 
-const DEFAULT_INVENTORY: Record<ComponentKind, number> = {
-  "origin-crystal": 0,
-  "void-drain": 0,
-  "rune-stone": 10,
-  "flux-well": 6,
-  "spiral-coil": 4,
-  "one-way-valve": 8,
-};
-
 export function useForgeState(account?: AccountInterface) {
   const [currentView, setCurrentView] = useState<ForgeView>("forge");
   const [activeCircuit, setActiveCircuitRaw] = useState<CircuitKey>("half-wave-rectifier");
@@ -72,12 +78,15 @@ export function useForgeState(account?: AccountInterface) {
   >({});
   const [isLit, setIsLit] = useState(false);
   const [persisted, setPersisted] = useState<PersistedState>(DEFAULT_PERSISTED);
-  const [inventory, setInventory] = useState<Record<ComponentKind, number>>(
-    () => ({ ...DEFAULT_INVENTORY }),
+  const [equipError, setEquipError] = useState<string | null>(null);
+  const [sessionInventory, setSessionInventory] = useState<Record<ComponentKind, number>>(
+    () => ({ ...EMPTY_INVENTORY }),
   );
 
   useEffect(() => {
-    setPersisted(loadPersisted());
+    const loaded = loadPersisted();
+    setPersisted(loaded);
+    setSessionInventory({ ...loaded.componentInventory });
   }, []);
 
   const persist = useCallback((next: PersistedState) => {
@@ -96,7 +105,7 @@ export function useForgeState(account?: AccountInterface) {
         return next;
       });
       if (isNew) {
-        setInventory((inv) => ({
+        setSessionInventory((inv) => ({
           ...inv,
           [kind]: Math.max(0, inv[kind] - 1),
         }));
@@ -113,7 +122,7 @@ export function useForgeState(account?: AccountInterface) {
       delete next[instanceId];
       return next;
     });
-    setInventory((inv) => ({ ...inv, [comp.kind]: inv[comp.kind] + 1 }));
+    setSessionInventory((inv) => ({ ...inv, [comp.kind]: inv[comp.kind] + 1 }));
     setIsLit(false);
   }, [placedComponents]);
 
@@ -121,24 +130,36 @@ export function useForgeState(account?: AccountInterface) {
     setActiveCircuitRaw(key);
     setPlacedComponents({});
     setIsLit(false);
-    setInventory({ ...DEFAULT_INVENTORY });
+    setSessionInventory({ ...persisted.componentInventory });
     setCurrentView("forge");
-  }, []);
+  }, [persisted.componentInventory]);
 
   const confirmForge = useCallback(() => {
     if (!isLit) return;
+    const usedParts: Partial<Record<ComponentKind, number>> = {};
+    for (const comp of Object.values(placedComponents)) {
+      usedParts[comp.kind] = (usedParts[comp.kind] ?? 0) + 1;
+    }
+
+    const newInventory = { ...persisted.componentInventory };
+    for (const [kind, count] of Object.entries(usedParts)) {
+      const k = kind as ComponentKind;
+      newInventory[k] = Math.max(0, newInventory[k] - count);
+    }
+
     const next: PersistedState = {
       ...persisted,
       forgedCircuits: persisted.forgedCircuits.includes(activeCircuit)
         ? persisted.forgedCircuits
         : [...persisted.forgedCircuits, activeCircuit],
+      componentInventory: newInventory,
     };
     persist(next);
     setCurrentView("celebration");
-  }, [isLit, persisted, activeCircuit, persist]);
+  }, [isLit, persisted, activeCircuit, placedComponents, persist]);
 
   const equipCosmetic = useCallback(
-    (circuitKey: CircuitKey) => {
+    async (circuitKey: CircuitKey) => {
       const cosmeticType: CosmeticType = CIRCUITS[circuitKey].cosmeticType;
       const next: PersistedState = {
         ...persisted,
@@ -148,12 +169,62 @@ export function useForgeState(account?: AccountInterface) {
         },
       };
       persist(next);
+      setEquipError(null);
 
       if (account) {
-        setCosmetic(account, cosmeticType, circuitKey).catch(() => {});
+        try {
+          await setCosmetic(account, cosmeticType, circuitKey);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setEquipError(msg);
+        }
+      } else {
+        setEquipError("Connect wallet to equip on-chain");
       }
     },
     [persisted, persist, account],
+  );
+
+  const unequipCosmetic = useCallback(
+    async (cosmeticType: CosmeticType) => {
+      const next: PersistedState = {
+        ...persisted,
+        equippedCosmetics: {
+          ...persisted.equippedCosmetics,
+          [cosmeticType]: null,
+        },
+      };
+      persist(next);
+      setEquipError(null);
+
+      if (account) {
+        try {
+          await setCosmetic(account, cosmeticType, null);
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setEquipError(msg);
+        }
+      }
+    },
+    [persisted, persist, account],
+  );
+
+  const addComponents = useCallback(
+    (kind: ComponentKind, quantity: number) => {
+      const next: PersistedState = {
+        ...persisted,
+        componentInventory: {
+          ...persisted.componentInventory,
+          [kind]: persisted.componentInventory[kind] + quantity,
+        },
+      };
+      persist(next);
+      setSessionInventory((inv) => ({
+        ...inv,
+        [kind]: inv[kind] + quantity,
+      }));
+    },
+    [persisted, persist],
   );
 
   const setView = useCallback((view: ForgeView) => {
@@ -166,14 +237,18 @@ export function useForgeState(account?: AccountInterface) {
     circuit,
     placedComponents,
     isLit,
-    inventory,
+    inventory: sessionInventory,
     forgedCircuits: persisted.forgedCircuits,
     equippedCosmetics: persisted.equippedCosmetics,
+    componentInventory: persisted.componentInventory,
+    equipError,
     placeComponent,
     removeComponent,
     selectCircuit,
     confirmForge,
     equipCosmetic,
+    unequipCosmetic,
+    addComponents,
     setView,
   };
 }

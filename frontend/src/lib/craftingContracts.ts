@@ -117,12 +117,21 @@ export function tokenIdFrom(type: number, tier: number): AbilityId {
   return ((tier - 1) * 5 + type) as AbilityId;
 }
 
-export function canAfford(cost: AbilityCost, balances: Record<string, number>): boolean {
-  return Object.entries(cost).every(([resource, amount]) => (balances[resource] || 0) >= amount);
+export function canAfford(cost: AbilityCost, balances: Record<string, number>, quantity = 1): boolean {
+  return Object.entries(cost).every(([resource, amount]) => (balances[resource] || 0) >= amount * quantity);
+}
+
+export function maxAffordable(cost: AbilityCost, balances: Record<string, number>): number {
+  let max = Infinity;
+  for (const [resource, amount] of Object.entries(cost)) {
+    if (amount <= 0) continue;
+    max = Math.min(max, Math.floor((balances[resource] || 0) / amount));
+  }
+  return max === Infinity ? 0 : max;
 }
 
 // Approve required tokens then craft a T1 ability in one multicall.
-export async function craftAbility(account: AccountInterface, abilityId: number, cost: AbilityCost): Promise<string> {
+export async function craftAbility(account: AccountInterface, abilityId: number, cost: AbilityCost, quantity = 1): Promise<string> {
   const calls: Call[] = [];
 
   for (const [resource, amount] of Object.entries(cost)) {
@@ -131,15 +140,17 @@ export async function craftAbility(account: AccountInterface, abilityId: number,
     calls.push({
       contractAddress: tokenAddr,
       entrypoint: "approve",
-      calldata: [CRAFTING_1V1_ADDRESS, amount.toString(), "0"],
+      calldata: [CRAFTING_1V1_ADDRESS, (amount * quantity).toString(), "0"],
     });
   }
 
-  calls.push({
-    contractAddress: CRAFTING_1V1_ADDRESS,
-    entrypoint: "craft_ability",
-    calldata: [abilityId.toString()],
-  });
+  for (let i = 0; i < quantity; i++) {
+    calls.push({
+      contractAddress: CRAFTING_1V1_ADDRESS,
+      entrypoint: "craft_ability",
+      calldata: [abilityId.toString()],
+    });
+  }
 
   const result = await account.execute(calls);
   return result.transaction_hash;
