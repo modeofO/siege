@@ -36,7 +36,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "The First Gate",
     realName: "Half-Wave Rectifier",
     category: "rectifier · ac→dc · single-phase",
-    blurb: "In the world before runes, this circuit took alternating current and let only one half through — turning a tide that surged in both directions into a current that flowed only forward. The valve permits, the well steadies, the rune throttles. The same as your gate.",
+    blurb: "The gatekeepers of old would stand at the pass and let the levy through — but never the retreating cowards. One direction only. What enters your Hold as strength stays as strength. The first ward any castellan learns.",
     cosmeticType: "banner",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 2, label: "ORIGIN", locked: true },
@@ -57,7 +57,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "Bleeder's Mark",
     realName: "Voltage Divider",
     category: "analog · scaling · two-resistor",
-    blurb: "Two stones in a row, splitting the tide. What enters at full pressure leaves diminished — measured at the seam between the two, you find a fraction of the source. A bleeder's trick, stamped into countless instruments.",
+    blurb: "When the war chest arrives, the quartermaster must split it — a share for the garrison, a share for the scouts. Two stones mark the division. The art is in knowing exactly where to cut so each outpost gets its due.",
     cosmeticType: "parcelSkin",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 2, label: "ORIGIN", locked: true },
@@ -76,7 +76,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "The Twin Tide",
     realName: "Full-Wave Rectifier",
     category: "rectifier · ac→dc · bridge",
-    blurb: "Four valves in a diamond, taking the tide whichever way it surges and folding both halves into one steady forward current. The smith's bridge — twice the yield of the single gate.",
+    blurb: "The twin gates of the inner ward — whether the enemy charges from the east or the west, the defenders fold both assaults into a single killing ground. No surge is wasted. Twice the harvest of a single gate, and no blind side.",
     cosmeticType: "banner",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 2, label: "ORIGIN", locked: true },
@@ -101,7 +101,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "The Still Pool",
     realName: "RC Low-Pass Filter",
     category: "filter · passive · 1st order",
-    blurb: "A throttle and a well, set in series. Sharp gusts are absorbed by the well's reservoir; only the slow, steady currents pass through to the drain. The first lesson in dampening — what stills the chatter, lets the song through.",
+    blurb: "The spymaster's sieve. Rumours, false reports, panicked riders screaming of phantom armies — the still pool swallows them all. Only the slow, steady truth filters through. If the message survives the pool, it can be trusted.",
     cosmeticType: "banner",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 2, label: "ORIGIN", locked: true },
@@ -120,7 +120,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "The Singing Spire",
     realName: "LC Tank",
     category: "resonator · oscillator · parallel",
-    blurb: "A coil and a well, joined in a closed ring. Energy passes between them in perfect cadence — magnetic field giving way to stored charge, then back again — ringing at one true note. The smiths use it to find a single frequency in a noisy sky.",
+    blurb: "The watchtower rings with a hundred bells, but only one tone carries the true signal. The coil and the well pass the call between them until every false note dies away and a single clear pitch remains — the frequency of the enemy's march.",
     cosmeticType: "banner",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 2, label: "ORIGIN", locked: true },
@@ -139,7 +139,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "The Crown Step",
     realName: "Buck Converter",
     category: "switching · dc-dc · step-down",
-    blurb: "A valve, a coil, and a well — switched in sequence to step a tall current down to a humbler one without losing its strength. The crown's secret: a torrent that becomes a brook, but the brook still turns the wheel.",
+    blurb: "The crown commands ten thousand swords, but the village needs only a garrison. The Crown Step takes the king's overwhelming force and measures it down — less men, same authority. The brook still turns the mill wheel.",
     cosmeticType: "holdDecoration",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 2, label: "ORIGIN", locked: true },
@@ -162,7 +162,7 @@ export const CIRCUITS: Record<string, Circuit> = {
     title: "The Herald's Voice",
     realName: "Common-Emitter Amp",
     category: "amplifier · inverting · single-stage",
-    blurb: "Two stones biasing the gate, a well to couple the song in, another to send it on — and at the heart, a gate that turns a whisper into a shout. The herald's trick: a small voice steers a large one.",
+    blurb: "The herald stands before the assembled host and speaks the king's whisper so that ten thousand hear it as a roar. A small voice steers a great one — the messenger's breath moves an army.",
     cosmeticType: "parcelSkin",
     components: [
       { id: "origin", kind: "origin-crystal", col: 0, row: 0, label: "ORIGIN", locked: true },

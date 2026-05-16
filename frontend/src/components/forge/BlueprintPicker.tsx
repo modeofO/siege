@@ -63,6 +63,41 @@ export function BlueprintPicker({
         </div>
       </div>
 
+      <div
+        style={{
+          marginTop: 18,
+          padding: "12px 14px",
+          background: "rgba(0,0,0,0.3)",
+          border: "1px solid rgba(214,193,154,0.08)",
+          lineHeight: 1.6,
+        }}
+      >
+        <div
+          className={styles.fontMono}
+          style={{ fontSize: 9, color: "#8a7a5a", letterSpacing: "0.12em", marginBottom: 6 }}
+        >
+          {circuit.category.toUpperCase()}
+        </div>
+        <div style={{ fontSize: 11, color: "#b39e74", fontStyle: "italic", marginBottom: 8 }}>
+          {circuit.blurb}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div className={styles.fontMono} style={{ fontSize: 8, color: "#6e5c3d", letterSpacing: "0.1em" }}>
+            {circuit.realName}
+          </div>
+          <div
+            style={{
+              fontSize: 8,
+              color: circuit.cosmeticType === "banner" ? "#c8a44e" : circuit.cosmeticType === "parcelSkin" ? "#8a8a9a" : "#4a7c59",
+              letterSpacing: "0.12em",
+              textTransform: "uppercase",
+            }}
+          >
+            {circuit.cosmeticType === "banner" ? "Banner" : circuit.cosmeticType === "parcelSkin" ? "Parcel Skin" : "Hold Crest"}
+          </div>
+        </div>
+      </div>
+
       <div className={styles.labelSm} style={{ marginTop: 22, marginBottom: 10 }}>
         BLUEPRINT
       </div>
