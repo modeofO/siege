@@ -130,7 +130,7 @@ export function maxAffordable(cost: AbilityCost, balances: Record<string, number
   return max === Infinity ? 0 : max;
 }
 
-// Approve required tokens then craft a T1 ability in one multicall.
+// Approve required tokens then batch-craft T1 abilities in one multicall.
 export async function craftAbility(account: AccountInterface, abilityId: number, cost: AbilityCost, quantity = 1): Promise<string> {
   const calls: Call[] = [];
 
@@ -144,23 +144,22 @@ export async function craftAbility(account: AccountInterface, abilityId: number,
     });
   }
 
-  for (let i = 0; i < quantity; i++) {
-    calls.push({
-      contractAddress: CRAFTING_1V1_ADDRESS,
-      entrypoint: "craft_ability",
-      calldata: [abilityId.toString()],
-    });
-  }
+  calls.push({
+    contractAddress: CRAFTING_1V1_ADDRESS,
+    entrypoint: "craft_ability_batch",
+    calldata: [abilityId.toString(), quantity.toString()],
+  });
 
   const result = await account.execute(calls);
   return result.transaction_hash;
 }
 
-// Approve required tokens then craft a T2 ability (burns T1 + resources).
+// Approve required tokens then batch-craft T2 abilities (burns T1 + resources).
 export async function craftAbilityTier2(
   account: AccountInterface,
   abilityTypeId: number,
   cost: AbilityCost,
+  quantity = 1,
 ): Promise<string> {
   const calls: Call[] = [];
 
@@ -170,14 +169,14 @@ export async function craftAbilityTier2(
     calls.push({
       contractAddress: tokenAddr,
       entrypoint: "approve",
-      calldata: [CRAFTING_1V1_ADDRESS, amount.toString(), "0"],
+      calldata: [CRAFTING_1V1_ADDRESS, (amount * quantity).toString(), "0"],
     });
   }
 
   calls.push({
     contractAddress: CRAFTING_1V1_ADDRESS,
-    entrypoint: "craft_ability_tier2",
-    calldata: [abilityTypeId.toString()],
+    entrypoint: "craft_ability_tier2_batch",
+    calldata: [abilityTypeId.toString(), quantity.toString()],
   });
 
   const result = await account.execute(calls);

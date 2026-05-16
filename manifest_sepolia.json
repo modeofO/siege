@@ -45,7 +45,7 @@
     },
     {
       "address": "0x15d867f69bae78dc951df8359d185064b5544b3c73cf66aa4cba9388e6f2c85",
-      "class_hash": "0x9350fde559ff66cedf03136db03ce935e2ed48bb19bd4fa294240fa50df665",
+      "class_hash": "0x986c6f1c06be585cc6a4408be218fb288f341bf7d891360cc7ca896e5ec9a4",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
       "selector": "0x26e0eeadcc0c8f020b1da157b4d0f038ca209cb1d1ed9b6b52248376703705",
@@ -73,7 +73,7 @@
     },
     {
       "address": "0xdbd65d19971d67c3f03cfa7220149ed001676d62eff92ffdd8af89e60baa40",
-      "class_hash": "0x3dd1f12de2042719c8ac66d803e20fb13a9ad1ee08408e45069c6839995bc86",
+      "class_hash": "0x33e705e3843f796d7c5c5fc872795db0606748634d53576b80626881e2f5c24",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal_1v1",
       "selector": "0x495013ee20d528ad6f0e109874e37a33ef3e258c7ed8c446cfb8389f7a94143",
@@ -98,13 +98,15 @@
     },
     {
       "address": "0x5d46148c9a4ec5e3e06dfc7efb6d28f4148c684d2811543d7b787cf4de3843",
-      "class_hash": "0x26925dd4a5d54a8b432c1a83c721c3953ee22c75cc72639f9113b60428f92cb",
+      "class_hash": "0x2c9b1c45ebb432aa901cbca94a6cccf015eabcfd4ffe662782a7ac3796c0686",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
       "selector": "0x48ced6417f88e7c589f1f67c5e7c6a5b74d4c4cc465d50b11d54b4095a42747",
       "systems": [
         "craft_ability",
         "craft_ability_tier2",
+        "craft_ability_batch",
+        "craft_ability_tier2_batch",
         "upgrade"
       ]
     },
@@ -132,7 +134,7 @@
     },
     {
       "address": "0x727c57716a650660de0466efb0572ccab13dfebb1e5bf854a38acd36cda4681",
-      "class_hash": "0x72c3a19d147f711d559c26bef22bae0ca365dfc78994a015aa01c73ac946397",
+      "class_hash": "0x589224a6802fb14d44aa4723a2ff3451ab74fda40f74609375cec9885b7a2d4",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
@@ -154,6 +156,7 @@
         "leave_faction",
         "kick_member",
         "set_faction_reinforcement",
+        "set_cosmetic",
         "upgrade"
       ]
     }
@@ -719,6 +722,33 @@
       "class_hash": "0x623e836dbb0a8350462e9c47476b69af611a7465d8799ee69f0cd6773d49b84",
       "tag": "siege_dojo-PillageEligibility",
       "selector": "0x2723558a90cc47391193ce4a50e5836518827232cab216683366ff0838f6ccd"
+    },
+    {
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "banner",
+          "type": "core::felt252",
+          "key": false
+        },
+        {
+          "name": "parcel_skin",
+          "type": "core::felt252",
+          "key": false
+        },
+        {
+          "name": "hold_decoration",
+          "type": "core::felt252",
+          "key": false
+        }
+      ],
+      "class_hash": "0x78cca0547a96f51543539eb57782296cebfb98e8da5b476293942aceba4ef9",
+      "tag": "siege_dojo-PlayerCosmetics",
+      "selector": "0xbbd2861acc91651d352ffbe0f5ae6d471610f7d2c851bb6a962809523129e3"
     },
     {
       "members": [
@@ -4715,6 +4745,52 @@
     },
     {
       "type": "struct",
+      "name": "siege_dojo::models::player_cosmetics::PlayerCosmetics",
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "banner",
+          "type": "core::felt252"
+        },
+        {
+          "name": "parcel_skin",
+          "type": "core::felt252"
+        },
+        {
+          "name": "hold_decoration",
+          "type": "core::felt252"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::player_cosmetics::PlayerCosmeticsValue",
+      "members": [
+        {
+          "name": "banner",
+          "type": "core::felt252"
+        },
+        {
+          "name": "parcel_skin",
+          "type": "core::felt252"
+        },
+        {
+          "name": "hold_decoration",
+          "type": "core::felt252"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::models::player_cosmetics::m_PlayerCosmetics::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "struct",
       "name": "siege_dojo::models::player_kingdom::PlayerKingdom",
       "members": [
         {
@@ -6453,6 +6529,38 @@
           ],
           "outputs": [],
           "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "craft_ability_batch",
+          "inputs": [
+            {
+              "name": "ability_id",
+              "type": "core::integer::u8"
+            },
+            {
+              "name": "quantity",
+              "type": "core::integer::u32"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "craft_ability_tier2_batch",
+          "inputs": [
+            {
+              "name": "ability_type",
+              "type": "core::integer::u8"
+            },
+            {
+              "name": "quantity",
+              "type": "core::integer::u32"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
         }
       ]
     },
@@ -6767,6 +6875,22 @@
             {
               "name": "enabled",
               "type": "core::bool"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "set_cosmetic",
+          "inputs": [
+            {
+              "name": "cosmetic_type",
+              "type": "core::felt252"
+            },
+            {
+              "name": "circuit_key",
+              "type": "core::felt252"
             }
           ],
           "outputs": [],

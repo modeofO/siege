@@ -6,8 +6,8 @@ import { RpcProvider } from "starknet";
 import type { Call } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useResourceBalances, RESOURCE_TOKENS, type ResourceBalances } from "@/lib/useResourceBalances";
-import { ABILITIES, canAfford, maxAffordable, craftAbility, type AbilityCost } from "@/lib/craftingContracts";
-import { fetchAbilityBalances, EMPTY_ABILITY_INVENTORY, type AbilityInventory } from "@/lib/abilityToken";
+import { ABILITIES, canAfford, maxAffordable, craftAbility, craftAbilityTier2, abilityType, type AbilityCost } from "@/lib/craftingContracts";
+import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { LAST_MATCH_KEY } from "@/components/Navbar";
 import { useForgeState } from "@/lib/forge/forgeState";
 import type { ComponentKind } from "@/lib/forge/circuits";
@@ -34,7 +34,8 @@ const DEVNET_TX_OPTS = {
 
 const BURN_ADDRESS = "0x1";
 
-const ABILITY_FIELDS: (keyof AbilityInventory)[] = ["siege_sword", "stone_cloak", "ember_blast", "hex", "fortify"];
+const EMPTY_BALANCES: Record<number, number> = {};
+for (let i = 1; i <= 10; i++) EMPTY_BALANCES[i] = 0;
 
 type CraftTab = "abilities" | "parts";
 
@@ -107,7 +108,7 @@ export default function CraftPage() {
     setOptimisticDelta({});
   }, [subscribedResources]);
 
-  const [inventory, setInventory] = useState<AbilityInventory>(EMPTY_ABILITY_INVENTORY);
+  const [abilityBalances, setAbilityBalances] = useState<Record<number, number>>({ ...EMPTY_BALANCES });
   const [busyKey, setBusyKey] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [lastMatch, setLastMatch] = useState<string | null>(null);
@@ -124,13 +125,13 @@ export default function CraftPage() {
 
   useEffect(() => {
     if (!address) {
-      setInventory(EMPTY_ABILITY_INVENTORY);
+      setAbilityBalances({ ...EMPTY_BALANCES });
       return;
     }
     let cancelled = false;
     const provider = new RpcProvider({ nodeUrl: RPC_URL });
-    fetchAbilityBalances(provider, address).then((inv) => {
-      if (!cancelled) setInventory(inv);
+    fetchAllAbilityBalances(provider, address).then((bal) => {
+      if (!cancelled) setAbilityBalances(bal);
     });
     return () => { cancelled = true; };
   }, [address]);
@@ -146,6 +147,13 @@ export default function CraftPage() {
     });
   };
 
+  const refreshAbilityBalances = async () => {
+    if (!address) return;
+    const provider = new RpcProvider({ nodeUrl: RPC_URL });
+    const bal = await fetchAllAbilityBalances(provider, address);
+    setAbilityBalances(bal);
+  };
+
   const handleCraftAbility = async (abilityId: number, cost: AbilityCost) => {
     if (!account) return;
     const qty = abilityQtys[abilityId] || 1;
@@ -157,10 +165,28 @@ export default function CraftPage() {
       await provider.waitForTransaction(txHash);
       applyOptimisticCost(cost, qty);
       setAbilityQtys((prev) => ({ ...prev, [abilityId]: 1 }));
-      if (address) {
-        const inv = await fetchAbilityBalances(provider, address);
-        setInventory(inv);
-      }
+      await refreshAbilityBalances();
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyKey(null);
+    }
+  };
+
+  const handleCraftTier2 = async (ability: (typeof ABILITIES)[number]) => {
+    if (!account) return;
+    const typeId = abilityType(ability.id);
+    const cost = ability.cost as unknown as AbilityCost;
+    const qty = abilityQtys[ability.id] || 1;
+    setBusyKey(`ability-${ability.id}`);
+    setError("");
+    try {
+      const provider = new RpcProvider({ nodeUrl: RPC_URL });
+      const txHash = await craftAbilityTier2(account, typeId, cost, qty);
+      await provider.waitForTransaction(txHash);
+      applyOptimisticCost(cost, qty);
+      setAbilityQtys((prev) => ({ ...prev, [ability.id]: 1 }));
+      await refreshAbilityBalances();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -223,17 +249,24 @@ export default function CraftPage() {
     const qty = abilityQtys[ability.id] || 1;
     const max = maxAffordable(cost, resourceBalances);
     const affordable = canAfford(cost, resourceBalances, qty);
-    const owned = inventory[ABILITY_FIELDS[ability.id - 1]];
+    const owned = abilityBalances[ability.id] ?? 0;
     const isBusy = busyKey === `ability-${ability.id}`;
+    const isT2 = ability.tier === 2;
+    const t1Owned = isT2 ? (abilityBalances[abilityType(ability.id)] ?? 0) : 0;
+    const needsT1 = isT2 && t1Owned < qty;
     const { baseTransform, bg } = cardStyle(side, "ability");
+
+    const bgT2 = isT2
+      ? "linear-gradient(180deg, rgba(212, 190, 148, 0.92) 0%, rgba(180, 155, 110, 0.88) 100%)"
+      : bg;
 
     return (
       <div
         key={ability.id}
         className="relative rounded-sm p-3 space-y-2"
         style={{
-          background: bg,
-          border: "1px solid rgba(74, 48, 22, 0.55)",
+          background: bgT2,
+          border: isT2 ? "1px solid rgba(178, 134, 60, 0.7)" : "1px solid rgba(74, 48, 22, 0.55)",
           boxShadow: "0 6px 14px rgba(30,18,8,0.55), 0 2px 4px rgba(30,18,8,0.35), inset 0 1px 0 rgba(255,240,200,0.6), inset 0 -1px 0 rgba(74,48,22,0.35)",
           transform: baseTransform,
           transformOrigin: "center bottom",
@@ -247,14 +280,33 @@ export default function CraftPage() {
           <h3 className="text-sm font-bold font-serif" style={{ color: "#3b2410", textShadow: "0 1px 0 rgba(255,240,200,0.5)" }}>
             {ability.name}
           </h3>
-          {owned > 0 && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm" style={{ background: "rgba(74,48,22,0.85)", color: "#e8d6aa" }}>
-              Owned: {owned}
-            </span>
-          )}
+          <div className="flex items-center gap-1">
+            {isT2 && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-sm" style={{ background: "rgba(178,134,60,0.85)", color: "#fff8e7" }}>
+                T2
+              </span>
+            )}
+            {owned > 0 && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-sm" style={{ background: "rgba(74,48,22,0.85)", color: "#e8d6aa" }}>
+                Owned: {owned}
+              </span>
+            )}
+          </div>
         </div>
         <p className="text-[11px] leading-snug" style={{ color: "#5a3b1e" }}>{ability.effect}</p>
         <div className="flex flex-wrap gap-1">
+          {isT2 && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-sm"
+              style={{
+                background: needsT1 ? "rgba(178,34,52,0.15)" : "rgba(74,48,22,0.12)",
+                border: needsT1 ? "1px solid rgba(178,34,52,0.5)" : "1px solid rgba(74,48,22,0.4)",
+                color: needsT1 ? "#8b1a2a" : "#3b2410",
+              }}
+            >
+              {qty} T1 {ability.name.replace(" (T2)", "")}
+            </span>
+          )}
           {Object.entries(ability.cost).map(([resource, amount]) => {
             const total = amount * qty;
             const hasEnough = (resourceBalances[resource] || 0) >= total;
@@ -276,8 +328,8 @@ export default function CraftPage() {
         <div className="flex items-center gap-2">
           <QtySelector qty={qty} max={Math.max(1, max)} onChange={(n) => setAbilityQtys((p) => ({ ...p, [ability.id]: n }))} disabled={isBusy} />
           <button
-            onClick={() => handleCraftAbility(ability.id, cost)}
-            disabled={!isConnected || !affordable || isBusy}
+            onClick={() => isT2 ? handleCraftTier2(ability) : handleCraftAbility(ability.id, cost)}
+            disabled={!isConnected || !affordable || (isT2 && needsT1) || isBusy}
             className="flex-1 py-1.5 rounded-sm font-bold tracking-wider text-xs font-serif transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             style={btnStyle}
           >
@@ -357,8 +409,8 @@ export default function CraftPage() {
     );
   };
 
-  const leftAbilities = ABILITIES.slice(0, 2);
-  const rightAbilities = ABILITIES.slice(2, 5);
+  const t1Abilities = ABILITIES.filter((a) => a.tier === 1);
+  const t2Abilities = ABILITIES.filter((a) => a.tier === 2);
   const leftParts = CRAFTABLE_COMPONENTS.slice(0, 2);
   const rightParts = CRAFTABLE_COMPONENTS.slice(2);
 
@@ -455,7 +507,7 @@ export default function CraftPage() {
             </div>
 
             {activeTab === "abilities"
-              ? <div className="space-y-3 mt-1">{leftAbilities.map((a) => renderAbilityCard(a, "left"))}</div>
+              ? <div className="space-y-3 mt-1">{t1Abilities.map((a) => renderAbilityCard(a, "left"))}</div>
               : <div className="space-y-3 mt-1">{leftParts.map((k) => renderPartCard(k, "left"))}</div>}
 
             {error && <div className="text-[10px] text-center" style={{ color: "#8b1a2a" }}>{error}</div>}
@@ -464,7 +516,7 @@ export default function CraftPage() {
           {/* RIGHT PAGE */}
           <div className="flex-1 flex flex-col gap-3 min-w-0" style={{ padding: "0 6% 0 5%" }}>
             {activeTab === "abilities"
-              ? <div className="space-y-3">{rightAbilities.map((a) => renderAbilityCard(a, "right"))}</div>
+              ? <div className="space-y-3">{t2Abilities.map((a) => renderAbilityCard(a, "right"))}</div>
               : <div className="space-y-3">{rightParts.map((k) => renderPartCard(k, "right"))}</div>}
 
             <div className="text-center mt-auto pt-2" style={{ transform: "rotateX(14deg) rotateY(-6deg)", transformOrigin: "center top", transformStyle: "preserve-3d" }}>

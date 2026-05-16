@@ -4,6 +4,8 @@ use starknet::ContractAddress;
 pub trait ICrafting1v1<T> {
     fn craft_ability(ref self: T, ability_id: u8);
     fn craft_ability_tier2(ref self: T, ability_type: u8);
+    fn craft_ability_batch(ref self: T, ability_id: u8, quantity: u32);
+    fn craft_ability_tier2_batch(ref self: T, ability_type: u8, quantity: u32);
 }
 
 #[starknet::interface]
@@ -138,6 +140,95 @@ pub mod crafting_1v1 {
             };
             ability_token.burn(caller, ability_type.into(), 1_u256);
             ability_token.mint(caller, (ability_type + 5).into(), 1_u256);
+        }
+
+        fn craft_ability_batch(ref self: ContractState, ability_id: u8, quantity: u32) {
+            assert(quantity >= 1, 'Quantity must be >= 1');
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let config: ResourceConfig = world.read_model(0_u8);
+
+            let mut kingdom: PlayerKingdom = world.read_model(caller);
+            let is_free = kingdom.registered && !kingdom.free_craft_used;
+
+            if is_free {
+                kingdom.free_craft_used = true;
+                world.write_model(@kingdom);
+            }
+
+            let burn_qty: u256 = if is_free {
+                (quantity - 1).into()
+            } else {
+                quantity.into()
+            };
+
+            assert(ability_id >= 1 && ability_id <= 5, 'Invalid ability ID');
+
+            if burn_qty > 0 {
+                if ability_id == 1 {
+                    burn_tokens(config.iron, caller, 3 * burn_qty);
+                    burn_tokens(config.wood, caller, 2 * burn_qty);
+                } else if ability_id == 2 {
+                    burn_tokens(config.stone, caller, 3 * burn_qty);
+                    burn_tokens(config.linen, caller, 2 * burn_qty);
+                } else if ability_id == 3 {
+                    burn_tokens(config.ember, caller, 3 * burn_qty);
+                    burn_tokens(config.seeds, caller, 2 * burn_qty);
+                } else if ability_id == 4 {
+                    burn_tokens(config.iron, caller, 2 * burn_qty);
+                    burn_tokens(config.stone, caller, 2 * burn_qty);
+                    burn_tokens(config.ember, caller, 1 * burn_qty);
+                } else {
+                    burn_tokens(config.stone, caller, 2 * burn_qty);
+                    burn_tokens(config.linen, caller, 2 * burn_qty);
+                    burn_tokens(config.wood, caller, 1 * burn_qty);
+                }
+            }
+
+            let ability_token = IAbilityTokenMintDispatcher {
+                contract_address: config.ability_token,
+            };
+            ability_token.mint(caller, ability_id.into(), quantity.into());
+        }
+
+        fn craft_ability_tier2_batch(ref self: ContractState, ability_type: u8, quantity: u32) {
+            assert(quantity >= 1, 'Quantity must be >= 1');
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            assert(ability_type >= 1 && ability_type <= 5, 'Invalid ability type');
+
+            let config: ResourceConfig = world.read_model(0_u8);
+            let qty: u256 = quantity.into();
+
+            if ability_type == 1 {
+                burn_tokens(config.iron, caller, 30 * qty);
+                burn_tokens(config.wood, caller, 20 * qty);
+                burn_tokens(config.ember, caller, 10 * qty);
+            } else if ability_type == 2 {
+                burn_tokens(config.stone, caller, 30 * qty);
+                burn_tokens(config.linen, caller, 20 * qty);
+                burn_tokens(config.seeds, caller, 10 * qty);
+            } else if ability_type == 3 {
+                burn_tokens(config.ember, caller, 30 * qty);
+                burn_tokens(config.seeds, caller, 20 * qty);
+                burn_tokens(config.iron, caller, 10 * qty);
+            } else if ability_type == 4 {
+                burn_tokens(config.iron, caller, 20 * qty);
+                burn_tokens(config.stone, caller, 20 * qty);
+                burn_tokens(config.ember, caller, 10 * qty);
+                burn_tokens(config.wood, caller, 10 * qty);
+            } else {
+                burn_tokens(config.stone, caller, 20 * qty);
+                burn_tokens(config.linen, caller, 20 * qty);
+                burn_tokens(config.wood, caller, 10 * qty);
+            }
+
+            let ability_token = IAbilityTokenMintDispatcher {
+                contract_address: config.ability_token,
+            };
+            ability_token.burn(caller, ability_type.into(), qty);
+            ability_token.mint(caller, (ability_type + 5).into(), qty);
         }
     }
 }

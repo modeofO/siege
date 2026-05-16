@@ -143,6 +143,8 @@ const SESSION_POLICIES: SessionPolicies = {
       methods: [
         { name: "Craft Ability", entrypoint: "craft_ability" },
         { name: "Craft Ability (T2)", entrypoint: "craft_ability_tier2" },
+        { name: "Craft Ability Batch", entrypoint: "craft_ability_batch" },
+        { name: "Craft Ability T2 Batch", entrypoint: "craft_ability_tier2_batch" },
       ],
     },
     ...Object.fromEntries(
