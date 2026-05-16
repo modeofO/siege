@@ -67,6 +67,7 @@ interface SkinDecor {
   innerRingOpacity: number;
   cornerMarks: boolean;
   ringDash: string;
+  centerEmblem: string;
 }
 
 const SKIN_DECOR: Record<string, SkinDecor> = {
@@ -76,6 +77,7 @@ const SKIN_DECOR: Record<string, SkinDecor> = {
     innerRingOpacity: 0.7,
     cornerMarks: true,
     ringDash: "4 3",
+    centerEmblem: "M0,-8 L0,8 M-4,-4 L0,-8 L4,-4",
   },
   "common-emitter-amp": {
     patternId: "skin-emitter",
@@ -83,6 +85,7 @@ const SKIN_DECOR: Record<string, SkinDecor> = {
     innerRingOpacity: 0.65,
     cornerMarks: true,
     ringDash: "2 2 6 2",
+    centerEmblem: "M-6,3 L-2,-3 L2,-3 L6,3 M0,-3 L0,-8",
   },
 };
 
@@ -94,28 +97,40 @@ function getSkinDecor(skin: string | null): SkinDecor | null {
 interface BannerStyle {
   fill: string;
   stroke: string;
-  shape: "rect" | "pennant" | "pointed" | "swallow";
+  shape: string;
+  emblem: string;
 }
 
 const BANNER_STYLES: Record<string, BannerStyle> = {
-  "half-wave-rectifier": { fill: "rgba(200,164,78,0.5)", stroke: "#daa520", shape: "rect" },
-  "full-wave-rectifier": { fill: "rgba(180,80,80,0.5)", stroke: "#c44332", shape: "pennant" },
-  "rc-low-pass": { fill: "rgba(100,150,200,0.5)", stroke: "#5a8cb8", shape: "pointed" },
-  "lc-tank": { fill: "rgba(140,190,100,0.5)", stroke: "#6aa046", shape: "swallow" },
+  "half-wave-rectifier": {
+    fill: "rgba(200,164,78,0.6)",
+    stroke: "#daa520",
+    shape: "M-6,-8 L6,-8 L6,10 L-6,10 Z",
+    emblem: "M-2,-2 L0,-4 L2,-2 L2,3 L-2,3 Z",
+  },
+  "full-wave-rectifier": {
+    fill: "rgba(180,80,80,0.6)",
+    stroke: "#c44332",
+    shape: "M-6,-8 L6,-8 L6,6 L0,10 L-6,6 Z",
+    emblem: "M-3,0 L0,-3 L3,0 M-3,3 L0,0 L3,3",
+  },
+  "rc-low-pass": {
+    fill: "rgba(100,150,200,0.6)",
+    stroke: "#5a8cb8",
+    shape: "M-6,-8 L6,-8 L6,5 L0,11 L-6,5 Z",
+    emblem: "M0,-2 A2,2,0,1,1,0,2 A2,2,0,1,1,0,-2 M0,0 L0,4",
+  },
+  "lc-tank": {
+    fill: "rgba(140,190,100,0.6)",
+    stroke: "#6aa046",
+    shape: "M-6,-8 L6,-8 L6,8 L0,4 L-6,8 Z",
+    emblem: "M0,-4 L3,1 L-3,1 Z M-1,2 L1,2 L1,4 L-1,4 Z",
+  },
 };
 
 function getBannerStyle(banner: string | null): BannerStyle | null {
   if (!banner) return null;
   return BANNER_STYLES[banner] ?? null;
-}
-
-function bannerPath(shape: BannerStyle["shape"]): string {
-  switch (shape) {
-    case "rect": return "M-6,-8 L6,-8 L6,10 L-6,10 Z";
-    case "pennant": return "M-6,-8 L6,-8 L6,6 L0,10 L-6,6 Z";
-    case "pointed": return "M-6,-8 L6,-8 L6,5 L0,11 L-6,5 Z";
-    case "swallow": return "M-6,-8 L6,-8 L6,8 L0,4 L-6,8 Z";
-  }
 }
 
 export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }: HexGridProps) {
@@ -247,6 +262,17 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                       />
                     );
                   })}
+                  {/* Center emblem */}
+                  <path
+                    d={skinDecor.centerEmblem}
+                    fill="none"
+                    stroke={skinDecor.innerRingColor}
+                    strokeWidth={1.8}
+                    strokeOpacity={0.8}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    transform={`translate(${x},${y})`}
+                  />
                 </>
               )}
 
@@ -276,9 +302,10 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                 if (!bs) return null;
                 return (
                   <g transform={`translate(${x + 16}, ${y - 22})`}>
-                    <path d={bannerPath(bs.shape)} fill={bs.fill} stroke={bs.stroke} strokeWidth={1} />
                     <line x1={0} y1={-8} x2={0} y2={-15} stroke={bs.stroke} strokeWidth={1} />
                     <circle cx={0} cy={-15} r={1.5} fill={bs.stroke} />
+                    <path d={bs.shape} fill={bs.fill} stroke={bs.stroke} strokeWidth={1} />
+                    <path d={bs.emblem} fill="none" stroke={bs.stroke} strokeWidth={1.2} transform="translate(0,1)" />
                   </g>
                 );
               })()}
