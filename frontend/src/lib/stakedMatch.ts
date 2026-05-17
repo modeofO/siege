@@ -159,7 +159,6 @@ const EMPTY_ESCROW: MatchEscrowData = {
 
 const ESCROW_TIMEOUT_MS = 8_000;
 
-// Reads MatchStakes1v1 (escrow + settled). gameState1v1.useMatchStakes1v1 reads MatchAbilities1v1 — different model.
 export function useMatchEscrow(matchId: string | null): MatchEscrowData {
   useEntityQuery(
     new ToriiQueryBuilder<SchemaType>()
@@ -175,7 +174,6 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
 
   const stakes = useModels(ModelsMapping.MatchStakes1v1);
 
-  // Timeout: if subscription yields no data after ESCROW_TIMEOUT_MS, surface it.
   const escrowFound = useMemo(() => {
     if (!matchId) return false;
     const idBig = BigInt(matchId);
@@ -188,7 +186,6 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
     const timer = setTimeout(() => setTimeoutTick((t) => t + 1), ESCROW_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [matchId, escrowFound]);
-  // Derived: timed out when we've ticked at least once and still no data.
   const timedOut = timeoutTick > 0 && !escrowFound && !!matchId;
 
   return useMemo<MatchEscrowData>(() => {

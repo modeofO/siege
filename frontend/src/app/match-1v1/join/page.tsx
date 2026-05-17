@@ -1,7 +1,7 @@
 // frontend/src/app/match-1v1/join/page.tsx
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useRouter } from "next/navigation";
@@ -11,6 +11,7 @@ import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
 import { AbilityWagerPicker } from "@/components/AbilityWagerPicker";
 import { AbilityIcon } from "@/components/AbilityIcon";
+import { toriiSql } from "@/lib/toriiSql";
 import Link from "next/link";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "http://localhost:5050";
@@ -24,10 +25,31 @@ export default function Join1v1Page() {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [alreadyInMatch, setAlreadyInMatch] = useState(false);
 
   const matchId = matchIdInput.trim() || null;
   const escrow = useMatchEscrow(matchId);
   const kingdom = usePlayerKingdom(address ?? null);
+
+  useEffect(() => {
+    if (!matchId || !address) { setAlreadyInMatch(false); return; }
+    let cancelled = false;
+    (async () => {
+      const rows = await toriiSql<{ player_a: string; player_b: string }>(
+        `SELECT player_a, player_b FROM "siege_dojo-MatchState1v1" WHERE match_id = ${matchId}`,
+      );
+      if (cancelled) return;
+      if (rows.length > 0) {
+        const addrBig = BigInt(address);
+        const isParticipant =
+          BigInt(rows[0].player_a) === addrBig || BigInt(rows[0].player_b) === addrBig;
+        setAlreadyInMatch(isParticipant);
+      } else {
+        setAlreadyInMatch(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [matchId, address]);
   // MatchStakes1v1 has 3 stake slots per side; world_system caps at 3 regardless of tier.
   const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
 
@@ -98,74 +120,93 @@ export default function Join1v1Page() {
         />
       </div>
 
-      {/* Match info (once loaded) */}
-      {matchId && escrow.loaded && !escrow.exists && !escrow.timedOut && (
-        <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-          No staked match with this ID. If it&apos;s a practice match, you can proceed — the join is implicit.
-        </div>
-      )}
-
-      {escrow.timedOut && !escrow.exists && (
-        <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
-          Could not load match data — Torii may be unreachable. Check your connection and refresh.
-        </div>
-      )}
-
-      {escrow.isStaked && (
-        <div className="space-y-3">
-          <div className="border border-[#c8a44e]/40 rounded p-3 bg-[#1a1714] space-y-2">
-            <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif text-center">
-              ⚔ Challenger&apos;s Wager ⚔
-            </div>
-            <div className="flex items-center justify-center gap-2">
-              {escrow.a.map((id, i) => (id > 0 ? <AbilityIcon key={i} tokenId={id} count={1} size={32} /> : null))}
-            </div>
-            <div className="text-[10px] text-center text-[#7a7060]">
-              {aStakeCount} ability{aStakeCount === 1 ? "" : "s"} escrowed — match this to activate the game. Actual
-              wager = min(yours, theirs); excess is refunded.
-            </div>
+      {/* Already in match — rejoin shortcut */}
+      {matchId && alreadyInMatch && (
+        <>
+          <div className="text-[11px] text-[#66cc66] border border-[#66cc66]/30 rounded p-3 bg-[#66cc66]/5">
+            You are already in this match. Rejoin to continue playing.
           </div>
-
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between">
-              <label className="text-xs text-[#6a6a7a] tracking-wider uppercase">Your matching wager</label>
-              <span className="text-[10px] text-[#7a7060]">
-                {tierName(kingdom.tier)} · {selectedIds.length}/{maxSlots} slots
-              </span>
-            </div>
-            {!kingdom.registered ? (
-              <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
-                Register your Hold in the Marches before staking.{" "}
-                <Link href="/world" className="underline">
-                  Go to Marches
-                </Link>
-              </div>
-            ) : balancesError ? (
-              <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
-                Could not load ability balances — check your RPC connection and refresh. ({balancesError})
-              </div>
-            ) : (
-              <AbilityWagerPicker
-                balances={balances}
-                selected={selectedIds}
-                maxSlots={maxSlots}
-                onChange={setSelectedIds}
-                balancesLoading={balancesLoading}
-              />
-            )}
-          </div>
-        </div>
+          <button
+            onClick={() => router.push(`/match-1v1/${matchId}`)}
+            className="w-full py-3 bg-[#66cc66]/10 border border-[#66cc66]/40 text-[#66cc66] rounded hover:bg-[#66cc66]/20 transition-colors tracking-wider text-sm"
+          >
+            REJOIN MATCH
+          </button>
+        </>
       )}
 
-      {error && <div className="text-[#ff3344] text-sm break-all">{error}</div>}
+      {/* Match info (once loaded) — only show join flow if NOT already in the match */}
+      {!alreadyInMatch && (
+        <>
+          {matchId && escrow.loaded && !escrow.exists && !escrow.timedOut && (
+            <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
+              No staked match with this ID. If it&apos;s a practice match, you can proceed — the join is implicit.
+            </div>
+          )}
 
-      <button
-        onClick={handleJoin}
-        disabled={!canJoin}
-        className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        {loading ? "JOINING..." : escrow.isStaked ? "MATCH WAGER & JOIN" : "JOIN MATCH"}
-      </button>
+          {escrow.timedOut && !escrow.exists && (
+            <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
+              Could not load match data — Torii may be unreachable. Check your connection and refresh.
+            </div>
+          )}
+
+          {escrow.isStaked && (
+            <div className="space-y-3">
+              <div className="border border-[#c8a44e]/40 rounded p-3 bg-[#1a1714] space-y-2">
+                <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif text-center">
+                  ⚔ Challenger&apos;s Wager ⚔
+                </div>
+                <div className="flex items-center justify-center gap-2">
+                  {escrow.a.map((id, i) => (id > 0 ? <AbilityIcon key={i} tokenId={id} count={1} size={32} /> : null))}
+                </div>
+                <div className="text-[10px] text-center text-[#7a7060]">
+                  {aStakeCount} ability{aStakeCount === 1 ? "" : "s"} escrowed — match this to activate the game. Actual
+                  wager = min(yours, theirs); excess is refunded.
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <label className="text-xs text-[#6a6a7a] tracking-wider uppercase">Your matching wager</label>
+                  <span className="text-[10px] text-[#7a7060]">
+                    {tierName(kingdom.tier)} · {selectedIds.length}/{maxSlots} slots
+                  </span>
+                </div>
+                {!kingdom.registered ? (
+                  <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
+                    Register your Hold in the Marches before staking.{" "}
+                    <Link href="/world" className="underline">
+                      Go to Marches
+                    </Link>
+                  </div>
+                ) : balancesError ? (
+                  <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
+                    Could not load ability balances — check your RPC connection and refresh. ({balancesError})
+                  </div>
+                ) : (
+                  <AbilityWagerPicker
+                    balances={balances}
+                    selected={selectedIds}
+                    maxSlots={maxSlots}
+                    onChange={setSelectedIds}
+                    balancesLoading={balancesLoading}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
+          {error && <div className="text-[#ff3344] text-sm break-all">{error}</div>}
+
+          <button
+            onClick={handleJoin}
+            disabled={!canJoin}
+            className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {loading ? "JOINING..." : escrow.isStaked ? "MATCH WAGER & JOIN" : "JOIN MATCH"}
+          </button>
+        </>
+      )}
     </div>
   );
 }

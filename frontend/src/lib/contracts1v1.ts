@@ -141,6 +141,7 @@ export async function revealMove1v1(
 }
 
 export async function resolveRound1v1(account: AccountInterface, matchId: string) {
+  let firstError: unknown;
   try {
     const tx = await account.execute(
       [
@@ -156,21 +157,23 @@ export async function resolveRound1v1(account: AccountInterface, matchId: string
     await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
     return tx;
   } catch (e) {
-    const errMsg = extractErrorMsg(e);
-    if (/not consumed/i.test(errMsg)) {
-      // Game-ending round: contract doesn't call consume_random, so retry without VRF wrap
-      const tx = await account.execute(
-        {
-          contractAddress: CONTRACTS_1V1.RESOLUTION,
-          entrypoint: "resolve_round",
-          calldata: [matchId],
-        },
-        TX_OPTS,
-      );
-      await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
-      return tx;
-    }
-    throw e;
+    firstError = e;
+    console.warn("[resolveRound1v1] with-VRF attempt failed, retrying without VRF wrap:", extractErrorMsg(e));
+  }
+  try {
+    const tx = await account.execute(
+      {
+        contractAddress: CONTRACTS_1V1.RESOLUTION,
+        entrypoint: "resolve_round",
+        calldata: [matchId],
+      },
+      TX_OPTS,
+    );
+    await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
+    return tx;
+  } catch (e2) {
+    console.error("[resolveRound1v1] without-VRF also failed:", extractErrorMsg(e2));
+    throw firstError;
   }
 }
 
