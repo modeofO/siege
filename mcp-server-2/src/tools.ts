@@ -230,8 +230,7 @@ function validateAllocationBudget(values: number[], budget: number, label: strin
 function tierAbilitySlots(tier: number): number {
   if (tier === 0) return 1;
   if (tier === 1) return 2;
-  if (tier === 2) return 3;
-  if (tier === 3) return 4;
+  if (tier >= 2) return 3;
   return 1;
 }
 

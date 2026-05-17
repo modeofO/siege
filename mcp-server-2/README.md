@@ -46,6 +46,8 @@ Cartridge session.
 | `siege_get_staked_match`              | read  | Match state plus staked ability escrow              |
 | `siege_get_pillage_status`            | read  | Active pillages and pillage eligibilities           |
 | `siege_get_factions`                  | read  | Factions, members, and pending invites              |
+| `siege_get_player_cosmetics`          | read  | Equipped cosmetics (banner, parcel_skin, hold_decoration) |
+| `siege_my_abilities`                  | read  | ERC-1155 ability token balances for the agent       |
 | `siege_register_player`               | write | world_system.register_player                        |
 | `siege_claim_drip`                    | write | world_system.claim_drip                             |
 | `siege_upgrade_kingdom`               | write | world_system.upgrade_kingdom                        |
@@ -63,6 +65,7 @@ Cartridge session.
 | `siege_leave_faction`                 | write | world_system.leave_faction                          |
 | `siege_kick_faction_member`           | write | world_system.kick_member                            |
 | `siege_set_faction_reinforcement`     | write | world_system.set_faction_reinforcement              |
+| `siege_set_cosmetic`                  | write | world_system.set_cosmetic                           |
 | `siege_set_ability_operator_approval` | write | AbilityToken.set_approval_for_all                   |
 | `siege_create_match`                  | write | Multicall: VRF + actions_1v1.create_match_1v1       |
 | `siege_commit`                        | write | Generate salt + hash + submit commit                |

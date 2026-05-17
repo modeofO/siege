@@ -1,6 +1,6 @@
 {
   "name": "siege-mcp-server-2",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "Autonomous MCP server for Siege 1v1 — signs and submits via Cartridge session keys.",
   "type": "module",
   "main": "dist/index.js",

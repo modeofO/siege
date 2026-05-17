@@ -351,7 +351,7 @@ mod tests {
         assert(siege_dojo::systems::world_system::tier_ability_slots(0) == 1, 'polis: 1 slot');
         assert(siege_dojo::systems::world_system::tier_ability_slots(1) == 2, 'strategos: 2 slots');
         assert(siege_dojo::systems::world_system::tier_ability_slots(2) == 3, 'hegemonia: 3 slots');
-        assert(siege_dojo::systems::world_system::tier_ability_slots(3) == 4, 'basileia: 4 slots');
+        assert(siege_dojo::systems::world_system::tier_ability_slots(3) == 3, 'basileia: 3 slots');
     }
 
     // Full setup with two players and ability token for staking tests.

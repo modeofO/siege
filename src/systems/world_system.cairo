@@ -27,7 +27,7 @@ pub fn tier_ability_slots(tier: u8) -> u8 {
         0 => 1,
         1 => 2,
         2 => 3,
-        3 => 4,
+        3 => 3,
         _ => 1,
     }
 }
