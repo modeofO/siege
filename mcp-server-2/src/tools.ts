@@ -875,6 +875,105 @@ export function registerSiegeTools(reg: RegisterArgs): void {
   );
 
   register(
+    "siege_craft_ability",
+    {
+      description:
+        "Craft ability tokens. T1 (ids 1-5) costs ERC-20 resources. T2 (ids 6-10) costs resources + burns 1 matching T1. Multicalls approve + craft_ability_batch or craft_ability_tier2_batch. Use siege_get_world_state to check ResourceConfig token addresses and resource balances first.",
+      inputSchema: {
+        ability_id: z.number().int().min(1).max(10).describe("1-5 for T1, 6-10 for T2"),
+        quantity: z.number().int().min(1).max(50).default(1),
+      },
+      requiresSigner: true,
+    },
+    async ({ ability_id, quantity }, ctx) => {
+      const resourceConfig = await ctx.state.resourceConfig();
+      const tokens: Record<string, string> = {
+        iron: resourceConfig.iron,
+        linen: resourceConfig.linen,
+        stone: resourceConfig.stone,
+        wood: resourceConfig.wood,
+        ember: resourceConfig.ember,
+        seeds: resourceConfig.seeds,
+      };
+
+      const tier = Math.floor((ability_id - 1) / 5) + 1;
+      const abilityType = ((ability_id - 1) % 5) + 1;
+
+      const costs: Record<number, Record<string, number>> = {
+        1: { iron: 8, wood: 5 },
+        2: { stone: 8, linen: 5 },
+        3: { ember: 8, seeds: 5 },
+        4: { iron: 5, stone: 5, ember: 3 },
+        5: { stone: 5, linen: 5, wood: 3 },
+        6: { iron: 30, wood: 20, ember: 10 },
+        7: { stone: 30, linen: 20, seeds: 10 },
+        8: { ember: 30, seeds: 20, iron: 10 },
+        9: { iron: 20, stone: 20, ember: 10, wood: 10 },
+        10: { stone: 20, linen: 20, wood: 10 },
+      };
+
+      const cost = costs[ability_id];
+      if (!cost) throw new Error(`Unknown ability_id: ${ability_id}`);
+
+      const calls_list: import("starknet").Call[] = [];
+      for (const [resource, amount] of Object.entries(cost)) {
+        const tokenAddr = tokens[resource];
+        if (!tokenAddr) continue;
+        calls_list.push(
+          call(tokenAddr, "approve", [ctx.config.contracts.crafting1v1, String(amount * quantity), "0"]),
+        );
+      }
+
+      if (tier === 1) {
+        calls_list.push(
+          call(ctx.config.contracts.crafting1v1, "craft_ability_batch", [String(ability_id), String(quantity)]),
+        );
+      } else {
+        calls_list.push(
+          call(ctx.config.contracts.crafting1v1, "craft_ability_tier2_batch", [String(abilityType), String(quantity)]),
+        );
+      }
+
+      const tx = await execute(ctx.signer!, calls_list);
+      const names = ["", "Siege Sword", "Stone Cloak", "Ember Blast", "Hex", "Fortify"];
+      return {
+        tx_hash: tx,
+        ability_id,
+        ability_name: `${names[abilityType]} (T${tier})`,
+        quantity,
+        resource_cost: Object.fromEntries(Object.entries(cost).map(([r, a]) => [r, a * quantity])),
+      };
+    },
+  );
+
+  register(
+    "siege_get_forge_info",
+    {
+      description:
+        "Get circuit forge information: available circuits (cosmetics), component types and their resource costs. Circuit forging is client-side — this tool provides the reference data an agent needs to advise crafting strategy.",
+      inputSchema: {},
+    },
+    async () => {
+      const components = [
+        { kind: "rune-stone", cost: { stone: 4, iron: 2 } },
+        { kind: "flux-well", cost: { ember: 4, linen: 2 } },
+        { kind: "spiral-coil", cost: { iron: 4, wood: 2 } },
+        { kind: "one-way-valve", cost: { stone: 3, ember: 3, seeds: 2 } },
+      ];
+      const circuits = [
+        { key: "half-wave-rectifier", name: "The First Gate", cosmetic_type: "banner", components_needed: ["one-way-valve", "rune-stone", "flux-well"] },
+        { key: "voltage-divider", name: "Bleeder's Mark", cosmetic_type: "parcelSkin", components_needed: ["rune-stone", "rune-stone", "flux-well"] },
+        { key: "full-wave-rectifier", name: "The Second Gate", cosmetic_type: "banner", components_needed: ["one-way-valve", "one-way-valve", "rune-stone", "flux-well"] },
+        { key: "rc-low-pass", name: "The Muffler", cosmetic_type: "banner", components_needed: ["rune-stone", "flux-well", "spiral-coil"] },
+        { key: "common-emitter-amp", name: "Voice of the Keep", cosmetic_type: "holdDecoration", components_needed: ["rune-stone", "rune-stone", "flux-well", "spiral-coil"] },
+        { key: "lc-tank", name: "The Resonance Chamber", cosmetic_type: "parcelSkin", components_needed: ["spiral-coil", "flux-well", "rune-stone"] },
+        { key: "buck-converter", name: "The Quartermaster", cosmetic_type: "banner", components_needed: ["one-way-valve", "spiral-coil", "flux-well", "rune-stone"] },
+      ];
+      return { components, circuits, note: "Circuit forging happens client-side. Use siege_set_cosmetic to equip a forged circuit on-chain." };
+    },
+  );
+
+  register(
     "siege_get_staked_match",
     {
       description:

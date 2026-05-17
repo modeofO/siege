@@ -6,7 +6,7 @@
  * silent. Anything not listed here will fail at sign time.
  */
 
-import type { SiegeContracts } from "./config.js";
+import type { ResourceTokenAddresses, SiegeContracts } from "./config.js";
 
 interface Method {
   name: string;
@@ -34,6 +34,7 @@ export function buildPolicies(
   contracts: SiegeContracts,
   vrfAddress: string,
   abilityTokenAddress: string | null = null,
+  resourceTokens?: ResourceTokenAddresses,
 ): SessionPolicies {
   const policies: SessionPolicies = {
     contracts: {
@@ -55,6 +56,13 @@ export function buildPolicies(
         methods: [
           m("set_preset_defense", "Set one preset defense slot for async conquest"),
           m("initiate_conquest", "Attack an adjacent non-home parcel using preset-defense resolution"),
+          ...DOJO_METHODS,
+        ],
+      },
+      [contracts.crafting1v1]: {
+        methods: [
+          m("craft_ability_batch", "Craft T1 abilities (burns ERC-20 resources)"),
+          m("craft_ability_tier2_batch", "Craft T2 abilities (burns T1 + ERC-20 resources)"),
           ...DOJO_METHODS,
         ],
       },
@@ -94,6 +102,14 @@ export function buildPolicies(
     policies.contracts[abilityTokenAddress] = {
       methods: [m("set_approval_for_all", "Approve or revoke world_system as ability-token operator")],
     };
+  }
+
+  if (resourceTokens) {
+    for (const addr of Object.values(resourceTokens)) {
+      policies.contracts[addr] = {
+        methods: [m("approve", "Approve crafting contract to spend resource tokens")],
+      };
+    }
   }
 
   return policies;

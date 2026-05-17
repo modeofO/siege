@@ -10,7 +10,7 @@
 
 import SessionProvider from "@cartridge/controller/session/node";
 import { shortString, type WalletAccount } from "starknet";
-import type { SiegeContracts } from "./config.js";
+import type { ResourceTokenAddresses, SiegeContracts } from "./config.js";
 import { buildPolicies } from "./policies.js";
 
 interface SessionConfig {
@@ -19,6 +19,7 @@ interface SessionConfig {
   contracts: SiegeContracts;
   vrfAddress: string;
   abilityTokenAddress: string | null;
+  resourceTokens: ResourceTokenAddresses;
   basePath: string;
 }
 
@@ -34,7 +35,7 @@ const POLL_TIMEOUT_MS = 5 * 60 * 1_000;
 function getProvider(cfg: SessionConfig): SessionProvider {
   if (provider) return provider;
 
-  const policies = buildPolicies(cfg.contracts, cfg.vrfAddress, cfg.abilityTokenAddress);
+  const policies = buildPolicies(cfg.contracts, cfg.vrfAddress, cfg.abilityTokenAddress, cfg.resourceTokens);
 
   // The WASM session expects chainId as a felt, not "SN_SEPOLIA".
   const chainIdFelt = shortString.encodeShortString(cfg.chainId);

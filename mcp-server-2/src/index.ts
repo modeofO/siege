@@ -173,6 +173,7 @@ async function main(): Promise<void> {
           contracts: config.contracts,
           vrfAddress: config.vrfAddress,
           abilityTokenAddress: config.abilityTokenAddress,
+          resourceTokens: config.resourceTokens,
           basePath: config.sessionDir,
         },
         {
