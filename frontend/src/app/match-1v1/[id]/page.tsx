@@ -20,6 +20,7 @@ import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
+import { BattlefieldView } from "@/components/BattlefieldView";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
 import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
@@ -580,6 +581,14 @@ export default function Match1v1Page() {
     });
   };
 
+  // Derive opponent allocations from the latest resolved round (shown post-reveal)
+  const lastRound = history.length > 0 ? history[history.length - 1] : null;
+  const opponentAllocations = lastRound && lastRound.round === state.round - 1
+    ? isPlayerA
+      ? [...lastRound.bAttack, ...lastRound.bDefense, 0, 0, 0, 0, ...lastRound.bTraps]
+      : [...lastRound.aAttack, ...lastRound.aDefense, 0, 0, 0, 0, ...lastRound.aTraps]
+    : null;
+
   return (
     <div className="space-y-2 max-w-4xl mx-auto">
       {/* ===== 1. HEADER BANNER ===== */}
@@ -680,6 +689,14 @@ export default function Match1v1Page() {
       {/* ===== 1b. STAKES + HOLD STATUS ===== */}
       <MatchStakesHeader stakes={matchStakes} isPlayerA={isPlayerA} />
       <HoldStatusStrip playerA={state.playerA} playerB={state.playerB} isPlayerA={isPlayerA} refreshKey={refreshKey} />
+
+      {/* ===== 1c. ANIMATED BATTLEFIELD ===== */}
+      <BattlefieldView
+        allocations={allocations}
+        isPlayerA={isPlayerA}
+        committed={effectiveCommitted}
+        opponentAllocations={opponentAllocations}
+      />
 
       {/* ===== 2. BATTLEFIELD PANEL ===== */}
       <div className="border border-[#3d3428] rounded-lg p-3 bg-[#1a1714]">
