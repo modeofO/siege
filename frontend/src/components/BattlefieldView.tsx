@@ -8,8 +8,25 @@ interface BattlefieldViewProps {
   allocations: number[];
   isPlayerA: boolean;
   committed: boolean;
+  modifiers: [number, number, number];
   opponentAllocations?: number[] | null;
 }
+
+const GATE_NAMES = ["East Gate", "West Gate", "Underground"];
+
+const MODIFIER_LABELS: Record<number, string> = {
+  1: "Narrow Pass",
+  2: "Mirror Gate",
+  3: "Deadlock",
+  4: "Reflection",
+};
+
+const MODIFIER_COLORS: Record<number, string> = {
+  1: "text-[#daa520] border-[#daa520]/40 bg-[#daa520]/10",
+  2: "text-[#c8a44e] border-[#c8a44e]/40 bg-[#c8a44e]/10",
+  3: "text-[#ff3344] border-[#ff3344]/40 bg-[#ff3344]/10",
+  4: "text-[#ff8800] border-[#ff8800]/40 bg-[#ff8800]/10",
+};
 
 const POSITIONS = {
   baseA: { x: 17, y: 42 },
@@ -54,6 +71,7 @@ export function BattlefieldView({
   allocations,
   isPlayerA,
   committed,
+  modifiers,
   opponentAllocations,
 }: BattlefieldViewProps) {
   const myTeam: Team = isPlayerA ? "a" : "b";
@@ -137,7 +155,27 @@ export function BattlefieldView({
 
   return (
     <div className="border border-[#3d3428] rounded-lg overflow-hidden bg-[#1a1714]">
-      <div className="text-[10px] tracking-wider text-[#7a7060] uppercase px-3 pt-2 font-serif">Battlefield</div>
+      {/* Gate modifier bar */}
+      <div className="flex items-center justify-between px-3 py-1.5">
+        <span className="text-[10px] tracking-wider text-[#7a7060] uppercase font-serif">Battlefield</span>
+        <div className="flex items-center gap-4">
+          {[0, 2, 1].map((i) => {
+            const mod = modifiers[i];
+            const label = MODIFIER_LABELS[mod];
+            const colors = MODIFIER_COLORS[mod];
+            return (
+              <div key={i} className="flex items-center gap-1.5">
+                <span className="text-[10px] text-[#d4cfc6]/60 font-serif tracking-wider">{GATE_NAMES[i]}</span>
+                {label ? (
+                  <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${colors}`}>{label}</span>
+                ) : (
+                  <span className="text-[9px] text-[#7a7060] px-1.5 py-0.5">Normal</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
       <div
         className="relative w-full select-none"
         style={{

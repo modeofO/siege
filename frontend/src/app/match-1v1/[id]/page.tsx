@@ -13,7 +13,6 @@ import {
   useRoundModifiers1v1,
   useMatchAbilities1v1,
   MODIFIER_NAMES,
-  MODIFIER_DESCRIPTIONS,
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1 } from "@/lib/gameState1v1";
 import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1 } from "@/lib/crypto";
@@ -66,7 +65,6 @@ export default function Match1v1Page() {
   // Round status for polling commit/reveal counts
   const roundStatus = useRoundStatus1v1(matchId, state?.round ?? 1, refreshKey);
 
-  // Gate modifiers for current round
   const modifiers = useRoundModifiers1v1(matchId, state?.round ?? 1);
 
   // Ability selection state
@@ -590,7 +588,7 @@ export default function Match1v1Page() {
     : null;
 
   return (
-    <div className="space-y-2 max-w-4xl mx-auto">
+    <div className="space-y-2 max-w-7xl mx-auto">
       {/* ===== 1. HEADER BANNER ===== */}
       <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] space-y-0 panel-header">
         {/* Row 1: Title, round, match ID, budget, player badge */}
@@ -690,343 +688,274 @@ export default function Match1v1Page() {
       <MatchStakesHeader stakes={matchStakes} isPlayerA={isPlayerA} />
       <HoldStatusStrip playerA={state.playerA} playerB={state.playerB} isPlayerA={isPlayerA} refreshKey={refreshKey} />
 
-      {/* ===== 1c. ANIMATED BATTLEFIELD ===== */}
-      <BattlefieldView
-        allocations={allocations}
-        isPlayerA={isPlayerA}
-        committed={effectiveCommitted}
-        opponentAllocations={opponentAllocations}
-      />
-
-      {/* ===== 2. BATTLEFIELD PANEL ===== */}
-      <div className="border border-[#3d3428] rounded-lg p-3 bg-[#1a1714]">
-        <div className="text-[10px] tracking-wider text-[#7a7060] uppercase mb-2 font-serif">Battlefield</div>
-
-        {/* Fortress Gates — East | Underground (main) | West */}
-        {(() => {
-          const gateConfig = [
-            { idx: 0, name: "East Gate", sprite: "/sprites/gate-east.png" },
-            { idx: 2, name: "Underground", sprite: "/sprites/gate-underground.png" },
-            { idx: 1, name: "West Gate", sprite: "/sprites/gate-west.png" },
-          ];
-          return (
-            <div className="grid grid-cols-[1fr_1.3fr_1fr] gap-2">
-              {gateConfig.map(({ idx, name, sprite }) => {
-                const mod = modifiers[idx];
-                const modName = MODIFIER_NAMES[mod] || "Normal";
-                const modDesc = MODIFIER_DESCRIPTIONS[mod] || "";
-                const modColor =
-                  mod === 0
-                    ? "text-[#7a7060]"
-                    : mod === 1
-                      ? "text-[#daa520]"
-                      : mod === 2
-                        ? "text-[#c8a44e]"
-                        : mod === 3
-                          ? "text-[#ff3344]"
-                          : "text-[#ff8800]";
-                const modBorder =
-                  mod === 0
-                    ? "border-[#3d3428]"
-                    : mod === 1
-                      ? "border-[#daa520]/30"
-                      : mod === 2
-                        ? "border-[#c8a44e]/30"
-                        : mod === 3
-                          ? "border-[#ff3344]/30"
-                          : "border-[#ff8800]/30";
-                const modGlow =
-                  mod === 0
-                    ? ""
-                    : mod === 1
-                      ? "shadow-[inset_0_0_12px_rgba(255,215,0,0.08)]"
-                      : mod === 2
-                        ? "shadow-[inset_0_0_12px_rgba(200,164,78,0.08)]"
-                        : mod === 3
-                          ? "shadow-[inset_0_0_12px_rgba(255,51,68,0.08)]"
-                          : "shadow-[inset_0_0_12px_rgba(255,136,0,0.08)]";
-                const isMain = idx === 2;
-                const hasModifier = mod !== 0;
-                return (
-                  <div
-                    key={idx}
-                    className={`rounded-lg text-center flex flex-col items-center justify-end gap-1 p-2 ${hasModifier ? `bg-[#252019]/50 border border-[#3d3428] ${modGlow}` : ""}`}
-                  >
-                    <Image
-                      src={sprite}
-                      alt={name}
-                      width={isMain ? 176 : 128}
-                      height={isMain ? 176 : 128}
-                      className={`object-contain rounded-xl ${isMain ? "w-44 h-44" : "w-32 h-32"}`}
-                    />
-                    <div
-                      className={`font-bold font-serif ${isMain ? "text-sm text-[#d4cfc6]" : "text-xs text-[#d4cfc6]"}`}
-                    >
-                      {name}
-                    </div>
-                    <div className={`text-xs font-bold ${modColor}`}>{modName}</div>
-                    {modDesc && <div className="text-[10px] text-[#7a7060] leading-tight">{modDesc}</div>}
-                  </div>
-                );
-              })}
-            </div>
-          );
-        })()}
-      </div>
-
-      {/* ===== 3. RESOURCES BAR ===== */}
-      <div className="flex items-center gap-1 px-3 py-2 bg-[#1a1714] border border-[#3d3428] rounded-lg overflow-x-auto">
-        <span className="text-[10px] tracking-wider text-[#7a7060] uppercase shrink-0 mr-2">Resources</span>
-        {[
-          { label: "Iron", value: resources.iron, color: "text-[#a0a0b0]" },
-          { label: "Linen", value: resources.linen, color: "text-[#d4a574]" },
-          { label: "Stone", value: resources.stone, color: "text-[#8a8a9a]" },
-          { label: "Wood", value: resources.wood, color: "text-[#8b6914]" },
-          { label: "Ember", value: resources.ember, color: "text-[#ff6633]" },
-          { label: "Seeds", value: resources.seeds, color: "text-[#66cc66]" },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="flex items-center gap-1 px-2 py-0.5 bg-[#252019] rounded text-xs shrink-0">
-            <span className={`font-bold ${color}`}>{value}</span>
-            <span className="text-[10px] text-[#7a7060]">{label}</span>
-          </div>
-        ))}
-      </div>
-
-      {/* ===== 4. DEPLOYMENT PANEL ===== */}
-      <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">
-        {state.phase === "committing" && (!effectiveCommitted || confirming) ? (
-          <AllocationForm1v1
-            budget={budget}
+      {/* ===== 2. BATTLEFIELD + CONTROLS (side-by-side) ===== */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-2">
+        {/* Left: Animated Battlefield + War Log */}
+        <div className="flex flex-col gap-2">
+          <BattlefieldView
             allocations={allocations}
-            onChange={setAllocations}
-            onCommit={handleCommit}
-            submitting={submitting}
-            confirming={confirming}
-            error={error}
-            nodes={state.nodes}
             isPlayerA={isPlayerA}
-            abilities={matchAbilities.abilities}
-            abilitiesUsed={matchAbilities.used}
-            selectedAbility={selectedAbility}
-            selectedTarget={selectedTarget}
-            onAbilitySelect={handleAbilitySelect}
+            committed={effectiveCommitted}
+            modifiers={modifiers}
+            opponentAllocations={opponentAllocations}
           />
-        ) : (
-          <div className="p-3 flex flex-col items-center justify-center gap-2">
-            {phaseText ? (
-              <span
-                className={`text-sm tracking-wide ${autoRevealStatus === "error" ? "text-[#ff9944]" : "text-[#7a7060] animate-pulse"}`}
-              >
-                {phaseText}
-              </span>
+
+          {/* War Dispatch Log */}
+          <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">
+            <div className="px-4 pt-3 pb-2">
+              <span className="text-[10px] tracking-wider text-[#7a7060] uppercase font-serif">War Dispatch Log</span>
+            </div>
+            {history.length === 0 ? (
+              <div className="px-4 pb-3 text-sm text-[#7a7060]">No rounds played yet</div>
             ) : (
-              <span className="text-[#7a7060] text-xs">Awaiting next phase...</span>
-            )}
-            {autoRevealStatus === "error" && (
-              <>
-                {autoRevealError && (
-                  <span className="text-[10px] text-[#7a7060] font-mono max-w-full truncate px-2">
-                    {autoRevealError}
-                  </span>
-                )}
-                <button
-                  onClick={handleRetryReveal}
-                  className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors"
-                >
-                  RETRY REVEAL
-                </button>
-              </>
-            )}
-            {autoResolveError && (
-              <>
-                <span className="text-[10px] text-[#7a7060] font-mono max-w-full truncate px-2">
-                  {autoResolveError}
-                </span>
-                <button
-                  onClick={() => {
-                    autoResolveLock.current = false;
-                    setAutoResolveError("");
-                    setResolveRetryCount((c) => c + 1);
-                  }}
-                  className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors"
-                >
-                  RETRY RESOLVE
-                </button>
-              </>
-            )}
-            {state.phase === "resolving" && !autoResolveError && effectiveRevealCount >= 2 && (
-              <button
-                onClick={async () => {
-                  if (!account) return;
-                  try {
-                    await resolveRound1v1(account, matchId);
-                    setAutoResolveError("");
-                  } catch (e) {
-                    setAutoResolveError(extractErrorMsg(e));
-                  }
-                  void refresh();
-                }}
-                className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors mt-1"
-              >
-                RESOLVE MANUALLY
-              </button>
+              <div className="max-h-64 overflow-y-auto">
+                {history.map((r: RoundResult1v1) => {
+                  const gateDmgDealt = isPlayerA ? r.damageToB : r.damageToA;
+                  const gateDmgTaken = isPlayerA ? r.damageToA : r.damageToB;
+                  const myTraps = isPlayerA ? r.aTraps : r.bTraps;
+                  const theirTraps = isPlayerA ? r.bTraps : r.aTraps;
+                  const myTrapDmg = myTraps.filter((t) => t > 0).length * 5;
+                  const theirTrapDmg = theirTraps.filter((t) => t > 0).length * 5;
+                  const dmgDealt = gateDmgDealt + myTrapDmg;
+                  const dmgTaken = gateDmgTaken + theirTrapDmg;
+                  const isExpanded = expandedRounds.has(r.round);
+                  const gateNames = ["East", "West", "Underground"];
+
+                  return (
+                    <div key={r.round} className="border-t border-[#252019]">
+                      <button
+                        onClick={() => toggleRound(r.round)}
+                        className="w-full px-4 py-2 flex items-center justify-between text-xs hover:bg-[#252019] transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="text-[#7a7060] text-[10px]">{isExpanded ? "▼" : "▶"}</span>
+                          <span className="text-[#d4cfc6] font-bold">R{r.round}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-green-400">+{dmgDealt} dealt</span>
+                          {myTrapDmg > 0 && <span className="text-[#daa520]">(trap +{myTrapDmg})</span>}
+                          <span className="text-[#7a7060]">/</span>
+                          <span className="text-red-400">-{dmgTaken} taken</span>
+                          {theirTrapDmg > 0 && <span className="text-[#ff3344]">(trap -{theirTrapDmg})</span>}
+                        </div>
+                      </button>
+
+                      {isExpanded && (
+                        <div className="px-4 pb-3 space-y-2">
+                          <div className="grid grid-cols-3 gap-2">
+                            {r.gateBreakdown.map((gate, i) => {
+                              const modName = MODIFIER_NAMES[gate.modifier] || "Normal";
+                              const modColor =
+                                gate.modifier === 0
+                                  ? "text-[#7a7060]"
+                                  : gate.modifier === 1
+                                    ? "text-[#daa520]"
+                                    : gate.modifier === 2
+                                      ? "text-[#c8a44e]"
+                                      : gate.modifier === 3
+                                        ? "text-[#ff3344]"
+                                        : "text-[#ff8800]";
+                              const myDmgDealt = isPlayerA ? gate.dmgToB : gate.dmgToA;
+                              const myDmgTaken = isPlayerA ? gate.dmgToA : gate.dmgToB;
+                              return (
+                                <div key={i} className="bg-[#252019] rounded p-2 space-y-1 text-xs">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-[#d4cfc6] font-bold">{gateNames[i]}</span>
+                                    {gate.modifier !== 0 && <span className={`${modColor} text-[10px]`}>{modName}</span>}
+                                  </div>
+                                  <div className="text-[#7a7060]">
+                                    You: {isPlayerA ? gate.attackA : gate.attackB} atk /{" "}
+                                    {isPlayerA ? gate.defenseA : gate.defenseB} def
+                                  </div>
+                                  <div className="text-[#7a7060]">
+                                    Them: {isPlayerA ? gate.attackB : gate.attackA} atk /{" "}
+                                    {isPlayerA ? gate.defenseB : gate.defenseA} def
+                                  </div>
+                                  <div>
+                                    {myDmgDealt > 0 && <span className="text-green-400">+{myDmgDealt} </span>}
+                                    {myDmgTaken > 0 && <span className="text-red-400">-{myDmgTaken}</span>}
+                                    {myDmgDealt === 0 && myDmgTaken === 0 && <span className="text-[#7a7060]">0</span>}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                          {(r.aTraps.some((t) => t > 0) || r.bTraps.some((t) => t > 0)) && (
+                            <div className="text-xs border-t border-[#3d3428] pt-2 space-y-1">
+                              <div className="text-[10px] tracking-wider text-[#7a7060] uppercase">Node Traps</div>
+                              {(() => {
+                                const nodeNames = ["Forge", "Quarry", "Grove"];
+                                return [0, 1, 2].map((ni) => {
+                                  const myTrap = isPlayerA ? r.aTraps[ni] : r.bTraps[ni];
+                                  const theirTrap = isPlayerA ? r.bTraps[ni] : r.aTraps[ni];
+                                  if (myTrap) {
+                                    return (
+                                      <div key={`mt${ni}`} className="text-[#daa520]">
+                                        You trapped {nodeNames[ni]} — opponent takes{" "}
+                                        <span className="text-[#ff3344] font-bold">5 damage</span> if they captured it
+                                      </div>
+                                    );
+                                  }
+                                  if (theirTrap) {
+                                    return (
+                                      <div key={`tt${ni}`} className="text-[#ff3344]">
+                                        Enemy trapped {nodeNames[ni]}! You take <span className="font-bold">5 damage</span>{" "}
+                                        if you captured it
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                });
+                              })()}
+                            </div>
+                          )}
+                          {(r.aAbilityId > 0 || r.bAbilityId > 0) && (
+                            <div className="text-xs border-t border-[#3d3428] pt-2 space-y-1">
+                              <div className="text-[10px] tracking-wider text-[#7a7060] uppercase">Abilities Used</div>
+                              {(() => {
+                                const myAbilityId = isPlayerA ? r.aAbilityId : r.bAbilityId;
+                                const myAbilityTarget = isPlayerA ? r.aAbilityTarget : r.bAbilityTarget;
+                                const theirAbilityId = isPlayerA ? r.bAbilityId : r.aAbilityId;
+                                const theirAbilityTarget = isPlayerA ? r.bAbilityTarget : r.aAbilityTarget;
+                                const abilityGateNames = ["East Gate", "West Gate", "Underground Gate"];
+                                const getAbilityName = (id: number) => ABILITIES[id - 1]?.name || `Ability #${id}`;
+                                return (
+                                  <>
+                                    {myAbilityId > 0 && (
+                                      <div className="text-[#c8a44e]">
+                                        You used <span className="font-bold">{getAbilityName(myAbilityId)}</span>
+                                        {myAbilityTarget > 0 && ` on ${abilityGateNames[myAbilityTarget - 1] || `target ${myAbilityTarget}`}`}
+                                      </div>
+                                    )}
+                                    {theirAbilityId > 0 && (
+                                      <div className="text-[#ff8800]">
+                                        Opponent used <span className="font-bold">{getAbilityName(theirAbilityId)}</span>
+                                        {theirAbilityTarget > 0 && ` on ${abilityGateNames[theirAbilityTarget - 1] || `target ${theirAbilityTarget}`}`}
+                                      </div>
+                                    )}
+                                  </>
+                                );
+                              })()}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
-        )}
+        </div>
+
+        {/* Right: Resources + Deployment Controls */}
+        <div className="flex flex-col gap-2">
+          {/* Resources bar */}
+          <div className="flex flex-wrap items-center gap-1 px-3 py-2 bg-[#1a1714] border border-[#3d3428] rounded-lg">
+            <span className="text-[10px] tracking-wider text-[#7a7060] uppercase shrink-0 mr-2">Resources</span>
+            {[
+              { label: "Iron", value: resources.iron, color: "text-[#a0a0b0]" },
+              { label: "Linen", value: resources.linen, color: "text-[#d4a574]" },
+              { label: "Stone", value: resources.stone, color: "text-[#8a8a9a]" },
+              { label: "Wood", value: resources.wood, color: "text-[#8b6914]" },
+              { label: "Ember", value: resources.ember, color: "text-[#ff6633]" },
+              { label: "Seeds", value: resources.seeds, color: "text-[#66cc66]" },
+            ].map(({ label, value, color }) => (
+              <div key={label} className="flex items-center gap-1 px-2 py-0.5 bg-[#252019] rounded text-xs shrink-0">
+                <span className={`font-bold ${color}`}>{value}</span>
+                <span className="text-[10px] text-[#7a7060]">{label}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Deployment panel */}
+          <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] flex-1">
+            {state.phase === "committing" && (!effectiveCommitted || confirming) ? (
+              <AllocationForm1v1
+                budget={budget}
+                allocations={allocations}
+                onChange={setAllocations}
+                onCommit={handleCommit}
+                submitting={submitting}
+                confirming={confirming}
+                error={error}
+                nodes={state.nodes}
+                isPlayerA={isPlayerA}
+                abilities={matchAbilities.abilities}
+                abilitiesUsed={matchAbilities.used}
+                selectedAbility={selectedAbility}
+                selectedTarget={selectedTarget}
+                onAbilitySelect={handleAbilitySelect}
+              />
+            ) : (
+              <div className="p-3 flex flex-col items-center justify-center gap-2 h-full">
+                {phaseText ? (
+                  <span
+                    className={`text-sm tracking-wide ${autoRevealStatus === "error" ? "text-[#ff9944]" : "text-[#7a7060] animate-pulse"}`}
+                  >
+                    {phaseText}
+                  </span>
+                ) : (
+                  <span className="text-[#7a7060] text-xs">Awaiting next phase...</span>
+                )}
+                {autoRevealStatus === "error" && (
+                  <>
+                    {autoRevealError && (
+                      <span className="text-[10px] text-[#7a7060] font-mono max-w-full truncate px-2">
+                        {autoRevealError}
+                      </span>
+                    )}
+                    <button
+                      onClick={handleRetryReveal}
+                      className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors"
+                    >
+                      RETRY REVEAL
+                    </button>
+                  </>
+                )}
+                {autoResolveError && (
+                  <>
+                    <span className="text-[10px] text-[#7a7060] font-mono max-w-full truncate px-2">
+                      {autoResolveError}
+                    </span>
+                    <button
+                      onClick={() => {
+                        autoResolveLock.current = false;
+                        setAutoResolveError("");
+                        setResolveRetryCount((c) => c + 1);
+                      }}
+                      className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors"
+                    >
+                      RETRY RESOLVE
+                    </button>
+                  </>
+                )}
+                {state.phase === "resolving" && !autoResolveError && effectiveRevealCount >= 2 && (
+                  <button
+                    onClick={async () => {
+                      if (!account) return;
+                      try {
+                        await resolveRound1v1(account, matchId);
+                        setAutoResolveError("");
+                      } catch (e) {
+                        setAutoResolveError(extractErrorMsg(e));
+                      }
+                      void refresh();
+                    }}
+                    className="px-4 py-1.5 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] text-xs tracking-wider rounded hover:bg-[#c8a44e]/20 transition-colors mt-1"
+                  >
+                    RESOLVE MANUALLY
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       {error && !state.phase && (
         <div className="text-[#ff3344] text-sm border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">{error}</div>
       )}
-
-      {/* ===== 5. WAR DISPATCH LOG ===== */}
-      <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">
-        <div className="px-4 pt-3 pb-2">
-          <span className="text-[10px] tracking-wider text-[#7a7060] uppercase font-serif">War Dispatch Log</span>
-        </div>
-        {history.length === 0 ? (
-          <div className="px-4 pb-3 text-sm text-[#7a7060]">No rounds played yet</div>
-        ) : (
-          <div className="max-h-96 overflow-y-auto">
-            {history.map((r: RoundResult1v1) => {
-              const gateDmgDealt = isPlayerA ? r.damageToB : r.damageToA;
-              const gateDmgTaken = isPlayerA ? r.damageToA : r.damageToB;
-              const myTraps = isPlayerA ? r.aTraps : r.bTraps;
-              const theirTraps = isPlayerA ? r.bTraps : r.aTraps;
-              const myTrapDmg = myTraps.filter((t) => t > 0).length * 5;
-              const theirTrapDmg = theirTraps.filter((t) => t > 0).length * 5;
-              const dmgDealt = gateDmgDealt + myTrapDmg;
-              const dmgTaken = gateDmgTaken + theirTrapDmg;
-              const isExpanded = expandedRounds.has(r.round);
-              const gateNames = ["East", "West", "Underground"];
-
-              return (
-                <div key={r.round} className="border-t border-[#252019]">
-                  {/* Summary row — always visible, clickable */}
-                  <button
-                    onClick={() => toggleRound(r.round)}
-                    className="w-full px-4 py-2 flex items-center justify-between text-xs hover:bg-[#252019] transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-[#7a7060] text-[10px]">{isExpanded ? "\u25BC" : "\u25B6"}</span>
-                      <span className="text-[#d4cfc6] font-bold">R{r.round}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-green-400">+{dmgDealt} dealt</span>
-                      {myTrapDmg > 0 && <span className="text-[#daa520]">(trap +{myTrapDmg})</span>}
-                      <span className="text-[#7a7060]">/</span>
-                      <span className="text-red-400">-{dmgTaken} taken</span>
-                      {theirTrapDmg > 0 && <span className="text-[#ff3344]">(trap -{theirTrapDmg})</span>}
-                    </div>
-                  </button>
-
-                  {/* Expanded details */}
-                  {isExpanded && (
-                    <div className="px-4 pb-3 space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        {r.gateBreakdown.map((gate, i) => {
-                          const modName = MODIFIER_NAMES[gate.modifier] || "Normal";
-                          const modColor =
-                            gate.modifier === 0
-                              ? "text-[#7a7060]"
-                              : gate.modifier === 1
-                                ? "text-[#daa520]"
-                                : gate.modifier === 2
-                                  ? "text-[#c8a44e]"
-                                  : gate.modifier === 3
-                                    ? "text-[#ff3344]"
-                                    : "text-[#ff8800]";
-                          const myDmgDealt = isPlayerA ? gate.dmgToB : gate.dmgToA;
-                          const myDmgTaken = isPlayerA ? gate.dmgToA : gate.dmgToB;
-                          return (
-                            <div key={i} className="bg-[#252019] rounded p-2 space-y-1 text-xs">
-                              <div className="flex justify-between items-center">
-                                <span className="text-[#d4cfc6] font-bold">{gateNames[i]}</span>
-                                {gate.modifier !== 0 && <span className={`${modColor} text-[10px]`}>{modName}</span>}
-                              </div>
-                              <div className="text-[#7a7060]">
-                                You: {isPlayerA ? gate.attackA : gate.attackB} atk /{" "}
-                                {isPlayerA ? gate.defenseA : gate.defenseB} def
-                              </div>
-                              <div className="text-[#7a7060]">
-                                Them: {isPlayerA ? gate.attackB : gate.attackA} atk /{" "}
-                                {isPlayerA ? gate.defenseB : gate.defenseA} def
-                              </div>
-                              <div>
-                                {myDmgDealt > 0 && <span className="text-green-400">+{myDmgDealt} </span>}
-                                {myDmgTaken > 0 && <span className="text-red-400">-{myDmgTaken}</span>}
-                                {myDmgDealt === 0 && myDmgTaken === 0 && <span className="text-[#7a7060]">0</span>}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      {(r.aTraps.some((t) => t > 0) || r.bTraps.some((t) => t > 0)) && (
-                        <div className="text-xs border-t border-[#3d3428] pt-2 space-y-1">
-                          <div className="text-[10px] tracking-wider text-[#7a7060] uppercase">Node Traps</div>
-                          {(() => {
-                            const nodeNames = ["Forge", "Quarry", "Grove"];
-                            return [0, 1, 2].map((ni) => {
-                              const myTrap = isPlayerA ? r.aTraps[ni] : r.bTraps[ni];
-                              const theirTrap = isPlayerA ? r.bTraps[ni] : r.aTraps[ni];
-                              if (myTrap) {
-                                return (
-                                  <div key={`mt${ni}`} className="text-[#daa520]">
-                                    You trapped {nodeNames[ni]} — opponent takes{" "}
-                                    <span className="text-[#ff3344] font-bold">5 damage</span> if they captured it
-                                  </div>
-                                );
-                              }
-                              if (theirTrap) {
-                                return (
-                                  <div key={`tt${ni}`} className="text-[#ff3344]">
-                                    Enemy trapped {nodeNames[ni]}! You take <span className="font-bold">5 damage</span>{" "}
-                                    if you captured it
-                                  </div>
-                                );
-                              }
-                              return null;
-                            });
-                          })()}
-                        </div>
-                      )}
-                      {(r.aAbilityId > 0 || r.bAbilityId > 0) && (
-                        <div className="text-xs border-t border-[#3d3428] pt-2 space-y-1">
-                          <div className="text-[10px] tracking-wider text-[#7a7060] uppercase">Abilities Used</div>
-                          {(() => {
-                            const myAbilityId = isPlayerA ? r.aAbilityId : r.bAbilityId;
-                            const myAbilityTarget = isPlayerA ? r.aAbilityTarget : r.bAbilityTarget;
-                            const theirAbilityId = isPlayerA ? r.bAbilityId : r.aAbilityId;
-                            const theirAbilityTarget = isPlayerA ? r.bAbilityTarget : r.aAbilityTarget;
-                            const abilityGateNames = ["East Gate", "West Gate", "Underground Gate"];
-                            const getAbilityName = (id: number) => ABILITIES[id - 1]?.name || `Ability #${id}`;
-                            return (
-                              <>
-                                {myAbilityId > 0 && (
-                                  <div className="text-[#c8a44e]">
-                                    You used <span className="font-bold">{getAbilityName(myAbilityId)}</span>
-                                    {myAbilityTarget > 0 && ` on ${abilityGateNames[myAbilityTarget - 1] || `target ${myAbilityTarget}`}`}
-                                  </div>
-                                )}
-                                {theirAbilityId > 0 && (
-                                  <div className="text-[#ff8800]">
-                                    Opponent used <span className="font-bold">{getAbilityName(theirAbilityId)}</span>
-                                    {theirAbilityTarget > 0 && ` on ${abilityGateNames[theirAbilityTarget - 1] || `target ${theirAbilityTarget}`}`}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
 
       <div className="text-[10px] text-[#3d3428] text-center pb-4">
         Move data stored in localStorage until revealed. Auto-reveal triggers when both players commit.
