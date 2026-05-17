@@ -440,7 +440,9 @@ pub mod world_system {
                 a_stake_1: a1, a_stake_2: a2, a_stake_3: a3,
                 b_stake_1: 0, b_stake_2: 0, b_stake_3: 0,
                 stake_count: 0,
+                staked: true,
                 settled: false,
+                parcel_claimed: false,
             });
 
             match_id
@@ -552,6 +554,7 @@ pub mod world_system {
             assert(state.status == MatchStatus::Finished, 'Match not finished');
 
             let mut stakes: MatchStakes1v1 = world.read_model(match_id);
+            assert(stakes.staked, 'Not a staked match');
             assert(!stakes.settled, 'Already settled');
             stakes.settled = true;
 
@@ -727,8 +730,9 @@ pub mod world_system {
             let state: MatchState1v1 = world.read_model(match_id);
             assert(state.status == MatchStatus::Finished, 'Match not finished');
 
-            let stakes: MatchStakes1v1 = world.read_model(match_id);
+            let mut stakes: MatchStakes1v1 = world.read_model(match_id);
             assert(stakes.settled, 'Not settled yet');
+            assert(!stakes.parcel_claimed, 'Parcel already claimed');
 
             // Verify caller is the winner
             let winner = if state.vault_a_hp > state.vault_b_hp {
@@ -757,6 +761,9 @@ pub mod world_system {
             let mut kingdom: PlayerKingdom = world.read_model(caller);
             kingdom.parcel_count += 1;
             world.write_model(@kingdom);
+
+            stakes.parcel_claimed = true;
+            world.write_model(@stakes);
         }
 
         fn claim_drip(ref self: ContractState) {

@@ -838,6 +838,44 @@ export function registerSiegeTools(reg: RegisterArgs): void {
   );
 
   register(
+    "siege_get_player_cosmetics",
+    {
+      description:
+        "Get a player's equipped cosmetics (banner, parcel_skin, hold_decoration). Each value is a circuit key string or null.",
+      inputSchema: {
+        player_address: z.string().optional().describe("Defaults to siege_whoami"),
+      },
+    },
+    async ({ player_address }, ctx) => {
+      const player = player_address ?? ctx.agentAddress;
+      if (!player) throw new Error("player_address not supplied and the session is not yet authenticated.");
+      const cosmetics = await ctx.state.playerCosmetics(player);
+      return { player, cosmetics: cosmetics ?? { banner: null, parcel_skin: null, hold_decoration: null } };
+    },
+  );
+
+  register(
+    "siege_set_cosmetic",
+    {
+      description:
+        "Set a cosmetic slot on your kingdom. cosmetic_type is one of 'banner', 'parcel_skin', 'hold_decoration'. circuit_key is the cosmetic id string (e.g. 'half-wave-rectifier') or null to clear.",
+      inputSchema: {
+        cosmetic_type: z.enum(["banner", "parcel_skin", "hold_decoration"]),
+        circuit_key: z.string().nullable().describe("Circuit key string or null to clear the slot"),
+      },
+      requiresSigner: true,
+    },
+    async ({ cosmetic_type, circuit_key }, ctx) => {
+      const typeFelt = shortString.encodeShortString(cosmetic_type);
+      const keyFelt = circuit_key ? shortString.encodeShortString(circuit_key) : "0x0";
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "set_cosmetic", [typeFelt, keyFelt]),
+      ]);
+      return { tx_hash: tx, cosmetic_type, circuit_key };
+    },
+  );
+
+  register(
     "siege_get_staked_match",
     {
       description:

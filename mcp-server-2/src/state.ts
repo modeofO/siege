@@ -200,6 +200,13 @@ export interface FactionInviteData {
   used: boolean;
 }
 
+export interface PlayerCosmeticsData {
+  player: string;
+  banner: string | null;
+  parcel_skin: string | null;
+  hold_decoration: string | null;
+}
+
 function assertSafeInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer`);
@@ -558,6 +565,31 @@ export class StateClient {
       current_streak: toNum(row.current_streak),
       best_streak: toNum(row.best_streak),
       bracket: toNum(row.bracket),
+    };
+  }
+
+  async playerCosmetics(player: string): Promise<PlayerCosmeticsData | null> {
+    const rows = await this.sql<Record<string, unknown>>(
+      `SELECT player, banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player = ${addressSqlKey(player)}`,
+    );
+    const row = rows[0];
+    if (!row) return null;
+    const feltToStr = (v: unknown): string | null => {
+      if (!v || v === "0x0" || v === "0") return null;
+      const hex = String(v).replace(/^0x/, "");
+      let s = "";
+      for (let i = 0; i < hex.length; i += 2) {
+        const code = parseInt(hex.slice(i, i + 2), 16);
+        if (code === 0) break;
+        s += String.fromCharCode(code);
+      }
+      return s || null;
+    };
+    return {
+      player: String(row.player),
+      banner: feltToStr(row.banner),
+      parcel_skin: feltToStr(row.parcel_skin),
+      hold_decoration: feltToStr(row.hold_decoration),
     };
   }
 
