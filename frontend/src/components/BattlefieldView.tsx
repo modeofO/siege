@@ -155,6 +155,15 @@ export function BattlefieldView({
 
   return (
     <div className="border border-[#3d3428] rounded-lg overflow-hidden bg-[#1a1714]">
+      <style>{`
+        @keyframes battlefield-drift {
+          0% { transform: translateX(-20%); }
+          100% { transform: translateX(140%); }
+        }
+        .battlefield-cloud {
+          animation: battlefield-drift var(--cloud-duration, 45s) linear infinite;
+        }
+      `}</style>
       {/* Gate modifier bar */}
       <div className="flex items-center justify-between px-3 py-1.5">
         <span className="text-[10px] tracking-wider text-[#7a7060] uppercase font-serif">Battlefield</span>
@@ -228,6 +237,50 @@ export function BattlefieldView({
             animate
           />
         ))}
+
+        {/* Cloud fog over enemy side */}
+        <div
+          className="absolute inset-y-0 pointer-events-none overflow-hidden"
+          style={{
+            left: isPlayerA ? "35%" : "0%",
+            right: isPlayerA ? "0%" : "35%",
+            zIndex: 10,
+            maskImage: `linear-gradient(to ${isPlayerA ? "left" : "right"}, black 0%, black 50%, transparent 100%)`,
+            WebkitMaskImage: `linear-gradient(to ${isPlayerA ? "left" : "right"}, black 0%, black 50%, transparent 100%)`,
+          }}
+        >
+          {[
+            { top: "5%", duration: "40s", delay: "0s", scale: 1.3 },
+            { top: "30%", duration: "55s", delay: "-15s", scale: 1.0 },
+            { top: "55%", duration: "48s", delay: "-30s", scale: 1.2 },
+            { top: "75%", duration: "52s", delay: "-8s", scale: 0.9 },
+          ].map((c, i) => (
+            <svg
+              key={i}
+              className="battlefield-cloud"
+              style={{
+                position: "absolute",
+                top: c.top,
+                left: 0,
+                width: "55%",
+                height: "50%",
+                opacity: 0.35,
+                filter: "blur(12px) brightness(0.8) saturate(0.5)",
+                transform: `scale(${c.scale}) translateX(-20%)`,
+                willChange: "transform",
+                animationDuration: c.duration,
+                animationDelay: c.delay,
+              } as React.CSSProperties}
+              viewBox="0 0 200 60"
+              preserveAspectRatio="none"
+            >
+              <ellipse cx="40" cy="30" rx="35" ry="14" fill="#c8bfa8" />
+              <ellipse cx="85" cy="25" rx="45" ry="18" fill="#c8bfa8" />
+              <ellipse cx="140" cy="32" rx="38" ry="15" fill="#c8bfa8" />
+              <ellipse cx="175" cy="28" rx="22" ry="12" fill="#c8bfa8" />
+            </svg>
+          ))}
+        </div>
 
         {/* Ember vignette overlay */}
         <div
