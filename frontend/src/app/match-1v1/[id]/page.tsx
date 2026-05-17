@@ -399,7 +399,7 @@ export default function Match1v1Page() {
     }
 
     const currentRound = state.round;
-    console.log(`[auto-resolve] elected=true, delay=500ms, round=${currentRound}`);
+    console.log(`[auto-resolve] elected=true, round=${currentRound}`);
 
     const timer = setTimeout(() => {
       const acc = accountRef.current;
@@ -423,7 +423,7 @@ export default function Match1v1Page() {
         }
         void refreshRef.current();
       })();
-    }, 500);
+    }, 0);
 
     return () => clearTimeout(timer);
     // Intentionally narrow deps — state/refresh accessed via refs so

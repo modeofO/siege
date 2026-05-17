@@ -1516,18 +1516,32 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_commit",
     {
       description:
-        "Generate a salt, hash the move with Poseidon, and submit commit_reveal_1v1.commit. Returns the salt and exact move — store both for the matching siege_reveal call.",
+        "Generate a salt, hash the move with Poseidon, and submit commit_reveal_1v1.commit. Returns the salt and exact move — store both for the matching siege_reveal call. Budget is auto-detected from match state.",
       inputSchema: {
         match_id: z.number().int().nonnegative(),
-        budget: z.number().int().positive().default(10).describe("Validate against this budget; default 10"),
+        budget: z.number().int().positive().default(10).describe("Fallback budget; auto-detected from match state when possible"),
         ...moveShape,
       },
       requiresSigner: true,
     },
     async (args, ctx) => {
       ctx.watchMatch(args.match_id);
+
+      // Auto-detect budget from node ownership
+      let budget = args.budget;
+      if (ctx.agentAddress) {
+        try {
+          const st = await ctx.state.matchState(args.match_id);
+          const r = roleFor(st, ctx.agentAddress);
+          if (r !== null) {
+            const ns = await ctx.state.nodeStates(args.match_id);
+            budget = budgetFor(ns, r);
+          }
+        } catch { /* fall back to args.budget */ }
+      }
+
       const move = moveAllocationFromInput(args as unknown as MoveInput);
-      const total = validateMove(move, args.budget);
+      const total = validateMove(move, budget);
 
       // Trap ownership validation. Mirror `commit_reveal_1v1.cairo:167-181` so
       // a bad trap fails fast client-side instead of reverting on-chain.
@@ -1557,7 +1571,10 @@ export function registerSiegeTools(reg: RegisterArgs): void {
 
       // Effective-allocation preview: show what Narrow Pass / Mirror will do
       // to the agent's own allocation. Best-effort; missing modifiers leave it null.
-      let effective_allocation_preview: MovePerGate[] | null = null;
+      let effective_allocation_preview: Array<{
+        attack: number; defense: number;
+        capped?: boolean; raw_attack?: number; raw_defense?: number;
+      }> | null = null;
       try {
         const matchState = await ctx.state.matchState(args.match_id);
         const mods = await ctx.state
@@ -1566,8 +1583,10 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         if (mods?.gates) {
           effective_allocation_preview = [];
           for (let g = 0; g < 3; g++) {
-            let a = move.attack[g];
-            let d = move.defense[g];
+            const raw_a = move.attack[g];
+            const raw_d = move.defense[g];
+            let a = raw_a;
+            let d = raw_d;
             const m = mods.gates[g];
             if (m === MOD_NARROW_PASS) {
               a = min3(a);
@@ -1576,7 +1595,16 @@ export function registerSiegeTools(reg: RegisterArgs): void {
             if (m === MOD_MIRROR) {
               [a, d] = [d, a];
             }
-            effective_allocation_preview.push({ attack: a, defense: d });
+            const gate: {
+              attack: number; defense: number;
+              capped?: boolean; raw_attack?: number; raw_defense?: number;
+            } = { attack: a, defense: d };
+            if (m === MOD_NARROW_PASS && (raw_a > 3 || raw_d > 3)) {
+              gate.capped = true;
+              gate.raw_attack = raw_a;
+              gate.raw_defense = raw_d;
+            }
+            effective_allocation_preview.push(gate);
           }
         }
       } catch {
@@ -1595,7 +1623,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         salt,
         commitment_hash: commitmentHash,
         total_allocated: total,
-        budget: args.budget,
+        budget,
         effective_allocation_preview,
         move: {
           attack: move.attack,
@@ -1651,17 +1679,21 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_resolve_round",
     {
       description:
-        "Resolve the current round once both players have revealed. Submits resolution_1v1.resolve_round. Auto-retries without VRF wrap if the contract did not consume_random (happens when the round ends the match — no next-round modifiers to roll).",
+        "Resolve the current round once both players have revealed. Uses designated-resolver election (lower address resolves; non-elected gets a waiting status — pass force=true to override). Returns a damage summary on success. On race-condition errors, returns structured status instead of raw revert.",
       inputSchema: {
         match_id: z.number().int().nonnegative(),
         skip_vrf: z
           .boolean()
           .default(false)
-          .describe("Skip the request_random wrap. Use when the round will end the match (no next-round modifiers needed)."),
+          .describe("Skip request_random wrap (match-ending rounds)."),
+        force: z
+          .boolean()
+          .default(false)
+          .describe("Bypass designated-resolver election. Use if the designated resolver is unresponsive."),
       },
       requiresSigner: true,
     },
-    async ({ match_id, skip_vrf }, ctx) => {
+    async ({ match_id, skip_vrf, force }, ctx) => {
       ctx.watchMatch(match_id);
       const state = await ctx.state.matchState(match_id);
       const round = await ctx.state
@@ -1673,6 +1705,45 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           `Round ${state.current_round} is in phase "${phase}" — both players must reveal before resolve_round can land.`,
         );
       }
+
+      // Designated-resolver election: lower address resolves, other waits.
+      if (!force && ctx.agentAddress) {
+        const myAddr = BigInt(ctx.agentAddress);
+        const addrA = BigInt(state.player_a);
+        const addrB = BigInt(state.player_b);
+        const lower = addrA < addrB ? addrA : addrB;
+        if (myAddr !== lower) {
+          return {
+            status: "waiting_for_resolver",
+            match_id,
+            round: state.current_round,
+            message:
+              "Other player is the designated resolver (lower address). " +
+              "Wait for the round to advance via channel. " +
+              "If the resolver hasn't acted, call again with force=true or use siege_force_timeout.",
+          };
+        }
+      }
+
+      // Pre-compute damage prediction from revealed moves
+      const [preNodes, mods] = await Promise.all([
+        ctx.state.nodeStates(match_id),
+        ctx.state.roundModifiers(match_id, state.current_round).catch(() => null),
+      ]);
+      let predicted: DamageBreakdown | null = null;
+      if (round && mods?.gates) {
+        const a_move = {
+          attack: [round.a_p0, round.a_p1, round.a_p2],
+          defense: [round.a_g0, round.a_g1, round.a_g2],
+        };
+        const b_move = {
+          attack: [round.b_p0, round.b_p1, round.b_p2],
+          defense: [round.b_g0, round.b_g1, round.b_g2],
+        };
+        const eff = effectiveMoves(mods.gates, a_move, b_move);
+        if (eff) predicted = predictedDamage(mods.gates, eff.player_a, eff.player_b);
+      }
+
       const calls = skip_vrf
         ? [call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)])]
         : [
@@ -1681,27 +1752,132 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           ];
       try {
         const tx = await execute(ctx.signer!, calls);
-        return { tx_hash: tx, match_id, skip_vrf };
+
+        // Build resolve summary with damage prediction + post-resolve state
+        const resolve_summary: Record<string, unknown> = {
+          round_resolved: state.current_round,
+        };
+        if (predicted && round) {
+          resolve_summary.damage_to_a = predicted.total_to_a;
+          resolve_summary.damage_to_b = predicted.total_to_b;
+          resolve_summary.per_gate_to_a = predicted.per_gate_to_a;
+          resolve_summary.per_gate_to_b = predicted.per_gate_to_b;
+          resolve_summary.repair_a = round.a_repair;
+          resolve_summary.repair_b = round.b_repair;
+          resolve_summary.note = predicted.note;
+        }
+
+        try {
+          const fresh = await ctx.state.matchState(match_id);
+          if (fresh.current_round > state.current_round || fresh.status === "Finished") {
+            resolve_summary.vault_a_hp = fresh.vault_a_hp;
+            resolve_summary.vault_b_hp = fresh.vault_b_hp;
+            resolve_summary.new_round = fresh.current_round;
+            resolve_summary.match_status = fresh.status;
+            resolve_summary.status_reason = statusReason(fresh);
+            const freshNodes = await ctx.state.nodeStates(match_id);
+            resolve_summary.nodes_changed = freshNodes
+              .filter((fn) => {
+                const pre = preNodes.find((n) => n.node_index === fn.node_index);
+                return pre && pre.owner !== fn.owner;
+              })
+              .map((fn) => ({
+                index: fn.node_index,
+                from: preNodes.find((n) => n.node_index === fn.node_index)?.owner ?? "None",
+                to: fn.owner,
+              }));
+          } else if (predicted && round) {
+            resolve_summary.vault_a_hp = Math.min(
+              MAX_VAULT_HP,
+              Math.max(0, state.vault_a_hp - predicted.total_to_a + round.a_repair),
+            );
+            resolve_summary.vault_b_hp = Math.min(
+              MAX_VAULT_HP,
+              Math.max(0, state.vault_b_hp - predicted.total_to_b + round.b_repair),
+            );
+            resolve_summary.hp_source = "predicted (Torii not yet indexed)";
+          }
+        } catch {
+          // Post-resolve state read failed; damage prediction still available
+        }
+
+        return { tx_hash: tx, match_id, skip_vrf, resolve_summary };
       } catch (err) {
-        const isNotConsumed = (() => {
+        // Extract error string, handling WASM-bindgen errors from Cartridge Controller
+        const errStr = (() => {
           const e = err as { __wbg_ptr?: unknown; data?: unknown };
-          let raw = "";
           if (e.__wbg_ptr) {
             try {
-              raw = typeof e.data === "function" ? (e as { data: () => string }).data() : String(e.data ?? "");
-            } catch {
-              /* ignore */
-            }
+              const d = typeof e.data === "function"
+                ? (e as { data: () => string }).data()
+                : String(e.data ?? "");
+              if (d) return d;
+            } catch { /* ignore */ }
           }
-          if (!raw) raw = safeStringifyError(err);
-          return /not consumed/i.test(raw);
+          return safeStringifyError(err);
         })();
-        if (!skip_vrf && isNotConsumed) {
+
+        // VRF "not consumed" — match-ending round, retry without VRF wrap
+        if (!skip_vrf && /not consumed/i.test(errStr)) {
           const tx = await execute(ctx.signer!, [
             call(ctx.config.contracts.resolution1v1, "resolve_round", [String(match_id)]),
           ]);
-          return { tx_hash: tx, match_id, skip_vrf: true, fallback: "match-ending round, retried without VRF" };
+          return {
+            tx_hash: tx,
+            match_id,
+            skip_vrf: true,
+            fallback: "match-ending round, retried without VRF",
+          };
         }
+
+        // Race: "Not all revealed" — check if opponent resolved
+        if (/Not all revealed/i.test(errStr) || /4e6f7420616c6c2072657665616c6564/.test(errStr)) {
+          const fresh = await ctx.state.matchState(match_id).catch(() => null);
+          if (fresh && (fresh.current_round > state.current_round || fresh.status === "Finished")) {
+            return {
+              status: "resolved_by_opponent",
+              match_id,
+              round: state.current_round,
+              new_round: fresh.current_round,
+              match_status: fresh.status,
+              status_reason: statusReason(fresh),
+              vault_a_hp: fresh.vault_a_hp,
+              vault_b_hp: fresh.vault_b_hp,
+            };
+          }
+        }
+
+        // Race: VRF already consumed by opponent's resolve
+        if (/not fulfilled/i.test(errStr)) {
+          const fresh = await ctx.state.matchState(match_id).catch(() => null);
+          if (fresh && (fresh.current_round > state.current_round || fresh.status === "Finished")) {
+            return {
+              status: "resolved_by_opponent",
+              match_id,
+              round: state.current_round,
+              new_round: fresh.current_round,
+              match_status: fresh.status,
+              status_reason: statusReason(fresh),
+              vault_a_hp: fresh.vault_a_hp,
+              vault_b_hp: fresh.vault_b_hp,
+              message: "VRF already consumed — opponent resolved this round",
+            };
+          }
+        }
+
+        // Match already ended
+        if (/Match not active/i.test(errStr)) {
+          const fresh = await ctx.state.matchState(match_id).catch(() => null);
+          return {
+            status: "match_finished",
+            match_id,
+            match_status: fresh?.status ?? "Finished",
+            status_reason: fresh ? statusReason(fresh) : null,
+            vault_a_hp: fresh?.vault_a_hp ?? null,
+            vault_b_hp: fresh?.vault_b_hp ?? null,
+          };
+        }
+
         throw err;
       }
     },
