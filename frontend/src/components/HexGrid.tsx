@@ -173,8 +173,8 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
           const home = isHome(parcel);
           const unclaimed = isUnclaimed(parcel);
           const ownerCosmetics = !unclaimed ? cosmeticsMap?.[normalizeAddr(parcel.owner)] : undefined;
-          const skinKey = ownerCosmetics?.parcelSkin ?? null;
-          const skinCircuit = skinKey ? CIRCUITS[skinKey] : null;
+          const skinEntry = ownerCosmetics?.parcelSkin ? CIRCUITS[ownerCosmetics.parcelSkin] : null;
+          const skinCircuit = skinEntry?.cosmeticType === "parcelSkin" ? skinEntry : null;
 
           return (
             <g
