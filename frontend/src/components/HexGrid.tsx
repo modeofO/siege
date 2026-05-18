@@ -4,6 +4,9 @@
 import { useState } from "react";
 import type { ParcelData } from "@/lib/worldState";
 import type { PlayerCosmeticsData } from "@/lib/cosmetics";
+import { CIRCUITS } from "@/lib/forge/circuits";
+import { projectToHex, traceToHexPoints, getWardTint } from "@/lib/forge/wardProjection";
+import { WardGlyph } from "@/components/forge/WardGlyph";
 
 interface HexGridProps {
   parcels: ParcelData[];
@@ -59,39 +62,6 @@ function normalizeAddr(a: string): string {
 function truncateAddress(addr: string): string {
   if (!addr || addr === "0x0" || addr.length < 10) return "Unclaimed";
   return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
-}
-
-interface SkinDecor {
-  patternId: string;
-  innerRingColor: string;
-  innerRingOpacity: number;
-  cornerMarks: boolean;
-  ringDash: string;
-  centerEmblem: string;
-}
-
-const SKIN_DECOR: Record<string, SkinDecor> = {
-  "voltage-divider": {
-    patternId: "skin-divider",
-    innerRingColor: "#daa520",
-    innerRingOpacity: 0.7,
-    cornerMarks: true,
-    ringDash: "4 3",
-    centerEmblem: "M0,-8 L0,8 M-4,-4 L0,-8 L4,-4",
-  },
-  "common-emitter-amp": {
-    patternId: "skin-emitter",
-    innerRingColor: "#7ab8e0",
-    innerRingOpacity: 0.65,
-    cornerMarks: true,
-    ringDash: "2 2 6 2",
-    centerEmblem: "M-6,3 L-2,-3 L2,-3 L6,3 M0,-3 L0,-8",
-  },
-};
-
-function getSkinDecor(skin: string | null): SkinDecor | null {
-  if (!skin) return null;
-  return SKIN_DECOR[skin] ?? null;
 }
 
 interface BannerStyle {
@@ -188,15 +158,13 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
             </feMerge>
           </filter>
 
-          {/* Parcel skin: Bleeder's Mark — gold diagonal slashes */}
-          <pattern id="skin-divider" patternUnits="userSpaceOnUse" width="7" height="7" patternTransform="rotate(45)">
-            <line x1="0" y1="0" x2="0" y2="7" stroke="#daa520" strokeWidth="2" strokeOpacity="0.7" />
-          </pattern>
-          {/* Parcel skin: Herald's Voice — blue concentric rings */}
-          <pattern id="skin-emitter" patternUnits="userSpaceOnUse" width="14" height="14">
-            <circle cx="7" cy="7" r="3" fill="none" stroke="#7ab8e0" strokeWidth="1.2" strokeOpacity="0.6" />
-            <circle cx="7" cy="7" r="6" fill="none" stroke="#7ab8e0" strokeWidth="0.8" strokeOpacity="0.4" />
-          </pattern>
+          <filter id="ward-glow" x="-30%" y="-30%" width="160%" height="160%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.8" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
         </defs>
 
         {parcels.map((parcel) => {
@@ -205,7 +173,8 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
           const home = isHome(parcel);
           const unclaimed = isUnclaimed(parcel);
           const ownerCosmetics = !unclaimed ? cosmeticsMap?.[normalizeAddr(parcel.owner)] : undefined;
-          const skinDecor = getSkinDecor(ownerCosmetics?.parcelSkin ?? null);
+          const skinKey = ownerCosmetics?.parcelSkin ?? null;
+          const skinCircuit = skinKey ? CIRCUITS[skinKey] : null;
 
           return (
             <g
@@ -225,56 +194,74 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                 strokeWidth={getStrokeWidth(parcel)}
               />
 
-              {/* Parcel skin overlay */}
-              {skinDecor && (
-                <>
-                  {/* Pattern fill overlay */}
-                  <polygon
-                    points={hexPoints(x, y, HEX_SIZE - 3)}
-                    fill={`url(#${skinDecor.patternId})`}
-                    stroke="none"
-                  />
-                  {/* Inner decorative ring */}
-                  <polygon
-                    points={hexPoints(x, y, HEX_SIZE - 6)}
-                    fill="none"
-                    stroke={skinDecor.innerRingColor}
-                    strokeWidth={1}
-                    strokeOpacity={skinDecor.innerRingOpacity}
-                    strokeDasharray={skinDecor.ringDash}
-                  />
-                  {/* Corner marks at hex vertices */}
-                  {skinDecor.cornerMarks && Array.from({ length: 6 }).map((_, i) => {
-                    const angle = (Math.PI / 180) * (60 * i + 30);
-                    const r1 = HEX_SIZE - 4;
-                    const r2 = HEX_SIZE - 8;
-                    const x1 = x + r1 * Math.cos(angle);
-                    const y1 = y + r1 * Math.sin(angle);
-                    const x2 = x + r2 * Math.cos(angle);
-                    const y2 = y + r2 * Math.sin(angle);
-                    return (
-                      <line
+              {/* Parcel skin overlay — ward projection */}
+              {skinCircuit && (() => {
+                const tint = getWardTint(parcel.parcelType);
+                return (
+                  <g filter="url(#ward-glow)">
+                    {/* Ward containment ring */}
+                    <polygon
+                      points={hexPoints(x, y, HEX_SIZE - 5)}
+                      fill="none"
+                      stroke={tint.core}
+                      strokeWidth={1}
+                      strokeOpacity={0.5}
+                    />
+                    {/* Ward traces */}
+                    {skinCircuit.traces.map((trace, i) => (
+                      <polyline
                         key={i}
-                        x1={x1} y1={y1} x2={x2} y2={y2}
-                        stroke={skinDecor.innerRingColor}
-                        strokeWidth={1.2}
-                        strokeOpacity={skinDecor.innerRingOpacity + 0.15}
+                        points={traceToHexPoints(trace, x, y, HEX_SIZE)}
+                        fill="none"
+                        stroke={tint.core}
+                        strokeWidth={1.8}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeOpacity={0.85}
                       />
-                    );
-                  })}
-                  {/* Center emblem */}
-                  <path
-                    d={skinDecor.centerEmblem}
-                    fill="none"
-                    stroke={skinDecor.innerRingColor}
-                    strokeWidth={1.8}
-                    strokeOpacity={0.8}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    transform={`translate(${x},${y})`}
-                  />
-                </>
-              )}
+                    ))}
+                    {/* Node sigils */}
+                    {skinCircuit.components.map((comp) => {
+                      const pos = projectToHex(comp.col, comp.row, x, y, HEX_SIZE);
+                      return (
+                        <WardGlyph
+                          key={comp.id}
+                          kind={comp.kind}
+                          cx={pos.x}
+                          cy={pos.y}
+                          color={tint.core}
+                        />
+                      );
+                    })}
+                    {/* Corner cross-hairs */}
+                    {Array.from({ length: 6 }).map((_, i) => {
+                      const angle = (Math.PI / 180) * (60 * i + 30);
+                      const r1 = HEX_SIZE - 5;
+                      const r2 = HEX_SIZE - 9;
+                      const x1 = x + r1 * Math.cos(angle);
+                      const y1 = y + r1 * Math.sin(angle);
+                      const x2 = x + r2 * Math.cos(angle);
+                      const y2 = y + r2 * Math.sin(angle);
+                      const perpAngle = angle + Math.PI / 2;
+                      const armLen = 1.5;
+                      return (
+                        <g key={i}>
+                          <line x1={x1} y1={y1} x2={x2} y2={y2} stroke={tint.core} strokeWidth={0.8} strokeOpacity={0.6} />
+                          <line
+                            x1={x2 - armLen * Math.cos(perpAngle)}
+                            y1={y2 - armLen * Math.sin(perpAngle)}
+                            x2={x2 + armLen * Math.cos(perpAngle)}
+                            y2={y2 + armLen * Math.sin(perpAngle)}
+                            stroke={tint.core}
+                            strokeWidth={0.8}
+                            strokeOpacity={0.6}
+                          />
+                        </g>
+                      );
+                    })}
+                  </g>
+                );
+              })()}
 
               {/* Home parcel marker */}
               {home && (
