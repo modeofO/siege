@@ -14,12 +14,13 @@ interface ArcaneSealProps {
 export function ArcaneSeal({ circuit, name, size, tintColor = "#daa520" }: ArcaneSealProps) {
   const r = size / 2;
   const traceRadius = r * 0.7;
-  const filterId = `seal-glow-${name.replace(/\s+/g, "-")}`;
+  const safeId = name.replace(/\s+/g, "-");
+  const isLarge = size >= 100;
 
   return (
     <svg width={size} height={size} viewBox={`${-r} ${-r} ${size} ${size}`}>
       <defs>
-        <filter id={filterId} x="-40%" y="-40%" width="180%" height="180%">
+        <filter id={`seal-glow-${safeId}`} x="-40%" y="-40%" width="180%" height="180%">
           <feGaussianBlur in="SourceGraphic" stdDeviation="2.5" result="blur" />
           <feFlood floodColor={tintColor} floodOpacity="0.5" />
           <feComposite in2="blur" operator="in" result="glow" />
@@ -28,34 +29,32 @@ export function ArcaneSeal({ circuit, name, size, tintColor = "#daa520" }: Arcan
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <radialGradient id={`seal-bg-${name.replace(/\s+/g, "-")}`}>
+        <radialGradient id={`seal-bg-${safeId}`}>
           <stop offset="0%" stopColor="#0a0604" stopOpacity="0.8" />
           <stop offset="100%" stopColor="#0a0604" stopOpacity="0" />
         </radialGradient>
+        <path id={`seal-arc-top-${safeId}`} d={`M ${-(r - 12)},0 A ${r - 12},${r - 12} 0 0,1 ${r - 12},0`} fill="none" />
+        <path id={`seal-arc-bot-${safeId}`} d={`M ${-(r - 12)},0 A ${r - 12},${r - 12} 0 0,0 ${r - 12},0`} fill="none" />
       </defs>
 
       {/* Background */}
-      <circle r={r - 2} fill={`url(#seal-bg-${name.replace(/\s+/g, "-")})`} />
+      <circle r={r - 2} fill={`url(#seal-bg-${safeId})`} />
 
       {/* Outer ring — solid */}
       <circle r={r - 3} fill="none" stroke={tintColor} strokeWidth="1.5" strokeOpacity="0.6" />
       {/* Inner ring — dashed */}
       <circle r={r - 8} fill="none" stroke={tintColor} strokeWidth="0.8" strokeOpacity="0.4" strokeDasharray="3 2" />
 
-      {/* Title along top arc */}
-      <defs>
-        <path id={`seal-arc-top-${name.replace(/\s+/g, "-")}`} d={`M ${-(r - 12)},0 A ${r - 12},${r - 12} 0 0,1 ${r - 12},0`} fill="none" />
-        <path id={`seal-arc-bot-${name.replace(/\s+/g, "-")}`} d={`M ${-(r - 12)},0 A ${r - 12},${r - 12} 0 0,0 ${r - 12},0`} fill="none" />
-      </defs>
-      {size >= 100 && (
+      {/* Title along arcs */}
+      {isLarge && (
         <>
-          <text fill={tintColor} fillOpacity="0.7" fontSize={size > 100 ? 7 : 5} fontFamily="Cinzel, serif" letterSpacing="2" textAnchor="middle">
-            <textPath href={`#seal-arc-top-${name.replace(/\s+/g, "-")}`} startOffset="50%">
+          <text fill={tintColor} fillOpacity="0.7" fontSize={7} fontFamily="Cinzel, serif" letterSpacing="2" textAnchor="middle">
+            <textPath href={`#seal-arc-top-${safeId}`} startOffset="50%">
               {circuit.title.toUpperCase()}
             </textPath>
           </text>
-          <text fill={tintColor} fillOpacity="0.4" fontSize={size > 100 ? 5 : 4} fontFamily='"JetBrains Mono", monospace' letterSpacing="1.5" textAnchor="middle">
-            <textPath href={`#seal-arc-bot-${name.replace(/\s+/g, "-")}`} startOffset="50%">
+          <text fill={tintColor} fillOpacity="0.4" fontSize={5} fontFamily='"JetBrains Mono", monospace' letterSpacing="1.5" textAnchor="middle">
+            <textPath href={`#seal-arc-bot-${safeId}`} startOffset="50%">
               {circuit.realName}
             </textPath>
           </text>
@@ -63,7 +62,7 @@ export function ArcaneSeal({ circuit, name, size, tintColor = "#daa520" }: Arcan
       )}
 
       {/* Ward traces */}
-      <g filter={`url(#${filterId})`}>
+      <g filter={`url(#seal-glow-${safeId})`}>
         {circuit.traces.map((trace, i) => (
           <polyline
             key={i}
