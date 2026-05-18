@@ -25,7 +25,7 @@ import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
 import { useMatchStakes1v1 } from "@/lib/gameState1v1";
 import { usePlayerCosmetics } from "@/lib/cosmetics";
-import { IlluminatedBanner } from "@/components/forge/IlluminatedBanner";
+import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import { toriiSql, sqlInt, toNum } from "@/lib/toriiSql";
 import { ABILITIES } from "@/lib/craftingContracts";
@@ -617,7 +617,7 @@ export default function Match1v1Page() {
                 const yourCosmetics = isPlayerA ? cosmeticsA : cosmeticsB;
                 const bannerKey = yourCosmetics?.banner;
                 return bannerKey && CIRCUITS[bannerKey] ? (
-                  <IlluminatedBanner circuit={CIRCUITS[bannerKey]} name={CIRCUITS[bannerKey].title} scale={0.2} />
+                  <ArcaneSeal circuit={CIRCUITS[bannerKey]} name={bannerKey} size={60} />
                 ) : null;
               })()}
               <Image
@@ -659,7 +659,7 @@ export default function Match1v1Page() {
                 const enemyCosmetics = isPlayerA ? cosmeticsB : cosmeticsA;
                 const bannerKey = enemyCosmetics?.banner;
                 return bannerKey && CIRCUITS[bannerKey] ? (
-                  <IlluminatedBanner circuit={CIRCUITS[bannerKey]} name={CIRCUITS[bannerKey].title} scale={0.2} />
+                  <ArcaneSeal circuit={CIRCUITS[bannerKey]} name={bannerKey} size={60} />
                 ) : null;
               })()}
             </div>
