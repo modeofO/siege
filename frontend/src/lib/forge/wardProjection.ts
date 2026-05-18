@@ -13,6 +13,10 @@ const PARCEL_TINTS: Record<number, WardTint> = {
 
 const DEFAULT_TINT: WardTint = { core: "#daa520", halo: "#ff9500" };
 
+// Circuit grid dimensions (cols 0–7, rows 0–5 in circuits.ts)
+const GRID_COLS = 7;
+const GRID_ROWS = 5;
+
 export function getWardTint(parcelType: number): WardTint {
   return PARCEL_TINTS[parcelType] ?? DEFAULT_TINT;
 }
@@ -24,11 +28,10 @@ export function projectToHex(
   cy: number,
   hexSize: number,
 ): { x: number; y: number } {
-  const innerW = hexSize * 1.2;
-  const innerH = hexSize * 1.2;
+  const inner = hexSize * 1.2;
   return {
-    x: cx - innerW / 2 + (col / 7) * innerW,
-    y: cy - innerH / 2 + (row / 5) * innerH,
+    x: cx - inner / 2 + (col / GRID_COLS) * inner,
+    y: cy - inner / 2 + (row / GRID_ROWS) * inner,
   };
 }
 
@@ -37,11 +40,10 @@ export function projectToCircle(
   row: number,
   radius: number,
 ): { x: number; y: number } {
-  const innerW = radius * 1.4;
-  const innerH = radius * 1.4;
+  const inner = radius * 1.4;
   return {
-    x: -innerW / 2 + (col / 7) * innerW,
-    y: -innerH / 2 + (row / 5) * innerH,
+    x: -inner / 2 + (col / GRID_COLS) * inner,
+    y: -inner / 2 + (row / GRID_ROWS) * inner,
   };
 }
 
