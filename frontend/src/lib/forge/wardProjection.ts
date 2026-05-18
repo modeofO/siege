@@ -28,7 +28,7 @@ export function projectToHex(
   cy: number,
   hexSize: number,
 ): { x: number; y: number } {
-  const inner = hexSize * 1.2;
+  const inner = hexSize * 0.95;
   return {
     x: cx - inner / 2 + (col / GRID_COLS) * inner,
     y: cy - inner / 2 + (row / GRID_ROWS) * inner,
