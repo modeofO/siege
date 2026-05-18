@@ -962,12 +962,12 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       ];
       const circuits = [
         { key: "half-wave-rectifier", name: "The First Gate", cosmetic_type: "banner", components_needed: ["one-way-valve", "rune-stone", "flux-well"] },
-        { key: "voltage-divider", name: "Bleeder's Mark", cosmetic_type: "parcelSkin", components_needed: ["rune-stone", "rune-stone", "flux-well"] },
-        { key: "full-wave-rectifier", name: "The Second Gate", cosmetic_type: "banner", components_needed: ["one-way-valve", "one-way-valve", "rune-stone", "flux-well"] },
-        { key: "rc-low-pass", name: "The Muffler", cosmetic_type: "banner", components_needed: ["rune-stone", "flux-well", "spiral-coil"] },
-        { key: "common-emitter-amp", name: "Voice of the Keep", cosmetic_type: "holdDecoration", components_needed: ["rune-stone", "rune-stone", "flux-well", "spiral-coil"] },
-        { key: "lc-tank", name: "The Resonance Chamber", cosmetic_type: "parcelSkin", components_needed: ["spiral-coil", "flux-well", "rune-stone"] },
-        { key: "buck-converter", name: "The Quartermaster", cosmetic_type: "banner", components_needed: ["one-way-valve", "spiral-coil", "flux-well", "rune-stone"] },
+        { key: "voltage-divider", name: "Bleeder's Mark", cosmetic_type: "parcelSkin", components_needed: ["rune-stone", "rune-stone"] },
+        { key: "full-wave-rectifier", name: "The Second Gate", cosmetic_type: "banner", components_needed: ["one-way-valve", "one-way-valve", "one-way-valve", "one-way-valve", "rune-stone"] },
+        { key: "rc-low-pass", name: "The Muffler", cosmetic_type: "banner", components_needed: ["rune-stone", "flux-well"] },
+        { key: "lc-tank", name: "The Resonance Chamber", cosmetic_type: "banner", components_needed: ["spiral-coil", "flux-well"] },
+        { key: "buck-converter", name: "The Quartermaster", cosmetic_type: "holdDecoration", components_needed: ["one-way-valve", "spiral-coil", "flux-well", "one-way-valve"] },
+        { key: "common-emitter-amp", name: "Voice of the Keep", cosmetic_type: "parcelSkin", components_needed: ["rune-stone", "rune-stone", "rune-stone", "rune-stone", "flux-well", "one-way-valve"] },
       ];
       return { components, circuits, note: "Circuit forging happens client-side. Use siege_set_cosmetic to equip a forged circuit on-chain." };
     },
