@@ -15,7 +15,7 @@ export function ForgeChrome({ children, width = 1280, height = 820 }: ForgeChrom
       className={`${styles.forgeBg} ${styles.forgeOverlay}`}
       style={{
         width,
-        height,
+        minHeight: height,
         position: "relative",
         overflow: "hidden",
       }}
