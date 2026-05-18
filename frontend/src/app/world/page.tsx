@@ -12,7 +12,7 @@ import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
-import { IlluminatedBanner } from "@/components/forge/IlluminatedBanner";
+import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import styles from "./parchment.module.css";
 
@@ -297,10 +297,10 @@ export default function WorldPage() {
               <div className="text-[10px] text-[#7a7060] uppercase tracking-wider">Hold Crest</div>
               {myCosmetics?.holdDecoration && CIRCUITS[myCosmetics.holdDecoration] ? (
                 <div className="flex justify-center">
-                  <IlluminatedBanner
+                  <ArcaneSeal
                     circuit={CIRCUITS[myCosmetics.holdDecoration]}
-                    name={CIRCUITS[myCosmetics.holdDecoration].title}
-                    scale={0.5}
+                    name={myCosmetics.holdDecoration}
+                    size={120}
                   />
                 </div>
               ) : (
