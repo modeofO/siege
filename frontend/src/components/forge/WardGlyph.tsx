@@ -1,8 +1,10 @@
 // frontend/src/components/forge/WardGlyph.tsx
 "use client";
 
+import type { ComponentKind } from "@/lib/forge/circuits";
+
 interface WardGlyphProps {
-  kind: string;
+  kind: ComponentKind;
   cx: number;
   cy: number;
   color: string;
