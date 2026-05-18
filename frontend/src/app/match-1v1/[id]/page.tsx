@@ -612,22 +612,20 @@ export default function Match1v1Page() {
         <div className="grid grid-cols-2 gap-6 px-4 pb-3">
           {/* Your Citadel */}
           <div className="flex flex-col items-center">
-            <div className="flex items-end gap-2">
-              {(() => {
-                const yourCosmetics = isPlayerA ? cosmeticsA : cosmeticsB;
-                const bannerKey = yourCosmetics?.banner;
-                return bannerKey && CIRCUITS[bannerKey] ? (
-                  <ArcaneSeal circuit={CIRCUITS[bannerKey]} name={bannerKey} size={60} />
-                ) : null;
-              })()}
-              <Image
-                src="/sprites/citadel.png"
-                alt="Your Citadel"
-                width={128}
-                height={128}
-                className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]"
-              />
-            </div>
+            {(() => {
+              const yourCosmetics = isPlayerA ? cosmeticsA : cosmeticsB;
+              const bannerKey = yourCosmetics?.banner;
+              return bannerKey && CIRCUITS[bannerKey] ? (
+                <ArcaneSeal circuit={CIRCUITS[bannerKey]} name={bannerKey} size={48} />
+              ) : null;
+            })()}
+            <Image
+              src="/sprites/citadel.png"
+              alt="Your Citadel"
+              width={128}
+              height={128}
+              className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(200,164,78,0.3)]"
+            />
             <span className="text-xs tracking-wider text-[#c8a44e] uppercase font-bold mt-1">Your Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
@@ -646,23 +644,21 @@ export default function Match1v1Page() {
           </div>
           {/* Enemy Citadel */}
           <div className="flex flex-col items-center">
-            <div className="flex items-end gap-2">
-              <Image
-                src="/sprites/citadel.png"
-                alt="Enemy Citadel"
-                width={128}
-                height={128}
-                className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]"
-                style={{ filter: "hue-rotate(340deg) saturate(1.5)" }}
-              />
-              {(() => {
-                const enemyCosmetics = isPlayerA ? cosmeticsB : cosmeticsA;
-                const bannerKey = enemyCosmetics?.banner;
-                return bannerKey && CIRCUITS[bannerKey] ? (
-                  <ArcaneSeal circuit={CIRCUITS[bannerKey]} name={bannerKey} size={60} />
-                ) : null;
-              })()}
-            </div>
+            {(() => {
+              const enemyCosmetics = isPlayerA ? cosmeticsB : cosmeticsA;
+              const bannerKey = enemyCosmetics?.banner;
+              return bannerKey && CIRCUITS[bannerKey] ? (
+                <ArcaneSeal circuit={CIRCUITS[bannerKey]} name={bannerKey} size={48} />
+              ) : null;
+            })()}
+            <Image
+              src="/sprites/citadel.png"
+              alt="Enemy Citadel"
+              width={128}
+              height={128}
+              className="w-32 h-32 object-contain rounded-xl drop-shadow-[0_0_12px_rgba(255,51,68,0.3)]"
+              style={{ filter: "hue-rotate(340deg) saturate(1.5)" }}
+            />
             <span className="text-xs tracking-wider text-[#ff3344] uppercase font-bold mt-1">Enemy Citadel</span>
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">

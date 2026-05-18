@@ -13,7 +13,8 @@ interface ArcaneSealProps {
 
 export function ArcaneSeal({ circuit, name, size, tintColor = "#daa520" }: ArcaneSealProps) {
   const r = size / 2;
-  const traceRadius = r * 0.7;
+  const traceRadius = r * 0.8;
+  const traceOffsetY = r * 0.08;
   const safeId = name.replace(/\s+/g, "-");
   const isLarge = size >= 100;
 
@@ -61,8 +62,8 @@ export function ArcaneSeal({ circuit, name, size, tintColor = "#daa520" }: Arcan
         </>
       )}
 
-      {/* Ward traces */}
-      <g filter={`url(#seal-glow-${safeId})`}>
+      {/* Ward traces — shifted down so bottom components sit near seal edge */}
+      <g filter={`url(#seal-glow-${safeId})`} transform={`translate(0,${traceOffsetY})`}>
         {circuit.traces.map((trace, i) => (
           <polyline
             key={i}
