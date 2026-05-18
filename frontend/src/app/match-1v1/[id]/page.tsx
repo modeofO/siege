@@ -15,7 +15,7 @@ import {
   MODIFIER_NAMES,
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1 } from "@/lib/gameState1v1";
-import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1 } from "@/lib/crypto";
+import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, clearCommitData1v1 } from "@/lib/crypto";
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
@@ -325,6 +325,7 @@ export default function Match1v1Page() {
         );
         setAutoRevealStatus("done");
         setAutoRevealError("");
+        clearCommitData1v1(matchId, state.round);
         console.log("[auto-reveal] reveal submitted");
         // Start polling for reveal_count to reach 2 (bridges gRPC lag for auto-resolve)
         startPostTxPoll({ expectRevealCount: 2 });

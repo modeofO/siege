@@ -11,7 +11,7 @@ import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
 import { AbilityWagerPicker } from "@/components/AbilityWagerPicker";
 import { AbilityIcon } from "@/components/AbilityIcon";
-import { toriiSql } from "@/lib/toriiSql";
+import { toriiSql, sqlInt } from "@/lib/toriiSql";
 import Link from "next/link";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "http://localhost:5050";
@@ -36,7 +36,7 @@ export default function Join1v1Page() {
     let cancelled = false;
     (async () => {
       const rows = await toriiSql<{ player_a: string; player_b: string }>(
-        `SELECT player_a, player_b FROM "siege_dojo-MatchState1v1" WHERE match_id = ${matchId}`,
+        `SELECT player_a, player_b FROM "siege_dojo-MatchState1v1" WHERE match_id = ${sqlInt(matchId)}`,
       );
       if (cancelled) return;
       if (rows.length > 0) {

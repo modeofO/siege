@@ -1,8 +1,8 @@
 {
   "world": {
     "class_hash": "0x613551abceb2b37073b1149bb862ea70cf029981ce1ca47e9dd7c7ab97cb65d",
-    "address": "0x7accd84355fc37a018f314d5b0460d5f8a4a69cb1ebb1836f3a58e22073b584",
-    "seed": "siege_dojo_v3",
+    "address": "0x51e8698f43b869b3e243344897d83ba236e6b049ab55e8b14b3a528bc690ce6",
+    "seed": "siege_dojo_v4",
     "name": "siege_dojo",
     "entrypoints": [
       "uuid",
@@ -33,7 +33,7 @@
   },
   "contracts": [
     {
-      "address": "0x289b59822dfd83da32f690dd3d5dc1ff3fb19f5e51ccf3f6306167dbb671d10",
+      "address": "0x45e612a60f967ac0f1e8e406b9eb4928fd0742109ba816a6f2f3b232cd22d3a",
       "class_hash": "0x2c414649782347837df2e227d2227d6d948eb8300409ec5c986c38a5c18f5a5",
       "init_calldata": [],
       "tag": "siege_dojo-actions",
@@ -44,7 +44,7 @@
       ]
     },
     {
-      "address": "0x15d867f69bae78dc951df8359d185064b5544b3c73cf66aa4cba9388e6f2c85",
+      "address": "0xa503dbf655e21fe7e65c42f18662edc584aa6b3e8c8bb19e35fa57f62492ab",
       "class_hash": "0x986c6f1c06be585cc6a4408be218fb288f341bf7d891360cc7ca896e5ec9a4",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
@@ -58,7 +58,7 @@
       ]
     },
     {
-      "address": "0x7a7b68dea634acb2fedca5336de6893d3c82ab882b6133a5ed5e4e2eefc3547",
+      "address": "0x34087751f8e88c1b02e61be7c493e15f9a4d3f0d8b0803667b407069dc0a73b",
       "class_hash": "0x25c918d33577b814103793959e779eea266d5d44acf0a3d546fb468704139f8",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal",
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "address": "0xdbd65d19971d67c3f03cfa7220149ed001676d62eff92ffdd8af89e60baa40",
+      "address": "0x5304e2568417d2e67d63caab54db914900afbf23035687c63b4962d2f5d8f5b",
       "class_hash": "0x33e705e3843f796d7c5c5fc872795db0606748634d53576b80626881e2f5c24",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal_1v1",
@@ -85,8 +85,8 @@
       ]
     },
     {
-      "address": "0x40ba55faef2a5e49a2bbb6c6a9a602d7040102b688c632039ac445bed558b00",
-      "class_hash": "0x282ca794ab43175781cd403fb754b019de48bc981546976d54c298cbb453507",
+      "address": "0x26bd1b97c0c29dcef1a161ff835817c0f1940f21afc3a747f7637408fddc094",
+      "class_hash": "0x2b667b280d5b563b3a3bacd9f72c70ce787cb0a98180744e4a90a8e67fd2ba8",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
       "selector": "0x2164fd7acc93a3de55c3bcb974b18eebe85614770b9c22881e53ffc80174a90",
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "address": "0x5d46148c9a4ec5e3e06dfc7efb6d28f4148c684d2811543d7b787cf4de3843",
+      "address": "0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2",
       "class_hash": "0x4a29e3e854cfc87d65746b01cc663e7fd5d10ae72dd6fec80de07282d1027c7",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
@@ -111,7 +111,7 @@
       ]
     },
     {
-      "address": "0x3aa9d23c94331c1d275d312c86c0cbed5935b7f8cddaec882c980b4d4dfa7a5",
+      "address": "0x21c09dbb97667a3dbe975d867ea491fd83cd8eafd9825b43a49e62ccd1da175",
       "class_hash": "0x636964b849eb0e4f5eb97fc13541ec84fc39d8c8825e42b0a4c47ba957e01da",
       "init_calldata": [],
       "tag": "siege_dojo-resolution",
@@ -122,7 +122,7 @@
       ]
     },
     {
-      "address": "0x563b2674aeb93c1d7e2a304de869995f001df49d6294dd010014b0227c79bb2",
+      "address": "0x7d42eb63561f6f25315833d674002e3a53accd00bd02e243154009890122e3d",
       "class_hash": "0x7ddf9fb2b1e1fda8e014fd43c1cf0c00d0287b9bbad5a2442017cd3b728932f",
       "init_calldata": [],
       "tag": "siege_dojo-resolution_1v1",
@@ -133,8 +133,8 @@
       ]
     },
     {
-      "address": "0x727c57716a650660de0466efb0572ccab13dfebb1e5bf854a38acd36cda4681",
-      "class_hash": "0x2c0abf568325829925cc1bca122571ba4a4243227314d21b4c08cfcb6aba893",
+      "address": "0x6d2455b76185900ffc6fb0fed0f91f4c61c7f4ac5e57a92d0fe8edc620b66f2",
+      "class_hash": "0x4f7a74026b597f425819247e29735a46317da2a698bed30a73b12829c825f5e",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",

@@ -61,7 +61,7 @@ docker compose down           # tear down
 
 ## Sepolia
 
-**World:** `0x07accd84355fc37a018f314d5b0460d5f8a4a69cb1ebb1836f3a58e22073b584` (v3 seed `siege_dojo_v3`, deployed 2026-04-19; prior v2 world `0x022824cd...` and v1 `0x07ba32ea...` are orphaned)
+**World:** `0x051e8698f43b869b3e243344897d83ba236e6b049ab55e8b14b3a528bc690ce6` (v4 seed `siege_dojo_v4`, deployed 2026-05-17 — security key rotation; prior v3 `0x07accd84...`, v2 `0x022824cd...`, v1 `0x07ba32ea...` are orphaned)
 **RPC:** `https://api.cartridge.gg/x/starknet/sepolia` (spec v0.9.0 — required by sozo v1.8.6)
 
 ```bash
@@ -82,12 +82,12 @@ sozo -P sepolia auth grant writer \
   siege_dojo,siege_dojo-conquest
 ```
 
-Full Sepolia deploy was run 2026-04-19 (v3, fresh world with 34-parcel diamond grid) — see `dojo_dev.toml` must exist locally (gitignored). The docker builder image (`docker compose run --rm builder sozo ...`) is the safe path for Sepolia migrations since it ships with sozo 1.8.6.
+Full Sepolia deploy was run 2026-05-17 (v4, security key rotation — fresh world with 34-parcel diamond grid). Deployer keystore lives in `~/.siege-keys/` (gitignored). The docker builder image (`docker compose run --rm builder sozo ...`) is the safe path for Sepolia migrations since it ships with sozo 1.8.6.
 
 **Torii:** `https://api.cartridge.gg/x/siege-dojo/torii` (hosted on Slot)
-- GraphQL: `https://api.cartridge.gg/x/siege-dojo/torii/graphql`
 - SQL: `https://api.cartridge.gg/x/siege-dojo/torii/sql`
 - Config: `torii_sepolia.toml`
+- **Needs redeployment** after v4 migration — Slot-hosted Torii still points at old v3 world
 
 **starkli uses a different RPC spec** — use the v0_8 endpoint:
 `https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8`
@@ -125,24 +125,24 @@ NEXT_PUBLIC_TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
 NEXT_PUBLIC_RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
 
 # 2v2 actions / commit_reveal (legacy mode)
-NEXT_PUBLIC_ACTIONS_ADDRESS=0x289b59822dfd83da32f690dd3d5dc1ff3fb19f5e51ccf3f6306167dbb671d10
-NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x7a7b68dea634acb2fedca5336de6893d3c82ab882b6133a5ed5e4e2eefc3547
+NEXT_PUBLIC_ACTIONS_ADDRESS=0x45e612a60f967ac0f1e8e406b9eb4928fd0742109ba816a6f2f3b232cd22d3a
+NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x34087751f8e88c1b02e61be7c493e15f9a4d3f0d8b0803667b407069dc0a73b
 
 # 1v1 mode contracts
-NEXT_PUBLIC_ACTIONS_1V1_ADDRESS=0x15d867f69bae78dc951df8359d185064b5544b3c73cf66aa4cba9388e6f2c85
-NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS=0xdbd65d19971d67c3f03cfa7220149ed001676d62eff92ffdd8af89e60baa40
-NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS=0x563b2674aeb93c1d7e2a304de869995f001df49d6294dd010014b0227c79bb2
+NEXT_PUBLIC_ACTIONS_1V1_ADDRESS=0xa503dbf655e21fe7e65c42f18662edc584aa6b3e8c8bb19e35fa57f62492ab
+NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS=0x5304e2568417d2e67d63caab54db914900afbf23035687c63b4962d2f5d8f5b
+NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS=0x7d42eb63561f6f25315833d674002e3a53accd00bd02e243154009890122e3d
 
 # World metagame
-NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS=0x727c57716a650660de0466efb0572ccab13dfebb1e5bf854a38acd36cda4681
-NEXT_PUBLIC_CONQUEST_ADDRESS=0x40ba55faef2a5e49a2bbb6c6a9a602d7040102b688c632039ac445bed558b00
+NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS=0x6d2455b76185900ffc6fb0fed0f91f4c61c7f4ac5e57a92d0fe8edc620b66f2
+NEXT_PUBLIC_CONQUEST_ADDRESS=0x26bd1b97c0c29dcef1a161ff835817c0f1940f21afc3a747f7637408fddc094
 
 # Tokens + crafting
-NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x5d46148c9a4ec5e3e06dfc7efb6d28f4148c684d2811543d7b787cf4de3843
-NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb
+NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2
+NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05
 ```
 
-`NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS` and `NEXT_PUBLIC_CONQUEST_ADDRESS` are read by `lib/conquest.ts`, `lib/pillage.ts`, `app/world/page.tsx`, `lib/factions.ts`, and the preset-defense hooks. Live Sepolia addresses above are the current deployment (fresh seed `siege_dojo_v3`, deployed 2026-04-19; 34-parcel diamond grid, untyped parcels from #7).
+`NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS` and `NEXT_PUBLIC_CONQUEST_ADDRESS` are read by `lib/conquest.ts`, `lib/pillage.ts`, `app/world/page.tsx`, `lib/factions.ts`, and the preset-defense hooks. Live Sepolia addresses above are the v4 deployment (seed `siege_dojo_v4`, deployed 2026-05-17; security key rotation, 34-parcel diamond grid, untyped parcels from #7).
 
 ### Session policies (Cartridge Controller)
 
@@ -195,9 +195,9 @@ Same world as 2v2 (`siege_dojo`). Deployed to Sepolia alongside existing contrac
 
 | Contract | Address |
 |----------|---------|
-| `actions_1v1` | `0x15d867f69bae78dc951df8359d185064b5544b3c73cf66aa4cba9388e6f2c85` |
-| `commit_reveal_1v1` | `0xdbd65d19971d67c3f03cfa7220149ed001676d62eff92ffdd8af89e60baa40` |
-| `resolution_1v1` | `0x563b2674aeb93c1d7e2a304de869995f001df49d6294dd010014b0227c79bb2` |
+| `actions_1v1` | `0xa503dbf655e21fe7e65c42f18662edc584aa6b3e8c8bb19e35fa57f62492ab` |
+| `commit_reveal_1v1` | `0x5304e2568417d2e67d63caab54db914900afbf23035687c63b4962d2f5d8f5b` |
+| `resolution_1v1` | `0x7d42eb63561f6f25315833d674002e3a53accd00bd02e243154009890122e3d` |
 
 Models: `MatchState1v1`, `RoundMoves1v1`, `RoundModifiers1v1`, `RoundTraps1v1`. Reuses `Commitment`, `NodeState`, `MatchCounter`.
 
@@ -283,20 +283,20 @@ T2 crafting requires burning 1 of the matching T1 ability in addition to the res
 **Resolution effects:** applied by `resolution_1v1.cairo` during the round, and by `conquest.cairo` for async parcel attacks. Effects are tier-aware — edit both places when rebalancing.
 
 **AbilityToken contract:** pure Starknet ERC-1155 (not a Dojo contract) in `src/tokens/ability_token.cairo`. Supporting modules: `base64.cairo` (encoder), `ability_metadata.cairo` (JSON builder). Three roles:
-- `admin` — rotates minter/minter2/burner and per-ability SVGs (set at deploy to deployer address, immutable)
+- `admin` — rotates minter/minter2/burner and per-ability SVGs (set at deploy to deployer address; transferable via `transfer_admin` added in v4)
 - `minter` — primary minter; currently `crafting_1v1` (for craft flow)
 - `minter2` — secondary minter; currently `world_system` (for starter-ability mint on register + staked-match settlement). Added in v3 (deployed 2026-04-12) because both crafting_1v1 and world_system need mint access.
 - `burner` — set when Phase 2B ships; starts at `0x0` (abilities are immortal until then)
 
 **Metadata:** fully on-chain. `uri(token_id)` returns `data:application/json;base64,...` with inline SVG image — no external server, no IPFS. Built at read time by `ability_metadata.cairo` using admin-settable per-ability SVGs stored in contract storage. Updating art requires one `set_ability_svg(ability_type, svg)` admin transaction per ability — no redeploy.
 
-**Sepolia addresses:**
-- `crafting_1v1`: `0x5d46148c9a4ec5e3e06dfc7efb6d28f4148c684d2811543d7b787cf4de3843`
-- `AbilityToken` (v3, with `minter2`): `0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb`
-- `world_system`: `0x727c57716a650660de0466efb0572ccab13dfebb1e5bf854a38acd36cda4681`
-- `conquest`: `0x40ba55faef2a5e49a2bbb6c6a9a602d7040102b688c632039ac445bed558b00`
+**Sepolia addresses (v4, deployed 2026-05-17):**
+- `crafting_1v1`: `0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2`
+- `AbilityToken` (v4, with `minter2` + `transfer_admin`): `0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05`
+- `world_system`: `0x6d2455b76185900ffc6fb0fed0f91f4c61c7f4ac5e57a92d0fe8edc620b66f2`
+- `conquest`: `0x26bd1b97c0c29dcef1a161ff835817c0f1940f21afc3a747f7637408fddc094`
 
-(AbilityToken v2 at `0xe1f7c5fd...` is still on-chain but orphaned — v3 superseded it when the minter2 pattern was added. Torii + ResourceConfig + frontend all point at v3.)
+(Prior AbilityToken versions — v3 `0x5a7805cc...`, v2 `0xe1f7c5fd...` — are still on-chain but orphaned. Torii + ResourceConfig + frontend all point at v4.)
 
 **Historical note:** Phase 2A used a `PlayerAbilities` Dojo model with u8 counters. Phase 2A.5 dropped it in favor of ERC-1155 so abilities would show in the wallet. The old model is still orphaned on-chain but not read by any live code.
 

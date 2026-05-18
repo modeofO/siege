@@ -16,6 +16,14 @@ pub trait IConquest<T> {
 #[starknet::interface]
 pub trait IERC1155<T> {
     fn balance_of(self: @T, account: ContractAddress, token_id: u256) -> u256;
+    fn safe_transfer_from(
+        ref self: T,
+        from: ContractAddress,
+        to: ContractAddress,
+        token_id: u256,
+        value: u256,
+        data: Span<felt252>,
+    );
 }
 
 pub fn ability_type_from_token(token_id: u8) -> u8 {
@@ -29,7 +37,7 @@ pub fn ability_tier_from_token(token_id: u8) -> u8 {
 #[dojo::contract]
 pub mod conquest {
     use core::num::traits::Zero;
-    use starknet::{ContractAddress, get_caller_address};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address};
     use dojo::model::ModelStorage;
     use siege_dojo::models::parcel::Parcel;
     use siege_dojo::models::player_kingdom::PlayerKingdom;
@@ -61,6 +69,40 @@ pub mod conquest {
     impl InternalImpl of InternalTrait {
         fn world_default(self: @ContractState) -> dojo::world::WorldStorage {
             self.world(@"siege_dojo")
+        }
+    }
+
+    #[abi(per_item)]
+    #[generate_trait]
+    impl ERC1155ReceiverImpl of ERC1155ReceiverTrait {
+        #[external(v0)]
+        fn on_erc1155_received(
+            self: @ContractState,
+            operator: ContractAddress,
+            from: ContractAddress,
+            token_id: u256,
+            value: u256,
+            data: Span<felt252>,
+        ) -> felt252 {
+            0x4e2312e0
+        }
+
+        #[external(v0)]
+        fn on_erc1155_batch_received(
+            self: @ContractState,
+            operator: ContractAddress,
+            from: ContractAddress,
+            token_ids: Span<u256>,
+            values: Span<u256>,
+            data: Span<felt252>,
+        ) -> felt252 {
+            0x4e2312e0
+        }
+
+        #[external(v0)]
+        fn supports_interface(self: @ContractState, interface_id: felt252) -> bool {
+            let isrc6_id: felt252 = 0x2ceccef7f994940b3962a6c67e0ba4fcd37df7d131417c604f91e03caecc1cd;
+            interface_id == isrc6_id
         }
     }
 
@@ -128,6 +170,11 @@ pub mod conquest {
                 let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
                 let balance = erc1155.balance_of(attacker, ability_id.into());
                 assert(balance >= 1_u256, 'Ability not owned');
+                erc1155.safe_transfer_from(
+                    attacker, get_contract_address(),
+                    ability_id.into(), 1_u256,
+                    array![].span(),
+                );
             }
 
             // Validate target parcel

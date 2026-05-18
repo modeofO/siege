@@ -97,15 +97,25 @@ mod tests {
         addr
     }
 
+    #[starknet::interface]
+    trait IERC1155Like<T> {
+        fn balance_of(self: @T, account: starknet::ContractAddress, token_id: u256) -> u256;
+        fn set_approval_for_all(ref self: T, operator: starknet::ContractAddress, approved: bool);
+    }
+
     fn deploy_ability_token(
         admin: starknet::ContractAddress,
-    ) -> (IAbilityTokenDispatcher, starknet::ContractAddress) {
+    ) -> (IAbilityTokenDispatcher, IERC1155LikeDispatcher, starknet::ContractAddress) {
         let mut calldata: Array<felt252> = array![];
         admin.serialize(ref calldata);
         let (addr, _) = starknet::syscalls::deploy_syscall(
             AbilityToken::TEST_CLASS_HASH.try_into().unwrap(), 0, calldata.span(), false,
         ).unwrap_syscall();
-        (IAbilityTokenDispatcher { contract_address: addr }, addr)
+        (
+            IAbilityTokenDispatcher { contract_address: addr },
+            IERC1155LikeDispatcher { contract_address: addr },
+            addr,
+        )
     }
 
     fn deploy_user() -> starknet::ContractAddress {
@@ -240,7 +250,7 @@ mod tests {
 
         // AbilityToken: deploy and wire via write_model_test (avoids world-owner check)
         let admin = contract_address_const::<0xADAD>();
-        let (ability_token, ability_token_addr) = deploy_ability_token(admin);
+        let (ability_token, erc1155, ability_token_addr) = deploy_ability_token(admin);
         starknet::testing::set_contract_address(admin);
         ability_token.set_minter(world_sys_addr);
         // Reset caller back to test runner so initialize_world can proceed
@@ -255,18 +265,12 @@ mod tests {
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
         world_sys.initialize_world(cols, rows);
 
-        // Register player_a, then force the home layout to the legacy
-        // first-unclaimed-per-type layout (parcels 0/1/2). The new spatial
-        // algorithm clusters homes differently, which breaks these tests'
-        // adjacency assumptions — but nothing here actually exercises the
-        // registration algorithm itself, so we patch state to the stable
-        // layout the rest of the setup expects.
         let player_a = deploy_user();
         starknet::testing::set_contract_address(player_a);
         world_sys.register_player(array![0, 1, 2]);
         force_legacy_homes(ref world, player_a, 0, 1, 2);
+        erc1155.set_approval_for_all(conquest_addr, true);
 
-        // Same for player_b → parcels 3/4/5
         let player_b = deploy_user();
         starknet::testing::set_contract_address(player_b);
         world_sys.register_player(array![0, 1, 2]);
@@ -277,17 +281,7 @@ mod tests {
         kb_tier.tier = 2;
         world.write_model_test(@kb_tier);
 
-        // Give player_a parcel 6 (col=1,row=1) as a non-home parcel.
-        // Parcel 6 at (1,1) is adjacent to parcel 9 (4,1)? No.
-        // We need player_a to have a parcel adjacent to player_b's non-home parcels (e.g. parcel 9 at col=4,row=1).
-        // Parcel 4 at (4,0) is adjacent to parcel 9 at (4,1). But parcel 4 is player_b's home!
-        // Let's just give player_a an extra parcel that is adjacent to unclaimed/B parcels for testing.
-        // Parcel 8 is at (3,1). Is it adjacent to parcel 9 (4,1)? hex_distance((3,1),(4,1)):
-        //   row=1 odd: x1=3-(1-1)/2=3, z1=1, y1=-4; x2=4, z2=1, y2=-5; dx=1,dy=1,dz=0 → max=1. Yes!
-        // So give player_a parcel 8 (col=3,row=1) as a non-home parcel.
-        // Parcel 8 is unclaimed after both players register (player_a gets 0,1,2; player_b gets 3,4,5).
         let mut extra_parcel: Parcel = world.read_model(8_u32);
-        // Only assign if unclaimed
         let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
         if extra_parcel.owner == zero_addr {
             extra_parcel.owner = player_a;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { cairo } from "starknet";
 import type { AccountInterface, UniversalDetails } from "starknet";
-import { toriiSql, feltToStr } from "./toriiSql";
+import { toriiSql, feltToStr, sqlHex } from "./toriiSql";
 import type { CircuitKey, CosmeticType } from "./forge/circuits";
 
 const WORLD_SYSTEM_ADDRESS =
@@ -61,7 +61,7 @@ export function usePlayerCosmetics(
         parcel_skin: string;
         hold_decoration: string;
       }>(
-        `SELECT banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player = '${playerAddress}'`,
+        `SELECT banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player = ${sqlHex(playerAddress)}`,
       );
 
       if (cancelled) return;

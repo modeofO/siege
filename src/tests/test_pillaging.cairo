@@ -250,6 +250,9 @@ mod tests {
         rc.ability_token = ability_token_addr;
         world.write_model_test(@rc);
 
+        // Reset to world owner before initialize_world (requires is_owner)
+        starknet::testing::set_contract_address(contract_address_const::<0>());
+
         // Init world with 10 parcels (2 rows of 5)
         let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
         let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];

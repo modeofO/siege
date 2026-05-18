@@ -4,7 +4,7 @@ import { byteArray, type RpcProvider } from "starknet";
 // Deployed ability token address — override via NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS
 export const ABILITY_TOKEN_ADDRESS =
   process.env.NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS ||
-  "0x5a7805ccb625c53f877f1bdd92b002f22a55878a4959b91f9635d475f0efebb";
+  "0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05";
 
 export type AbilityInventory = {
   siege_sword: number;

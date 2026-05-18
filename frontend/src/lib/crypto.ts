@@ -168,3 +168,12 @@ export function getSalt1v1(matchId: string, round: number): string | null {
   const key = `siege_1v1_salt_${matchId}_${round}`;
   return localStorage.getItem(key);
 }
+
+/**
+ * Clear stored commit data after a successful reveal
+ */
+export function clearCommitData1v1(matchId: string, round: number) {
+  localStorage.removeItem(`siege_1v1_salt_${matchId}_${round}`);
+  localStorage.removeItem(`siege_1v1_move_${matchId}_${round}`);
+  localStorage.removeItem(`siege_1v1_ability_${matchId}_${round}`);
+}

@@ -365,6 +365,7 @@ mod tests {
         rc.ability_token = ability_token.contract_address;
         world.write_model_test(@rc);
 
+        starknet::testing::set_contract_address(0.try_into().unwrap());
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
@@ -393,6 +394,7 @@ mod tests {
         rc.ability_token = ability_token.contract_address;
         world.write_model_test(@rc);
 
+        starknet::testing::set_contract_address(0.try_into().unwrap());
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
@@ -423,6 +425,7 @@ mod tests {
         rc.ability_token = ability_token.contract_address;
         world.write_model_test(@rc);
 
+        starknet::testing::set_contract_address(0.try_into().unwrap());
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
@@ -462,6 +465,7 @@ mod tests {
         rc.ability_token = ability_token.contract_address;
         world.write_model_test(@rc);
 
+        starknet::testing::set_contract_address(0.try_into().unwrap());
         ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();

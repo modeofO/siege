@@ -6,7 +6,7 @@ export type AbilityId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
 // Crafting contract address — set via NEXT_PUBLIC_CRAFTING_1V1_ADDRESS in .env.local
 export const CRAFTING_1V1_ADDRESS =
-  process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS || "0x5d46148c9a4ec5e3e06dfc7efb6d28f4148c684d2811543d7b787cf4de3843";
+  process.env.NEXT_PUBLIC_CRAFTING_1V1_ADDRESS || "0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2";
 
 export type AbilityCost = Record<string, number>;
 

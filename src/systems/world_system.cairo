@@ -181,6 +181,10 @@ pub mod world_system {
             rows: Array<u16>,
         ) {
             let mut world = self.world_default();
+            assert(
+                world.dispatcher.is_owner(world.namespace_hash, get_caller_address()),
+                'Not world owner',
+            );
             let config: WorldConfig = world.read_model(0_u8);
             assert(!config.initialized, 'Already initialized');
             let n = cols.len();
@@ -549,9 +553,14 @@ pub mod world_system {
 
         fn settle_match(ref self: ContractState, match_id: u64) {
             let mut world = self.world_default();
+            let caller = get_caller_address();
 
             let state: MatchState1v1 = world.read_model(match_id);
             assert(state.status == MatchStatus::Finished, 'Match not finished');
+            assert(
+                caller == state.player_a || caller == state.player_b,
+                'Not a match participant',
+            );
 
             let mut stakes: MatchStakes1v1 = world.read_model(match_id);
             assert(stakes.staked, 'Not a staked match');

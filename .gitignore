@@ -155,6 +155,8 @@ vite.config.ts.timestamp-*
 credentials.json
 service-account*.json
 keyfile*.json
+*-deployer*.json
+*-account*.json
 account*.json
 .secrets
 .secret

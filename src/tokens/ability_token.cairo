@@ -23,6 +23,7 @@ pub trait IAbilityToken<T> {
     fn set_minter2(ref self: T, new_minter2: ContractAddress);
     fn set_burner(ref self: T, new_burner: ContractAddress);
     fn set_ability_svg(ref self: T, ability_type: u8, svg: ByteArray);
+    fn transfer_admin(ref self: T, new_admin: ContractAddress);
     fn admin(self: @T) -> ContractAddress;
     fn minter(self: @T) -> ContractAddress;
     fn minter2(self: @T) -> ContractAddress;
@@ -143,6 +144,12 @@ pub mod AbilityToken {
             assert(get_caller_address() == self.admin_address.read(), 'Not admin');
             assert(ability_type >= 1 && ability_type <= 5, 'Invalid ability type');
             self.ability_svgs.entry(ability_type).write(svg);
+        }
+
+        fn transfer_admin(ref self: ContractState, new_admin: ContractAddress) {
+            assert(get_caller_address() == self.admin_address.read(), 'Not admin');
+            assert(new_admin.is_non_zero(), 'Zero address');
+            self.admin_address.write(new_admin);
         }
 
         fn admin(self: @ContractState) -> ContractAddress {
