@@ -134,7 +134,7 @@
     },
     {
       "address": "0x727c57716a650660de0466efb0572ccab13dfebb1e5bf854a38acd36cda4681",
-      "class_hash": "0x28dccd10459d417350d35aa8e6b066fc188c5d672fe8eb3ef0bff3ddd16b55f",
+      "class_hash": "0x2c0abf568325829925cc1bca122571ba4a4243227314d21b4c08cfcb6aba893",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
@@ -485,9 +485,19 @@
           "name": "settled",
           "type": "core::bool",
           "key": false
+        },
+        {
+          "name": "staked",
+          "type": "core::bool",
+          "key": false
+        },
+        {
+          "name": "parcel_claimed",
+          "type": "core::bool",
+          "key": false
         }
       ],
-      "class_hash": "0x7541e653f4205ad52cf1e5a123b54b4765ad69dd710648cb446f97ef72fb082",
+      "class_hash": "0x4e52aade16056bff98d01811f68fa1100ed767e97be516d37105ae7d31d435e",
       "tag": "siege_dojo-MatchStakes1v1",
       "selector": "0x15983e5ef9166b8ab73996de92dbc207fab907fc5023434972acf818b074bab"
     },
@@ -4280,6 +4290,14 @@
         {
           "name": "settled",
           "type": "core::bool"
+        },
+        {
+          "name": "staked",
+          "type": "core::bool"
+        },
+        {
+          "name": "parcel_claimed",
+          "type": "core::bool"
         }
       ]
     },
@@ -4317,6 +4335,14 @@
         },
         {
           "name": "settled",
+          "type": "core::bool"
+        },
+        {
+          "name": "staked",
+          "type": "core::bool"
+        },
+        {
+          "name": "parcel_claimed",
           "type": "core::bool"
         }
       ]
