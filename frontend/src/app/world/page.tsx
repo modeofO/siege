@@ -12,6 +12,7 @@ import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
+import { toriiSql, toNum } from "@/lib/toriiSql";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import styles from "./parchment.module.css";
@@ -161,6 +162,53 @@ function CloudDrift() {
   );
 }
 
+interface ActiveBattle {
+  matchId: number;
+  playerA: string;
+  playerB: string;
+  round: number;
+  vaultAHp: number;
+  vaultBHp: number;
+  status: number;
+}
+
+function useActiveBattles(refreshKey: number): { battles: ActiveBattle[]; loading: boolean } {
+  const [battles, setBattles] = useState<ActiveBattle[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchBattles = async () => {
+      const rows = await toriiSql<Record<string, unknown>>(
+        `SELECT match_id, player_a, player_b, current_round, vault_a_hp, vault_b_hp, status FROM "siege_dojo-MatchState1v1" WHERE status = 1 ORDER BY match_id DESC LIMIT 20`
+      );
+      if (cancelled) return;
+      setBattles(
+        rows.map((r) => ({
+          matchId: toNum(r.match_id),
+          playerA: String(r.player_a ?? ""),
+          playerB: String(r.player_b ?? ""),
+          round: toNum(r.current_round),
+          vaultAHp: toNum(r.vault_a_hp),
+          vaultBHp: toNum(r.vault_b_hp),
+          status: toNum(r.status),
+        }))
+      );
+      setLoading(false);
+    };
+    void fetchBattles();
+    const interval = setInterval(fetchBattles, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, [refreshKey]);
+
+  return { battles, loading };
+}
+
+function truncAddr(addr: string): string {
+  if (!addr || addr.length < 10) return addr || "???";
+  return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+}
+
 export default function WorldPage() {
   const { account, address } = useAccount();
   const [refreshKey, setRefreshKey] = useState(0);
@@ -174,6 +222,7 @@ export default function WorldPage() {
   const myCosmetics = usePlayerCosmetics(address ?? undefined, refreshKey);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
+  const { battles, loading: battlesLoading } = useActiveBattles(refreshKey);
 
   const claimDrip = useCallback(async () => {
     if (!account) return;
@@ -361,6 +410,58 @@ export default function WorldPage() {
               JOIN MATCH
             </Link>
           </div>
+        </div>
+      )}
+
+      {/* Live Battles */}
+      {kingdom.registered && (
+        <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
+          <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Live Battles</div>
+          {battlesLoading ? (
+            <div className="text-[11px] text-[#7a7060] animate-pulse">Loading...</div>
+          ) : battles.length === 0 ? (
+            <div className="text-[11px] text-[#7a7060]">No active battles</div>
+          ) : (
+            <div className="space-y-2">
+              {battles.map((b) => {
+                const aPct = Math.max(0, Math.min(100, (b.vaultAHp / 50) * 100));
+                const bPct = Math.max(0, Math.min(100, (b.vaultBHp / 50) * 100));
+                return (
+                  <Link
+                    key={b.matchId}
+                    href={`/match-1v1/${b.matchId}/spectate`}
+                    className="block border border-[#3d3428] rounded p-2 hover:border-[#c8a44e]/50 hover:bg-[#252019] transition-all"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-[#7a7060]">#{b.matchId}</span>
+                        <span className="text-xs text-[#d4cfc6]">
+                          {truncAddr(b.playerA)} vs {truncAddr(b.playerB)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-[#7a7060]">R{b.round}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                      <div className="flex-1 h-1.5 bg-[#252019] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${aPct > 50 ? "bg-green-500" : aPct > 20 ? "bg-yellow-500" : "bg-red-500"}`}
+                          style={{ width: `${aPct}%` }}
+                        />
+                      </div>
+                      <div className="flex-1 h-1.5 bg-[#252019] rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${bPct > 50 ? "bg-green-500" : bPct > 20 ? "bg-yellow-500" : "bg-red-500"}`}
+                          style={{ width: `${bPct}%` }}
+                        />
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
 
