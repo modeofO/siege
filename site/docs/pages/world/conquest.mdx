@@ -1,0 +1,38 @@
+---
+title: Conquest
+description: Asynchronous attacks against preset defenses.
+---
+
+# Conquest
+
+*You don't always need to wait for an invitation. Sometimes, you just march.*
+
+Conquest is Siege's asynchronous combat system. Instead of a full multi-round 1v1, you attack a neighbor's non-home parcel in a single transaction, resolved instantly against one of their preset defenses via Cartridge vRF.
+
+## How it works
+
+1. **The attacker allocates** — budget of 10 split across 3 attack pressure points and 3 gate defenses (same shape as a normal round, without repair/nodes/traps). You can optionally commit one ability.
+2. **vRF picks a preset** — the defender has stored preset defense allocations (budget of 12). A verifiable random roll selects which preset is used for resolution.
+3. **Damage resolves** — per-gate damage is computed as `max(attack − defense, 0)` summed both ways. The attacker has 10 HP; the defender has 15 HP. Same gate math as a regular match, and abilities apply with tier-aware effects.
+4. **Outcome** — if the attacker wins (defender HP hits 0 first), they take the parcel. If the defender wins, the parcel stays put.
+
+## Preset defenses
+
+Defenders register preset defense allocations in advance — up to the number of slots their [tier](/world/tiers) allows (1 for Polis, up to 4 for Basileia). Each preset uses a budget of 12, spread across gates.
+
+Presets are stored on-chain and can be updated anytime. The attacker never knows which preset will be selected — the randomness is verified by Cartridge vRF, so neither side can manipulate the outcome.
+
+## Constraints
+
+- You can only attack parcels belonging to a **neighbor** (hex-adjacent to your territory).
+- You **cannot** attack home parcels — those are permanent. Only claimed (non-home) parcels are valid targets.
+- Taking a parcel is subject to your [parcel cap](/world/tiers).
+- Abilities used in conquest must be owned (verified on-chain via `balance_of` on the AbilityToken contract).
+
+## Asymmetry by design
+
+The attacker gets a smaller budget (10 vs 12) and less HP (10 vs 15). Conquest favors the defender — you need a strong allocation or a well-timed ability to overcome the defender's advantage. This keeps territory sticky while still allowing aggressive expansion.
+
+- [Kingdom tiers](/world/tiers) — preset defense slot scaling
+- [Staked matches](/world/staked-matches) — the other path to territory
+- [Abilities](/mechanics/abilities) — what you can bring to a conquest attack

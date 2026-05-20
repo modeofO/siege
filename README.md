@@ -30,6 +30,8 @@ Persistent metagame wrapping 1v1 matches. Register a **Hold** (the in-game name 
 - **Pillage**: match winners become eligible to pillage a losing neighbor's home parcel — siphoning its drip until the pillage expires or breaks.
 - **Reputation**: tracked bracket (Unranked → Bronze → Silver → Gold → Diamond) from win/loss counts + streaks.
 - **Factions**: kingdoms can band into factions (invite / accept / leave) for social play.
+- **Spectator mode**: live match viewing at `/match-1v1/{id}/spectate` — dual health bars, round counter, auto-refresh.
+- **Cosmetics**: equippable hold crests (ArcaneSeal) and parcel skins (WardGlyph) via the Forge (`/forge`).
 
 ### Frontend terminology
 
@@ -47,7 +49,7 @@ Backend models and function names are unchanged.
 
 - **Cairo contracts** (Dojo v1.8.0, cairo 2.13.1) — ECS models + systems in `src/`
 - **Frontend** (Next.js 16, React 19, Tailwind 4, Starknet.js v8) in `frontend/`
-- **Torii indexer** — GraphQL/SQL over world state (hosted on Slot for Sepolia)
+- **Torii indexer** — SQL + gRPC over world state (hosted on Slot for Sepolia)
 - **Cartridge Controller** — session-based gasless tx via paymaster on Sepolia
 - **AbilityToken** (ERC-1155) — standalone Starknet contract in `src/tokens/`, fully on-chain SVG metadata
 - **Resource tokens** (6 ERC-20) — paired per resource node
@@ -66,13 +68,13 @@ siege/
 │   ├── models/                 # Dojo ECS models (match state, parcels, kingdoms, pillage…)
 │   ├── tokens/                 # AbilityToken ERC-1155 + on-chain SVG metadata
 │   ├── utils/hex.cairo         # offset-coord hex math
-│   └── tests/                  # ~159 tests across 19 files
+│   └── tests/                  # ~166 tests across 19 files
 ├── frontend/                   # Next.js app
 │   └── src/
-│       ├── app/                # /, /match-1v1, /craft, /world, /match (hidden legacy)
-│       ├── components/         # HexGrid, AllocationForm1v1, AbilitySelector, FactionPanel…
+│       ├── app/                # /, /match-1v1, /craft, /world, /forge, /match (hidden legacy)
+│       ├── components/         # HexGrid, AllocationForm1v1, AbilitySelector, FactionPanel, ArcaneSeal…
 │       └── lib/                # contracts1v1, conquest, pillage, reputation, tiers, factions…
-├── mcp-server/                 # TypeScript MCP server (read-only tools)
+├── mcp-server-2/               # TypeScript MCP server (47 tools — read + write via Cartridge session)
 ├── scripts/                    # local-dev.sh, deploy scripts, siege-cli/, test bots
 ├── docs/                       # specs + implementation plans under superpowers/
 ├── skill/SKILL.md              # in-depth development skill
@@ -121,7 +123,7 @@ Network mode is controlled by `NEXT_PUBLIC_NETWORK`:
 ### Tests
 
 ```bash
-sozo test                                   # ~159 tests
+sozo test                                   # ~166 tests
 docker compose run --rm builder sozo test   # via Docker (ships sozo 1.8.6)
 ```
 
@@ -227,17 +229,14 @@ Tokens IDs 1–10 on `AbilityToken`: IDs 1–5 are T1, IDs 6–10 are T2 (same 5
 
 ## MCP Server
 
-`mcp-server/` exposes read-only Siege game-state tools over the Model Context Protocol — move building, state reads, hash helpers. It never touches private keys; agents pair it with a separate Starknet MCP (e.g. `starknet-agentic`) for signing and tx submission.
+`mcp-server-2/` exposes 47 Siege tools over the Model Context Protocol — read tools for match state, world state, kingdom, reputation, factions, and abilities; write tools for committing, revealing, resolving, staking, settling, conquest, pillage, and faction management. The server holds a Cartridge session key and submits transactions on-chain itself.
 
 ```bash
-cd mcp-server && npm install && npm run build && npm start
+cd mcp-server-2 && pnpm install && pnpm run build
+claude mcp add siege -- node /path/to/siege/mcp-server-2/dist/index.js
 ```
 
-Env:
-- `STARKNET_RPC_URL=http://localhost:5050`
-- `WORLD_ADDRESS=…`
-- `COMMIT_REVEAL_ADDRESS=…`
-- `TORII_URL=http://localhost:8080` (optional, preferred for reads)
+First run prints a Cartridge auth URL — approve once and the session persists to `.cartridge/`. Read tools work immediately; write tools wait on session approval. Contract addresses come from the Dojo manifest, so session policy and tx targets always agree.
 
 ### Ask Torii (remote MCP)
 
@@ -272,7 +271,7 @@ npx tsx siege-cli.ts --match <id> --json \
 
 ## Open Work
 
-Active playtest bugs and upcoming features live as GitHub issues #1–#10 on `modeofO/siege`. Issue #10 is the "dogfood the stack" meta-audit, blocked on the others. Check issues before starting new work.
+Active bugs and upcoming features are tracked as GitHub issues on `modeofO/siege` (currently up to #42). Check the issue list for priorities before starting new work.
 
 ## License
 

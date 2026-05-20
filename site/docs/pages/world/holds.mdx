@@ -1,0 +1,39 @@
+---
+title: Your Hold
+description: Registering a Hold, home parcels, and resource drip.
+---
+
+# Your Hold
+
+*Three walls. Three hearths. This is where your campaign begins.*
+
+A Hold is your home base in The Marches — three permanent parcels on the hex grid that can never be taken from you. Everything else in the world layer builds from here.
+
+## Registering
+
+From [The Marches](/world/overview) page, connect your wallet and click **CLAIM YOUR HOLD**. Registration picks three unclaimed parcels on the map — one Forge, one Quarry, one Grove — and assigns them to you as your home parcels. You choose the types; the map chooses the positions.
+
+Registration is free (gasless via your Controller session) and permanent. Once claimed, your Hold is yours.
+
+## Home parcels
+
+Your three home parcels are special:
+
+- **Permanent.** They cannot be conquered or taken by another player.
+- **Typed.** One Forge (mints IRON + LINEN), one Quarry (STONE + WOOD), one Grove (EMBER + SEEDS).
+- **Drip source.** You call `claim_drip` to harvest resources from every parcel you own, including homes.
+- **Pillageable.** An opponent who defeats you in a staked match and shares a border can [pillage](/world/pillaging) your home — siphoning its drip temporarily. You don't lose the parcel, but you lose its income until the pillage expires or you break it.
+
+## Claiming resources
+
+Every parcel you own generates resource tokens on a cooldown. Click **Claim Resources** on The Marches page to mint them all at once. Each Forge parcel mints 1 IRON + 1 LINEN, each Quarry mints 1 STONE + 1 WOOD, each Grove mints 1 EMBER + 1 SEEDS.
+
+Home parcels that are currently under active [pillage](/world/pillaging) are skipped — the pillager claims that drip instead.
+
+## Growing your territory
+
+Beyond your three homes, you can claim additional parcels by winning [staked matches](/world/staked-matches). After settling a match win, you may claim one unclaimed parcel adjacent to any of your existing territory. The number of extra parcels you can hold is capped by your [kingdom tier](/world/tiers).
+
+- [Kingdom tiers](/world/tiers) — how wins unlock higher parcel caps
+- [Staked matches](/world/staked-matches) — the path to new territory
+- [Pillaging](/world/pillaging) — what happens when an enemy targets your home

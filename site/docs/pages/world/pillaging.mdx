@@ -1,0 +1,42 @@
+---
+title: Pillaging
+description: Siphoning resources from a defeated neighbor's home.
+---
+
+# Pillaging
+
+*You can't take their home. But you can make sure it works for you instead.*
+
+Pillaging lets a match winner siphon resource drip from a defeated opponent's home parcel. It's temporary economic pressure — the target keeps the parcel but loses its income until the pillage expires or breaks.
+
+## How pillaging starts
+
+After settling a [staked match](/world/staked-matches) win, the winner gains **pillage eligibility** against the loser — but only if the two players share an adjacent border (your territory is hex-adjacent to one of the loser's home parcels).
+
+The winner calls `initiate_pillage` targeting one of the loser's home parcels. This creates an active pillage with a start time and expiration.
+
+## What it does
+
+While a home parcel is under active pillage:
+
+- The **owner's** `claim_drip` skips that parcel — they get no resources from it.
+- The **pillager** calls `claim_pillage_drip` to harvest the drip instead — receiving the parcel's paired resource tokens.
+
+The owner still owns the parcel. It's still their home. They just can't profit from it until the pillage ends.
+
+## How pillaging ends
+
+A pillage ends in one of two ways:
+
+- **Expiration.** Every pillage has an `expires_at` timestamp. Once it passes, the pillage ends automatically and the owner's drip resumes.
+- **Breaking it.** If the target wins a staked match against the pillager, the active pillage breaks immediately. Winning back is the fastest way to restore your income.
+
+## The pressure it creates
+
+Pillaging is the punishment layer of The Marches. Losing a match near your border means your opponent can leech your income — and you have to either wait it out or fight back and win. It makes border disputes personal and gives losing a staked match real economic teeth beyond just losing the escrowed abilities.
+
+Pillage eligibility is single-use and expires, so a single match win doesn't grant indefinite pillage access.
+
+- [Staked matches](/world/staked-matches) — how pillage eligibility is earned
+- [Your Hold](/world/holds) — how home parcels and drip work
+- [Reputation](/world/reputation) — the record that follows you

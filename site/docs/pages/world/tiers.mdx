@@ -1,0 +1,43 @@
+---
+title: Kingdom tiers
+description: Progressing from Polis to Basileia.
+---
+
+# Kingdom tiers
+
+*Stone by stone, siege by siege, your Hold grows into something that commands respect on the map.*
+
+Every Hold starts at the lowest tier and advances by accumulating match wins. Each tier unlocks mechanical advantages — more ability slots in staked matches, more parcels to hold, and more preset defenses for conquest.
+
+## The four tiers
+
+| Tier | Name | Wins required | Ability slots | Parcel cap | Preset defenses |
+|------|------|---------------|---------------|------------|-----------------|
+| 0 | **Polis** | 0 | 1 | 2 | 1 |
+| 1 | **Strategos** | 10 | 2 | 5 | 2 |
+| 2 | **Hegemonia** | 30 | 3 | 8 | 3 |
+| 3 | **Basileia** | 60 | 4 | 12 | 4 |
+
+The parcel cap is *in addition to* your 3 permanent home parcels. A Strategos can hold up to 8 total parcels (3 homes + 5 claimed).
+
+## Upgrading
+
+Tier upgrades are not automatic — once you've accumulated enough wins, you call `upgrade_kingdom` to advance. This is an explicit step so you control when the upgrade happens.
+
+Wins are cumulative and permanent. You never lose tier progress, even if you lose matches afterward. Your Hold might lose territory, abilities, or income to pillage, but its tier never drops.
+
+## What each unlock means
+
+**Ability slots** determine how many [abilities](/mechanics/abilities) you can stake in a [staked match](/world/staked-matches). A Polis player brings 1 ability; a Basileia brings 4. More slots means more tactical options — and more at risk if you lose.
+
+**Parcel cap** limits how much territory you can hold beyond your 3 homes. Expanding territory means more resource [drip](/world/holds), more border pressure on neighbors, and more targets for [conquest](/world/conquest).
+
+**Preset defenses** are stored defensive allocations used in [conquest](/world/conquest). Higher-tier players can register more presets, making their territory harder to attack asynchronously.
+
+## Pace of progression
+
+Strategos (10 wins) is reachable in a focused first week. Hegemonia (30 wins) takes sustained play over weeks. Basileia (60 wins) is the long-term target — a mark of a committed commander.
+
+- [Staked matches](/world/staked-matches) — how wins count
+- [Conquest](/world/conquest) — why preset defense slots matter
+- [Reputation](/world/reputation) — the other axis of progression

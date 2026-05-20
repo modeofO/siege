@@ -45,6 +45,19 @@ export default defineConfig({
       ],
     },
     {
+      text: 'The Marches',
+      items: [
+        { text: 'Overview', link: '/world/overview' },
+        { text: 'Your Hold', link: '/world/holds' },
+        { text: 'Kingdom tiers', link: '/world/tiers' },
+        { text: 'Staked matches', link: '/world/staked-matches' },
+        { text: 'Conquest', link: '/world/conquest' },
+        { text: 'Pillaging', link: '/world/pillaging' },
+        { text: 'Reputation', link: '/world/reputation' },
+        { text: 'Factions', link: '/world/factions' },
+      ],
+    },
+    {
       text: 'Glossary',
       link: '/glossary',
     },
