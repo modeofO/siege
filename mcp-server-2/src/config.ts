@@ -31,6 +31,7 @@ export interface Config {
   abilityTokenAddress: string | null;
   resourceTokens: ResourceTokenAddresses;
   agentPromptPath: string;
+  frontendUrl: string;
 }
 
 export interface DojoManifest {
@@ -105,5 +106,6 @@ export function loadConfig(): Config {
     abilityTokenAddress: process.env.ABILITY_TOKEN_ADDRESS ?? null,
     resourceTokens,
     agentPromptPath: fromRoot("agent-prompt.md"),
+    frontendUrl: process.env.SIEGE_FRONTEND_URL ?? "https://localhost:3000",
   };
 }
