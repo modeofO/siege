@@ -532,6 +532,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         modifiers,
         modifier_details: describeModifiers(modifiers),
         nodes: nodes.map((n) => ({ index: n.node_index, owner: n.owner })),
+        spectate_url: `${ctx.config.frontendUrl}/match-1v1/${match_id}/spectate`,
       };
     },
   );
@@ -1158,6 +1159,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         match_id,
         opponent,
         abilities,
+        spectate_url: match_id !== null ? `${ctx.config.frontendUrl}/match-1v1/${match_id}/spectate` : null,
         warning:
           match_id === null
             ? "match_id not yet indexed by Torii — query siege_get_staked_match once it appears"
@@ -1517,12 +1519,13 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       const match_id = await ctx.state.findLatestMatchForPlayers(player_a, player_b);
       if (match_id !== null) ctx.watchMatch(match_id);
       return match_id !== null
-        ? { tx_hash: tx, match_id, player_a, player_b }
+        ? { tx_hash: tx, match_id, player_a, player_b, spectate_url: `${ctx.config.frontendUrl}/match-1v1/${match_id}/spectate` }
         : {
             tx_hash: tx,
             match_id: null,
             player_a,
             player_b,
+            spectate_url: null,
             warning: "match_id not yet indexed by Torii — query siege_get_match_state by id once it appears",
           };
     },
