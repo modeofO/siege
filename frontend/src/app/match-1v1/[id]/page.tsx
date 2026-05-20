@@ -400,7 +400,8 @@ export default function Match1v1Page() {
     }
 
     const currentRound = state.round;
-    console.log(`[auto-resolve] elected=true, round=${currentRound}`);
+    const delay = [2000, 4000, 6000, 10000, 15000][resolveRetryCount] ?? 15000;
+    console.log(`[auto-resolve] elected=true, round=${currentRound}, attempt=${resolveRetryCount}, delay=${delay}ms`);
 
     const timer = setTimeout(() => {
       const acc = accountRef.current;
@@ -408,23 +409,49 @@ export default function Match1v1Page() {
       if (!acc || !curState || curState.round !== currentRound) return;
       (async () => {
         try {
+          const rows = await toriiSql<{ reveal_count: unknown }>(
+            `SELECT reveal_count FROM "siege_dojo-RoundMoves1v1" WHERE match_id = ${sqlInt(matchId)} AND round = ${sqlInt(currentRound)}`,
+          );
+          const onChainReveals = rows.length > 0 ? toNum(rows[0].reveal_count) : 0;
+          if (onChainReveals < 2) {
+            console.log(`[auto-resolve] Torii SQL reveal_count=${onChainReveals}, deferring`);
+            autoResolveLock.current = false;
+            if (resolveRetryCount < 4) setResolveRetryCount((c) => c + 1);
+            return;
+          }
+        } catch {
+          // SQL check failed — proceed with resolve attempt anyway
+        }
+
+        try {
           await resolveRound1v1(acc, matchId);
           console.log("[auto-resolve] resolve_round submitted");
           setAutoResolveError("");
         } catch (e) {
           const msg = extractErrorMsg(e);
-          if (msg.includes("Not all revealed") || msg.includes("4e6f7420616c6c2072657665616c6564")) {
-            console.log("[auto-resolve] round already resolved or advanced");
+          const isTransient =
+            msg.includes("Not all revealed") ||
+            msg.includes("4e6f7420616c6c2072657665616c6564") ||
+            msg.includes("not fulfilled") ||
+            msg.includes("6e6f742066756c66696c6c6564");
+          if (isTransient && resolveRetryCount < 4) {
+            console.log(`[auto-resolve] transient failure, retry ${resolveRetryCount + 1}/4`);
+            autoResolveLock.current = false;
+            setResolveRetryCount((c) => c + 1);
+          } else if (isTransient) {
+            console.log("[auto-resolve] retries exhausted, waiting for opponent or manual resolve");
           } else {
             console.error("[auto-resolve] failed:", msg);
             setAutoResolveError(msg);
-            setResolveRetryCount((c) => c + 1);
-            autoResolveLock.current = false;
+            if (resolveRetryCount < 4) {
+              setResolveRetryCount((c) => c + 1);
+              autoResolveLock.current = false;
+            }
           }
         }
         void refreshRef.current();
       })();
-    }, 0);
+    }, delay);
 
     return () => clearTimeout(timer);
     // Intentionally narrow deps — state/refresh accessed via refs so
