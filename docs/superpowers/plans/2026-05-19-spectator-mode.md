@@ -506,7 +506,7 @@ function useActiveBattles(refreshKey: number): { battles: ActiveBattle[]; loadin
     let cancelled = false;
     const fetchBattles = async () => {
       const rows = await toriiSql<Record<string, unknown>>(
-        `SELECT match_id, player_a, player_b, current_round, vault_a_hp, vault_b_hp, status FROM "siege_dojo-MatchState1v1" WHERE status = 1 ORDER BY match_id DESC LIMIT 20`
+        `SELECT match_id, player_a, player_b, current_round, vault_a_hp, vault_b_hp, status FROM "siege_dojo-MatchState1v1" WHERE status = 'Active' ORDER BY match_id DESC LIMIT 20`
       );
       if (cancelled) return;
       setBattles(
