@@ -33,6 +33,7 @@ pub mod tokens;
 
 pub mod utils {
     pub mod hex;
+    pub mod tile_graph;
 }
 
 pub mod systems {
@@ -70,4 +71,5 @@ pub mod tests {
     pub mod test_ability_tiers;
     pub mod test_pillaging;
     pub mod test_factions;
+    pub mod test_tile_graph;
 }
