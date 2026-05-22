@@ -68,7 +68,7 @@ function generateSeed(radius: number): Tile[] {
     });
   }
 
-  // Additional frontier tiles — 16 more tiles around the perimeter
+  // Frontier ring 1 — 16 tiles (2 per sector)
   for (let i = 0; i < 16; i++) {
     const angle = (i * PI) / 8;
     const r = radius;
@@ -89,6 +89,30 @@ function generateSeed(radius: number): Tile[] {
       ],
       center: [cx, cy],
       sector,
+      zone: 2, // frontier
+    });
+  }
+
+  // Frontier ring 2 — 8 more tiles (1 per sector, at wider radius)
+  for (let i = 0; i < 8; i++) {
+    const angle = (i * PI) / 4 + PI / 8;
+    const r = radius * 1.2;
+    const size = radius * 0.2;
+
+    const cx = r * Math.cos(angle);
+    const cy = r * Math.sin(angle);
+
+    tiles.push({
+      id: id++,
+      shape: 0,
+      vertices: [
+        [cx - size, cy - size],
+        [cx + size, cy - size],
+        [cx + size, cy + size],
+        [cx - size, cy + size],
+      ],
+      center: [cx, cy],
+      sector: i,
       zone: 2, // frontier
     });
   }

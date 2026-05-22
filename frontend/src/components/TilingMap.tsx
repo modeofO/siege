@@ -5,6 +5,9 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import { OrbitControls } from "@react-three/drei";
 import * as THREE from "three";
 import type { ParcelData, TileAdjacencyData, WorldFoldState } from "@/lib/worldState";
+import tileGeometry from "@/lib/tileGeometry.json";
+
+const SCALE = 1 / 25;
 
 const TYPE_COLORS: Record<number, string> = {
   0: "#c84a32", // Forge — warm red
@@ -21,13 +24,17 @@ interface TilingMapProps {
   onTileClick?: (tileId: number) => void;
 }
 
+type TileGeo = (typeof tileGeometry)[number];
+
 function TileMesh({
   parcel,
+  geo,
   isOwned,
   foldState,
   onClick,
 }: {
   parcel: ParcelData;
+  geo: TileGeo;
   isOwned: boolean;
   foldState: WorldFoldState;
   onClick: () => void;
@@ -35,22 +42,27 @@ function TileMesh({
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
 
-  const position = useMemo(() => {
-    const angle = (parcel.sectorId / 8) * Math.PI * 2 + (parcel.tileId * 0.1);
-    const radius = parcel.zone === 0 ? 2 : parcel.zone === 1 ? 5 : 8;
-    const jitter = (parcel.tileId % 7) * 0.3;
-    return new THREE.Vector3(
-      (radius + jitter) * Math.cos(angle),
-      0,
-      (radius + jitter) * Math.sin(angle),
-    );
-  }, [parcel]);
+  const geometry = useMemo(() => {
+    const verts = geo.vertices;
+    const cx = geo.center[0];
+    const cy = geo.center[1];
 
-  const foldedPosition = useMemo(() => {
-    if (!foldState.isWorldFolded) return position;
-    const bendAmount = Math.abs(position.x) * 0.15;
-    return new THREE.Vector3(position.x, bendAmount, position.z);
-  }, [position, foldState.isWorldFolded]);
+    const shape = new THREE.Shape();
+    shape.moveTo((verts[0][0] - cx) * SCALE, (verts[0][1] - cy) * SCALE);
+    for (let i = 1; i < verts.length; i++) {
+      shape.lineTo((verts[i][0] - cx) * SCALE, (verts[i][1] - cy) * SCALE);
+    }
+    shape.closePath();
+    return new THREE.ExtrudeGeometry(shape, { depth: 0.08, bevelEnabled: false });
+  }, [geo]);
+
+  const position = useMemo(() => {
+    const x = geo.center[0] * SCALE;
+    const z = geo.center[1] * SCALE;
+    if (!foldState.isWorldFolded) return new THREE.Vector3(x, 0, z);
+    const bendAmount = Math.abs(x) * 0.15;
+    return new THREE.Vector3(x, bendAmount, z);
+  }, [geo, foldState.isWorldFolded]);
 
   const color = useMemo(() => {
     if (parcel.isStranded) return "#666";
@@ -65,24 +77,11 @@ function TileMesh({
     }
   });
 
-  const geometry = useMemo(() => {
-    if (parcel.tileShape === 0) {
-      return new THREE.BoxGeometry(0.9, 0.1, 0.9);
-    }
-    // Rhombus: 45° rotated quad
-    const shape = new THREE.Shape();
-    shape.moveTo(0, -0.5);
-    shape.lineTo(0.35, 0);
-    shape.lineTo(0, 0.5);
-    shape.lineTo(-0.35, 0);
-    shape.closePath();
-    return new THREE.ExtrudeGeometry(shape, { depth: 0.1, bevelEnabled: false });
-  }, [parcel.tileShape]);
-
   return (
     <mesh
       ref={meshRef}
-      position={foldedPosition}
+      position={position}
+      rotation={[-Math.PI / 2, 0, 0]}
       geometry={geometry}
       onClick={onClick}
       onPointerOver={() => setHovered(true)}
@@ -99,8 +98,64 @@ function TileMesh({
   );
 }
 
-export function TilingMap({ parcels, adjacency: _adjacency, foldState, playerAddress, onTileClick }: TilingMapProps) {
+function AdjacencyLines({
+  adjacency,
+}: {
+  adjacency: TileAdjacencyData[];
+}) {
+  const geoMap = useMemo(() => {
+    const m = new Map<number, TileGeo>();
+    for (const g of tileGeometry) m.set(g.id, g);
+    return m;
+  }, []);
+
+  const lineGeometry = useMemo(() => {
+    const points: THREE.Vector3[] = [];
+    const seen = new Set<string>();
+
+    for (const adj of adjacency) {
+      const key =
+        adj.tileId < adj.neighborTileId
+          ? `${adj.tileId}-${adj.neighborTileId}`
+          : `${adj.neighborTileId}-${adj.tileId}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+
+      const g1 = geoMap.get(adj.tileId);
+      const g2 = geoMap.get(adj.neighborTileId);
+      if (!g1 || !g2) continue;
+
+      points.push(
+        new THREE.Vector3(g1.center[0] * SCALE, 0.01, g1.center[1] * SCALE),
+        new THREE.Vector3(g2.center[0] * SCALE, 0.01, g2.center[1] * SCALE),
+      );
+    }
+
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    return geo;
+  }, [adjacency, geoMap]);
+
+  return (
+    <lineSegments geometry={lineGeometry}>
+      <lineBasicMaterial color="#555" transparent opacity={0.3} />
+    </lineSegments>
+  );
+}
+
+export function TilingMap({
+  parcels,
+  adjacency,
+  foldState,
+  playerAddress,
+  onTileClick,
+}: TilingMapProps) {
   const addr = playerAddress?.toLowerCase();
+
+  const geoMap = useMemo(() => {
+    const m = new Map<number, TileGeo>();
+    for (const g of tileGeometry) m.set(g.id, g);
+    return m;
+  }, []);
 
   return (
     <Canvas
@@ -114,15 +169,22 @@ export function TilingMap({ parcels, adjacency: _adjacency, foldState, playerAdd
         color={foldState.isWorldFolded ? "#ffaa44" : "#ffffff"}
       />
 
-      {parcels.map((parcel) => (
-        <TileMesh
-          key={parcel.tileId}
-          parcel={parcel}
-          isOwned={addr ? parcel.owner.toLowerCase() === addr : false}
-          foldState={foldState}
-          onClick={() => onTileClick?.(parcel.tileId)}
-        />
-      ))}
+      <AdjacencyLines adjacency={adjacency} />
+
+      {parcels.map((parcel) => {
+        const geo = geoMap.get(parcel.tileId);
+        if (!geo) return null;
+        return (
+          <TileMesh
+            key={parcel.tileId}
+            parcel={parcel}
+            geo={geo}
+            isOwned={addr ? parcel.owner.toLowerCase() === addr : false}
+            foldState={foldState}
+            onClick={() => onTileClick?.(parcel.tileId)}
+          />
+        );
+      })}
 
       <OrbitControls
         maxPolarAngle={Math.PI / 2.5}
