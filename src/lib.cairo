@@ -72,4 +72,5 @@ pub mod tests {
     pub mod test_pillaging;
     pub mod test_factions;
     pub mod test_tile_graph;
+    pub mod test_fold;
 }

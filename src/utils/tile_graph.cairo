@@ -24,7 +24,7 @@ pub fn get_neighbors(world: @dojo::world::WorldStorage, tile_id: u32) -> Array<u
     let mut i: u8 = 0;
     while i < MAX_EDGES {
         let adj: TileAdjacency = world.read_model((tile_id, i));
-        if adj.neighbor_tile_id != NO_NEIGHBOR && adj.neighbor_tile_id != 0 {
+        if adj.neighbor_tile_id != NO_NEIGHBOR {
             neighbors.append(adj.neighbor_tile_id);
         }
         i += 1;

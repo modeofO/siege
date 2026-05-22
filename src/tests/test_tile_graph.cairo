@@ -25,6 +25,17 @@ mod tests {
 
         // Create a small graph: 4 tiles in a line
         // Tile 0 -- Tile 1 -- Tile 2 -- Tile 3
+        // Pre-fill all edges with NO_NEIGHBOR sentinel (mirrors initialize_world)
+        let mut t: u32 = 0;
+        while t < 4 {
+            let mut e: u8 = 0;
+            while e < 4 {
+                world.write_model_test(@TileAdjacency { tile_id: t, edge_index: e, neighbor_tile_id: 0xFFFFFFFF });
+                e += 1;
+            };
+            t += 1;
+        };
+        // Write actual adjacency
         world.write_model_test(@TileAdjacency { tile_id: 0, edge_index: 0, neighbor_tile_id: 1 });
         world.write_model_test(@TileAdjacency { tile_id: 1, edge_index: 0, neighbor_tile_id: 0 });
         world.write_model_test(@TileAdjacency { tile_id: 1, edge_index: 1, neighbor_tile_id: 2 });

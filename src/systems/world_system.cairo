@@ -239,6 +239,16 @@ pub mod world_system {
                     is_home: false,
                     is_stranded: false,
                 });
+                // Pre-fill all 4 edge slots with NO_NEIGHBOR sentinel
+                let mut e: u8 = 0;
+                while e < 4 {
+                    world.write_model(@TileAdjacency {
+                        tile_id: i,
+                        edge_index: e,
+                        neighbor_tile_id: 0xFFFFFFFF,
+                    });
+                    e += 1;
+                };
                 i += 1;
             };
 
@@ -299,6 +309,16 @@ pub mod world_system {
                     is_home: false,
                     is_stranded: false,
                 });
+                // Pre-fill all 4 edge slots with NO_NEIGHBOR sentinel
+                let mut e: u8 = 0;
+                while e < 4 {
+                    world.write_model(@TileAdjacency {
+                        tile_id: tid,
+                        edge_index: e,
+                        neighbor_tile_id: 0xFFFFFFFF,
+                    });
+                    e += 1;
+                };
                 i += 1;
             };
 
@@ -791,25 +811,25 @@ pub mod world_system {
 
             world.write_model(@stakes);
 
-            // Fold probability check via VRF
-            let vrf = IVrfProviderDispatcher {
-                contract_address: 0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f
-                    .try_into()
-                    .unwrap(),
-            };
-            let random: felt252 = vrf.consume_random(Source::Nonce(get_caller_address()));
-            let roll: u8 = (Into::<felt252, u256>::into(random) % 100).try_into().unwrap();
+            // Fold probability check via VRF (only when VRF provider is configured)
+            if rc.vrf_provider.is_non_zero() {
+                let vrf = IVrfProviderDispatcher {
+                    contract_address: rc.vrf_provider,
+                };
+                let random: felt252 = vrf.consume_random(Source::Nonce(get_caller_address()));
+                let roll: u8 = (Into::<felt252, u256>::into(random) % 100).try_into().unwrap();
 
-            if roll >= FOLD_THRESHOLD_NONE {
-                if roll < FOLD_THRESHOLD_SECTOR {
-                    // Sector fold — axis from random bits
-                    let axis: u8 = ((Into::<felt252, u256>::into(random) / 100) % 4)
-                        .try_into()
-                        .unwrap();
-                    self.execute_sector_fold(axis, match_id);
-                } else {
-                    // World fold toggle
-                    self.toggle_world_fold(match_id);
+                if roll >= FOLD_THRESHOLD_NONE {
+                    if roll < FOLD_THRESHOLD_SECTOR {
+                        // Sector fold — axis from random bits
+                        let axis: u8 = ((Into::<felt252, u256>::into(random) / 100) % 4)
+                            .try_into()
+                            .unwrap();
+                        self.execute_sector_fold(axis, match_id);
+                    } else {
+                        // World fold toggle
+                        self.toggle_world_fold(match_id);
+                    }
                 }
             }
         }
