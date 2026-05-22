@@ -1390,7 +1390,7 @@ pub mod world_system {
                     let mut e: u8 = 0;
                     while e < 4 {
                         let adj: TileAdjacency = world.read_model((p, e));
-                        if adj.neighbor_tile_id != 0xFFFFFFFF && adj.neighbor_tile_id != 0 {
+                        if adj.neighbor_tile_id != 0xFFFFFFFF {
                             let neighbor: Parcel = world.read_model(adj.neighbor_tile_id);
                             if neighbor.sector_id == sector_b1 {
                                 parcel.sector_id = sector_b2;
@@ -1403,7 +1403,7 @@ pub mod world_system {
                     let mut e: u8 = 0;
                     while e < 4 {
                         let adj: TileAdjacency = world.read_model((p, e));
-                        if adj.neighbor_tile_id != 0xFFFFFFFF && adj.neighbor_tile_id != 0 {
+                        if adj.neighbor_tile_id != 0xFFFFFFFF {
                             let neighbor: Parcel = world.read_model(adj.neighbor_tile_id);
                             if neighbor.sector_id == sector_a1 {
                                 parcel.sector_id = sector_a2;

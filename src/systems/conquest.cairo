@@ -321,9 +321,9 @@ pub mod conquest {
                     atk_g1 = atk_g1 + 1 * fold_mult;
                     atk_g2 = atk_g2 + 1 * fold_mult;
                 } else {
-                    atk_g0 = atk_g0 * 2;
-                    atk_g1 = atk_g1 * 2;
-                    atk_g2 = atk_g2 * 2;
+                    atk_g0 = atk_g0 * 2 * fold_mult;
+                    atk_g1 = atk_g1 * 2 * fold_mult;
+                    atk_g2 = atk_g2 * 2 * fold_mult;
                 }
             }
 
