@@ -24,6 +24,8 @@
     "@cartridge/presets": "^0.5.2",
     "@dojoengine/core": "^1.8.8",
     "@dojoengine/sdk": "^1.9.0",
+    "@react-three/drei": "^10.7.7",
+    "@react-three/fiber": "^9.6.1",
     "@starknet-react/chains": "^5.0.3",
     "@starknet-react/core": "^5.0.3",
     "animejs": "4.4.1",
@@ -32,13 +34,15 @@
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
-    "starknet": "^8.9.2"
+    "starknet": "^8.9.2",
+    "three": "^0.184.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/three": "^0.184.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "eslint-config-prettier": "^10.1.8",
