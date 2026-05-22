@@ -24,12 +24,16 @@ pub mod models {
     pub mod faction_member;
     pub mod faction_invite;
     pub mod player_cosmetics;
+    pub mod tile_adjacency;
+    pub mod sector_environment;
+    pub mod fold_event;
 }
 
 pub mod tokens;
 
 pub mod utils {
     pub mod hex;
+    pub mod tile_graph;
 }
 
 pub mod systems {
@@ -67,4 +71,6 @@ pub mod tests {
     pub mod test_ability_tiers;
     pub mod test_pillaging;
     pub mod test_factions;
+    pub mod test_tile_graph;
+    pub mod test_fold;
 }

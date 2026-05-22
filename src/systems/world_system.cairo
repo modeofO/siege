@@ -2,7 +2,20 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IWorldSystem<T> {
-    fn initialize_world(ref self: T, cols: Array<u16>, rows: Array<u16>);
+    fn initialize_world(
+        ref self: T,
+        tile_shapes: Array<u8>,
+        sector_ids: Array<u8>,
+        zones: Array<u8>,
+        adj_tile_ids: Array<u32>,
+    );
+    fn expand_world(
+        ref self: T,
+        tile_shapes: Array<u8>,
+        sector_ids: Array<u8>,
+        zones: Array<u8>,
+        adj_tile_ids: Array<u32>,
+    );
     fn register_player(ref self: T, home_types: Array<u8>);
     fn set_ability_token(ref self: T, ability_token: ContractAddress);
     fn create_staked_match(ref self: T, opponent: ContractAddress, abilities: Array<u8>) -> u64;
@@ -103,9 +116,28 @@ pub mod world_system {
     use siege_dojo::models::faction_member::FactionMember;
     use siege_dojo::models::faction_invite::FactionInvite;
     use siege_dojo::models::player_cosmetics::PlayerCosmetics;
+    use siege_dojo::models::tile_adjacency::TileAdjacency;
+    use siege_dojo::utils::tile_graph;
+    use siege_dojo::models::fold_event::FoldEvent;
+    use siege_dojo::models::sector_environment::SectorEnvironment;
 
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
     const PILLAGE_WINDOW: u64 = 86400; // 24 hours in seconds
+
+    const FOLD_THRESHOLD_NONE: u8 = 90;   // 0-89 = nothing (90% chance)
+    const FOLD_THRESHOLD_SECTOR: u8 = 97; // 90-96 = sector fold (7% chance)
+    // 97-99 = world fold toggle (3% chance)
+
+    #[starknet::interface]
+    trait IVrfProvider<T> {
+        fn consume_random(ref self: T, source: Source) -> felt252;
+    }
+
+    #[derive(Drop, Copy, Clone, Serde)]
+    enum Source {
+        Nonce: ContractAddress,
+        Salt: felt252,
+    }
 
     // ERC-1155 dispatcher for safe_transfer_from calls
     #[starknet::interface]
@@ -177,8 +209,10 @@ pub mod world_system {
     impl WorldSystemImpl of super::IWorldSystem<ContractState> {
         fn initialize_world(
             ref self: ContractState,
-            cols: Array<u16>,
-            rows: Array<u16>,
+            tile_shapes: Array<u8>,
+            sector_ids: Array<u8>,
+            zones: Array<u8>,
+            adj_tile_ids: Array<u32>,
         ) {
             let mut world = self.world_default();
             assert(
@@ -187,20 +221,47 @@ pub mod world_system {
             );
             let config: WorldConfig = world.read_model(0_u8);
             assert(!config.initialized, 'Already initialized');
-            let n = cols.len();
-            assert(rows.len() == n, 'Array length mismatch');
+
+            let n = tile_shapes.len();
+            assert(sector_ids.len() == n, 'sector_ids length mismatch');
+            assert(zones.len() == n, 'zones length mismatch');
+            assert(adj_tile_ids.len() % 3 == 0, 'adj_tile_ids must be triples');
 
             let mut i: u32 = 0;
             while i < n {
                 world.write_model(@Parcel {
-                    parcel_id: i,
-                    col: *cols.at(i),
-                    row: *rows.at(i),
+                    tile_id: i,
+                    sector_id: *sector_ids.at(i),
+                    tile_shape: *tile_shapes.at(i),
+                    zone: *zones.at(i),
                     parcel_type: 255,
                     owner: 0.try_into().unwrap(),
                     is_home: false,
+                    is_stranded: false,
                 });
+                // Pre-fill all 4 edge slots with NO_NEIGHBOR sentinel
+                let mut e: u8 = 0;
+                while e < 4 {
+                    world.write_model(@TileAdjacency {
+                        tile_id: i,
+                        edge_index: e,
+                        neighbor_tile_id: 0xFFFFFFFF,
+                    });
+                    e += 1;
+                };
                 i += 1;
+            };
+
+            let adj_count = adj_tile_ids.len() / 3;
+            let mut j: u32 = 0;
+            while j < adj_count {
+                let base = j * 3;
+                world.write_model(@TileAdjacency {
+                    tile_id: *adj_tile_ids.at(base),
+                    edge_index: (*adj_tile_ids.at(base + 1)).try_into().unwrap(),
+                    neighbor_tile_id: *adj_tile_ids.at(base + 2),
+                });
+                j += 1;
             };
 
             world.write_model(@WorldConfig {
@@ -208,7 +269,74 @@ pub mod world_system {
                 total_parcels: n,
                 next_parcel_id: n,
                 initialized: true,
+                is_world_folded: false,
+                fold_epoch: 0,
+                total_folds: 0,
             });
+        }
+
+        fn expand_world(
+            ref self: ContractState,
+            tile_shapes: Array<u8>,
+            sector_ids: Array<u8>,
+            zones: Array<u8>,
+            adj_tile_ids: Array<u32>,
+        ) {
+            let mut world = self.world_default();
+            assert(
+                world.dispatcher.is_owner(world.namespace_hash, get_caller_address()),
+                'Not world owner',
+            );
+            let mut config: WorldConfig = world.read_model(0_u8);
+            assert(config.initialized, 'World not initialized');
+
+            let n = tile_shapes.len();
+            assert(sector_ids.len() == n, 'sector_ids length mismatch');
+            assert(zones.len() == n, 'zones length mismatch');
+            assert(adj_tile_ids.len() % 3 == 0, 'adj_tile_ids must be triples');
+
+            let start_id = config.next_parcel_id;
+            let mut i: u32 = 0;
+            while i < n {
+                let tid = start_id + i;
+                world.write_model(@Parcel {
+                    tile_id: tid,
+                    sector_id: *sector_ids.at(i),
+                    tile_shape: *tile_shapes.at(i),
+                    zone: *zones.at(i),
+                    parcel_type: 255,
+                    owner: 0.try_into().unwrap(),
+                    is_home: false,
+                    is_stranded: false,
+                });
+                // Pre-fill all 4 edge slots with NO_NEIGHBOR sentinel
+                let mut e: u8 = 0;
+                while e < 4 {
+                    world.write_model(@TileAdjacency {
+                        tile_id: tid,
+                        edge_index: e,
+                        neighbor_tile_id: 0xFFFFFFFF,
+                    });
+                    e += 1;
+                };
+                i += 1;
+            };
+
+            let adj_count = adj_tile_ids.len() / 3;
+            let mut j: u32 = 0;
+            while j < adj_count {
+                let base = j * 3;
+                world.write_model(@TileAdjacency {
+                    tile_id: *adj_tile_ids.at(base),
+                    edge_index: (*adj_tile_ids.at(base + 1)).try_into().unwrap(),
+                    neighbor_tile_id: *adj_tile_ids.at(base + 2),
+                });
+                j += 1;
+            };
+
+            config.total_parcels += n;
+            config.next_parcel_id = start_id + n;
+            world.write_model(@config);
         }
 
         fn register_player(ref self: ContractState, home_types: Array<u8>) {
@@ -220,122 +348,76 @@ pub mod world_system {
 
             let config: WorldConfig = world.read_model(0_u8);
             assert(config.initialized, 'World not initialized');
-
             let zero_addr: ContractAddress = 0.try_into().unwrap();
 
-            // Spatial starting algorithm (farthest-first anchor, then cluster).
-            //
-            // 1. Collect positions of every already-claimed parcel once.
-            // 2. First home (home_types[0]): pick the unclaimed parcel of that
-            //    type that MAXIMIZES min-distance to any claimed parcel.
-            //    Tie-break: lowest parcel_id (first candidate to reach the max wins,
-            //    since we only update on strict-greater).
-            // 3. Second + third homes: pick the unclaimed parcel of the requested
-            //    type with MINIMUM distance to the first home, so the player's
-            //    three homes cluster. Tie-break: lowest parcel_id.
-            //
-            // Result: new players spawn in the least-crowded region, with their
-            // three homes adjacent enough to form a defensible cluster.
-
-            let mut claimed_cols: Array<u16> = ArrayTrait::new();
-            let mut claimed_rows: Array<u16> = ArrayTrait::new();
-            let mut scan: u32 = 0;
-            while scan < config.total_parcels {
-                let p: Parcel = world.read_model(scan);
-                if p.owner != zero_addr {
-                    claimed_cols.append(p.col);
-                    claimed_rows.append(p.row);
-                }
-                scan += 1;
-            };
-            let n_claimed = claimed_cols.len();
-
-            let first_type = *home_types.at(0);
-            assert(first_type <= 2, 'Invalid parcel type');
-
-            let mut first_home_id: u32 = 0;
-            let mut first_home_col: u16 = 0;
-            let mut first_home_row: u16 = 0;
-            let mut first_home_score: u16 = 0;
-            let mut first_home_found = false;
-
-            let mut p_idx: u32 = 0;
-            while p_idx < config.total_parcels {
-                let parcel: Parcel = world.read_model(p_idx);
-                if parcel.owner == zero_addr {
-                    // Min-distance to any already-claimed parcel (sentinel if empty).
-                    let score: u16 = if n_claimed == 0 {
-                        65535_u16
-                    } else {
-                        let mut min_dist: u16 = 65535_u16;
-                        let mut q: u32 = 0;
-                        while q < n_claimed {
-                            let d = siege_dojo::utils::hex::hex_distance(
-                                parcel.col, parcel.row,
-                                *claimed_cols.at(q), *claimed_rows.at(q),
-                            );
-                            if d < min_dist { min_dist = d; }
-                            q += 1;
-                        };
-                        min_dist
+            // Find the sector with the most unclaimed frontier tiles
+            let mut sector_counts: Array<u32> = array![0, 0, 0, 0, 0, 0, 0, 0];
+            let mut p: u32 = 0;
+            while p < config.total_parcels {
+                let parcel: Parcel = world.read_model(p);
+                if parcel.owner == zero_addr && parcel.zone == 2 {
+                    let sid: u32 = parcel.sector_id.into();
+                    let mut new_counts: Array<u32> = ArrayTrait::new();
+                    let mut s: u32 = 0;
+                    while s < 8 {
+                        if s == sid {
+                            new_counts.append(*sector_counts.at(s) + 1);
+                        } else {
+                            new_counts.append(*sector_counts.at(s));
+                        }
+                        s += 1;
                     };
-
-                    if !first_home_found || score > first_home_score {
-                        first_home_id = p_idx;
-                        first_home_col = parcel.col;
-                        first_home_row = parcel.row;
-                        first_home_score = score;
-                        first_home_found = true;
-                    }
+                    sector_counts = new_counts;
                 }
-                p_idx += 1;
+                p += 1;
             };
-            assert(first_home_found, 'No parcel available for type');
 
+            let mut best_sector: u8 = 0;
+            let mut best_count: u32 = 0;
+            let mut s: u32 = 0;
+            while s < 8 {
+                if *sector_counts.at(s) > best_count {
+                    best_count = *sector_counts.at(s);
+                    best_sector = s.try_into().unwrap();
+                }
+                s += 1;
+            };
+            assert(best_count >= 3, 'Not enough frontier tiles');
+
+            // Pick 3 unclaimed frontier tiles in that sector
             let mut home_ids: Array<u32> = ArrayTrait::new();
-            home_ids.append(first_home_id);
-
-            let mut type_idx: u32 = 1;
+            let mut type_idx: u32 = 0;
             while type_idx < 3 {
                 let wanted_type = *home_types.at(type_idx);
                 assert(wanted_type <= 2, 'Invalid parcel type');
 
-                let mut best_id: u32 = 0;
-                let mut best_dist: u16 = 65535_u16;
                 let mut found = false;
-
-                let mut p: u32 = 0;
-                while p < config.total_parcels {
-                    let parcel: Parcel = world.read_model(p);
-                    if parcel.owner == zero_addr {
-                        let mut already_used = false;
-                        let mut j: u32 = 0;
-                        while j < home_ids.len() {
-                            if *home_ids.at(j) == p {
-                                already_used = true;
-                            }
-                            j += 1;
-                        };
-                        if !already_used {
-                            let d = siege_dojo::utils::hex::hex_distance(
-                                parcel.col, parcel.row,
-                                first_home_col, first_home_row,
-                            );
-                            if !found || d < best_dist {
-                                best_id = p;
-                                best_dist = d;
+                let mut p2: u32 = 0;
+                while p2 < config.total_parcels {
+                    if !found {
+                        let parcel: Parcel = world.read_model(p2);
+                        if parcel.owner == zero_addr && parcel.zone == 2
+                            && parcel.sector_id == best_sector {
+                            let mut already_used = false;
+                            let mut j: u32 = 0;
+                            while j < home_ids.len() {
+                                if *home_ids.at(j) == p2 {
+                                    already_used = true;
+                                }
+                                j += 1;
+                            };
+                            if !already_used {
+                                home_ids.append(p2);
                                 found = true;
                             }
                         }
                     }
-                    p += 1;
+                    p2 += 1;
                 };
-                assert(found, 'No parcel available for type');
-                home_ids.append(best_id);
+                assert(found, 'No tile available');
                 type_idx += 1;
             };
 
-            // Assign home parcels
             let h0 = *home_ids.at(0);
             let h1 = *home_ids.at(1);
             let h2 = *home_ids.at(2);
@@ -728,6 +810,28 @@ pub mod world_system {
             }
 
             world.write_model(@stakes);
+
+            // Fold probability check via VRF (only when VRF provider is configured)
+            if rc.vrf_provider.is_non_zero() {
+                let vrf = IVrfProviderDispatcher {
+                    contract_address: rc.vrf_provider,
+                };
+                let random: felt252 = vrf.consume_random(Source::Nonce(get_caller_address()));
+                let roll: u8 = (Into::<felt252, u256>::into(random) % 100).try_into().unwrap();
+
+                if roll >= FOLD_THRESHOLD_NONE {
+                    if roll < FOLD_THRESHOLD_SECTOR {
+                        // Sector fold — axis from random bits
+                        let axis: u8 = ((Into::<felt252, u256>::into(random) / 100) % 4)
+                            .try_into()
+                            .unwrap();
+                        self.execute_sector_fold(axis, match_id);
+                    } else {
+                        // World fold toggle
+                        self.toggle_world_fold(match_id);
+                    }
+                }
+            }
         }
 
         fn claim_parcel(ref self: ContractState, match_id: u64, parcel_id: u32, parcel_type: u8) {
@@ -758,7 +862,7 @@ pub mod world_system {
             let parcel: Parcel = world.read_model(parcel_id);
             assert(parcel.owner == zero_addr, 'Parcel not unclaimed');
             assert(
-                self.is_adjacent_to_territory(caller, parcel.col, parcel.row),
+                self.is_adjacent_to_territory(caller, parcel_id),
                 'Not adjacent to territory',
             );
 
@@ -791,7 +895,7 @@ pub mod world_system {
             let rc: ResourceConfig = world.read_model(0_u8);
             let amount: u256 = intervals.into();
 
-            // Mint for each home parcel based on its type, skipping actively pillaged ones
+            // Mint for each home parcel based on its type, skipping actively pillaged and stranded ones
             let home_parcels: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
             let mut i: u32 = 0;
             while i < 3 {
@@ -800,7 +904,15 @@ pub mod world_system {
                 let is_pillaged = pillage.active && pillage.expires_at > now;
                 if !is_pillaged {
                     let parcel: Parcel = world.read_model(home_id);
-                    self.mint_parcel_resources(@rc, parcel.parcel_type, caller, amount);
+                    if !parcel.is_stranded {
+                        let zone_mult: u256 = match parcel.zone {
+                            0 => 3, // core
+                            1 => 2, // mid
+                            _ => 1, // frontier
+                        };
+                        let drip_amount: u256 = amount * zone_mult;
+                        self.mint_parcel_resources(@rc, parcel.parcel_type, caller, drip_amount);
+                    }
                 }
                 i += 1;
             };
@@ -827,31 +939,28 @@ pub mod world_system {
 
             // Verify caller still has adjacency to THIS specific home parcel
             assert(
-                self.is_adjacent_to_territory(caller, parcel.col, parcel.row),
+                self.is_adjacent_to_territory(caller, home_parcel_id),
                 'No adjacency to parcel',
             );
 
             // Faction pillage protection — if any faction ally borders the target home parcel, block
             let target_member: FactionMember = world.read_model(parcel.owner);
             if target_member.faction_id != 0 {
-                let config: WorldConfig = world.read_model(0_u8);
-                let mut p_iter: u32 = 0;
+                let neighbors = tile_graph::get_neighbors(@world, home_parcel_id);
+                let mut ni: u32 = 0;
                 let mut protected = false;
-                while p_iter < config.total_parcels {
+                while ni < neighbors.len() {
                     if !protected {
-                        let ally_parcel: Parcel = world.read_model(p_iter);
+                        let nid = *neighbors.at(ni);
+                        let ally_parcel: Parcel = world.read_model(nid);
                         if ally_parcel.owner.is_non_zero() && ally_parcel.owner != parcel.owner {
                             let ally_member: FactionMember = world.read_model(ally_parcel.owner);
                             if ally_member.faction_id == target_member.faction_id {
-                                if siege_dojo::utils::hex::is_neighbor(
-                                    ally_parcel.col, ally_parcel.row, parcel.col, parcel.row
-                                ) {
-                                    protected = true;
-                                }
+                                protected = true;
                             }
                         }
                     }
-                    p_iter += 1;
+                    ni += 1;
                 };
                 assert(!protected, 'Home protected by ally');
             }
@@ -888,7 +997,7 @@ pub mod world_system {
 
             // Lazy adjacency check
             let parcel: Parcel = world.read_model(home_parcel_id);
-            if !self.is_adjacent_to_territory(caller, parcel.col, parcel.row) {
+            if !self.is_adjacent_to_territory(caller, home_parcel_id) {
                 pillage.active = false;
                 world.write_model(@pillage);
                 return;
@@ -1172,36 +1281,23 @@ pub mod world_system {
             }
         }
 
-        /// Find and release the loser's furthest-from-home parcel (becomes unclaimed).
+        /// Release the most recently claimed non-home parcel (highest tile_id among owned non-homes).
         /// If the player only has home parcels, no parcel is released.
         fn release_furthest_parcel(ref self: ContractState, player: ContractAddress) {
             let mut world = self.world_default();
             let mut kingdom: PlayerKingdom = world.read_model(player);
             let config: WorldConfig = world.read_model(0_u8);
-
-            // Get home parcel coordinates
-            let h0: Parcel = world.read_model(kingdom.home_0);
-            let h1: Parcel = world.read_model(kingdom.home_1);
-            let h2: Parcel = world.read_model(kingdom.home_2);
-
-            let mut max_dist: u16 = 0;
-            let mut furthest_id: u32 = 0;
-            let mut found = false;
             let zero_addr: ContractAddress = 0.try_into().unwrap();
+
+            let mut highest_id: u32 = 0;
+            let mut found = false;
 
             let mut p: u32 = 0;
             while p < config.total_parcels {
                 let parcel: Parcel = world.read_model(p);
                 if parcel.owner == player && !parcel.is_home {
-                    // Min distance to any home parcel
-                    let d0 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, h0.col, h0.row);
-                    let d1 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, h1.col, h1.row);
-                    let d2 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, h2.col, h2.row);
-                    let min_d = if d0 < d1 { if d0 < d2 { d0 } else { d2 } } else { if d1 < d2 { d1 } else { d2 } };
-
-                    if min_d > max_dist || !found {
-                        max_dist = min_d;
-                        furthest_id = p;
+                    if !found || p > highest_id {
+                        highest_id = p;
                         found = true;
                     }
                 }
@@ -1209,7 +1305,7 @@ pub mod world_system {
             };
 
             if found {
-                let mut parcel: Parcel = world.read_model(furthest_id);
+                let mut parcel: Parcel = world.read_model(highest_id);
                 parcel.owner = zero_addr;
                 world.write_model(@parcel);
                 kingdom.parcel_count -= 1;
@@ -1218,23 +1314,21 @@ pub mod world_system {
         }
 
         fn is_adjacent_to_territory(
-            self: @ContractState, player: ContractAddress, col: u16, row: u16,
+            self: @ContractState, player: ContractAddress, target_tile_id: u32,
         ) -> bool {
             let world = self.world_default();
-            let config: WorldConfig = world.read_model(0_u8);
-
-            let mut p: u32 = 0;
+            let neighbors = tile_graph::get_neighbors(@world, target_tile_id);
+            let mut i: u32 = 0;
             let mut adjacent = false;
-            while p < config.total_parcels {
+            while i < neighbors.len() {
                 if !adjacent {
-                    let parcel: Parcel = world.read_model(p);
+                    let neighbor_id = *neighbors.at(i);
+                    let parcel: Parcel = world.read_model(neighbor_id);
                     if parcel.owner == player {
-                        if siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, col, row) {
-                            adjacent = true;
-                        }
+                        adjacent = true;
                     }
                 }
-                p += 1;
+                i += 1;
             };
             adjacent
         }
@@ -1253,14 +1347,205 @@ pub mod world_system {
             let mut found = false;
             while i < 3 {
                 if !found {
-                    let home: Parcel = world.read_model(*home_ids.at(i));
-                    if self.is_adjacent_to_territory(pillager, home.col, home.row) {
+                    let home_id = *home_ids.at(i);
+                    if self.is_adjacent_to_territory(pillager, home_id) {
                         found = true;
                     }
                 }
                 i += 1;
             };
             found
+        }
+
+        fn toggle_world_fold(ref self: ContractState, match_id: u64) {
+            let mut world = self.world_default();
+            let mut config: WorldConfig = world.read_model(0_u8);
+            config.is_world_folded = !config.is_world_folded;
+            config.fold_epoch += 1;
+            config.total_folds += 1;
+            world.write_model(@config);
+
+            world.write_model(@FoldEvent {
+                fold_id: config.total_folds,
+                fold_type: 1,
+                axis: 0,
+                trigger_match: match_id,
+                timestamp: get_block_timestamp(),
+            });
+        }
+
+        fn execute_sector_fold(ref self: ContractState, axis: u8, match_id: u64) {
+            let mut world = self.world_default();
+            let config: WorldConfig = world.read_model(0_u8);
+
+            let sector_a1 = axis * 2;
+            let sector_a2 = axis * 2 + 1;
+            let sector_b1 = (axis * 2 + 4) % 8;
+            let sector_b2 = (axis * 2 + 5) % 8;
+
+            let mut p: u32 = 0;
+            while p < config.total_parcels {
+                let mut parcel: Parcel = world.read_model(p);
+                if parcel.sector_id == sector_a1 {
+                    let mut e: u8 = 0;
+                    while e < 4 {
+                        let adj: TileAdjacency = world.read_model((p, e));
+                        if adj.neighbor_tile_id != 0xFFFFFFFF {
+                            let neighbor: Parcel = world.read_model(adj.neighbor_tile_id);
+                            if neighbor.sector_id == sector_b1 {
+                                parcel.sector_id = sector_b2;
+                                world.write_model(@parcel);
+                            }
+                        }
+                        e += 1;
+                    };
+                } else if parcel.sector_id == sector_b1 {
+                    let mut e: u8 = 0;
+                    while e < 4 {
+                        let adj: TileAdjacency = world.read_model((p, e));
+                        if adj.neighbor_tile_id != 0xFFFFFFFF {
+                            let neighbor: Parcel = world.read_model(adj.neighbor_tile_id);
+                            if neighbor.sector_id == sector_a1 {
+                                parcel.sector_id = sector_a2;
+                                world.write_model(@parcel);
+                            }
+                        }
+                        e += 1;
+                    };
+                }
+                p += 1;
+            };
+
+            let mut cfg: WorldConfig = world.read_model(0_u8);
+            cfg.total_folds += 1;
+            world.write_model(@cfg);
+
+            world.write_model(@FoldEvent {
+                fold_id: cfg.total_folds,
+                fold_type: 0,
+                axis,
+                trigger_match: match_id,
+                timestamp: get_block_timestamp(),
+            });
+
+            self.break_pillages_on_fold();
+            self.recompute_stranded_after_fold();
+        }
+
+        fn break_pillages_on_fold(ref self: ContractState) {
+            let mut world = self.world_default();
+            let config: WorldConfig = world.read_model(0_u8);
+
+            let mut p: u32 = 0;
+            while p < config.total_parcels {
+                let parcel: Parcel = world.read_model(p);
+                if parcel.is_home {
+                    let mut pillage: Pillage = world.read_model(p);
+                    if pillage.active {
+                        if !self.is_adjacent_to_territory(pillage.pillager, p) {
+                            pillage.active = false;
+                            world.write_model(@pillage);
+                        }
+                    }
+                }
+                p += 1;
+            };
+        }
+
+        fn recompute_stranded_after_fold(ref self: ContractState) {
+            let mut world = self.world_default();
+            let config: WorldConfig = world.read_model(0_u8);
+            let zero_addr: ContractAddress = 0.try_into().unwrap();
+
+            // Collect all unique owners
+            let mut owners: Array<ContractAddress> = ArrayTrait::new();
+            let mut p: u32 = 0;
+            while p < config.total_parcels {
+                let parcel: Parcel = world.read_model(p);
+                if parcel.owner != zero_addr {
+                    let mut already = false;
+                    let mut o: u32 = 0;
+                    while o < owners.len() {
+                        if *owners.at(o) == parcel.owner { already = true; }
+                        o += 1;
+                    };
+                    if !already { owners.append(parcel.owner); }
+                }
+                p += 1;
+            };
+
+            // For each owner: BFS from homes, mark unreached tiles as stranded
+            let mut oi: u32 = 0;
+            while oi < owners.len() {
+                let owner = *owners.at(oi);
+                let kingdom: PlayerKingdom = world.read_model(owner);
+                if kingdom.registered {
+                    let member: FactionMember = world.read_model(owner);
+
+                    // BFS queue: start from homes
+                    let mut visited: Array<u32> = ArrayTrait::new();
+                    let mut queue: Array<u32> = ArrayTrait::new();
+                    queue.append(kingdom.home_0);
+                    queue.append(kingdom.home_1);
+                    queue.append(kingdom.home_2);
+                    visited.append(kingdom.home_0);
+                    visited.append(kingdom.home_1);
+                    visited.append(kingdom.home_2);
+
+                    let mut qi: u32 = 0;
+                    while qi < queue.len() {
+                        let current = *queue.at(qi);
+                        let neighbors = tile_graph::get_neighbors(@world, current);
+                        let mut ni: u32 = 0;
+                        while ni < neighbors.len() {
+                            let nid = *neighbors.at(ni);
+                            let mut already_visited = false;
+                            let mut vi: u32 = 0;
+                            while vi < visited.len() {
+                                if *visited.at(vi) == nid { already_visited = true; }
+                                vi += 1;
+                            };
+                            if !already_visited {
+                                let np: Parcel = world.read_model(nid);
+                                let is_own = np.owner == owner;
+                                let is_faction_bridge = if member.faction_id != 0 {
+                                    let nm: FactionMember = world.read_model(np.owner);
+                                    nm.faction_id == member.faction_id
+                                } else {
+                                    false
+                                };
+                                if is_own || is_faction_bridge {
+                                    visited.append(nid);
+                                    queue.append(nid);
+                                }
+                            }
+                            ni += 1;
+                        };
+                        qi += 1;
+                    };
+
+                    // Mark tiles: owned by this player but not in visited = stranded
+                    let mut p2: u32 = 0;
+                    while p2 < config.total_parcels {
+                        let mut parcel: Parcel = world.read_model(p2);
+                        if parcel.owner == owner && !parcel.is_home {
+                            let mut in_visited = false;
+                            let mut vi2: u32 = 0;
+                            while vi2 < visited.len() {
+                                if *visited.at(vi2) == p2 { in_visited = true; }
+                                vi2 += 1;
+                            };
+                            let was_stranded = parcel.is_stranded;
+                            parcel.is_stranded = !in_visited;
+                            if parcel.is_stranded != was_stranded {
+                                world.write_model(@parcel);
+                            }
+                        }
+                        p2 += 1;
+                    };
+                }
+                oi += 1;
+            };
         }
     }
 }

@@ -65,6 +65,9 @@ mod tests {
     use siege_dojo::models::parcel::{Parcel, m_Parcel};
     use siege_dojo::models::player_kingdom::{PlayerKingdom, m_PlayerKingdom};
     use siege_dojo::models::world_config::{WorldConfig, m_WorldConfig};
+    use siege_dojo::models::tile_adjacency::{TileAdjacency, m_TileAdjacency};
+    use siege_dojo::models::sector_environment::m_SectorEnvironment;
+    use siege_dojo::models::fold_event::m_FoldEvent;
     use siege_dojo::models::match_stakes_1v1::{MatchStakes1v1, m_MatchStakes1v1};
     use siege_dojo::models::preset_defense::m_PresetDefense;
     use siege_dojo::models::match_state::MatchStatus;
@@ -176,6 +179,9 @@ mod tests {
                 TestResource::Model(m_Parcel::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Model(m_WorldConfig::TEST_CLASS_HASH),
+                TestResource::Model(m_TileAdjacency::TEST_CLASS_HASH),
+                TestResource::Model(m_SectorEnvironment::TEST_CLASS_HASH),
+                TestResource::Model(m_FoldEvent::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchStakes1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchAbilities1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_PresetDefense::TEST_CLASS_HASH),
@@ -253,10 +259,17 @@ mod tests {
         // Reset to world owner before initialize_world (requires is_owner)
         starknet::testing::set_contract_address(contract_address_const::<0>());
 
-        // Init world with 10 parcels (2 rows of 5)
-        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
-        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
-        world_sys.initialize_world(cols, rows);
+        // Init world with 10 tiles (all squares, frontier zone, sectors 0/1)
+        world_sys.initialize_world(
+            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  // tile_shapes
+            array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1],  // sector_ids
+            array![2, 2, 2, 2, 2, 2, 2, 2, 2, 2],  // zones (all frontier)
+            array![
+                0, 0, 1,   1, 0, 0,   1, 1, 2,   2, 0, 1,   2, 1, 3,   3, 0, 2,   3, 1, 4,   4, 0, 3,
+                5, 0, 6,   6, 0, 5,   6, 1, 7,   7, 0, 6,   7, 1, 8,   8, 0, 7,   8, 1, 9,   9, 0, 8,
+                0, 1, 5,   5, 1, 0,   1, 2, 6,   6, 2, 1,   2, 2, 7,   7, 2, 2,   3, 2, 8,   8, 2, 3,   4, 2, 9,   9, 2, 4,
+            ],
+        );
 
         // Register player A; pin homes to parcels 0/1/2 (legacy layout).
         let player_a = deploy_user();
@@ -343,7 +356,6 @@ mod tests {
 
         // Force adjacency: assign an unclaimed parcel next to player_b's home_0 to player_a
         let kingdom_b: PlayerKingdom = world.read_model(player_b);
-        let b_home_0: Parcel = world.read_model(kingdom_b.home_0);
         let config: WorldConfig = world.read_model(0_u8);
         let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
         let mut forced_id: u32 = 999999;
@@ -351,7 +363,7 @@ mod tests {
         while p < config.total_parcels {
             let parcel: Parcel = world.read_model(p);
             if parcel.owner == zero_addr
-                && siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, b_home_0.col, b_home_0.row)
+                && siege_dojo::utils::tile_graph::is_adjacent(@world, p, kingdom_b.home_0)
             {
                 forced_id = p;
                 break;
@@ -664,7 +676,6 @@ mod tests {
         });
 
         let kingdom_b: siege_dojo::models::player_kingdom::PlayerKingdom = world.read_model(player_b);
-        let home_0: siege_dojo::models::parcel::Parcel = world.read_model(kingdom_b.home_0);
 
         // Find an unclaimed parcel adjacent to home_0 and assign it to ally
         let config: siege_dojo::models::world_config::WorldConfig = world.read_model(0_u8);
@@ -675,8 +686,8 @@ mod tests {
             if ally_parcel_id == 999999 {
                 let parcel: siege_dojo::models::parcel::Parcel = world.read_model(p_search);
                 if parcel.owner == zero_addr
-                    && siege_dojo::utils::hex::is_neighbor(
-                        parcel.col, parcel.row, home_0.col, home_0.row
+                    && siege_dojo::utils::tile_graph::is_adjacent(
+                        @world, p_search, kingdom_b.home_0
                     )
                 {
                     ally_parcel_id = p_search;

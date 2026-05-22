@@ -34,12 +34,14 @@ function flatModels<T extends object>(store: unknown): T[] {
 // --- Parcel data ---
 
 export interface ParcelData {
-  parcelId: number;
-  col: number;
-  row: number;
-  parcelType: number; // 0=Forge, 1=Quarry, 2=Grove, 255=Untyped
-  owner: string; // hex address, "0x0" = unclaimed
+  tileId: number;
+  sectorId: number;
+  tileShape: number; // 0=square, 1=rhombus
+  zone: number;      // 0=core, 1=mid, 2=frontier
+  parcelType: number;
+  owner: string;
   isHome: boolean;
+  isStranded: boolean;
 }
 
 export function useWorldParcels(refreshKey?: number) {
@@ -49,39 +51,36 @@ export function useWorldParcels(refreshKey?: number) {
   useEffect(() => {
     const doFetch = async () => {
       const rows = await toriiSql<{
-        parcel_id: number;
-        col: number;
-        row: number;
+        tile_id: number;
+        sector_id: number;
+        tile_shape: number;
+        zone: number;
         parcel_type: number;
         owner: string;
         is_home: number;
-      }>('SELECT parcel_id, col, row, parcel_type, owner, is_home FROM "siege_dojo-Parcel"');
+        is_stranded: number;
+      }>('SELECT tile_id, sector_id, tile_shape, zone, parcel_type, owner, is_home, is_stranded FROM "siege_dojo-Parcel"');
 
       if (rows.length > 0) {
         setParcels(
           rows.map((r) => ({
-            parcelId: toNum(r.parcel_id),
-            col: toNum(r.col),
-            row: toNum(r.row),
+            tileId: toNum(r.tile_id),
+            sectorId: toNum(r.sector_id),
+            tileShape: toNum(r.tile_shape),
+            zone: toNum(r.zone),
             parcelType: toNum(r.parcel_type),
             owner: r.owner || "0x0",
             isHome: !!r.is_home,
+            isStranded: !!r.is_stranded,
           })),
         );
       }
       setLoading(false);
     };
 
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
+    const t = setTimeout(() => { void doFetch(); }, 0);
+    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
   }, [refreshKey]);
 
   return { parcels, loading };
@@ -141,4 +140,80 @@ export function usePlayerKingdom(playerAddress: string | null, _refreshKey?: num
       factionReinforcementEnabled: !!k.faction_reinforcement_enabled,
     };
   }, [playerAddress, kingdoms]);
+}
+
+// --- Tile adjacency ---
+
+export interface TileAdjacencyData {
+  tileId: number;
+  edgeIndex: number;
+  neighborTileId: number;
+}
+
+export function useTileAdjacency(refreshKey?: number) {
+  const [adjacency, setAdjacency] = useState<TileAdjacencyData[]>([]);
+
+  useEffect(() => {
+    const doFetch = async () => {
+      const rows = await toriiSql<{
+        tile_id: number;
+        edge_index: number;
+        neighbor_tile_id: number;
+      }>('SELECT tile_id, edge_index, neighbor_tile_id FROM "siege_dojo-TileAdjacency"');
+
+      setAdjacency(
+        rows.map((r) => ({
+          tileId: toNum(r.tile_id),
+          edgeIndex: toNum(r.edge_index),
+          neighborTileId: toNum(r.neighbor_tile_id),
+        })),
+      );
+    };
+
+    const t = setTimeout(() => { void doFetch(); }, 0);
+    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [refreshKey]);
+
+  return adjacency;
+}
+
+// --- World fold state ---
+
+export interface WorldFoldState {
+  isWorldFolded: boolean;
+  foldEpoch: number;
+  totalFolds: number;
+}
+
+export function useWorldFoldState(refreshKey?: number) {
+  const [foldState, setFoldState] = useState<WorldFoldState>({
+    isWorldFolded: false,
+    foldEpoch: 0,
+    totalFolds: 0,
+  });
+
+  useEffect(() => {
+    const doFetch = async () => {
+      const rows = await toriiSql<{
+        is_world_folded: number;
+        fold_epoch: number;
+        total_folds: number;
+      }>('SELECT is_world_folded, fold_epoch, total_folds FROM "siege_dojo-WorldConfig" WHERE id = 0');
+
+      if (rows.length > 0) {
+        setFoldState({
+          isWorldFolded: !!rows[0].is_world_folded,
+          foldEpoch: toNum(rows[0].fold_epoch),
+          totalFolds: toNum(rows[0].total_folds),
+        });
+      }
+    };
+
+    const t = setTimeout(() => { void doFetch(); }, 0);
+    const i = setInterval(() => { void doFetch(); }, POLL_INTERVAL);
+    return () => { clearTimeout(t); clearInterval(i); };
+  }, [refreshKey]);
+
+  return foldState;
 }

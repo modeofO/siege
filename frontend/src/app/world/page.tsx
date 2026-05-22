@@ -5,13 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
-import { useWorldParcels, usePlayerKingdom } from "@/lib/worldState";
-import { HexGrid } from "@/components/HexGrid";
+import { useWorldParcels, usePlayerKingdom, useTileAdjacency, useWorldFoldState } from "@/lib/worldState";
+import { TilingMap } from "@/components/TilingMap";
 import { RegisterKingdom } from "@/components/RegisterKingdom";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
-import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
+import { usePlayerCosmetics } from "@/lib/cosmetics";
 import { toriiSql, toNum } from "@/lib/toriiSql";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
@@ -213,12 +213,12 @@ export default function WorldPage() {
   const { account, address } = useAccount();
   const [refreshKey, setRefreshKey] = useState(0);
   const { parcels, loading } = useWorldParcels(refreshKey);
+  const adjacency = useTileAdjacency(refreshKey);
+  const foldState = useWorldFoldState(refreshKey);
   const kingdom = usePlayerKingdom(address || null, refreshKey);
   const [abilities, setAbilities] = useState<Record<number, number>>({});
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState("");
-  const ownerAddresses = parcels.map((p) => p.owner).filter((o) => o && o !== "0x0");
-  const cosmeticsMap = useBulkPlayerCosmetics(ownerAddresses, refreshKey);
   const myCosmetics = usePlayerCosmetics(address ?? undefined, refreshKey);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
@@ -262,7 +262,7 @@ export default function WorldPage() {
 
   // Get home parcel types for display
   const homeParcelTypes = kingdom.registered
-    ? [kingdom.home0, kingdom.home1, kingdom.home2].map((id) => parcels.find((p) => p.parcelId === id)).filter(Boolean)
+    ? [kingdom.home0, kingdom.home1, kingdom.home2].map((id) => parcels.find((p) => p.tileId === id)).filter(Boolean)
     : [];
 
   if (!account || !address) {
@@ -305,11 +305,12 @@ export default function WorldPage() {
           {parcels.length === 0 ? (
             <div className="text-center text-[#7a7060] py-12">World not initialized. No parcels found.</div>
           ) : (
-            <HexGrid
+            <TilingMap
               parcels={parcels}
-              playerAddress={address}
-              homeParcelIds={kingdom.registered ? [kingdom.home0, kingdom.home1, kingdom.home2] : []}
-              cosmeticsMap={cosmeticsMap}
+              adjacency={adjacency}
+              foldState={foldState}
+              playerAddress={address || null}
+              onTileClick={(tileId) => console.log("Selected tile:", tileId)}
             />
           )}
         </div>

@@ -44,7 +44,9 @@ pub mod conquest {
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::preset_defense::PresetDefense;
     use siege_dojo::models::faction_member::FactionMember;
-    use siege_dojo::utils::hex;
+    use siege_dojo::models::tile_adjacency::TileAdjacency;
+    use siege_dojo::models::sector_environment::SectorEnvironment;
+    use siege_dojo::utils::tile_graph;
     use super::{IERC1155Dispatcher, IERC1155DispatcherTrait};
     use super::{ability_type_from_token, ability_tier_from_token};
 
@@ -213,27 +215,30 @@ pub mod conquest {
             let mut ally_g0_3: u8 = 0; let mut ally_g1_3: u8 = 0; let mut ally_g2_3: u8 = 0;
             let mut ally_count: u8 = 0;
 
-            let mut pi: u32 = 0;
-            while pi < config.total_parcels {
-                let parcel_iter: Parcel = world.read_model(pi);
-                // Attacker adjacency
-                if !has_adjacent && parcel_iter.owner == attacker {
-                    if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+            // Attacker adjacency: check if any tile adjacent to target is owned by attacker
+            let target_neighbors = tile_graph::get_neighbors(@world, target_parcel);
+            let mut ni: u32 = 0;
+            while ni < target_neighbors.len() {
+                if !has_adjacent {
+                    let neighbor_parcel: Parcel = world.read_model(*target_neighbors.at(ni));
+                    if neighbor_parcel.owner == attacker {
                         has_adjacent = true;
                     }
                 }
-                // Faction ally reinforcement.
-                // NOTE: entries are per-adjacent-parcel, not per-ally-player. An ally
-                // that owns multiple parcels bordering the target contributes their
-                // preset 0 once per adjacent parcel (up to the ally_count cap of 3).
-                // This is exercised by test_conquest_reinforcement_ally_contributes_to_pool.
-                // If per-ally dedup is desired in the future, track seen owners here.
-                if reinforcement_on && defender_faction_id != 0 && ally_count < 3 {
-                    if parcel_iter.owner.is_non_zero() && parcel_iter.owner != defender {
-                        let ally_member: FactionMember = world.read_model(parcel_iter.owner);
-                        if ally_member.faction_id == defender_faction_id {
-                            if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
-                                let ally_defense: siege_dojo::models::preset_defense::PresetDefense = world.read_model(parcel_iter.owner);
+                ni += 1;
+            };
+
+            // Faction ally reinforcement
+            if reinforcement_on && defender_faction_id != 0 {
+                let mut tni: u32 = 0;
+                while tni < target_neighbors.len() {
+                    if ally_count < 3 {
+                        let ally_tile_id = *target_neighbors.at(tni);
+                        let ally_parcel: Parcel = world.read_model(ally_tile_id);
+                        if ally_parcel.owner.is_non_zero() && ally_parcel.owner != defender {
+                            let ally_member: FactionMember = world.read_model(ally_parcel.owner);
+                            if ally_member.faction_id == defender_faction_id {
+                                let ally_defense: PresetDefense = world.read_model(ally_parcel.owner);
                                 if ally_count == 0 {
                                     ally_p0_1 = ally_defense.p0_p0; ally_p1_1 = ally_defense.p0_p1; ally_p2_1 = ally_defense.p0_p2;
                                     ally_g0_1 = ally_defense.p0_g0; ally_g1_1 = ally_defense.p0_g1; ally_g2_1 = ally_defense.p0_g2;
@@ -248,9 +253,10 @@ pub mod conquest {
                             }
                         }
                     }
-                }
-                pi += 1;
-            };
+                    tni += 1;
+                };
+            }
+
             assert(has_adjacent, 'No adjacent parcel');
 
             // Get defender's preset defense and select via VRF
@@ -293,6 +299,9 @@ pub mod conquest {
                 }
             };
 
+            // --- World fold multiplier ---
+            let fold_mult: u8 = if config.is_world_folded { 2 } else { 1 };
+
             // --- Apply attacker ability effects ---
             // Mutable copies of attacker values
             let mut atk_p0 = p0;
@@ -302,24 +311,25 @@ pub mod conquest {
             let mut atk_g1 = g1;
             let mut atk_g2 = g2;
 
-            // Fortify — tier-aware defense boost
             let a_type = ability_type_from_token(ability_id);
             let a_tier = ability_tier_from_token(ability_id);
+
+            // Fortify — tier-aware defense boost (doubled when world is folded)
             if a_type == 5 {
                 if a_tier == 1 {
-                    atk_g0 = atk_g0 + 1;
-                    atk_g1 = atk_g1 + 1;
-                    atk_g2 = atk_g2 + 1;
+                    atk_g0 = atk_g0 + 1 * fold_mult;
+                    atk_g1 = atk_g1 + 1 * fold_mult;
+                    atk_g2 = atk_g2 + 1 * fold_mult;
                 } else {
-                    atk_g0 = atk_g0 * 2;
-                    atk_g1 = atk_g1 * 2;
-                    atk_g2 = atk_g2 * 2;
+                    atk_g0 = atk_g0 * 2 * fold_mult;
+                    atk_g1 = atk_g1 * 2 * fold_mult;
+                    atk_g2 = atk_g2 * 2 * fold_mult;
                 }
             }
 
-            // Siege Sword — tier-aware attack override
+            // Siege Sword — tier-aware attack override (doubled when world is folded)
             if a_type == 1 {
-                let new_attack: u8 = if a_tier == 1 { 5 } else { 10 };
+                let new_attack: u8 = if a_tier == 1 { 5 * fold_mult } else { 10 * fold_mult };
                 if ability_target == 0 { atk_p0 = new_attack; }
                 else if ability_target == 1 { atk_p1 = new_attack; }
                 else { atk_p2 = new_attack; }
@@ -336,7 +346,7 @@ pub mod conquest {
             let dmg_to_atk_2: u8 = if def_p2 > atk_g2 { def_p2 - atk_g2 } else { 0 };
             let mut total_dmg_to_atk: u8 = dmg_to_atk_0 + dmg_to_atk_1 + dmg_to_atk_2;
 
-            // Stone Cloak — tier-aware gate damage reduction
+            // Stone Cloak — tier-aware gate damage reduction (no fold multiplier — halve/zero can't be doubled)
             if a_type == 2 {
                 if a_tier == 1 {
                     total_dmg_to_atk = total_dmg_to_atk / 2;
@@ -345,9 +355,9 @@ pub mod conquest {
                 }
             }
 
-            // Hex — tier-aware total damage reduction
+            // Hex — tier-aware total damage reduction (doubled when world is folded)
             if a_type == 4 {
-                let reduction: u8 = if a_tier == 1 { 3 } else { 8 };
+                let reduction: u8 = if a_tier == 1 { 3 * fold_mult } else { 8 * fold_mult };
                 if total_dmg_to_atk > reduction {
                     total_dmg_to_atk = total_dmg_to_atk - reduction;
                 } else {
@@ -359,9 +369,9 @@ pub mod conquest {
             let mut atk_hp: u8 = if total_dmg_to_atk >= ATTACKER_HP { 0 } else { ATTACKER_HP - total_dmg_to_atk };
             let mut def_hp: u8 = if total_dmg_to_def >= DEFENDER_HP { 0 } else { DEFENDER_HP - total_dmg_to_def };
 
-            // Ember Blast — tier-aware direct vault damage
+            // Ember Blast — tier-aware direct vault damage (doubled when world is folded)
             if a_type == 3 {
-                let ember_dmg: u8 = if a_tier == 1 { 2 } else { 6 };
+                let ember_dmg: u8 = if a_tier == 1 { 2 * fold_mult } else { 6 * fold_mult };
                 if def_hp > ember_dmg { def_hp = def_hp - ember_dmg; } else { def_hp = 0; }
             }
 
@@ -384,26 +394,37 @@ pub mod conquest {
                 dk.parcel_count -= 1;
                 world.write_model(@dk);
             } else {
-                // Attacker loses — find their parcel closest to the target
-                // and transfer it to the defender.
+                // Attacker loses — find their non-home parcel adjacent to target.
                 // Exception: last stand (attacker has only home parcels) → no loss.
                 let mut has_non_home = false;
                 let mut closest_id: u32 = 0;
-                let mut min_dist: u16 = 65535;
 
-                let mut p2: u32 = 0;
-                while p2 < config.total_parcels {
-                    let parcel: Parcel = world.read_model(p2);
-                    if parcel.owner == attacker && !parcel.is_home {
-                        has_non_home = true;
-                        let dist = hex::hex_distance(parcel.col, parcel.row, target.col, target.row);
-                        if dist < min_dist {
-                            min_dist = dist;
-                            closest_id = p2;
+                // Find attacker's non-home parcel adjacent to target (simplest loss)
+                let loss_neighbors = tile_graph::get_neighbors(@world, target_parcel);
+                let mut ln: u32 = 0;
+                while ln < loss_neighbors.len() {
+                    if !has_non_home {
+                        let lp: Parcel = world.read_model(*loss_neighbors.at(ln));
+                        if lp.owner == attacker && !lp.is_home {
+                            has_non_home = true;
+                            closest_id = *loss_neighbors.at(ln);
                         }
                     }
-                    p2 += 1;
+                    ln += 1;
                 };
+
+                // If no adjacent non-home, fall back to any non-home parcel (highest tile_id)
+                if !has_non_home {
+                    let mut p2: u32 = 0;
+                    while p2 < config.total_parcels {
+                        let parcel: Parcel = world.read_model(p2);
+                        if parcel.owner == attacker && !parcel.is_home {
+                            has_non_home = true;
+                            closest_id = p2;
+                        }
+                        p2 += 1;
+                    };
+                }
 
                 if has_non_home {
                     let mut lost_parcel: Parcel = world.read_model(closest_id);
