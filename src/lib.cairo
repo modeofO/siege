@@ -24,6 +24,9 @@ pub mod models {
     pub mod faction_member;
     pub mod faction_invite;
     pub mod player_cosmetics;
+    pub mod tile_adjacency;
+    pub mod sector_environment;
+    pub mod fold_event;
 }
 
 pub mod tokens;
