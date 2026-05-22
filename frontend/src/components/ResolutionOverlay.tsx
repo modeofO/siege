@@ -24,7 +24,7 @@ interface ResolutionOverlayProps {
 // ---------------------------------------------------------------------------
 // Helper: call onComplete exactly once
 // ---------------------------------------------------------------------------
-function makeCompleter(ref: React.MutableRefObject<boolean>, cb: () => void) {
+function makeCompleter(ref: React.RefObject<boolean>, cb: () => void) {
   return () => {
     if (!ref.current) {
       ref.current = true;
