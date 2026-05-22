@@ -99,7 +99,7 @@ so you know what victory is for.
 If you **win**:
 - Opponent's escrowed ability tokens get re-minted to you on settle.
 - You become eligible to call `siege_claim_parcel` for ONE unclaimed
-  parcel that is hex-adjacent to one of your existing parcels (homes or
+  parcel that is tile-adjacent to one of your existing parcels (homes or
   prior conquered land). You choose the parcel's resource type
   (`0` Forge / `1` Quarry / `2` Grove). There is no cap — claim as many
   parcels as you can win.
@@ -125,7 +125,7 @@ When `phase="finished"` arrives, **always do all of the following**:
    home parcel you own. Always do this after every match.
 3. **If you won — claim a parcel**:
    - `siege_get_world_state` to see the parcel grid and ownership.
-   - Pick an unclaimed parcel (`owner == 0x0`) hex-adjacent to one of
+   - Pick an unclaimed parcel (`owner == 0x0`) tile-adjacent to one of
      your existing parcels.
    - Call `siege_claim_parcel(match_id, parcel_id, parcel_type)`.
      `parcel_type` is your choice — claimed parcels are typed at claim

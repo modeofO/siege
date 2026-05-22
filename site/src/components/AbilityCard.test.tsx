@@ -25,9 +25,9 @@ describe('AbilityCard', () => {
 
     it('renders each cost entry with amount and label', () => {
       render(<AbilityCard ability={siegeSwordT1} />)
-      // Siege Sword T1: 3 iron + 2 wood
-      expect(screen.getByText(/3\s*×\s*IRON/i)).toBeInTheDocument()
-      expect(screen.getByText(/2\s*×\s*WOOD/i)).toBeInTheDocument()
+      // Siege Sword T1: 8 iron + 5 wood
+      expect(screen.getByText(/8\s*×\s*IRON/i)).toBeInTheDocument()
+      expect(screen.getByText(/5\s*×\s*WOOD/i)).toBeInTheDocument()
     })
 
     it('renders the ability icon with alt text', () => {

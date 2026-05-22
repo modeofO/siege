@@ -1,45 +1,34 @@
 ---
 title: Scoring & damage
-description: How damage is calculated and applied.
+description: How resolution changes HP and control.
 ---
 
 # Scoring & damage
 
-_The gate holds, or it doesn't. The vault remembers either way._
+Resolution is deterministic once both moves are revealed and gate modifiers are known.
 
-## Gate-by-gate resolution
+## Gate damage
 
-The 3 gates resolve independently. For each gate, your **pressure** (attack) is compared to your opponent's **defense** at the matching gate:
+At each gate, damage normally equals:
 
-- Base damage at a gate = `max(0, attack − defense)`.
-- Any excess attack beyond the defense becomes **vault damage**.
+```text
+max(attack - defense, 0)
+```
 
-A gate with attack less than or equal to defense deals nothing. A gate with far more attack than defense punches directly into the vault.
+Modifiers can cap, swap, block, or reflect that damage.
 
-## Modifiers transform the math
+## Ability timing
 
-Before damage is computed, each gate's modifier changes how the numbers behave. See [Modifiers](/mechanics/modifiers) for the full list.
+Fortify and Siege Sword alter per-gate values before gate damage. Stone Cloak reduces incoming gate and reflected damage. Hex reduces total incoming damage. Ember Blast deals direct vault damage after normal gate damage.
 
-- **Normal** — no change.
-- **Narrow Pass** — both attack and defense at the gate are capped to 3.
-- **Mirror Gate** — attack and defense values are swapped.
-- **Deadlock** — the gate deals no damage, no matter what.
-- **Reflection** — damage that would land at this gate is redirected to the other gates.
+If the world is folded, numeric ability effects are doubled.
 
-Modifiers are rolled at the start of the round and visible to both players before allocation, so your plan should already account for them.
+## Repair timing
 
-## Repair applies after damage
+Repair applies before damage and cannot raise a vault above 50 HP. The cap is 3 per round.
 
-You can put up to **3 points** into repair each round. Repair resolves **after** damage is applied, heals your vault, and is capped by the vault's maximum HP (50). Repair cannot save a vault that already hit 0 this round.
+Trap damage and Ember Blast happen after repair, so they cannot be undone by repair in the same round.
 
-## Traps bypass repair
+## Nodes
 
-If you contest a node your opponent secretly trapped, you take **direct vault damage** that is not reduced by repair. Traps are resolved alongside the rest of the round but the damage they deal is post-repair and cannot be healed back in the same round. See [Traps](/mechanics/traps).
-
-## Abilities change the math
-
-Abilities spent during the round modify resolution in various ways — increasing damage, blocking it, bypassing gates, weakening the opponent, and more. See [Abilities](/mechanics/abilities) for the full catalog. Abilities apply during the resolution step alongside everything else.
-
-## Match end
-
-The moment a vault hits 0, the match ends and the surviving player wins. See [Goal & win condition](/rules/goal).
+The higher contest value wins each node. Ties leave ownership unchanged. Owned nodes increase next round's budget and mint paired resource tokens after resolution.

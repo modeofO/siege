@@ -1,3 +1,5 @@
+> **Historical note:** This dated design or implementation record is archived. It may not match the current code. For current behavior, read `README.md`, `CLAUDE.md`, and the implementation files directly.
+
 # World Map Parchment Frame — Design Spec
 
 **Date:** 2026-04-13

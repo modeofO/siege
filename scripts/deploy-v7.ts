@@ -49,6 +49,16 @@ async function main() {
   console.log("set_minter2 tx:", tx3.transaction_hash);
   await provider.waitForTransaction(tx3.transaction_hash);
 
+  // 4. Set AbilityToken burner (crafting_1v1, required for T2 crafting)
+  console.log("Setting AbilityToken burner...");
+  const tx4 = await account.execute({
+    contractAddress: ABILITY_TOKEN,
+    entrypoint: "set_burner",
+    calldata: [NEW_CRAFTING],
+  });
+  console.log("set_burner tx:", tx4.transaction_hash);
+  await provider.waitForTransaction(tx4.transaction_hash);
+
   console.log("All done!");
 }
 

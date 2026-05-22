@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file gives Claude Code current working context for this repository. The source of truth is the code, manifests, and config in this checkout.
+This file gives Codex current working context for this repository. The source of truth is the code, manifests, and config in this checkout.
 
 ## Current Product Shape
 
@@ -206,11 +206,24 @@ The frontend supports `devnet` and `sepolia` modes through `src/app/providers.ts
 
 Use `BigInt(0)` rather than `0n` in frontend code.
 
+Use Bun for simple frontend and docs-site workflows:
+
+```bash
+cd frontend
+bun run lint
+bun run test
+bun run build
+
+cd site
+bun run test
+bun run build
+```
+
 ## MCP Notes
 
 Use `mcp-server-2/`. It registers 39 tools and signs writes through a Cartridge session. It reads Dojo contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses come from env/defaults.
 
-Build and test:
+Build and test with pnpm because this package has a pnpm lockfile:
 
 ```bash
 cd mcp-server-2
@@ -225,15 +238,6 @@ Contract tests:
 ```bash
 sozo test
 docker compose run --rm builder sozo test
-```
-
-Frontend:
-
-```bash
-cd frontend
-bun run lint
-bun run test
-bun run build
 ```
 
 Docs site:

@@ -1,41 +1,33 @@
 ---
 title: Staked matches
-description: Wagering abilities in 1v1 matches for territory and spoils.
+description: Wager abilities for match consequences.
 ---
 
 # Staked matches
 
-*Real stakes. Real losses. The abilities you bring to the table are the ones you might never see again.*
+A staked match wraps a 1v1 battle in world consequences.
 
-A staked match is a 1v1 arena match with abilities escrowed on-chain. Both players lock in their chosen ability tokens before the match begins. The winner takes everything the loser staked — and earns the right to claim new territory.
+## Creating
 
-## Creating a staked match
+`create_staked_match(opponent, abilities)` escrows 1 to 3 ability tokens from the creator, subject to tier ability-slot limits, then creates a pending 1v1 match.
 
-From The Marches, click **Create Match** and choose your opponent's address. Select the abilities you want to stake (up to your [tier's](/world/tiers) ability slot limit). The contract escrows your tokens — they leave your wallet and are held by the match until settlement.
+## Joining
 
-Your opponent then joins by staking their own abilities. Once both sides are committed, the match plays out like any other 1v1 — same budget, same gates, same commit-reveal loop.
+`join_staked_match(match_id, abilities)` can only be called by the named opponent. The contract escrows the matched wager amount, refunds creator excess if the creator offered more abilities than the joiner matches, copies staked ability IDs into `MatchAbilities1v1`, and activates the match.
 
 ## Settlement
 
-After the match ends, either player calls **settle**. Settlement:
+After the match finishes, either participant can call `settle_match`.
 
-1. **Transfers abilities** — the winner receives all staked abilities from both sides (re-minted to their address).
-2. **Records the win** — the winner's `total_wins` increments, feeding into [tier](/world/tiers) progression and [reputation](/world/reputation).
-3. **Grants claim rights** — the winner may claim one unclaimed parcel adjacent to their existing territory.
-4. **Grants pillage eligibility** — if the winner and loser share an adjacent border, the winner becomes eligible to [pillage](/world/pillaging) one of the loser's home parcels.
+Settlement:
 
-## Claiming a parcel
+- Returns all escrowed abilities on draw.
+- Transfers all matched escrowed abilities to the winner on decisive result.
+- Increments the winner's total wins.
+- Updates reputation and head-to-head records.
+- Releases the loser's highest-id non-home parcel, if one exists.
+- Mints one resource reward for all parcels owned by both match players.
+- Grants pillage eligibility if the winner borders any loser home parcel.
+- Breaks pillages where the loser was pillaging the winner.
 
-After settling a win, you can claim one unclaimed parcel on the hex grid that is adjacent to any parcel you already own. You choose its type — Forge, Quarry, or Grove — which determines what resources it generates.
-
-Claiming is subject to your [tier's parcel cap](/world/tiers). If you're already at your cap, you can't claim even after a win.
-
-## What you risk
-
-Everything you stake. If you lose, your opponent gets your escrowed abilities and gains the same claim and pillage rights against you. There's no partial loss — staked matches are winner-take-all.
-
-Choose what to stake carefully. A T2 ability is a significant investment to put on the line. But higher-stakes matches carry higher rewards: more abilities captured, more territory pressure, more reputation momentum.
-
-- [Kingdom tiers](/world/tiers) — ability slot limits per tier
-- [Conquest](/world/conquest) — the other way to take territory
-- [Pillaging](/world/pillaging) — what happens after you win against a neighbor
+After settlement, the winner may call `claim_parcel` once for an unclaimed adjacent tile and choose its parcel type.

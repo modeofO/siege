@@ -1,34 +1,36 @@
 ---
 title: Factions
-description: Alliances between Holds for shared defense and social play.
+description: Alliances, reinforcement, and protection.
 ---
 
 # Factions
 
-*A wall is stronger with allies behind it. A map is smaller with friends across it.*
+Factions are on-chain alliances between Holds.
 
-Factions are on-chain alliances between Holds. They provide social structure — shared identity, mutual defense, and coordinated play — without replacing individual agency.
+## Creating
 
-## Creating a faction
+Creating a faction requires:
 
-Any registered player can create a faction. Pick a name, and you become its leader. Creation is gasless through your Controller session.
+- Registered Hold.
+- Strategos tier or higher.
+- Not already being in a faction.
+- 30 Iron, 30 Stone, and 20 Wood.
+
+The creator becomes the leader.
 
 ## Membership
 
-The leader invites other players by address. Invitees accept to join. Members can leave at any time; the leader can kick members. All membership changes are recorded on-chain.
+Leaders invite players. Invited players accept by faction id. Members can leave. Leaders can kick members. If the leader leaves, the faction is marked dissolved.
 
-## What factions enable
+After leaving a faction, a player has a 24-hour cooldown before joining another.
 
-**Shared identity.** Faction tags are visible on the hex grid next to member names. Other players can see who you're allied with.
+## Gameplay effects
 
-**Conquest reinforcement.** When a faction member's parcel is attacked via [conquest](/world/conquest), nearby faction members can contribute their preset defenses to the defender's pool. The vRF draw includes allied presets alongside the defender's own, making faction territory harder to crack.
+Factions affect:
 
-**Social coordination.** Factions provide a natural grouping for coordinated play — sharing intelligence about border threats, coordinating staked match targets, and pooling resources through standard ERC-20 transfers.
+- Conquest: faction allies cannot attack each other.
+- Conquest defense: if reinforcement is enabled, nearby faction allies can add preset defenses.
+- Pillage: an adjacent faction ally can protect a home from pillage initiation.
+- Folds: faction-owned connected tiles can bridge stranded-territory checks.
 
-## Solo viability
-
-Every mechanical benefit of factions can be achieved solo — factions just reach it faster. A solo Basileia with strong presets and smart territory expansion is entirely viable. Factions are an accelerator, not a requirement.
-
-- [Conquest](/world/conquest) — where faction reinforcement matters
-- [Your Hold](/world/holds) — the territory factions help protect
-- [Reputation](/world/reputation) — the signal factions use to evaluate recruits
+Each Hold can toggle faction reinforcement.

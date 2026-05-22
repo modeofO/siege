@@ -1,45 +1,34 @@
 ---
 title: The round loop
-description: How a single round plays out, start to finish.
+description: Commit, reveal, resolve.
 ---
 
 # The round loop
 
-_The war is long. The round is short. Everything interesting happens in between._
+Every round has three phases.
 
-A single round has six stages. Every match repeats this loop until one vault falls.
+## 1. Commit
 
-## 1. Modifier roll
+Each player submits a Poseidon hash of their allocation and a random salt. The allocation stays hidden.
 
-Each of the **3 gates** independently rolls one modifier via Cartridge vRNG. All three rolls happen on-chain before allocation begins, and both players see the results before they plan. A gate might be Normal, Narrow Pass, Mirror Gate, Deadlock, or Reflection — see [Modifiers](/mechanics/modifiers) for the full effects.
+## 2. Reveal
 
-## 2. Allocation
+After both commits are in, each player reveals the salt and allocation. The contract recomputes the hash and rejects mismatches.
 
-Each player privately fills in their **13-slot allocation** from their shared budget. This is the core decision of the round: attack, defense, repair, node contests, and traps, all competing for the same pool of points. See [Budget allocation](/rules/budget) for the slot layout.
+Reveal data includes attack, defense, repair, node contests, traps, ability id, and ability target.
 
-## 3. Commit
+## 3. Resolve
 
-Each player picks a random salt, computes a Poseidon hash of `[salt, ...allocation]`, and submits only the **hash** to the contract. The opponent sees the hash but not the allocation. See [Commit & reveal](/rules/commit-reveal) for why this matters.
+After both reveals are in, anyone can resolve the round. Resolution applies:
 
-## 4. Reveal
+- Gate modifiers.
+- Ability effects.
+- Repair.
+- Gate damage.
+- Direct vault damage.
+- Node contests.
+- Trap damage.
+- Resource rewards.
+- Win or next-round state.
 
-Once both players have committed, each reveals their full allocation plus their salt. The contract recomputes the hash and verifies it matches the commitment. If the numbers don't match the hash, the reveal fails and the round's actions are forfeited.
-
-## 5. Resolution
-
-Everything happens on-chain in one pass:
-
-- Damage is computed gate-by-gate with modifiers applied.
-- Repair is applied after damage.
-- Node contests are resolved and resource tokens are minted to the winners.
-- Traps fire if an opponent stepped into a trapped node.
-- Abilities take effect.
-- Vault HPs update.
-
-See [Scoring & damage](/rules/scoring) for the math.
-
-## 6. Loop or end
-
-If both vaults are alive, the next round begins with a fresh modifier roll. If either vault is at 0, the match is over.
-
-A complete match is typically **3–6 rounds**.
+Commit and reveal deadlines are 300 seconds each. Timeout handling exists for stalled rounds.

@@ -1,39 +1,23 @@
 ---
 title: Resource nodes
-description: Forge, Quarry, and Grove.
+description: Forge, Quarry, and Grove control.
 ---
 
 # Resource nodes
 
-*Between the two keeps lie the old workings — a forge still warm, a quarry still open, a grove still standing. Whoever holds them eats.*
+Each match has three resource nodes.
 
-Three resource nodes sit on the map between the two players:
+| Node   | Contest field | Rewards       |
+| ------ | ------------- | ------------- |
+| Forge  | `nc0`         | IRON + LINEN  |
+| Quarry | `nc1`         | STONE + WOOD  |
+| Grove  | `nc2`         | EMBER + SEEDS |
 
-- **Forge** (`nc0`) — iron and linen
-- **Quarry** (`nc1`) — stone and wood
-- **Grove** (`nc2`) — ember and seeds
+Both players can spend budget contesting a node. Higher contest wins. A tie leaves the previous owner unchanged.
 
-At any moment, each node has a single controller, or no one. Control isn't taken by violence — it's won quietly, through contests that resolve alongside the gate math.
+Owned nodes matter twice:
 
-## Contesting
+- They mint 1 of each paired token to the owner after resolution.
+- They add +1 budget next round.
 
-Each round you can allocate budget to the `nc0`, `nc1`, and `nc2` slots to contest a node. When the round resolves, whoever spent more on a node wins control for the **next** round. Ties favor the status quo — the current controller keeps the node if spending matches. A contest is a commitment: the points you spend here are points you don't spend on gates or defense.
-
-## Rewards for control
-
-Controlling a node pays out at the end of each round:
-
-- **Budget bonus.** Each controlled node adds +1 to your budget next round. Three nodes is three extra points — meaningful, compounding, and hard to claw back once it tips.
-- **Resource tokens.** Each controlled node mints 1 of each of its paired tokens to you at round-end. These are real ERC-20 tokens, they persist across matches, and you'll use them to craft abilities. See [Resources](/mechanics/resources).
-
-## Nodes are orthogonal to gates
-
-Contesting a node doesn't damage your opponent. It doesn't interact with the gate math at all. Nodes are a parallel economic layer — a long game running under the short game. A player who loses every gate round but holds two nodes will often outlast an opponent who wins gates but leaves the map empty.
-
-## Traps live on nodes
-
-Nodes you own can be trapped — at a cost, and with a real trade-off. See [Traps](/mechanics/traps) for how trapping interacts with contesting.
-
-- [Budget allocation](/rules/budget) — how nodes fit into your 10 points
-- [Resources](/mechanics/resources) — what the tokens are and what they're for
-- [Traps](/mechanics/traps) — trapping nodes you own
+Node ownership starts empty at match creation.

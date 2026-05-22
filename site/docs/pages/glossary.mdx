@@ -5,191 +5,178 @@ description: Terms used throughout Siege.
 
 # Glossary
 
-*A quartermaster's ledger of every word a commander must know.*
+## Ability
 
-Terms are listed alphabetically. If you arrived here from another page, click through the cross-links; most terms are explained in depth elsewhere.
+An ERC-1155 token that can be crafted, staked into a match, and activated once during that match. Ability IDs 1-5 are T1, and 6-10 are T2.
 
-## A
+## Ability slot
 
-### Ability
-A single-use ERC-1155 token crafted from resources that applies a one-round mechanical effect during resolution. See: [Abilities](/mechanics/abilities).
+The number of abilities a Hold can stake in a staked match. Current Cairo slots by tier are 1, 2, 3, and 3.
 
-### Ability tier
-T1 and T2. Each of the 5 ability types has both a T1 (cheaper, weaker) and a T2 (costlier, stronger) variant. T2 crafting requires burning a T1 of the same type. See: [Abilities](/mechanics/abilities).
+## Allocation
 
-### Allocation
-The 13-slot array a player fills each round: 3 attack (p0–p2), 3 defense (g0–g2), 1 repair, 3 node contests (nc0–nc2), 3 traps (trap0–trap2). See: [Budget allocation](/rules/budget).
+The values revealed for a round: three attack values, three defense values, repair, three node contests, three traps, an ability id, and an ability target.
 
-### Attack
-Budget committed to a specific gate (p0, p1, or p2) to deal damage through it. See: [Gates](/mechanics/gates).
+## Basileia
 
-## B
+Tier 3 Hold rank. Requires 60 wins and an explicit upgrade.
 
-### Basileia
-The highest kingdom tier (tier 3), requiring 60 cumulative wins. Grants 4 ability slots, 12 parcel cap, and 4 preset defense slots. See: [Kingdom tiers](/world/tiers).
+## Budget
 
-### Bracket
-A reputation tier derived from games played: Unranked, Bronze, Silver, Gold, Diamond. See: [Reputation](/world/reputation).
+Points spent each round. Budget is `10 + owned resource nodes`.
 
-### Budget
-The shared pool of points each player spends every round across attack, defense, repair, node contests, and traps. It refreshes each round and grows with controlled nodes. See: [Budget allocation](/rules/budget).
+## Claim drip
 
-## C
+The action that mints resource tokens from a Hold's home parcels after the drip interval.
 
-### Claim drip
-The action that harvests resource tokens from all parcels you own in The Marches. Home parcels under active pillage are skipped. See: [Your Hold](/world/holds).
+## Commit
 
-### Conquest
-An asynchronous attack against a neighbor's non-home parcel, resolved in a single transaction against a randomly selected preset defense. See: [Conquest](/world/conquest).
+The hidden-move phase where a player submits a Poseidon hash of their salt and allocation.
 
-### Cartridge Controller
-A browser-based gasless Starknet wallet that uses passkeys and session keys to pre-approve gameplay actions. See: [Connect your wallet](/getting-started/connect-wallet).
+## Conquest
 
-### Commit phase
-The first phase of each round. Each player submits a Poseidon hash of their allocation plus a random salt, keeping the allocation hidden. See: [Commit & reveal](/rules/commit-reveal).
+A one-transaction attack against a neighbor's non-home parcel, resolved against a random preset defense.
 
-### Commitment
-The on-chain Poseidon hash submitted during the commit phase. See: [Commit & reveal](/rules/commit-reveal).
+## Deadlock
 
-### Contest
-Allocating budget to a node (nc0–nc2) to fight for control. Winner of the contest owns the node next round. See: [Resource nodes](/mechanics/nodes).
+A gate modifier that prevents damage at that gate.
 
-## D
+## Defense
 
-### Deadlock
-A gate modifier in which neither side yields: no damage is dealt at that gate this round. See: [Gate modifiers](/mechanics/modifiers).
+Budget placed at one of your gates to absorb incoming attack.
 
-### Defense
-Budget committed to a specific gate (g0, g1, or g2) to absorb incoming attack. See: [Gates](/mechanics/gates).
+## Ember Blast
 
-## E
+An ability that deals direct vault damage after gate damage. T1 deals 2; T2 deals 6.
 
-### Ember Blast
-A vault-focused ability that deals direct damage to the enemy, bypassing their gates entirely. Costs ember and seeds. See: [Abilities](/mechanics/abilities).
+## Faction
 
-## F
+An on-chain alliance. Factions affect conquest ally checks, optional reinforcement, pillage protection, and fold stranded checks.
 
-### Faction
-An on-chain alliance between Holds. Members share identity (visible tags on the map), conquest reinforcement, and social coordination. See: [Factions](/world/factions).
+## Fold
 
-### Forge
-One of the three resource nodes. When controlled, it mints IRON and LINEN each round. See: [Resource nodes](/mechanics/nodes). Also a parcel type in The Marches.
+A world event. A world fold toggles the global folded state; a sector fold changes sector state along an axis. Folds can break pillages and strand parcels.
 
-### Fortify
-A defender-focused ability that strengthens every gate for a single round. Costs stone, linen, and wood. See: [Abilities](/mechanics/abilities).
+## Forge
 
-## G
+A battle node and parcel type that produces IRON and LINEN.
 
-### Gate
-One of three chokepoints between the attacker and the vault (g0, g1, g2). Attack resolves against defense at each gate, with any overflow damaging the vault. See: [Gates](/mechanics/gates).
+## Fortify
 
-### Gate modifier
-A random effect rolled by vRNG at the start of each round for each gate independently, changing how that gate resolves. See: [Gate modifiers](/mechanics/modifiers).
+An ability that improves defense. T1 adds 1 defense at every gate. T2 doubles defense at every gate.
 
-### Grove
-One of the three resource nodes. When controlled, it mints EMBER and SEEDS each round. See: [Resource nodes](/mechanics/nodes). Also a parcel type in The Marches.
+## Gate
 
-## H
+One of three battle lanes. Gate damage normally equals `max(attack - defense, 0)`.
 
-### Hegemonia
-Kingdom tier 2, requiring 30 cumulative wins. Grants 3 ability slots, 8 parcel cap, and 3 preset defense slots. See: [Kingdom tiers](/world/tiers).
+## Gate modifier
 
-### Hex
-A disruption ability that reduces the opponent's total outgoing damage for a round. Costs iron, stone, and ember. See: [Abilities](/mechanics/abilities).
+A public per-gate effect rolled before allocation: Normal, Narrow Pass, Mirror, Deadlock, or Reflection.
 
-### Hold
-Your home base in The Marches — three permanent parcels (Forge, Quarry, Grove) that can never be conquered. See: [Your Hold](/world/holds).
+## Grove
 
-### Home parcel
-One of the three permanent parcels assigned when you register your Hold. Cannot be conquered, but can be pillaged. See: [Your Hold](/world/holds).
+A battle node and parcel type that produces EMBER and SEEDS.
 
-## M
+## Hegemonia
 
-### Mirror Gate
-A gate modifier that swaps the attack and defense values at that gate, turning aggression into defense and vice versa. See: [Gate modifiers](/mechanics/modifiers).
+Tier 2 Hold rank. Requires 30 wins and an explicit upgrade.
 
-## N
+## Hex
 
-### Narrow Pass
-A gate modifier that caps both attack and defense at 3, squeezing the fight at that chokepoint. See: [Gate modifiers](/mechanics/modifiers).
+An ability that reduces opponent total damage. T1 reduces by 3; T2 reduces by 8.
 
-### Node
-A contested resource site on the map — Forge, Quarry, or Grove. Controlling a node mints its paired resource tokens each round. See: [Resource nodes](/mechanics/nodes).
+## Hold
 
-### Normal
-The default gate modifier. Attack and defense resolve without alteration. See: [Gate modifiers](/mechanics/modifiers).
+Your persistent base in The Marches. A Hold starts with three home parcels.
 
-## P
+## Home parcel
 
-### Parcel
-A hex tile on The Marches map. Typed as Forge, Quarry, or Grove. Generates paired resource tokens via claim drip. See: [Your Hold](/world/holds).
+A permanent parcel assigned during registration. Homes generate claim drip and can be pillaged but not conquered.
 
-### Pillage
-Temporarily siphoning resource drip from a defeated neighbor's home parcel. Earned by winning a staked match against an adjacent opponent. See: [Pillaging](/world/pillaging).
+## Mirror
 
-### Polis
-The starting kingdom tier (tier 0). Grants 1 ability slot, 2 parcel cap, and 1 preset defense slot. See: [Kingdom tiers](/world/tiers).
+A gate modifier that swaps attack and defense at the gate.
 
-### Poseidon hash
-A Starknet-native cryptographic hash function. Allocations are hashed as `poseidon([salt, ...allocation])` for commit-reveal. See: [Commit & reveal](/rules/commit-reveal).
+## Narrow Pass
 
-## Q
+A gate modifier that caps attack and defense at 3.
 
-### Preset defense
-A stored defensive allocation (budget 12) used to defend parcels during conquest attacks. The number of presets scales with kingdom tier. See: [Conquest](/world/conquest).
+## Node
 
-### Quarry
-One of the three resource nodes. When controlled, it mints STONE and WOOD each round. See: [Resource nodes](/mechanics/nodes). Also a parcel type in The Marches.
+One of three battle resource points: Forge, Quarry, Grove. Controlled nodes mint resources and increase next-round budget.
 
-## R
+## Parcel
 
-### Reflection
-A gate modifier that causes damage at the affected gate to echo onto the other gates instead. See: [Gate modifiers](/mechanics/modifiers).
+A tile in The Marches. Parcels are keyed by `tile_id` and store sector, zone, shape, type, owner, home, and stranded state.
 
-### Repair
-Budget spent to heal the vault, up to a per-round cap. Does not heal trap damage or direct-damage abilities. See: [Vault & repair](/mechanics/vault).
+## Pillage
 
-### Reveal phase
-The second phase of each round. Players reveal their salt and allocation; the contract verifies it matches their earlier commitment, then resolves the round. See: [Commit & reveal](/rules/commit-reveal).
+A temporary siphon on a defeated neighbor's home drip.
 
-### Round
-One full cycle of commit, reveal, and resolution. Each match is a sequence of rounds that ends when a vault hits zero. See: [Round loop](/rules/round-loop).
+## Polis
 
-### Reputation
-Your on-chain competitive record: wins, losses, streaks, and bracket. Publicly visible on the hex grid. See: [Reputation](/world/reputation).
+Tier 0 Hold rank.
 
-## S
+## Poseidon hash
 
-### Salt
-A random value prepended to the allocation before hashing in the commit phase. Prevents opponents from brute-forcing the commitment. See: [Commit & reveal](/rules/commit-reveal).
+The Starknet-friendly hash used for round commitments.
 
-### Siege Sword
-An attacker-focused ability that sets your pressure at one chosen gate to a fixed value. Costs iron and wood. See: [Abilities](/mechanics/abilities).
+## Preset defense
 
-### Staked match
-A 1v1 match where both players escrow ability tokens. Winner takes all stakes, gains claim and pillage rights. See: [Staked matches](/world/staked-matches).
+A stored conquest defense allocation. Preset budget is 12.
 
-### Stone Cloak
-A defender-focused ability that reduces all gate damage taken for one round. Costs stone and linen. See: [Abilities](/mechanics/abilities).
+## Quarry
 
-### Strategos
-Kingdom tier 1, requiring 10 cumulative wins. Grants 2 ability slots, 5 parcel cap, and 2 preset defense slots. See: [Kingdom tiers](/world/tiers).
+A battle node and parcel type that produces STONE and WOOD.
 
-## T
+## Reflection
 
-### The Marches
-The persistent hex-grid world layer of Siege. Players own territory, harvest resources, and compete over parcels. See: [The Marches](/world/overview).
+A gate modifier that stores overflow damage at the gate, then splits half to each other non-deadlock gate, reduced by unused defense.
 
-### Tier (kingdom)
-Your Hold's progression level: Polis → Strategos → Hegemonia → Basileia. Determines ability slots, parcel cap, and preset defense count. See: [Kingdom tiers](/world/tiers).
+## Repair
 
-### Trap
-A hidden device placed on a node you own. If the opponent takes that node, they take vault damage that cannot be repaired. Traps last one round and must be re-placed. See: [Traps](/mechanics/traps).
+Budget spent to heal your vault before damage. Resolution caps repair at 3.
 
-## V
+## Reveal
 
-### Vault HP
-Your health bar. It starts at 50 per match; when it reaches 0, you lose. Repair can heal it, but trap damage and Ember Blast bypass repair. See: [Vault & repair](/mechanics/vault).
+The phase where a player submits the salt and allocation behind their commitment.
 
-### vRNG
-Verifiable random number generation, provided by Cartridge, used to roll gate modifiers each round. See: [Gate modifiers](/mechanics/modifiers).
+## Siege Sword
+
+An ability that sets attack at a target gate. T1 sets it to 5; T2 sets it to 10.
+
+## Staked match
+
+A 1v1 match created through `world_system` where both players escrow ability tokens. Settlement transfers or refunds those stakes and updates world state.
+
+## Stone Cloak
+
+An ability that reduces gate damage taken. T1 halves it; T2 zeros it.
+
+## Strategos
+
+Tier 1 Hold rank. Requires 10 wins and an explicit upgrade.
+
+## Stranded
+
+A parcel state used after folds. Owned non-home parcels can become stranded if they no longer connect back to home through owned or faction-bridged territory.
+
+## The Marches
+
+The persistent tile-graph world around Siege battles.
+
+## Tile graph
+
+The current map model. Tiles have up to four adjacency edges; missing edges use the `0xFFFFFFFF` sentinel.
+
+## Trap
+
+A hidden node defense. If the opponent takes a trapped node, they take 5 vault damage after repair.
+
+## Vault
+
+Your match health. A vault starts at 50 HP.
+
+## vRNG
+
+Cartridge verifiable randomness, used for gate modifiers, conquest preset selection, and fold rolls.

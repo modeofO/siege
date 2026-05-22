@@ -1,45 +1,33 @@
 ---
 title: Reputation
-description: Brackets, streaks, and your public record.
+description: Wins, losses, streaks, and brackets.
 ---
 
 # Reputation
 
-*Every match leaves a mark. Some are boasts; some are scars. All of them are permanent.*
+Reputation is updated during staked-match settlement.
 
-Reputation tracks your competitive record on-chain. It's publicly visible, shapes who you're matched against, and follows you across every match and every interaction in The Marches.
+Tracked fields:
 
-## What's tracked
+- Total losses.
+- Current streak.
+- Best streak.
+- Bracket.
 
-- **Total wins and losses** — your lifetime match record.
-- **Current streak** — consecutive wins or losses (signed: positive for wins, negative for losses).
-- **Best streak** — your all-time highest win streak.
-- **Bracket** — a tier derived from games played and win rate.
+Wins live on `PlayerKingdom.total_wins`; losses live on `PlayerReputation.total_losses`.
 
 ## Brackets
 
-Your bracket is calculated from your total match count and win rate:
+The contract calculates brackets from total games and win rate.
 
-| Bracket | Requirement |
-|---------|-------------|
-| **Unranked** | Fewer than 10 games played |
-| **Bronze** | 10+ games |
-| **Silver** | 30+ games |
-| **Gold** | 60+ games |
-| **Diamond** | 100+ games |
+| Bracket  | Rule                                     |
+| -------- | ---------------------------------------- |
+| Unranked | Fewer than 10 games.                     |
+| Bronze   | 10+ games and below higher thresholds.   |
+| Silver   | 30+ games and win rate above threshold.  |
+| Gold     | 60+ games and win rate above threshold.  |
+| Diamond  | 100+ games and win rate above threshold. |
 
-Brackets go up with games played — they reflect experience and commitment, not just raw win rate.
+The exact threshold logic is in `calculate_bracket` in `world_system.cairo`.
 
-## How it updates
-
-Reputation updates automatically when a [staked match](/world/staked-matches) is settled. The winner's `total_wins` increments, the loser's `total_losses` increments, streaks adjust, and brackets recalculate if thresholds are crossed.
-
-## Visibility
-
-Your reputation is public. Other players can inspect your Hold on the hex grid to see your bracket, streak, and head-to-head record against them. Factions can review a player's reputation before extending an invite.
-
-Reputation is the fast-moving axis of progression — [kingdom tiers](/world/tiers) advance slowly through cumulative wins, while reputation shifts every match with streaks and bracket jumps.
-
-- [Kingdom tiers](/world/tiers) — the slow progression axis
-- [Factions](/world/factions) — social context for your record
-- [Staked matches](/world/staked-matches) — every match feeds your reputation
+Reputation is public world state. It does not replace tier; tier is based on cumulative wins and explicit upgrades.

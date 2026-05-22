@@ -1,6 +1,6 @@
 # Siege Deployment Reference
 
-This file is a quick lookup for where things run. The authoritative source for contract addresses is `dojo_sepolia.toml` + `frontend/.env.local` + `CLAUDE.md` at the repo root — update those when redeploying.
+This file is a quick lookup for where things run. The authoritative source for contract addresses is `dojo_sepolia.toml`, `manifest_sepolia.json`, `frontend/.env.local`, `CLAUDE.md`, and `AGENTS.md` at the repo root. Update those when redeploying.
 
 ## Local dev
 
@@ -9,9 +9,8 @@ Brought up by `./scripts/local-dev.sh` via `docker-compose.yml`:
 | Service | URL | Notes |
 |---------|-----|-------|
 | Katana | http://localhost:5050 | `ghcr.io/dojoengine/katana` (linux/amd64 under Rosetta) |
-| Torii GraphQL | http://localhost:8080/graphql | `ghcr.io/dojoengine/torii` |
-| Torii gRPC / SQL | http://localhost:8080 | same container |
-| Frontend | http://localhost:3000 | `cd frontend && npm run dev` |
+| Torii SQL / gRPC | http://localhost:8080 | `ghcr.io/dojoengine/torii` |
+| Frontend | http://localhost:3000 | `cd frontend && bun run dev` |
 
 `local-dev.sh` builds + migrates in a `builder` compose service, then writes the dev contract addresses into `frontend/.env.local` automatically.
 
@@ -22,12 +21,11 @@ Brought up by `./scripts/local-dev.sh` via `docker-compose.yml`:
 | Starknet RPC | https://api.cartridge.gg/x/starknet/sepolia (spec v0.9.0) |
 | Starknet RPC (starkli) | https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8 |
 | Torii (Slot) | https://api.cartridge.gg/x/siege-dojo/torii |
-| Torii GraphQL | https://api.cartridge.gg/x/siege-dojo/torii/graphql |
 | Torii SQL | https://api.cartridge.gg/x/siege-dojo/torii/sql |
 
-World address: `0x07ba32eaaa2a25145ea713e17ad1f42dc7f9f08355a2fd058a9a875e609fa8c0` (see `dojo_sepolia.toml`).
+World address: `0x05ae03c23b817afa096a51e3b04e31c176f168ee8193465229d08fa67366a942` (seed `siege_dojo_v7`; see `dojo_sepolia.toml`).
 
-Current 1v1 + crafting contract addresses are tracked in `CLAUDE.md` under the 1v1 Contracts section and in `frontend/.env.local`. When those change, update both plus `frontend/src/lib/contracts1v1.ts` fallbacks.
+Current contract addresses are tracked in `manifest_sepolia.json`, `CLAUDE.md`, `AGENTS.md`, and `frontend/.env.local`. When those change, update those docs and set frontend env vars explicitly; some frontend fallback addresses are known to lag deployments.
 
 ## Torii config
 

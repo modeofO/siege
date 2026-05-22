@@ -1,102 +1,138 @@
 # Siege MCP Server v2
 
+`mcp-server-2` is the active MCP server for Siege. It reads Torii state, watches matches, and submits write transactions through a Cartridge session after browser approval.
+
+Run it with Node, not Bun. Cartridge's WASM shims are not reliable under Bun's runtime.
+
 ## Setup
 
 ```bash
 cd mcp-server-2
 pnpm install
 cp .env.example .env
-```
-
-> ⚠️ **Run under Node, not Bun.** Cartridge's `wasm-bindgen` shims fail
-> under Bun's WASM loader. `bun install` is fine; running uses `tsx`/`node`.
-
-## Build
-
-```bash
 pnpm run build
 ```
 
-## Wire into Claude Code
+Minimum `.env` for Sepolia:
+
+```bash
+TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
+RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
+CHAIN_ID=SN_SEPOLIA
+MANIFEST_PATH=../manifest_sepolia.json
+ABILITY_TOKEN_ADDRESS=0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05
+SIEGE_FRONTEND_URL=https://localhost:3000
+```
+
+Resource token env vars are optional but should be set before live use because the defaults currently differ from `scripts/init-sepolia-resource-config.sh`:
+
+```bash
+IRON_TOKEN_ADDRESS=0x773f033bcbeb2e6362491d45680d7f7c788222c4a7deba580d7c89ab1251838
+LINEN_TOKEN_ADDRESS=0x3602775d72b9fbb0cbc70fa27f15a8466779a5b5b224de5024378d6f7f0f91
+STONE_TOKEN_ADDRESS=0x555c070dcd35bfe65c12c1ba89c76136df3af1b9bb9e765fc0a3f711cddeb29
+WOOD_TOKEN_ADDRESS=0x777850aaa4cd27f40550464e9528d2a159836f722dd362e9fe1f3f4591fcb30
+EMBER_TOKEN_ADDRESS=0x3d539cd317ecf470532a281922722826fadfa13eb5cc45f448ad714ef80cba1
+SEEDS_TOKEN_ADDRESS=0x25372cc987ebff79ca4a781aadb02ef8853d43b496ee381f382c59f7deafb35
+```
+
+## Claude Code
 
 ```bash
 claude mcp add siege -- node /Users/boat/Projects/siege/mcp-server-2/dist/index.js
 ```
 
-The server self-locates `.env`, the manifest, and the persisted session via
-`import.meta.url`, so it works regardless of who launches it or from which
-directory. First run prints a Cartridge auth URL to stderr — approve once,
-session persists to `.cartridge/`, subsequent runs sign silently.
+The server self-locates `.env`, the manifest, `agent-prompt.md`, and the Cartridge session directory from `import.meta.url`. First write use prints a Cartridge auth URL to stderr. Approve it once; the session persists in `.cartridge/`.
 
-## Tools
+Read tools work as soon as Torii is reachable. Write tools return a `not_ready` status until the Cartridge session is approved.
 
-Read tools work as soon as `TORII_URL` is reachable. Write tools wait on the
-Cartridge session.
+## Commands
 
-| Tool                                  | Kind  | Purpose                                             |
-| ------------------------------------- | ----- | --------------------------------------------------- |
-| `siege_whoami`                        | write | Authenticated agent address                         |
-| `siege_get_match_state`               | read  | Phase, HP, nodes, budgets, modifiers                |
-| `siege_get_round_history`             | read  | Recent revealed rounds                              |
-| `siege_get_round_details`             | read  | Full snapshot of one round                          |
-| `siege_get_my_status`                 | read  | Your slot, budget, commit/reveal flags              |
-| `siege_get_world_state`               | read  | World/resource config and parcel map                |
-| `siege_get_parcel`                    | read  | One parcel by id                                    |
-| `siege_get_player_kingdom`            | read  | Kingdom, reputation, presets, pillage, faction info |
-| `siege_get_staked_match`              | read  | Match state plus staked ability escrow              |
-| `siege_get_pillage_status`            | read  | Active pillages and pillage eligibilities           |
-| `siege_get_factions`                  | read  | Factions, members, and pending invites              |
-| `siege_get_player_cosmetics`          | read  | Equipped cosmetics (banner, parcel_skin, hold_decoration) |
-| `siege_my_abilities`                  | read  | ERC-1155 ability token balances for the agent       |
-| `siege_register_player`               | write | world_system.register_player                        |
-| `siege_claim_drip`                    | write | world_system.claim_drip                             |
-| `siege_upgrade_kingdom`               | write | world_system.upgrade_kingdom                        |
-| `siege_create_staked_match`           | write | VRF + world_system.create_staked_match              |
-| `siege_join_staked_match`             | write | world_system.join_staked_match                      |
-| `siege_settle_match`                  | write | world_system.settle_match                           |
-| `siege_claim_parcel`                  | write | world_system.claim_parcel                           |
-| `siege_set_preset_defense`            | write | conquest.set_preset_defense                         |
-| `siege_initiate_conquest`             | write | VRF + conquest.initiate_conquest                    |
-| `siege_initiate_pillage`              | write | world_system.initiate_pillage                       |
-| `siege_claim_pillage_drip`            | write | world_system.claim_pillage_drip                     |
-| `siege_create_faction`                | write | world_system.create_faction                         |
-| `siege_invite_faction_member`         | write | world_system.invite_member                          |
-| `siege_accept_faction_invite`         | write | world_system.accept_invite                          |
-| `siege_leave_faction`                 | write | world_system.leave_faction                          |
-| `siege_kick_faction_member`           | write | world_system.kick_member                            |
-| `siege_set_faction_reinforcement`     | write | world_system.set_faction_reinforcement              |
-| `siege_set_cosmetic`                  | write | world_system.set_cosmetic                           |
-| `siege_set_ability_operator_approval` | write | AbilityToken.set_approval_for_all                   |
-| `siege_create_match`                  | write | Multicall: VRF + actions_1v1.create_match_1v1       |
-| `siege_commit`                        | write | Generate salt + hash + submit commit                |
-| `siege_reveal`                        | write | Submit reveal with stored salt + move               |
-| `siege_resolve_round`                 | write | Multicall: VRF + resolution_1v1.resolve_round       |
-| `siege_force_timeout`                 | write | Force timeout when a deadline elapses               |
-
-Set `ABILITY_TOKEN_ADDRESS` before approving the Cartridge session if you want
-`siege_set_ability_operator_approval` to be available. Staked match creation
-and joining require `world_system` to be approved as an AbilityToken operator.
+```bash
+pnpm run build
+pnpm run test
+pnpm run dev
+pnpm run start
+```
 
 ## Architecture
 
-```
-src/
-  index.ts      stdout redirect, .env load, transport, background bootstrap, live resource notifications
-  paths.ts      self-locating PROJECT_ROOT + tiny .env parser
-  config.ts     env + manifest loading
-  session.ts    Cartridge SessionProvider singleton
-  policies.ts   allowed (contract, entrypoint) pairs
-  tx.ts         Call helpers + revert-reason extraction
-  state.ts      Torii SQL queries
-  torii.ts      generic Torii gRPC/query helpers
-  live.ts       Torii gRPC invalidation bridge
-  match-resource.ts SQL-backed MCP match state resource
-  hash.ts       Poseidon move commitment
-  move.ts       Zod move schema + budget validation
-  tools.ts      tool definitions + registry
+```text
+src/index.ts           MCP process, stdio transport, session bootstrap, live updates
+src/config.ts          env and Dojo manifest loading
+src/session.ts         Cartridge SessionProvider singleton
+src/policies.ts        session policy construction
+src/tools.ts           39 tool definitions and handlers
+src/state.ts           Torii SQL state reads
+src/torii.ts           generic Torii helpers
+src/live.ts            Torii gRPC invalidation bridge
+src/match-resource.ts  SQL-backed MCP match resource
+src/hash.ts            Poseidon commitment helpers
+src/move.ts            move schema and budget validation
+src/damage.ts          local damage prediction helpers
+src/tx.ts              Starknet call helpers and revert extraction
+src/paths.ts           project-root and dotenv helpers
 ```
 
-Until the Cartridge session is approved, write tools return
-`{ status: "not_ready", message: "Open <auth_url>..." }`. Reads work normally.
-Contract addresses come from the Dojo manifest (`MANIFEST_PATH`), so the
-session policy and tx targets always agree.
+Contract addresses come from `MANIFEST_PATH`, so policy targets and transaction targets agree for Dojo contracts. AbilityToken and resource token addresses come from env/defaults.
+
+## Tools
+
+Current registered tools: 39.
+
+Read tools:
+
+- `siege_get_match_state`
+- `siege_get_round_history`
+- `siege_get_round_details`
+- `siege_get_my_status`
+- `siege_my_abilities`
+- `siege_get_world_state`
+- `siege_get_parcel`
+- `siege_get_player_kingdom`
+- `siege_get_player_cosmetics`
+- `siege_get_forge_info`
+- `siege_get_staked_match`
+- `siege_get_pillage_status`
+- `siege_get_factions`
+
+Write tools:
+
+- `siege_whoami`
+- `siege_set_cosmetic`
+- `siege_craft_ability`
+- `siege_register_player`
+- `siege_claim_drip`
+- `siege_upgrade_kingdom`
+- `siege_create_staked_match`
+- `siege_join_staked_match`
+- `siege_settle_match`
+- `siege_claim_parcel`
+- `siege_set_preset_defense`
+- `siege_initiate_conquest`
+- `siege_initiate_pillage`
+- `siege_claim_pillage_drip`
+- `siege_create_faction`
+- `siege_invite_faction_member`
+- `siege_accept_faction_invite`
+- `siege_leave_faction`
+- `siege_kick_faction_member`
+- `siege_set_faction_reinforcement`
+- `siege_set_ability_operator_approval`
+- `siege_create_match`
+- `siege_commit`
+- `siege_reveal`
+- `siege_resolve_round`
+- `siege_force_timeout`
+
+## Match Flow For Agents
+
+1. Call `siege_whoami`.
+2. Call `siege_get_match_state` and `siege_get_my_status`.
+3. Build a move within budget.
+4. Call `siege_commit`; store the returned salt and exact move.
+5. Reveal only after both commits are present.
+6. Call `siege_reveal` with the same salt and move.
+7. Resolve after both reveals.
+8. After a staked match finishes, call settle, claim drip, and if eligible claim a parcel or pillage.
+
+Ability activations are single-use per match. `siege_my_abilities` should be checked before committing an ability id.

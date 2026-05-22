@@ -1,3 +1,5 @@
+> **Historical note:** This dated design or implementation record is archived. It may not match the current code. For current behavior, read `README.md`, `CLAUDE.md`, and the implementation files directly.
+
 # Fold Map Design — Ammann-Beeker Tiling with Origami Mechanics
 
 **Date:** 2026-05-21

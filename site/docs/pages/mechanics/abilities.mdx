@@ -1,6 +1,6 @@
 ---
 title: Abilities
-description: Craftable abilities that shape the battle.
+description: Craftable ERC-1155 abilities.
 ---
 
 import { AbilityCard } from '@/components/AbilityCard'
@@ -8,26 +8,28 @@ import { ABILITIES } from '@/data/abilities'
 
 # Abilities
 
-*Somewhere between the forge and the altar, a few strange things get made. You hoard them for the round that has to go your way.*
+Abilities are ERC-1155 tokens. They are crafted from resources, held in your wallet, staked into matches, and activated once per match.
 
-Abilities are single-use items that can bend a round in your favor — a crack in a stubborn gate, a blanket over a bad one, a curse laid on the opponent's ledger. They live in your Cartridge wallet as ERC-1155 tokens, which means they're fully tradeable, transferable, and visible alongside everything else you own.
-
-There are **five distinct ability types**, and each type has two variants: a **Tier 1** version and a stronger **Tier 2** version. T1 and T2 share the same name and the same general shape of effect — T2 is simply a harder-hitting version of the same idea, at a much higher cost.
+There are five ability types. Each has a T1 token and a stronger T2 token.
 
 ## Crafting
 
-Crafting consumes [resource tokens](/mechanics/resources). From the crafting interface you approve the tokens the recipe needs, call `craft_ability(id)` for a T1 or `craft_ability_tier2(type)` for a T2, and the contract burns the resources and mints a 1/1 ability token to your address. The whole flow is gasless through your Controller session — no wallet prompts, no fees.
+T1 crafting burns resource tokens and mints one ability token. If your registered Hold has not used its free craft, the first T1 craft is free.
 
-T2 crafting has one extra requirement: along with the resource cost, **you burn 1 of the matching T1 ability** on craft. You must already own the T1 version to craft the T2 version of the same type. T2 is an upgrade path, not a shortcut — the T1 is the price of admission.
+T2 crafting requires Strategos tier or higher. It burns the matching T1 ability plus the T2 resource recipe.
 
-Crafted abilities persist across matches. You can stockpile them between rounds, between matches, even between entire sessions, and deploy them only when the round actually calls for it.
+Batch crafting exists for both T1 and T2.
+
+## Using abilities
+
+In a staked match, your staked ability IDs are copied into `MatchAbilities1v1`. During reveal, you may activate one available ability ID. Once revealed, that ability slot is marked used for the rest of the match.
+
+When the world is folded, numeric ability effects are doubled.
 
 ## Tier 1
 
 {ABILITIES.filter(a => a.tier === 1).map(a => <AbilityCard key={a.id} ability={a} />)}
 
 ## Tier 2
-
-T2 abilities are the same five types as T1, tuned harder. They cost roughly **10× the resources** of their T1 counterpart and consume 1 of the matching T1 on craft. In return, the effects are considerably stronger — the exact numbers are on each card below.
 
 {ABILITIES.filter(a => a.tier === 2).map(a => <AbilityCard key={a.id} ability={a} />)}

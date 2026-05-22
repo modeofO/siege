@@ -1,186 +1,294 @@
-# Siege Dojo 🏯
+# Siege Dojo
 
-A Starknet / Dojo ECS strategy game. Two gameplay modes share one world (`siege_dojo` namespace): fast **1v1 commit-reveal matches** and a **persistent hex-grid metagame** where holds battle over parcels, resources, and reputation.
+Siege is a Starknet / Dojo strategy game in the `siege_dojo` namespace. The codebase now has three layers:
 
-Player-facing docs: [siege-mauve.vercel.app](https://siege-mauve.vercel.app/).
+- **1v1 battles**: commit-reveal rounds with gate modifiers, resource nodes, traps, and single-use ability tokens.
+- **The Marches**: a persistent tile-graph world where Holds own parcels, stake abilities, claim land, pillage neighbors, form factions, and fight asynchronous conquests.
+- **Legacy 2v2 contracts**: still present in `src/systems/actions.cairo`, `commit_reveal.cairo`, and `resolution.cairo`, but not the primary product path.
 
-## Game Modes
+This README describes the code as of May 22, 2026. Treat older dated plans and specs as historical unless current code confirms them.
 
-### 1v1 Arena (`/match-1v1`)
+## Current Status
 
-Single-match tactical duels — each player controls both attack and defense with a shared budget of 10 (+node bonuses). Vault HP starts at 50.
+The latest branch is on a world-map migration. The old hex map has been replaced by a 40-tile square/rhombus tile graph with sectors, zones, tile adjacency, and fold state.
 
-- **13-slot allocation**: 3 pressure points (attack), 3 gates + repair (defense), 3 resource-node contests, 3 traps
-- **Gate modifiers** roll each round via Cartridge vRNG: Normal, Narrow Pass, Mirror Gate, Deadlock, Reflection
-- **Node traps** (2 pts each): +5 damage if opponent takes the node, consumed after one round
-- **Abilities**: staked ERC-1155 tokens deployed once per match — 5 types × 2 tiers (Siege Sword, Stone Cloak, Ember Blast, Hex, Fortify)
-- **Resource nodes**: Forge / Quarry / Grove — controlling them mints paired ERC-20 tokens (IRON+LINEN, STONE+WOOD, EMBER+SEEDS)
-- **Commit-reveal**: 14-element Poseidon hash (salt + 13 allocations)
+Important current mismatches:
 
-A **2v2 mode** also exists in the contracts (`actions`, `commit_reveal`, `resolution`) and remains on-chain, but the UI no longer surfaces it — 1v1 is the supported flow.
+- `frontend/src/lib/tileGeometry.json` and `scripts/tiling-generator/seed.json` were regenerated in commit `9b0f050` with the note "needs updated contracts." Sepolia config points at v7, but the newest geometry may still require a contract/world reinitialization.
+- Some frontend direct-call wrappers still have older Sepolia hardcoded fallbacks. For Sepolia, set the `NEXT_PUBLIC_*` contract env vars explicitly instead of relying on fallbacks.
+- Resource token addresses are not uniform across all scripts. `scripts/init-sepolia-resource-config.sh` and `torii_sepolia.toml` use the v7 ResourceConfig set; `frontend/src/lib/useResourceBalances.ts`, `scripts/check-balances.ts`, and MCP defaults still contain an older token set.
+- `frontend/src/lib/tiers.ts` says Basileia has 4 ability slots, but `world_system.cairo` currently caps match ability stakes at 3 for tier 2 and tier 3.
+- T2 crafting calls `AbilityToken.burn`, so the live AbilityToken `burner` must be set to `crafting_1v1`. If T2 crafting reverts with `Not burner`, rerun the ability-token setup script.
 
-### The Marches (`/world`)
+## Gameplay
 
-Persistent metagame wrapping 1v1 matches. Register a **Hold** (the in-game name for a kingdom), claim three home parcels, stake abilities in matches, and take territory on the win.
+### 1v1 Battles
 
-- **Tiers** (by `total_wins`): Polis → Strategos (10) → Hegemonia (30) → Basileia (60). Each tier raises parcel cap, match ability slots, and preset-defense slots.
-- **Claim drip**: `claim_drip()` mints resource tokens for every owned parcel on a cooldown.
-- **Staked matches**: both players stake up to 3 abilities; winner takes all stakes and may claim an adjacent non-home parcel.
-- **Conquest**: async attacks against a neighbor's preset defense, resolved in one tx via Cartridge vRF (attacker budget 10 / HP 10, defender budget 12 / HP 15).
-- **Pillage**: match winners become eligible to pillage a losing neighbor's home parcel — siphoning its drip until the pillage expires or breaks.
-- **Reputation**: tracked bracket (Unranked → Bronze → Silver → Gold → Diamond) from win/loss counts + streaks.
-- **Factions**: kingdoms can band into factions (invite / accept / leave) for social play.
-- **Spectator mode**: live match viewing at `/match-1v1/{id}/spectate` — dual health bars, round counter, auto-refresh.
-- **Cosmetics**: equippable hold crests (ArcaneSeal) and parcel skins (WardGlyph) via the Forge (`/forge`).
+Each battle has two players, two 50 HP vaults, and up to 10 rounds. A round follows commit, reveal, then resolve.
 
-### Frontend terminology
+Each player spends a budget of `10 + owned_resource_nodes` across:
 
-To avoid collision with other Starknet strategy games, the UI renames backend concepts:
+- `attack`: 3 gate pressure values.
+- `defense`: 3 gate garrison values.
+- `repair`: heals the vault before gate damage, capped at 3.
+- `nodes`: 3 resource-node contest values.
+- `traps`: 3 hidden node traps, each costing 2 budget.
+- `ability_id` and `ability_target`: optional single-use staked ability activation.
 
-| Backend | Frontend label |
-|---|---|
-| `World`, `/world` | **THE MARCHES** |
-| `PlayerKingdom`, "kingdom" | **Your Hold** |
-| `register_player` | **CLAIM YOUR HOLD** |
+The 1v1 reveal hash is Poseidon over:
 
-Backend models and function names are unchanged.
-
-## Architecture
-
-- **Cairo contracts** (Dojo v1.8.0, cairo 2.13.1) — ECS models + systems in `src/`
-- **Frontend** (Next.js 16, React 19, Tailwind 4, Starknet.js v8) in `frontend/`
-- **Torii indexer** — SQL + gRPC over world state (hosted on Slot for Sepolia)
-- **Cartridge Controller** — session-based gasless tx via paymaster on Sepolia
-- **AbilityToken** (ERC-1155) — standalone Starknet contract in `src/tokens/`, fully on-chain SVG metadata
-- **Resource tokens** (6 ERC-20) — paired per resource node
-- **MCP server** — read-only Siege game-state tools (`mcp-server/`)
-
-## Project Structure
-
+```text
+salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, ability_id, ability_target
 ```
-siege/
-├── src/
-│   ├── systems/                # 1v1 + 2v2 + world contracts
-│   │   ├── actions_1v1.cairo   commit_reveal_1v1.cairo   resolution_1v1.cairo
-│   │   ├── crafting_1v1.cairo
-│   │   ├── world_system.cairo  conquest.cairo
-│   │   └── actions.cairo       commit_reveal.cairo       resolution.cairo   (legacy 2v2)
-│   ├── models/                 # Dojo ECS models (match state, parcels, kingdoms, pillage…)
-│   ├── tokens/                 # AbilityToken ERC-1155 + on-chain SVG metadata
-│   ├── utils/hex.cairo         # offset-coord hex math
-│   └── tests/                  # ~166 tests across 19 files
-├── frontend/                   # Next.js app
-│   └── src/
-│       ├── app/                # /, /match-1v1, /craft, /world, /forge, /match (hidden legacy)
-│       ├── components/         # HexGrid, AllocationForm1v1, AbilitySelector, FactionPanel, ArcaneSeal…
-│       └── lib/                # contracts1v1, conquest, pillage, reputation, tiers, factions…
-├── mcp-server-2/               # TypeScript MCP server (47 tools — read + write via Cartridge session)
-├── scripts/                    # local-dev.sh, deploy scripts, siege-cli/, test bots
-├── docs/                       # specs + implementation plans under superpowers/
-├── skill/SKILL.md              # in-depth development skill
-├── dojo_dev.toml               # local (gitignored — has dev keys)
-├── dojo_sepolia.toml           # Sepolia profile
-└── torii_sepolia.toml          # Torii config for hosted indexer
+
+Gate modifiers are rolled per gate with Cartridge vRNG:
+
+| Code | Name        | Effect                                                                                           |
+| ---- | ----------- | ------------------------------------------------------------------------------------------------ |
+| 0    | Normal      | Standard `max(attack - defense, 0)` damage.                                                      |
+| 1    | Narrow Pass | Attack and defense are capped at 3.                                                              |
+| 2    | Mirror      | Attack and defense swap at that gate.                                                            |
+| 3    | Deadlock    | No damage at that gate.                                                                          |
+| 4    | Reflection  | Damage becomes overflow split across the other non-deadlock gates and reduced by unused defense. |
+
+Resource nodes mint paired ERC-20 resources after resolution:
+
+| Node   | Tokens        |
+| ------ | ------------- |
+| Forge  | IRON + LINEN  |
+| Quarry | STONE + WOOD  |
+| Grove  | EMBER + SEEDS |
+
+### Abilities
+
+Abilities are ERC-1155 tokens from `src/tokens/ability_token.cairo`. IDs 1-5 are T1; IDs 6-10 are T2.
+
+| ID     | Ability     | T1 effect / cost                                                     | T2 effect / cost                                                                                |
+| ------ | ----------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| 1 / 6  | Siege Sword | Set target gate attack to 5. Costs 8 Iron + 5 Wood.                  | Set target gate attack to 10. Costs 30 Iron + 20 Wood + 10 Ember + matching T1.                 |
+| 2 / 7  | Stone Cloak | Halve gate damage taken. Costs 8 Stone + 5 Linen.                    | Zero gate damage taken. Costs 30 Stone + 20 Linen + 10 Seeds + matching T1.                     |
+| 3 / 8  | Ember Blast | Deal 2 direct vault damage. Costs 8 Ember + 5 Seeds.                 | Deal 6 direct vault damage. Costs 30 Ember + 20 Seeds + 10 Iron + matching T1.                  |
+| 4 / 9  | Hex         | Reduce opponent total damage by 3. Costs 5 Iron + 5 Stone + 3 Ember. | Reduce opponent total damage by 8. Costs 20 Iron + 20 Stone + 10 Ember + 10 Wood + matching T1. |
+| 5 / 10 | Fortify     | Add 1 defense at every gate. Costs 5 Stone + 5 Linen + 3 Wood.       | Double defense at every gate. Costs 20 Stone + 20 Linen + 10 Wood + matching T1.                |
+
+When the world is folded, `resolution_1v1.cairo` and `conquest.cairo` double numeric ability effects where a multiplier makes sense. Stone Cloak's halve/zero effect is not doubled.
+
+Registration mints starter ability tokens 1, 2, and 3 if `ResourceConfig.ability_token` is set.
+
+### The Marches
+
+The Marches is backed by a tile graph, not hex coordinates.
+
+Core models:
+
+- `Parcel`: keyed by `tile_id`; stores `sector_id`, `tile_shape`, `zone`, `parcel_type`, `owner`, `is_home`, and `is_stranded`.
+- `TileAdjacency`: four edge slots per tile, using `0xFFFFFFFF` as the no-neighbor sentinel.
+- `WorldConfig`: total tile count, next tile id, initialization flag, world-fold flag, fold epoch, and total fold count.
+- `FoldEvent`: records sector folds and world-fold toggles.
+- `SectorEnvironment`: defined but not yet central to the frontend.
+
+`initialize_world` creates the tile rows and adjacency rows. `expand_world` appends more tiles. The current generated seed contains 40 tiles and 128 adjacency triples.
+
+A player registers a Hold with three home parcel types. The contract chooses three unclaimed frontier tiles from the sector with the most available frontier space, marks them as homes, and records the player in `PlayerKingdom`.
+
+Claim drip currently mints only for home parcels. It skips homes under active pillage and homes marked stranded. Zone multipliers are:
+
+- Core: 3x
+- Mid: 2x
+- Frontier: 1x
+
+### Staked Matches, Parcels, and Pillage
+
+`world_system.create_staked_match` escrows 1-3 ability tokens from player A and creates a pending 1v1 match. `join_staked_match` escrows player B's matched wager, refunds A's excess stakes, wires `MatchAbilities1v1`, and activates the match.
+
+After a staked match finishes:
+
+- `settle_match` transfers escrowed abilities to the winner, returns both sides' abilities on draw, increments the winner's total wins, updates reputation and head-to-head records, releases the loser's highest-id non-home parcel, mints one resource drip for both players' owned parcels, and may grant pillage eligibility.
+- `claim_parcel(match_id, parcel_id, parcel_type)` lets the winner claim one unclaimed adjacent tile and assign its type.
+- A pillage eligibility lasts 24 hours. `initiate_pillage` targets an adjacent loser home parcel. `claim_pillage_drip` siphons that home's resource drip until expiration or broken adjacency.
+
+Parcel caps are not enforced in current Cairo code.
+
+### Conquest
+
+Conquest is a one-transaction attack against another player's non-home parcel.
+
+- Defender preset budget: 12.
+- Attacker budget: 10.
+- Defender HP: 15.
+- Attacker HP: 10.
+- Ties go to the defender.
+
+The attacker must own a tile adjacent to the target. Faction allies cannot conquest one another. If defender reinforcement is enabled, up to three adjacent faction allies can contribute preset defenses to the random preset pool.
+
+If `ability_id` is non-zero, `conquest.cairo` checks ownership and calls `safe_transfer_from(attacker, conquest_contract, ability_id, 1, [])` before resolving. That means conquest ability use requires ERC-1155 operator approval for the conquest contract and currently leaves the token in the conquest contract.
+
+On attacker win, the target parcel transfers to the attacker. On attacker loss, a non-home attacker parcel transfers to the defender if one exists.
+
+### Factions and Cosmetics
+
+Factions live in `world_system.cairo`.
+
+- Creating a faction requires Strategos tier and burns 30 Iron + 30 Stone + 20 Wood.
+- Leaders invite and kick members.
+- Members have a 24-hour cooldown after leaving.
+- Reinforcement can be toggled per Hold and affects conquest defense.
+- Allied adjacency can protect a home from pillage and bridge stranded tiles during fold recomputation.
+
+Cosmetics are stored in `PlayerCosmetics` by `world_system.set_cosmetic`. The frontend uses Forge circuits as banners, parcel skins, and hold decorations.
+
+## Project Layout
+
+```text
+src/
+  systems/
+    actions_1v1.cairo        1v1 match creation and config
+    commit_reveal_1v1.cairo  1v1 commit, reveal, timeout
+    resolution_1v1.cairo     1v1 damage, nodes, traps, abilities
+    crafting_1v1.cairo       ability crafting and batch crafting
+    world_system.cairo       holds, staking, settlement, drip, pillage, factions, folds
+    conquest.cairo           async parcel conquest
+    actions.cairo            legacy 2v2
+    commit_reveal.cairo      legacy 2v2
+    resolution.cairo         legacy 2v2
+  models/                    Dojo ECS models
+  tokens/                    AbilityToken, ResourceToken, metadata helpers
+  utils/tile_graph.cairo     tile adjacency helpers
+  utils/hex.cairo            legacy hex helper, still tested
+  tests/                     23 Cairo test files
+
+frontend/
+  src/app/                   Next.js routes
+  src/components/            battle, world, forge, faction UI
+  src/lib/                   contract wrappers, Torii queries, state hooks
+  src/lib/tileGeometry.json  rendered tile geometry for TilingMap
+
+mcp-server-2/                active MCP server
+mcp-server/                  older read-only MCP server
+scripts/                    deploy, token, local-dev, and bot scripts
+scripts/siege-cli/           CLI for 1v1 matches
+scripts/tiling-generator/    generated tile seed and geometry
+site/                       Vocs player documentation site
+docs/superpowers/           historical specs and implementation plans
 ```
 
 ## Toolchain
 
-| Tool | Version | Notes |
-|------|---------|-------|
-| sozo | **v1.8.6** | ≥ v1.8.1 required for Sepolia (blake2s CASM hashing) |
-| scarb | 2.13.1 | matches dojo v1.8.0 |
-| cairo | 2.13.1 | |
-| dojo | v1.8.0 | pinned in `Scarb.toml` |
-| starkli | 0.4.2 | account management only |
+| Tool             | Version / source                              |
+| ---------------- | --------------------------------------------- |
+| Cairo            | 2.13.1                                        |
+| Scarb            | 2.13.1                                        |
+| Dojo dependency  | `dojo` v1.8.0 in `Scarb.toml`                 |
+| sozo             | v1.8.6 expected for Sepolia                   |
+| Katana container | Dojo v1.8.0, Katana 1.7.0                     |
+| Torii container  | Dojo v1.8.0, Torii 1.8.3                      |
+| Frontend         | Next 16.2.6, React 19.2.3, Starknet.js 8.9.2  |
+| MCP server       | TypeScript, MCP SDK 1.29.0, Starknet.js 8.5.2 |
 
-## Local Development
+## Development
 
-Prerequisites: Docker, Node.js ≥ 18, the Dojo toolchain (`curl -L https://install.dojoengine.org | bash && dojoup`).
-
-```bash
-./scripts/local-dev.sh        # starts katana + builds + migrates + grants writers + starts torii
-cd frontend && npm run dev    # frontend on localhost:3000 (experimental HTTPS)
-docker compose down           # tear down
-```
-
-Notes:
-- Dojo images ship AMD64 only — `docker-compose.yml` pins `platform: linux/amd64` (Rosetta on ARM Macs)
-- Katana CLI flags: `--http.addr` (not `--host`), `--http.cors_origins "*"`
-- Dev accounts live in `frontend/src/app/providers.tsx` (katana 1.7.0, seed 0)
-- `sozo migrate` syncs **zero** permissions by default — `local-dev.sh` runs `sozo auth grant writer` for all contracts afterwards
-
-### Frontend dual-mode (`providers.tsx`)
-
-Network mode is controlled by `NEXT_PUBLIC_NETWORK`:
-
-| Mode | Value | Provider | Wallet |
-|------|-------|----------|--------|
-| Dev (default) | `devnet` | 4 hardcoded Katana accounts | dropdown selector |
-| Sepolia | `sepolia` | `@starknet-react/core` + Cartridge Controller | connect button (session-based) |
-
-`useAccount()`, `useDevAccounts()`, and `isDevMode()` are the unified hooks. `DEVNET_TX_OPTS` (skip validation, zero gas) applies only in devnet mode; Sepolia relies on the Cartridge paymaster for fees.
-
-### Tests
+Install frontend dependencies:
 
 ```bash
-sozo test                                   # ~166 tests
-docker compose run --rm builder sozo test   # via Docker (ships sozo 1.8.6)
+cd frontend
+bun install
+bun run dev
 ```
 
-Coverage spans `test_actions_1v1`, `test_commit_reveal_1v1`, `test_resolution_1v1`, `test_modifiers_1v1`, `test_traps_1v1`, `test_abilities_1v1`, `test_ability_tiers`, `test_ability_token`, `test_world`, `test_staked_match`, `test_conquest`, `test_kingdom_tiers`, `test_reputation`, `test_pillaging`, and the legacy 2v2 suites.
+The frontend `predev` and `prebuild` hooks copy `manifest_dev.json` and `manifest_sepolia.json` from the repo root into `frontend/src/manifests/`.
 
-### Bot testing
+Local chain:
 
 ```bash
-cd scripts && MATCH_ID=3 npx tsx play-opponent.js   # 3 bot players
-cd scripts && bash run-test.sh                      # full automated round
+./scripts/local-dev.sh
 ```
 
-## Sepolia Deployment
+Current caveat: `scripts/local-dev.sh` still prints GraphQL-era Torii text and only grants writer permissions for the legacy contracts when migration does not grant permissions. If local world actions revert with permissions errors, grant writers for the 1v1, crafting, world, and conquest systems manually.
 
-Live on Starknet Sepolia — last deploy 2026-05-17 (v4, security key rotation).
+Contract tests:
 
-**World:** `0x051e8698f43b869b3e243344897d83ba236e6b049ab55e8b14b3a528bc690ce6`
-**RPC:** `https://api.cartridge.gg/x/starknet/sepolia` (spec v0.9.0)
-**Torii:** `https://api.cartridge.gg/x/siege-dojo/torii` (SQL, gRPC via Slot)
-
-### Contract Addresses (Sepolia v4)
-
-| Contract | Address |
-|----------|---------|
-| `actions_1v1` | `0xa503dbf655e21fe7e65c42f18662edc584aa6b3e8c8bb19e35fa57f62492ab` |
-| `commit_reveal_1v1` | `0x5304e2568417d2e67d63caab54db914900afbf23035687c63b4962d2f5d8f5b` |
-| `resolution_1v1` | `0x7d42eb63561f6f25315833d674002e3a53accd00bd02e243154009890122e3d` |
-| `crafting_1v1` | `0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2` |
-| `world_system` | `0x6d2455b76185900ffc6fb0fed0f91f4c61c7f4ac5e57a92d0fe8edc620b66f2` |
-| `conquest` | `0x26bd1b97c0c29dcef1a161ff835817c0f1940f21afc3a747f7637408fddc094` |
-| `AbilityToken` (ERC-1155, v4) | `0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05` |
-| `actions` (legacy 2v2) | `0x45e612a60f967ac0f1e8e406b9eb4928fd0742109ba816a6f2f3b232cd22d3a` |
-| `commit_reveal` (legacy 2v2) | `0x34087751f8e88c1b02e61be7c493e15f9a4d3f0d8b0803667b407069dc0a73b` |
-
-### Frontend `.env.local` for Sepolia
-
-Only `NEXT_PUBLIC_NETWORK`, `NEXT_PUBLIC_TORII_URL`, and `NEXT_PUBLIC_RPC_URL` are strictly required (contract addresses have hardcoded fallbacks in `lib/contracts*.ts`), but set all of them explicitly when redeploying so the frontend never silently pins to stale code.
-
+```bash
+sozo test
+docker compose run --rm builder sozo test
 ```
+
+Frontend checks:
+
+```bash
+cd frontend
+bun run lint
+bun run test
+bun run build
+```
+
+MCP checks:
+
+```bash
+cd mcp-server-2
+pnpm run build
+pnpm run test
+```
+
+## Sepolia
+
+Current config:
+
+- World seed: `siege_dojo_v7`
+- World address: `0x05ae03c23b817afa096a51e3b04e31c176f168ee8193465229d08fa67366a942`
+- RPC: `https://api.cartridge.gg/x/starknet/sepolia`
+- Torii: `https://api.cartridge.gg/x/siege-dojo/torii`
+- Torii start block: `10009090`
+
+Contracts from `manifest_sepolia.json`:
+
+| Tag                            | Address                                                             |
+| ------------------------------ | ------------------------------------------------------------------- |
+| `siege_dojo-actions`           | `0x2e9f46df80daf57789a15140c272e22575893e8db75e957ba3efbc020bb262a` |
+| `siege_dojo-actions_1v1`       | `0x4242c71cda43bdc6f24e0baa6eb353f1cca6e960cb3e622787c46e5083ff516` |
+| `siege_dojo-commit_reveal`     | `0x1c5ff97432e3f25892efbae549b4d43c84768a0b824f74caa590c932c491efd` |
+| `siege_dojo-commit_reveal_1v1` | `0x6a6b677b9dea4f766b10dcfe2907ad60861103263aa85c2ca2122db86eb2c52` |
+| `siege_dojo-conquest`          | `0x305fdf6f2fe07c08436fea5ea4e7c77b9f7515654e4e764af7c131d848b441f` |
+| `siege_dojo-crafting_1v1`      | `0x4d14cd36d9ab960de7b88da7421e87e16d028c1ab4b973d4b5892d1d193e130` |
+| `siege_dojo-resolution`        | `0x4a67025337a82aea39058228b81d91b22d6dc28035b05d3377607671334ccd2` |
+| `siege_dojo-resolution_1v1`    | `0x7f57549212a1db5b5cf8a1ac29eeed62f7e8566a5c08f16c737eedf54aa1842` |
+| `siege_dojo-world_system`      | `0x4d52c26bd2b9ff241807fd94d7a2cf53e97e126e560bbd987864099be742cea` |
+
+AbilityToken:
+
+```text
+0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05
+```
+
+Resource tokens used by `scripts/init-sepolia-resource-config.sh`:
+
+| Token | Address                                                             |
+| ----- | ------------------------------------------------------------------- |
+| IRON  | `0x773f033bcbeb2e6362491d45680d7f7c788222c4a7deba580d7c89ab1251838` |
+| LINEN | `0x3602775d72b9fbb0cbc70fa27f15a8466779a5b5b224de5024378d6f7f0f91`  |
+| STONE | `0x555c070dcd35bfe65c12c1ba89c76136df3af1b9bb9e765fc0a3f711cddeb29` |
+| WOOD  | `0x777850aaa4cd27f40550464e9528d2a159836f722dd362e9fe1f3f4591fcb30` |
+| EMBER | `0x3d539cd317ecf470532a281922722826fadfa13eb5cc45f448ad714ef80cba1` |
+| SEEDS | `0x25372cc987ebff79ca4a781aadb02ef8853d43b496ee381f382c59f7deafb35` |
+
+Recommended frontend Sepolia env:
+
+```bash
 NEXT_PUBLIC_NETWORK=sepolia
 NEXT_PUBLIC_TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
 NEXT_PUBLIC_RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
 
-NEXT_PUBLIC_ACTIONS_1V1_ADDRESS=0xa503dbf655e21fe7e65c42f18662edc584aa6b3e8c8bb19e35fa57f62492ab
-NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS=0x5304e2568417d2e67d63caab54db914900afbf23035687c63b4962d2f5d8f5b
-NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS=0x7d42eb63561f6f25315833d674002e3a53accd00bd02e243154009890122e3d
-NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2
-NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS=0x6d2455b76185900ffc6fb0fed0f91f4c61c7f4ac5e57a92d0fe8edc620b66f2
-NEXT_PUBLIC_CONQUEST_ADDRESS=0x26bd1b97c0c29dcef1a161ff835817c0f1940f21afc3a747f7637408fddc094
+NEXT_PUBLIC_ACTIONS_ADDRESS=0x2e9f46df80daf57789a15140c272e22575893e8db75e957ba3efbc020bb262a
+NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x1c5ff97432e3f25892efbae549b4d43c84768a0b824f74caa590c932c491efd
+NEXT_PUBLIC_ACTIONS_1V1_ADDRESS=0x4242c71cda43bdc6f24e0baa6eb353f1cca6e960cb3e622787c46e5083ff516
+NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS=0x6a6b677b9dea4f766b10dcfe2907ad60861103263aa85c2ca2122db86eb2c52
+NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS=0x7f57549212a1db5b5cf8a1ac29eeed62f7e8566a5c08f16c737eedf54aa1842
+NEXT_PUBLIC_CRAFTING_1V1_ADDRESS=0x4d14cd36d9ab960de7b88da7421e87e16d028c1ab4b973d4b5892d1d193e130
+NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS=0x4d52c26bd2b9ff241807fd94d7a2cf53e97e126e560bbd987864099be742cea
+NEXT_PUBLIC_CONQUEST_ADDRESS=0x305fdf6f2fe07c08436fea5ea4e7c77b9f7515654e4e764af7c131d848b441f
 NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS=0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05
-
-# Legacy 2v2 (UI hidden)
-NEXT_PUBLIC_ACTIONS_ADDRESS=0x45e612a60f967ac0f1e8e406b9eb4928fd0742109ba816a6f2f3b232cd22d3a
-NEXT_PUBLIC_COMMIT_REVEAL_ADDRESS=0x34087751f8e88c1b02e61be7c493e15f9a4d3f0d8b0803667b407069dc0a73b
 ```
 
-### Redeploying
+Deployment sequence:
 
 ```bash
 export DOJO_ACCOUNT_ADDRESS="0x..."
@@ -188,7 +296,6 @@ export DOJO_PRIVATE_KEY="0x..."
 
 sozo build -P sepolia
 sozo -P sepolia migrate
-
 sozo -P sepolia auth grant writer \
   siege_dojo,siege_dojo-actions \
   siege_dojo,siege_dojo-commit_reveal \
@@ -201,77 +308,45 @@ sozo -P sepolia auth grant writer \
   siege_dojo,siege_dojo-conquest
 ```
 
-`[[writers]]` in `dojo_*.toml` is **not** supported in this sozo — always grant via CLI. The safest deploy path is the bundled Docker builder (`docker compose run --rm builder sozo -P sepolia migrate`) which ships sozo v1.8.6.
+Then run the post-migration setup scripts that match the deployment:
 
-`starkli` uses a different RPC spec — use the v0.8 endpoint:
-
+```bash
+npx tsx scripts/deploy-v7.ts
+bash scripts/init-sepolia-resource-config.sh
 ```
+
+`starkli` should use the v0.8 RPC endpoint:
+
+```text
 https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8
 ```
 
-## Abilities (ERC-1155)
-
-Tokens IDs 1–10 on `AbilityToken`: IDs 1–5 are T1, IDs 6–10 are T2 (same 5 types, stronger). Transferable, visible in the Cartridge wallet.
-
-| Type | Name | T1 effect | T2 effect |
-|------|------|-----------|-----------|
-| 1 | Siege Sword | set gate attack to 5 | set gate attack to 10 |
-| 2 | Stone Cloak | halve gate damage | zero gate damage |
-| 3 | Ember Blast | +2 direct damage bypassing gates | +6 direct damage |
-| 4 | Hex | -3 to opponent total damage | -8 |
-| 5 | Fortify | +1 defense at all gates | double all defense |
-
-**Crafting flow:** the frontend multicalls `approve` on each required ERC-20 and then `craft_ability(id)` / `craft_ability_tier2(type)` on `crafting_1v1`. T2 burns 1 of the matching T1 plus larger resource costs. `crafting_1v1` burns inputs (`transfer_from` to `0x1`) and calls `AbilityToken.mint(caller, id, 1)`.
-
-**Metadata:** fully on-chain — `uri(token_id)` returns `data:application/json;base64,…` with inline SVG. Updating art: one `set_ability_svg(type, svg)` admin tx per ability. No redeploy, no external server, no IPFS.
-
-**Roles:** `admin` (deployer; transferable via `transfer_admin` since v4), `minter` = `crafting_1v1`, `minter2` = `world_system` (for starter mints and staked-match settlement), `burner` = `0x0` until Phase 2B.
-
 ## MCP Server
 
-`mcp-server-2/` exposes 47 Siege tools over the Model Context Protocol — read tools for match state, world state, kingdom, reputation, factions, and abilities; write tools for committing, revealing, resolving, staking, settling, conquest, pillage, and faction management. The server holds a Cartridge session key and submits transactions on-chain itself.
+`mcp-server-2/` is the active MCP server. It registers 39 tools and can submit transactions through a Cartridge session after browser approval.
 
 ```bash
-cd mcp-server-2 && pnpm install && pnpm run build
-claude mcp add siege -- node /path/to/siege/mcp-server-2/dist/index.js
+cd mcp-server-2
+pnpm install
+pnpm run build
 ```
 
-First run prints a Cartridge auth URL — approve once and the session persists to `.cartridge/`. Read tools work immediately; write tools wait on session approval. Contract addresses come from the Dojo manifest, so session policy and tx targets always agree.
-
-### Ask Torii (remote MCP)
-
-[Ask Torii](https://liquid-data.dev/) is a hosted natural-language MCP that accepts queries against any Torii-indexed world — endpoint `https://asktorii.com/mcp`. Point `query-world` at the Sepolia Torii URL to query matches, parcels, pillages, or any other Siege state without building custom readers.
-
-Built by [@frontboat](https://github.com/frontboat).
-
-## CLI (`scripts/siege-cli/`)
+Required runtime env:
 
 ```bash
-cd scripts/siege-cli
-
-# Cartridge Controller (default — first run opens a browser for auth)
-npx tsx siege-cli.ts --create --opponent 0x<addr>
-npx tsx siege-cli.ts --match <id>
-
-# Private-key fallback
-npx tsx siege-cli.ts --match <id> --use-private-key
-
-# Scripting via JSON
-npx tsx siege-cli.ts --match <id> --json \
-  '{"attack":[3,2,1],"defense":[2,1,0],"repair":1,"nodes":[0,0,0]}'
+TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
+RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
+MANIFEST_PATH=../manifest_sepolia.json
+ABILITY_TOKEN_ADDRESS=0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05
 ```
 
-## Docs & Specs
+## Documentation
 
-- `skill/SKILL.md` — deep development skill (architecture, hash layouts, debug checklist)
-- `docs/superpowers/specs/` — recent design specs (game redesign, reputation, tiers, conquest, pillaging, factions, docs site)
-- `docs/superpowers/plans/` — implementation plans tied to each spec
-- `docs/blender-style-guide.md` — art style guide
-- `SEPOLIA_MIGRATION_SUMMARY.md` — historical notes on the blake2s migration blocker
-
-## Open Work
-
-Active bugs and upcoming features are tracked as GitHub issues on `modeofO/siege` (currently up to #42). Check the issue list for priorities before starting new work.
+- `site/docs/pages/`: player-facing docs site.
+- `frontend/README.md`: frontend architecture and env.
+- `mcp-server-2/README.md`: MCP setup and tool list.
+- `skill/SKILL.md`: compact development guide for Codex/agent use.
+- `docs/superpowers/`: historical specs and plans. Do not treat dated plans as current truth without checking code.
 
 ## License
 

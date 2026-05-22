@@ -1,10 +1,10 @@
-// Verify AbilityToken wiring: minter role, and ResourceConfig.ability_token field.
+// Verify AbilityToken wiring for crafting/staking.
 // Usage: npx tsx scripts/verify-ability-wiring.ts
 import { RpcProvider } from "starknet";
 
 const RPC = "https://api.cartridge.gg/x/starknet/sepolia";
-const ABILITY_TOKEN = "0x6de8e6addfd54cb600d5a7549e92fa5b275379ff85364626874a00bc138d37c";
-const CRAFTING_1V1 = "0x66ec68d64ee749f1c5ba5339788d585d6f4aea75ee38b48932115811a185235";
+const ABILITY_TOKEN = "0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05";
+const CRAFTING_1V1 = "0x4d14cd36d9ab960de7b88da7421e87e16d028c1ab4b973d4b5892d1d193e130";
 
 async function main() {
   const provider = new RpcProvider({ nodeUrl: RPC });
@@ -31,9 +31,12 @@ async function main() {
     entrypoint: "burner",
     calldata: [],
   });
-  console.log("  burner =", burnerResult[0]);
-  if (BigInt(burnerResult[0]) === 0n) {
-    console.log("  ✅ burner is 0x0 (expected until Phase 2B)");
+  const burner = burnerResult[0];
+  console.log("  burner =", burner);
+  if (BigInt(burner) === expected) {
+    console.log("  ✅ burner matches crafting_1v1");
+  } else {
+    console.log("  ❌ MISMATCH — expected", CRAFTING_1V1);
   }
 
   console.log("\nReading AbilityToken.admin()...");

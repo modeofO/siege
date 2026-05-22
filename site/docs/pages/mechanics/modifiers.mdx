@@ -8,10 +8,14 @@ import { MODIFIERS } from '@/data/modifiers'
 
 # Gate modifiers
 
-*Some nights the stones remember. The gates are never quite the same twice.*
+Each round, every gate independently rolls a modifier through Cartridge vRNG. Both players see the modifiers before allocating.
 
-Every round, each of the three gates independently rolls a single modifier via Cartridge's vRNG. Both players see all three modifiers before they allocate their budget — these are public information, and planning around them is most of the game. A modifier applies for that round only; when the next round begins, the gates roll again from scratch. Normal is by far the most common result, so most gates resolve exactly as you'd expect. The four "interesting" modifiers are what keep every round honest.
+Normal is most common. The other four modifiers change how attack and defense resolve for that gate only.
 
 ## The five modifiers
 
 {MODIFIERS.map(m => <ModifierCard key={m.slug} modifier={m} />)}
+
+## Reflection detail
+
+Reflection stores overflow damage at the reflected gate. Half of that overflow, using integer division, is applied to each other non-deadlock gate and reduced by unused defense at the receiving gate.

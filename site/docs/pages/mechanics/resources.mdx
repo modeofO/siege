@@ -1,42 +1,25 @@
 ---
 title: Resources
-description: The six resource tokens and what they do.
+description: ERC-20 resources used for crafting and upgrades.
 ---
 
 # Resources
 
-*Iron from the forge, stone from the quarry, ember from the grove. The same six bundles keep changing hands, round after round.*
+Siege uses six 0-decimal ERC-20 resource tokens.
 
-Siege has **six resource tokens**, all implemented as standard **ERC-20** with **0 decimals**. They live in your Cartridge wallet like any other on-chain token — they persist across matches, they're transferable between addresses, and you can trade them however you like outside the game.
+| Source | Tokens        |
+| ------ | ------------- |
+| Forge  | IRON + LINEN  |
+| Quarry | STONE + WOOD  |
+| Grove  | EMBER + SEEDS |
 
-## How you earn them
+Battle nodes mint resources during match resolution. The Marches also mints resources through Hold drip and pillage drip.
 
-Resources come from two sources:
+Resources are spent on:
 
-- **Resource nodes in matches.** At the end of each round, if you control a node, the contract mints **1 of each of that node's paired tokens** directly to your address. See [Resource nodes](/mechanics/nodes) for how ownership and contests work.
-- **Parcel drip in The Marches.** Every parcel you own on the hex grid generates the same paired tokens on a cooldown. Claim them by clicking **Claim Resources** on the world page. See [Your Hold](/world/holds) for how parcels and drip work.
+- Crafting T1 abilities.
+- Crafting T2 abilities.
+- Upgrading Hold tier.
+- Creating factions.
 
-## The three node pairs
-
-Each node mints a specific pair of tokens:
-
-| Node   | Token 1 | Token 2 |
-| ------ | ------- | ------- |
-| Forge  | IRON    | LINEN   |
-| Quarry | STONE   | WOOD    |
-| Grove  | EMBER   | SEEDS   |
-
-A round where you own all three nodes mints you one of each of all six resources. A round where you hold nothing mints you nothing from that match — though your parcels in [The Marches](/world/holds) still generate drip independently.
-
-## What you spend them on
-
-Resources are the **crafting currency for abilities**. From the crafting interface you approve the exact tokens a recipe calls for, the contract burns them, and an [ability](/mechanics/abilities) token is minted to your wallet. Different recipes want different pairings — Iron and Wood for one ability type, Stone and Linen for another — so which nodes you contest shapes which abilities you can actually build.
-
-That's the whole loop, in both directions: you fight over nodes to earn resources, and you burn resources to craft abilities that help you fight more effectively.
-
-## The long game
-
-Because resources are real ERC-20 tokens in your wallet, they are the bridge between individual match outcomes and a **persistent inventory**. You don't lose them when a match ends — not the ones you won, not the ones you stockpiled. A bad round costs you the momentum of that round, but it doesn't erase the resources you've accumulated across every match before it. Over time, the tokens in your wallet are a record of every node you ever held.
-
-- [Resource nodes](/mechanics/nodes) — how nodes mint these tokens
-- [Abilities](/mechanics/abilities) — what you actually spend them on
+Because the tokens are ERC-20s, balances live outside a single match.

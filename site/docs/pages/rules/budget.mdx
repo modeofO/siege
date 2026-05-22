@@ -1,43 +1,30 @@
 ---
 title: Budget allocation
-description: How to spend your 10 points each round.
+description: How to spend a round budget.
 ---
 
 # Budget allocation
 
-_Ten points. Three gates. Three nodes. One vault to protect. Choose well._
+Your round budget is:
 
-## Base budget
-
-Every round, each player starts with **10 points**, plus a bonus for any resource nodes they controlled at the end of the previous round — **one extra point per controlled node**. A player who held all three nodes last round starts this round with 13 points.
-
-## The 13-slot array
-
-You spend your budget by filling in a 13-element array. Every slot is a u8; unspent points are lost.
-
-| Index | Slot | Purpose |
-| --- | --- | --- |
-| 0–2 | Attack (p0, p1, p2) | Pressure at each of the 3 gates |
-| 3–5 | Defense (g0, g1, g2) | Defense at each of the 3 gates |
-| 6 | Repair | Heal Vault HP (max 3) |
-| 7–9 | Nodes (nc0, nc1, nc2) | Contest Forge / Quarry / Grove |
-| 10–12 | Traps (trap0, trap1, trap2) | Set a trap on a node you own (costs 2) |
-
-See [Gates](/mechanics/gates), [Nodes](/mechanics/nodes), [Traps](/mechanics/traps), and [Vault](/mechanics/vault) for the mechanics each slot drives.
-
-## Rules of thumb
-
-- **Unused budget is lost.** Points do not carry to the next round.
-- **Repair is capped at 3** per round.
-- **Traps cost 2** each and can only be placed on nodes you already own. Setting a trap on a node gives up contesting it that round.
-- **Attack and defense** at a gate interact via modifiers; see [Scoring & damage](/rules/scoring).
-
-## The commitment hash
-
-Your allocation is hidden from your opponent via commit-reveal. The Poseidon hash includes the salt plus all 13 allocation slots — **14 elements total**:
-
-```ts
-// [salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2]
+```text
+10 + number of resource nodes you control
 ```
 
-You compute this locally, submit only the hash, and later reveal the plaintext. See [Commit & reveal](/rules/commit-reveal) for the full flow.
+The maximum is 13.
+
+## Spend categories
+
+| Field                     | Meaning                                         |
+| ------------------------- | ----------------------------------------------- |
+| `p0`, `p1`, `p2`          | Attack pressure at gates 0, 1, and 2.           |
+| `g0`, `g1`, `g2`          | Defense at gates 0, 1, and 2.                   |
+| `repair`                  | Vault healing, capped at 3 during resolution.   |
+| `nc0`, `nc1`, `nc2`       | Contest values for Forge, Quarry, and Grove.    |
+| `trap0`, `trap1`, `trap2` | Hidden traps on owned nodes. Each trap costs 2. |
+
+The contract rejects reveals that spend over budget.
+
+## Ability fields
+
+Ability activation is not part of the numeric budget. You may reveal `ability_id = 0` for no ability, or an available staked ability token ID from 1 to 10. `ability_target` is a gate index from 0 to 2 and matters for Siege Sword.

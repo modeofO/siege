@@ -1,39 +1,36 @@
 ---
 title: Your Hold
-description: Registering a Hold, home parcels, and resource drip.
+description: Registration, homes, and drip.
 ---
 
 # Your Hold
 
-*Three walls. Three hearths. This is where your campaign begins.*
+Your Hold is your permanent base in The Marches.
 
-A Hold is your home base in The Marches — three permanent parcels on the hex grid that can never be taken from you. Everything else in the world layer builds from here.
+Registration calls `register_player(home_types)`. You choose three home parcel types. The contract chooses three unclaimed frontier tiles in the sector with the most available frontier space, marks them as homes, and records your Hold.
 
-## Registering
+Valid home types:
 
-From [The Marches](/world/overview) page, connect your wallet and click **CLAIM YOUR HOLD**. Registration picks three unclaimed parcels on the map — one Forge, one Quarry, one Grove — and assigns them to you as your home parcels. You choose the types; the map chooses the positions.
+| Type | Parcel | Resources     |
+| ---- | ------ | ------------- |
+| 0    | Forge  | IRON + LINEN  |
+| 1    | Quarry | STONE + WOOD  |
+| 2    | Grove  | EMBER + SEEDS |
 
-Registration is free (gasless via your Controller session) and permanent. Once claimed, your Hold is yours.
+If AbilityToken is configured, registration also mints starter abilities 1, 2, and 3.
 
-## Home parcels
+## Claim drip
 
-Your three home parcels are special:
+`claim_drip` mints resources for your three home parcels after enough time has elapsed. The drip interval is one hour.
 
-- **Permanent.** They cannot be conquered or taken by another player.
-- **Typed.** One Forge (mints IRON + LINEN), one Quarry (STONE + WOOD), one Grove (EMBER + SEEDS).
-- **Drip source.** You call `claim_drip` to harvest resources from every parcel you own, including homes.
-- **Pillageable.** An opponent who defeats you in a staked match and shares a border can [pillage](/world/pillaging) your home — siphoning its drip temporarily. You don't lose the parcel, but you lose its income until the pillage expires or you break it.
+Homes under active pillage are skipped. Stranded homes are also skipped.
 
-## Claiming resources
+Zone multiplier:
 
-Every parcel you own generates resource tokens on a cooldown. Click **Claim Resources** on The Marches page to mint them all at once. Each Forge parcel mints 1 IRON + 1 LINEN, each Quarry mints 1 STONE + 1 WOOD, each Grove mints 1 EMBER + 1 SEEDS.
+| Zone     | Multiplier |
+| -------- | ---------- |
+| Core     | 3x         |
+| Mid      | 2x         |
+| Frontier | 1x         |
 
-Home parcels that are currently under active [pillage](/world/pillaging) are skipped — the pillager claims that drip instead.
-
-## Growing your territory
-
-Beyond your three homes, you can claim additional parcels by winning [staked matches](/world/staked-matches). After settling a match win, you may claim one unclaimed parcel adjacent to any of your existing territory. The number of extra parcels you can hold is capped by your [kingdom tier](/world/tiers).
-
-- [Kingdom tiers](/world/tiers) — how wins unlock higher parcel caps
-- [Staked matches](/world/staked-matches) — the path to new territory
-- [Pillaging](/world/pillaging) — what happens when an enemy targets your home
+Current Cairo mints claim drip from homes only. Settlement can also mint a one-time resource reward for all parcels owned by the match players.

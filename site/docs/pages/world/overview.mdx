@@ -1,30 +1,29 @@
 ---
 title: The Marches
-description: The persistent hex-grid world that wraps every 1v1 match.
+description: The persistent tile world around Siege battles.
 ---
 
 # The Marches
 
-*Beyond the arena walls, a map stretches to the horizon. Every Hold, every parcel, every border dispute — it all lives here.*
+The Marches is the persistent world around 1v1 battles. It is a tile graph of square and rhombus parcels, not a hex grid.
 
-The Marches is the persistent world layer of Siege. It wraps the 1v1 match system in a hex-grid map where players own territory, harvest resources, stake abilities in high-stakes matches, conquer neighbors, pillage rivals, and climb the ranks.
+Each tile has:
 
-## How it connects to matches
+- A `tile_id`.
+- A sector from 0 to 7.
+- A zone: core, mid, or frontier.
+- A shape: square or rhombus.
+- A parcel type: Forge, Quarry, Grove, or untyped.
+- An owner, home flag, and stranded flag.
 
-A 1v1 match is still the core of Siege — budget allocation, commit-reveal, gates, traps, abilities. The Marches gives those matches *consequences*. Win a staked match and you take your opponent's abilities, claim new territory, and gain reputation. Lose and the reverse happens.
+Tile adjacency is stored edge by edge. The map can fold, which changes sector state, may break pillages, and can strand owned territory that no longer connects back to home.
 
-## What you'll find here
+## What The Marches adds
 
-- **[Your Hold](/world/holds)** — register your Hold, claim three home parcels, and start harvesting resources.
-- **[Kingdom tiers](/world/tiers)** — win matches to unlock higher tiers with more ability slots, parcel capacity, and preset defenses.
-- **[Staked matches](/world/staked-matches)** — wager abilities in 1v1 matches for territory and spoils.
-- **[Conquest](/world/conquest)** — launch asynchronous attacks against a neighbor's preset defenses to take their parcels.
-- **[Pillaging](/world/pillaging)** — siphon resources from a defeated neighbor's home parcels.
-- **[Reputation](/world/reputation)** — your bracket, your streak, your record.
-- **[Factions](/world/factions)** — band together with other Holds for shared defense and social play.
-
-## The map
-
-The Marches is a hex grid of parcels. Each parcel has a type — Forge, Quarry, or Grove — that determines which resource tokens it generates. Every player starts with three home parcels (one of each type) and expands outward by winning matches and claiming unclaimed territory.
-
-The full map is visible to everyone: territory ownership, faction tags, active pillages, and tier badges are all public. Inspect any player to see their reputation, titles, and match history against you.
+- **[Your Hold](/world/holds)** - register three home parcels.
+- **[Kingdom tiers](/world/tiers)** - progress through wins and resource burns.
+- **[Staked matches](/world/staked-matches)** - wager abilities in 1v1 battles.
+- **[Conquest](/world/conquest)** - attack non-home neighbor parcels against preset defenses.
+- **[Pillaging](/world/pillaging)** - siphon home drip from a defeated neighbor.
+- **[Reputation](/world/reputation)** - wins, losses, streaks, and brackets.
+- **[Factions](/world/factions)** - allies, reinforcement, and protection.
