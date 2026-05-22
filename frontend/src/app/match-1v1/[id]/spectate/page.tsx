@@ -1,7 +1,7 @@
 // frontend/src/app/match-1v1/[id]/spectate/page.tsx
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import {
@@ -12,8 +12,9 @@ import {
   useMatchStakes1v1,
   MODIFIER_NAMES,
 } from "@/lib/gameState1v1";
-import type { RoundResult1v1 } from "@/lib/gameState1v1";
+import type { RoundResult1v1, NodeOwner } from "@/lib/gameState1v1";
 import { BattlefieldView } from "@/components/BattlefieldView";
+import { ResolutionOverlay } from "@/components/ResolutionOverlay";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
 import { usePlayerCosmetics } from "@/lib/cosmetics";
@@ -193,6 +194,32 @@ export default function SpectatorPage() {
   const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined, refreshKey);
   const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined, refreshKey);
 
+  const [pendingResult, setPendingResult] = useState<RoundResult1v1 | null>(null);
+  const [heldHp, setHeldHp] = useState<{ a: number; b: number } | null>(null);
+  const [prevNodes, setPrevNodes] = useState<[NodeOwner, NodeOwner, NodeOwner]>(["neutral", "neutral", "neutral"]);
+  const prevRoundRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (!state || !history.length) return;
+    const currentRound = state.round;
+    if (prevRoundRef.current > 0 && currentRound > prevRoundRef.current) {
+      const justResolved = history.find((r) => r.round === prevRoundRef.current);
+      if (justResolved) {
+        setHeldHp({ a: state.vaultAHp + justResolved.damageToA, b: state.vaultBHp + justResolved.damageToB });
+        setPendingResult(justResolved);
+      }
+    }
+    if (currentRound !== prevRoundRef.current) {
+      setPrevNodes(state.nodes);
+      prevRoundRef.current = currentRound;
+    }
+  }, [state?.round, history, state]);
+
+  const handleResolutionComplete = useCallback(() => {
+    setPendingResult(null);
+    setHeldHp(null);
+  }, []);
+
   // Loading
   if (loading || !state) {
     return (
@@ -202,8 +229,10 @@ export default function SpectatorPage() {
     );
   }
 
-  const vaultAPct = Math.max(0, Math.min(100, (state.vaultAHp / 50) * 100));
-  const vaultBPct = Math.max(0, Math.min(100, (state.vaultBHp / 50) * 100));
+  const displayAHp = heldHp ? heldHp.a : state.vaultAHp;
+  const displayBHp = heldHp ? heldHp.b : state.vaultBHp;
+  const vaultAPct = Math.max(0, Math.min(100, (displayAHp / 50) * 100));
+  const vaultBPct = Math.max(0, Math.min(100, (displayBHp / 50) * 100));
   const hpBarColor = (pct: number) => (pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500");
 
   // SAFETY CRITICAL: Only derive allocations from fully resolved rounds.
@@ -296,7 +325,7 @@ export default function SpectatorPage() {
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
                 <span className={`text-sm font-bold ${vaultAPct < 10 ? "animate-pulse text-red-400" : "text-[#d4cfc6]"}`}>
-                  {state.vaultAHp} / 50
+                  {displayAHp} / 50
                 </span>
                 <span className="text-[10px] text-[#7a7060]">{Math.round(vaultAPct)}%</span>
               </div>
@@ -328,7 +357,7 @@ export default function SpectatorPage() {
             <div className="w-full mt-1.5">
               <div className="flex justify-between items-center mb-0.5">
                 <span className={`text-sm font-bold ${vaultBPct < 10 ? "animate-pulse text-red-400" : "text-[#d4cfc6]"}`}>
-                  {state.vaultBHp} / 50
+                  {displayBHp} / 50
                 </span>
                 <span className="text-[10px] text-[#7a7060]">{Math.round(vaultBPct)}%</span>
               </div>
@@ -351,13 +380,24 @@ export default function SpectatorPage() {
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-2">
         {/* Left: Animated Battlefield */}
         <div className="flex flex-col gap-2">
-          <BattlefieldView
-            allocations={aAllocations}
-            isPlayerA={true}
-            committed={true}
-            modifiers={modifiers}
-            opponentAllocations={bAllocations}
-          />
+          <div className="relative">
+            <BattlefieldView
+              allocations={aAllocations}
+              isPlayerA={true}
+              committed={true}
+              modifiers={modifiers}
+              opponentAllocations={bAllocations}
+            />
+            {pendingResult && (
+              <ResolutionOverlay
+                result={pendingResult}
+                prevNodes={prevNodes}
+                newNodes={state.nodes}
+                isPlayerA={true}
+                onComplete={handleResolutionComplete}
+              />
+            )}
+          </div>
 
           {/* War Dispatch Log */}
           <RoundHistorySection history={history} />
