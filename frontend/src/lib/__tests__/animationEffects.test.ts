@@ -37,10 +37,11 @@ const baseResult: RoundResult1v1 = {
 describe("buildGateImpacts", () => {
   it("creates effects only for gates with damage", () => {
     const effects = buildGateImpacts(baseResult, true);
-    const nonZero = effects.filter((e) => e.type === "gate-flash");
-    expect(nonZero.length).toBe(2);
+    const nonZero = effects.filter((e: EffectDescriptor) => e.type === "gate-flash");
+    expect(nonZero.length).toBe(3);
     expect(nonZero[0].gateIndex).toBe(0);
     expect(nonZero[1].gateIndex).toBe(1);
+    expect(nonZero[2].gateIndex).toBe(2);
   });
 
   it("skips gates with zero damage", () => {
@@ -56,10 +57,10 @@ describe("buildGateImpacts", () => {
     expect(effects).toHaveLength(0);
   });
 
-  it("scales intensity by damage amount", () => {
+  it("scales intensity by total damage amount", () => {
     const effects = buildGateImpacts(baseResult, true);
-    const gate0 = effects.find((e) => e.gateIndex === 0)!;
-    const gate1 = effects.find((e) => e.gateIndex === 1)!;
+    const gate0 = effects.find((e: EffectDescriptor) => e.gateIndex === 0)!;
+    const gate1 = effects.find((e: EffectDescriptor) => e.gateIndex === 1)!;
     expect(gate0.intensity).toBeGreaterThan(gate1.intensity);
   });
 });
@@ -67,8 +68,8 @@ describe("buildGateImpacts", () => {
 describe("buildDamageNumbers", () => {
   it("creates per-gate damage numbers for dealt and taken", () => {
     const effects = buildDamageNumbers(baseResult, true);
-    const dealt = effects.filter((e) => e.variant === "dealt");
-    const taken = effects.filter((e) => e.variant === "taken");
+    const dealt = effects.filter((e: EffectDescriptor) => e.variant === "dealt");
+    const taken = effects.filter((e: EffectDescriptor) => e.variant === "taken");
     expect(dealt.length).toBeGreaterThan(0);
     expect(taken.length).toBeGreaterThan(0);
   });
@@ -110,8 +111,8 @@ describe("buildTrapEffects", () => {
       bTraps: [0, 0, 1],
     };
     const effects = buildTrapEffects(result, true);
-    const rings = effects.filter((e) => e.type === "trap-ring");
-    const numbers = effects.filter((e) => e.type === "trap-number");
+    const rings = effects.filter((e: EffectDescriptor) => e.type === "trap-ring");
+    const numbers = effects.filter((e: EffectDescriptor) => e.type === "trap-number");
     expect(rings).toHaveLength(2);
     expect(numbers).toHaveLength(2);
   });
@@ -124,41 +125,41 @@ describe("buildTrapEffects", () => {
 
 describe("buildAbilityEffect", () => {
   it("returns slash effect for Siege Sword (type 1)", () => {
-    const effect = buildAbilityEffect(1, 1, true, true);
+    const effect = buildAbilityEffect(1, 1, true);
     expect(effect).not.toBeNull();
     expect(effect!.type).toBe("ability-slash");
   });
 
   it("returns shield effect for Stone Cloak (type 2)", () => {
-    const effect = buildAbilityEffect(2, 0, true, true);
+    const effect = buildAbilityEffect(2, 0, true);
     expect(effect!.type).toBe("ability-shield");
   });
 
   it("returns ember effect for Ember Blast (type 3)", () => {
-    const effect = buildAbilityEffect(3, 0, true, true);
+    const effect = buildAbilityEffect(3, 0, true);
     expect(effect!.type).toBe("ability-ember");
   });
 
   it("returns hex effect for Hex (type 4)", () => {
-    const effect = buildAbilityEffect(4, 0, true, true);
+    const effect = buildAbilityEffect(4, 0, true);
     expect(effect!.type).toBe("ability-hex");
   });
 
   it("returns fortify effect for Fortify (type 5)", () => {
-    const effect = buildAbilityEffect(5, 0, true, true);
+    const effect = buildAbilityEffect(5, 0, true);
     expect(effect!.type).toBe("ability-fortify");
   });
 
   it("returns T2 variant with higher intensity for T2 abilities", () => {
-    const t1 = buildAbilityEffect(1, 1, true, true);
-    const t2 = buildAbilityEffect(6, 1, true, true);
+    const t1 = buildAbilityEffect(1, 1, true);
+    const t2 = buildAbilityEffect(6, 1, true);
     expect(t1!.tier).toBe(1);
     expect(t2!.tier).toBe(2);
     expect(t2!.intensity).toBeGreaterThan(t1!.intensity);
   });
 
   it("returns null for ability ID 0", () => {
-    const effect = buildAbilityEffect(0, 0, true, true);
+    const effect = buildAbilityEffect(0, 0, true);
     expect(effect).toBeNull();
   });
 });

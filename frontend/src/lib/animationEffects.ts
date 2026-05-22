@@ -18,12 +18,14 @@ export function buildGateImpacts(result: RoundResult1v1, isPlayerA: boolean): Ef
   for (let i = 0; i < 3; i++) {
     const gate = result.gateBreakdown[i];
     const dmgDealt = isPlayerA ? gate.dmgToB : gate.dmgToA;
-    if (dmgDealt === 0) continue;
+    const dmgTaken = isPlayerA ? gate.dmgToA : gate.dmgToB;
+    const totalDmg = dmgDealt + dmgTaken;
+    if (totalDmg === 0) continue;
     effects.push({
       type: "gate-flash",
       gateIndex: i,
-      intensity: Math.min(dmgDealt / 8, 1),
-      value: dmgDealt,
+      intensity: Math.min(totalDmg / 8, 1),
+      value: totalDmg,
     });
   }
   return effects;
@@ -109,7 +111,6 @@ const ABILITY_TYPE_MAP: Record<number, string> = {
 export function buildAbilityEffect(
   abilityId: number,
   target: number,
-  isPlayerA: boolean,
   isMine: boolean,
 ): EffectDescriptor | null {
   if (abilityId === 0) return null;
