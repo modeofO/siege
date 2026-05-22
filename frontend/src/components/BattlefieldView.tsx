@@ -28,7 +28,7 @@ const MODIFIER_COLORS: Record<number, string> = {
   4: "text-[#ff8800] border-[#ff8800]/40 bg-[#ff8800]/10",
 };
 
-const POSITIONS = {
+export const POSITIONS = {
   baseA: { x: 17, y: 42 },
   baseB: { x: 83, y: 42 },
   // Indexed by allocation slot: 0=East (top), 1=West (bottom), 2=Underground (middle)
