@@ -12,8 +12,8 @@ importers:
         specifier: ^0.13.9
         version: 0.13.12(@types/react@19.2.14)(typescript@5.9.3)(zod@3.25.76)
       '@cartridge/controller-wasm':
-        specifier: ^0.9.6
-        version: 0.9.6
+        specifier: ^0.10.0
+        version: 0.10.0
       '@dojoengine/torii-client':
         specifier: ^1.8.2
         version: 1.8.2
@@ -53,9 +53,6 @@ packages:
 
   '@cartridge/controller-wasm@0.10.0':
     resolution: {integrity: sha512-msmQFjZRRAcAbcGf0mt4z4bTvUY6H3ypgYz+imJp+S36SCabvh42vog7FttuvcVKQoVjS5hNKb3rf0YwU/plig==}
-
-  '@cartridge/controller-wasm@0.9.6':
-    resolution: {integrity: sha512-BkFth1LuS4Im27mdjxkiCk3fP2t4X3KXsEO9k1U0V8OtnLuRtH2P0X4fKklLyOSfmZ7GKk5KTDwcdR/LhJA03Q==}
 
   '@cartridge/controller@0.13.12':
     resolution: {integrity: sha512-bNhjRcIvMoi3BkaLPBXVGlHJwR7zHLaRp1SoOOeiRCXXX/Dos6eClE1T0Hy3SCBSqm16dOr2EdV518+vMEmZ6Q==}
@@ -2013,8 +2010,8 @@ packages:
     resolution: {integrity: sha512-40QW5YalBNfQo5yRYmiw7Yz6TKKVr3h6970B2YE+3fQpsWcrbj1PzJgxeJ19DRQjhMbKPIuMY8rFaXc8moolVw==}
     engines: {node: '>=10.13.0'}
 
-  postcss@8.5.14:
-    resolution: {integrity: sha512-SoSL4+OSEtR99LHFZQiJLkT59C5B1amGO1NzTwj7TT1qCUgUO6hxOvzkOYxD+vMrXBM3XJIKzokoERdqQq/Zmg==}
+  postcss@8.5.15:
+    resolution: {integrity: sha512-FfR8sjd4em2T6fb3I2MwAJU7HWVMr9zba+enmQeeWFfCbm+UOC/0X4DS8XtpUTMwWMGbjKYP7xjfNekzyGmB3A==}
     engines: {node: ^10 || ^12 || >=14}
 
   preact@10.24.2:
@@ -2612,8 +2609,6 @@ snapshots:
     optional: true
 
   '@cartridge/controller-wasm@0.10.0': {}
-
-  '@cartridge/controller-wasm@0.9.6': {}
 
   '@cartridge/controller@0.13.12(@types/react@19.2.14)(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
@@ -5478,7 +5473,7 @@ snapshots:
 
   pngjs@5.0.0: {}
 
-  postcss@8.5.14:
+  postcss@8.5.15:
     dependencies:
       nanoid: 3.3.12
       picocolors: 1.1.1
@@ -5816,7 +5811,7 @@ snapshots:
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
-      postcss: 8.5.14
+      postcss: 8.5.15
       rolldown: 1.0.1
       tinyglobby: 0.2.16
     optionalDependencies:

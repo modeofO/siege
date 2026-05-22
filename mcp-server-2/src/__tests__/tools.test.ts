@@ -210,7 +210,8 @@ describe("cosmetic felt encoding", () => {
   });
 
   it("null circuit_key encodes as 0x0", () => {
-    const keyFelt = null ? shortString.encodeShortString("x") : "0x0";
+    const circuitKey = null as string | null;
+    const keyFelt = circuitKey ? shortString.encodeShortString(circuitKey) : "0x0";
     expect(keyFelt).toBe("0x0");
   });
 });
