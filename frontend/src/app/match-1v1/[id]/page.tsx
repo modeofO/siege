@@ -14,7 +14,7 @@ import {
   useMatchAbilities1v1,
   MODIFIER_NAMES,
 } from "@/lib/gameState1v1";
-import type { RoundResult1v1 } from "@/lib/gameState1v1";
+import type { RoundResult1v1, NodeOwner } from "@/lib/gameState1v1";
 import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, clearCommitData1v1 } from "@/lib/crypto";
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
@@ -29,6 +29,7 @@ import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import { toriiSql, sqlInt, toNum } from "@/lib/toriiSql";
 import { ABILITIES } from "@/lib/craftingContracts";
+import { ResolutionOverlay } from "@/components/ResolutionOverlay";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -107,6 +108,10 @@ export default function Match1v1Page() {
   const [resolveRetryCount, setResolveRetryCount] = useState(0);
   const [error, setError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
+  const [pendingResult, setPendingResult] = useState<RoundResult1v1 | null>(null);
+  const [heldHp, setHeldHp] = useState<{ a: number; b: number } | null>(null);
+  const [prevNodes, setPrevNodes] = useState<[NodeOwner, NodeOwner, NodeOwner]>(["neutral", "neutral", "neutral"]);
+  const prevRoundRef = useRef<number>(0);
 
   // --- Polling fallback for stale gRPC subscription state ---
   // After a user's own commit/reveal tx, we poll Torii SQL for a short window
@@ -250,6 +255,26 @@ export default function Match1v1Page() {
       pollTimerRef.current = null;
     }
   }, [state?.round, setAllocations, setAutoRevealStatus, setAutoRevealError, setRevealRetry, setSubmitting, setConfirming, setError]);
+
+  // Detect round transitions and capture pre-resolution HP for the overlay
+  useEffect(() => {
+    if (!state || !history.length) return;
+    const currentRound = state.round;
+    if (prevRoundRef.current > 0 && currentRound > prevRoundRef.current) {
+      const justResolved = history.find((r) => r.round === prevRoundRef.current);
+      if (justResolved) {
+        setHeldHp({
+          a: state.vaultAHp + justResolved.damageToA,
+          b: state.vaultBHp + justResolved.damageToB,
+        });
+        setPendingResult(justResolved);
+      }
+    }
+    if (currentRound !== prevRoundRef.current) {
+      setPrevNodes(state.nodes);
+      prevRoundRef.current = currentRound;
+    }
+  }, [state?.round, history, state, isPlayerA]);
 
   // One-shot mount log — if this never appears in console after reload, the
   // page is serving a stale bundle and a hard refresh is needed.
@@ -466,6 +491,11 @@ export default function Match1v1Page() {
     setRevealRetry((c) => c + 1);
   }, []);
 
+  const handleResolutionComplete = useCallback(() => {
+    setPendingResult(null);
+    setHeldHp(null);
+  }, []);
+
   // Commit handler
   const handleCommit = useCallback(async () => {
     if (!account || !state || commitLock.current) return;
@@ -574,8 +604,8 @@ export default function Match1v1Page() {
     );
   }
 
-  const yourVault = isPlayerA ? state.vaultAHp : state.vaultBHp;
-  const enemyVault = isPlayerA ? state.vaultBHp : state.vaultAHp;
+  const yourVault = heldHp ? (isPlayerA ? heldHp.a : heldHp.b) : (isPlayerA ? state.vaultAHp : state.vaultBHp);
+  const enemyVault = heldHp ? (isPlayerA ? heldHp.b : heldHp.a) : (isPlayerA ? state.vaultBHp : state.vaultAHp);
   const yourPct = Math.max(0, Math.min(100, (yourVault / 50) * 100));
   const enemyPct = Math.max(0, Math.min(100, (enemyVault / 50) * 100));
   const hpBarColor = (pct: number) => (pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500");
@@ -716,13 +746,24 @@ export default function Match1v1Page() {
       <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-2">
         {/* Left: Animated Battlefield + War Log */}
         <div className="flex flex-col gap-2">
-          <BattlefieldView
-            allocations={allocations}
-            isPlayerA={isPlayerA}
-            committed={effectiveCommitted}
-            modifiers={modifiers}
-            opponentAllocations={opponentAllocations}
-          />
+          <div className="relative">
+            <BattlefieldView
+              allocations={allocations}
+              isPlayerA={isPlayerA}
+              committed={effectiveCommitted}
+              modifiers={modifiers}
+              opponentAllocations={opponentAllocations}
+            />
+            {pendingResult && (
+              <ResolutionOverlay
+                result={pendingResult}
+                prevNodes={prevNodes}
+                newNodes={state.nodes}
+                isPlayerA={isPlayerA}
+                onComplete={handleResolutionComplete}
+              />
+            )}
+          </div>
 
           {/* War Dispatch Log */}
           <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">
