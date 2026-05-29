@@ -1,8 +1,8 @@
 {
   "world": {
     "class_hash": "0x613551abceb2b37073b1149bb862ea70cf029981ce1ca47e9dd7c7ab97cb65d",
-    "address": "0x5ae03c23b817afa096a51e3b04e31c176f168ee8193465229d08fa67366a942",
-    "seed": "siege_dojo_v7",
+    "address": "0x4134697f1327052025f01786d97effdf5de98528802aaaf3dc3c8896b57bc61",
+    "seed": "siege_dojo_v8",
     "name": "siege_dojo",
     "entrypoints": [
       "uuid",
@@ -33,7 +33,7 @@
   },
   "contracts": [
     {
-      "address": "0x2e9f46df80daf57789a15140c272e22575893e8db75e957ba3efbc020bb262a",
+      "address": "0x37389e3cdbede705a17881ec47994de6ab3a39938713b5fde10ac656e48614f",
       "class_hash": "0x2c414649782347837df2e227d2227d6d948eb8300409ec5c986c38a5c18f5a5",
       "init_calldata": [],
       "tag": "siege_dojo-actions",
@@ -44,7 +44,7 @@
       ]
     },
     {
-      "address": "0x4242c71cda43bdc6f24e0baa6eb353f1cca6e960cb3e622787c46e5083ff516",
+      "address": "0x286267bdebd4b4d3ada22ecb563518787298798e8da9036403668d9c0f58e3",
       "class_hash": "0x986c6f1c06be585cc6a4408be218fb288f341bf7d891360cc7ca896e5ec9a4",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
@@ -58,7 +58,7 @@
       ]
     },
     {
-      "address": "0x1c5ff97432e3f25892efbae549b4d43c84768a0b824f74caa590c932c491efd",
+      "address": "0x42a88215f2d1bc22d211700893f21604741bd0e56d8145741ac27aa5568d175",
       "class_hash": "0x25c918d33577b814103793959e779eea266d5d44acf0a3d546fb468704139f8",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal",
@@ -72,7 +72,7 @@
       ]
     },
     {
-      "address": "0x6a6b677b9dea4f766b10dcfe2907ad60861103263aa85c2ca2122db86eb2c52",
+      "address": "0x4d97c45dce38f3157a04bc886b343e5516b06aadc97c1aa5878cfed2568de05",
       "class_hash": "0x33e705e3843f796d7c5c5fc872795db0606748634d53576b80626881e2f5c24",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal_1v1",
@@ -85,8 +85,8 @@
       ]
     },
     {
-      "address": "0x305fdf6f2fe07c08436fea5ea4e7c77b9f7515654e4e764af7c131d848b441f",
-      "class_hash": "0x2e2c7c7534739d523f3edaf82b6bae605ee3af3aea37a35995a38a4886cc319",
+      "address": "0x48f1be212d1273f6797304b35b9a1c8b8b9602844137e200489d0ce1d86fec1",
+      "class_hash": "0x2b667b280d5b563b3a3bacd9f72c70ce787cb0a98180744e4a90a8e67fd2ba8",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
       "selector": "0x2164fd7acc93a3de55c3bcb974b18eebe85614770b9c22881e53ffc80174a90",
@@ -97,7 +97,7 @@
       ]
     },
     {
-      "address": "0x4d14cd36d9ab960de7b88da7421e87e16d028c1ab4b973d4b5892d1d193e130",
+      "address": "0x19ea09d20d2575caf9472de37c62872fbc5d88c5390596cb48bbb9c8bb258b2",
       "class_hash": "0x4a29e3e854cfc87d65746b01cc663e7fd5d10ae72dd6fec80de07282d1027c7",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
@@ -111,7 +111,7 @@
       ]
     },
     {
-      "address": "0x4a67025337a82aea39058228b81d91b22d6dc28035b05d3377607671334ccd2",
+      "address": "0x77426dcb85593b43e3508cea7062922676a8e45913772d632c7e6d85b0d80a4",
       "class_hash": "0x636964b849eb0e4f5eb97fc13541ec84fc39d8c8825e42b0a4c47ba957e01da",
       "init_calldata": [],
       "tag": "siege_dojo-resolution",
@@ -122,8 +122,8 @@
       ]
     },
     {
-      "address": "0x7f57549212a1db5b5cf8a1ac29eeed62f7e8566a5c08f16c737eedf54aa1842",
-      "class_hash": "0x6c6235d1227c123ccbf1b591b678c528c3d9f9feefe6bd558232ca08874b708",
+      "address": "0x4d514e20212824f10f4dfeab2a701ca4aaedaddc3f06cbf2e47f299faa81641",
+      "class_hash": "0x7ddf9fb2b1e1fda8e014fd43c1cf0c00d0287b9bbad5a2442017cd3b728932f",
       "init_calldata": [],
       "tag": "siege_dojo-resolution_1v1",
       "selector": "0x3243785fc5c17bf6bc5b9d485ddaa1275e126e753d2eddd05e69e17e98f85fd",
@@ -133,14 +133,13 @@
       ]
     },
     {
-      "address": "0x4d52c26bd2b9ff241807fd94d7a2cf53e97e126e560bbd987864099be742cea",
-      "class_hash": "0x6d5075654870d1b7545c45fcfc37960c674bf0745ff602662f7b23601fb4d93",
+      "address": "0x16bb80d4dae3f3b0468ec5d93368908e2b6a50a621b55dafeead99f38725ef6",
+      "class_hash": "0x4f7a74026b597f425819247e29735a46317da2a698bed30a73b12829c825f5e",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
       "systems": [
         "initialize_world",
-        "expand_world",
         "register_player",
         "set_ability_token",
         "create_staked_match",
@@ -318,38 +317,6 @@
       "class_hash": "0xe3b74afa872197e45e00c37e734bc0b077abf57144426daa7f7b90c8545270",
       "tag": "siege_dojo-FactionMember",
       "selector": "0x4a8c03314a46b5acf2834647e481771f4297fe7855d5bd1a4a45b0a36141b17"
-    },
-    {
-      "members": [
-        {
-          "name": "fold_id",
-          "type": "core::integer::u32",
-          "key": true
-        },
-        {
-          "name": "fold_type",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "axis",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "trigger_match",
-          "type": "core::integer::u64",
-          "key": false
-        },
-        {
-          "name": "timestamp",
-          "type": "core::integer::u64",
-          "key": false
-        }
-      ],
-      "class_hash": "0x5b2a0720dee8b1bf5081aa7e5dae7ac8414b824993c6c03a1412f8fcd081980",
-      "tag": "siege_dojo-FoldEvent",
-      "selector": "0x42774f7a853711dde621b030b32fa7cdd78e5fe61cb2f2bda1af39bb86bbb1a"
     },
     {
       "members": [
@@ -653,23 +620,18 @@
     {
       "members": [
         {
-          "name": "tile_id",
+          "name": "parcel_id",
           "type": "core::integer::u32",
           "key": true
         },
         {
-          "name": "sector_id",
-          "type": "core::integer::u8",
+          "name": "col",
+          "type": "core::integer::u16",
           "key": false
         },
         {
-          "name": "tile_shape",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "zone",
-          "type": "core::integer::u8",
+          "name": "row",
+          "type": "core::integer::u16",
           "key": false
         },
         {
@@ -686,14 +648,9 @@
           "name": "is_home",
           "type": "core::bool",
           "key": false
-        },
-        {
-          "name": "is_stranded",
-          "type": "core::bool",
-          "key": false
         }
       ],
-      "class_hash": "0x1421ea955e652238dd770cda9928288be65a300860631ac790fe6bf5660aef4",
+      "class_hash": "0x16ba3d960dedc5074dfd19d9261aa0029b3713c2d0436e93a225631289de191",
       "tag": "siege_dojo-Parcel",
       "selector": "0x2fe170a6ab4a59c7c89d40f04b1a9be00a5af162e906239e75b201b92ba6d1c"
     },
@@ -1497,50 +1454,6 @@
     {
       "members": [
         {
-          "name": "sector_id",
-          "type": "core::integer::u8",
-          "key": true
-        },
-        {
-          "name": "effect_type",
-          "type": "core::integer::u8",
-          "key": false
-        },
-        {
-          "name": "effect_magnitude",
-          "type": "core::integer::u8",
-          "key": false
-        }
-      ],
-      "class_hash": "0x48f6e0a016baf9989d85e88a53b4d54385268756584afb3ee98fa571e954cb8",
-      "tag": "siege_dojo-SectorEnvironment",
-      "selector": "0x7f9d67a31845817aa3882676765c530e700284d3add7a91c3c96277757ecee4"
-    },
-    {
-      "members": [
-        {
-          "name": "tile_id",
-          "type": "core::integer::u32",
-          "key": true
-        },
-        {
-          "name": "edge_index",
-          "type": "core::integer::u8",
-          "key": true
-        },
-        {
-          "name": "neighbor_tile_id",
-          "type": "core::integer::u32",
-          "key": false
-        }
-      ],
-      "class_hash": "0x1c15faa736ce5ad018bba129511cb7d3e95a98d019946bc9721d9a29853b949",
-      "tag": "siege_dojo-TileAdjacency",
-      "selector": "0x6c878c9e13f639ed1bbfe00d436099a742b25b34a5b972f97103b9f112d274"
-    },
-    {
-      "members": [
-        {
           "name": "id",
           "type": "core::integer::u8",
           "key": true
@@ -1559,24 +1472,9 @@
           "name": "initialized",
           "type": "core::bool",
           "key": false
-        },
-        {
-          "name": "is_world_folded",
-          "type": "core::bool",
-          "key": false
-        },
-        {
-          "name": "fold_epoch",
-          "type": "core::integer::u32",
-          "key": false
-        },
-        {
-          "name": "total_folds",
-          "type": "core::integer::u32",
-          "key": false
         }
       ],
-      "class_hash": "0x5fd6db98de420dde21482d36ebabe18f525a08e9af2af8737ed6127352db0ef",
+      "class_hash": "0x7b63ae82f91c95b1a6fbd0550159152d295d7634d5f059823e4630c262b04ff",
       "tag": "siege_dojo-WorldConfig",
       "selector": "0x84c7dbac65f89ad67fa472e0b28e72212a19d9d60da1f8433d2df69c3be845"
     }
@@ -4157,60 +4055,6 @@
     },
     {
       "type": "struct",
-      "name": "siege_dojo::models::fold_event::FoldEvent",
-      "members": [
-        {
-          "name": "fold_id",
-          "type": "core::integer::u32"
-        },
-        {
-          "name": "fold_type",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "axis",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "trigger_match",
-          "type": "core::integer::u64"
-        },
-        {
-          "name": "timestamp",
-          "type": "core::integer::u64"
-        }
-      ]
-    },
-    {
-      "type": "struct",
-      "name": "siege_dojo::models::fold_event::FoldEventValue",
-      "members": [
-        {
-          "name": "fold_type",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "axis",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "trigger_match",
-          "type": "core::integer::u64"
-        },
-        {
-          "name": "timestamp",
-          "type": "core::integer::u64"
-        }
-      ]
-    },
-    {
-      "type": "event",
-      "name": "siege_dojo::models::fold_event::m_FoldEvent::Event",
-      "kind": "enum",
-      "variants": []
-    },
-    {
-      "type": "struct",
       "name": "siege_dojo::models::match_abilities_1v1::MatchAbilities1v1",
       "members": [
         {
@@ -4740,20 +4584,16 @@
       "name": "siege_dojo::models::parcel::Parcel",
       "members": [
         {
-          "name": "tile_id",
+          "name": "parcel_id",
           "type": "core::integer::u32"
         },
         {
-          "name": "sector_id",
-          "type": "core::integer::u8"
+          "name": "col",
+          "type": "core::integer::u16"
         },
         {
-          "name": "tile_shape",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "zone",
-          "type": "core::integer::u8"
+          "name": "row",
+          "type": "core::integer::u16"
         },
         {
           "name": "parcel_type",
@@ -4765,10 +4605,6 @@
         },
         {
           "name": "is_home",
-          "type": "core::bool"
-        },
-        {
-          "name": "is_stranded",
           "type": "core::bool"
         }
       ]
@@ -4778,16 +4614,12 @@
       "name": "siege_dojo::models::parcel::ParcelValue",
       "members": [
         {
-          "name": "sector_id",
-          "type": "core::integer::u8"
+          "name": "col",
+          "type": "core::integer::u16"
         },
         {
-          "name": "tile_shape",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "zone",
-          "type": "core::integer::u8"
+          "name": "row",
+          "type": "core::integer::u16"
         },
         {
           "name": "parcel_type",
@@ -4799,10 +4631,6 @@
         },
         {
           "name": "is_home",
-          "type": "core::bool"
-        },
-        {
-          "name": "is_stranded",
           "type": "core::bool"
         }
       ]
@@ -6101,78 +5929,6 @@
     },
     {
       "type": "struct",
-      "name": "siege_dojo::models::sector_environment::SectorEnvironment",
-      "members": [
-        {
-          "name": "sector_id",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "effect_type",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "effect_magnitude",
-          "type": "core::integer::u8"
-        }
-      ]
-    },
-    {
-      "type": "struct",
-      "name": "siege_dojo::models::sector_environment::SectorEnvironmentValue",
-      "members": [
-        {
-          "name": "effect_type",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "effect_magnitude",
-          "type": "core::integer::u8"
-        }
-      ]
-    },
-    {
-      "type": "event",
-      "name": "siege_dojo::models::sector_environment::m_SectorEnvironment::Event",
-      "kind": "enum",
-      "variants": []
-    },
-    {
-      "type": "struct",
-      "name": "siege_dojo::models::tile_adjacency::TileAdjacency",
-      "members": [
-        {
-          "name": "tile_id",
-          "type": "core::integer::u32"
-        },
-        {
-          "name": "edge_index",
-          "type": "core::integer::u8"
-        },
-        {
-          "name": "neighbor_tile_id",
-          "type": "core::integer::u32"
-        }
-      ]
-    },
-    {
-      "type": "struct",
-      "name": "siege_dojo::models::tile_adjacency::TileAdjacencyValue",
-      "members": [
-        {
-          "name": "neighbor_tile_id",
-          "type": "core::integer::u32"
-        }
-      ]
-    },
-    {
-      "type": "event",
-      "name": "siege_dojo::models::tile_adjacency::m_TileAdjacency::Event",
-      "kind": "enum",
-      "variants": []
-    },
-    {
-      "type": "struct",
       "name": "siege_dojo::models::world_config::WorldConfig",
       "members": [
         {
@@ -6190,18 +5946,6 @@
         {
           "name": "initialized",
           "type": "core::bool"
-        },
-        {
-          "name": "is_world_folded",
-          "type": "core::bool"
-        },
-        {
-          "name": "fold_epoch",
-          "type": "core::integer::u32"
-        },
-        {
-          "name": "total_folds",
-          "type": "core::integer::u32"
         }
       ]
     },
@@ -6220,18 +5964,6 @@
         {
           "name": "initialized",
           "type": "core::bool"
-        },
-        {
-          "name": "is_world_folded",
-          "type": "core::bool"
-        },
-        {
-          "name": "fold_epoch",
-          "type": "core::integer::u32"
-        },
-        {
-          "name": "total_folds",
-          "type": "core::integer::u32"
         }
       ]
     },
@@ -6954,44 +6686,12 @@
           "name": "initialize_world",
           "inputs": [
             {
-              "name": "tile_shapes",
-              "type": "core::array::Array::<core::integer::u8>"
+              "name": "cols",
+              "type": "core::array::Array::<core::integer::u16>"
             },
             {
-              "name": "sector_ids",
-              "type": "core::array::Array::<core::integer::u8>"
-            },
-            {
-              "name": "zones",
-              "type": "core::array::Array::<core::integer::u8>"
-            },
-            {
-              "name": "adj_tile_ids",
-              "type": "core::array::Array::<core::integer::u32>"
-            }
-          ],
-          "outputs": [],
-          "state_mutability": "external"
-        },
-        {
-          "type": "function",
-          "name": "expand_world",
-          "inputs": [
-            {
-              "name": "tile_shapes",
-              "type": "core::array::Array::<core::integer::u8>"
-            },
-            {
-              "name": "sector_ids",
-              "type": "core::array::Array::<core::integer::u8>"
-            },
-            {
-              "name": "zones",
-              "type": "core::array::Array::<core::integer::u8>"
-            },
-            {
-              "name": "adj_tile_ids",
-              "type": "core::array::Array::<core::integer::u32>"
+              "name": "rows",
+              "type": "core::array::Array::<core::integer::u16>"
             }
           ],
           "outputs": [],
