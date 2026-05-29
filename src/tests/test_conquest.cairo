@@ -68,9 +68,6 @@ mod tests {
     use siege_dojo::models::parcel::{Parcel, m_Parcel};
     use siege_dojo::models::player_kingdom::{PlayerKingdom, m_PlayerKingdom};
     use siege_dojo::models::world_config::{WorldConfig, m_WorldConfig};
-    use siege_dojo::models::tile_adjacency::{TileAdjacency, m_TileAdjacency};
-    use siege_dojo::models::sector_environment::m_SectorEnvironment;
-    use siege_dojo::models::fold_event::m_FoldEvent;
     use siege_dojo::models::match_stakes_1v1::m_MatchStakes1v1;
     use siege_dojo::models::preset_defense::{PresetDefense, m_PresetDefense};
     use siege_dojo::models::match_state_1v1::m_MatchState1v1;
@@ -189,9 +186,6 @@ mod tests {
                 TestResource::Model(m_Parcel::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Model(m_WorldConfig::TEST_CLASS_HASH),
-                TestResource::Model(m_TileAdjacency::TEST_CLASS_HASH),
-                TestResource::Model(m_SectorEnvironment::TEST_CLASS_HASH),
-                TestResource::Model(m_FoldEvent::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchStakes1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_PresetDefense::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchState1v1::TEST_CLASS_HASH),
@@ -265,18 +259,11 @@ mod tests {
         rc.ability_token = ability_token_addr;
         world.write_model_test(@rc);
 
-        // Grid: 10 tiles, all squares, frontier zone, sectors 0/1
-        // Adjacency: row 0: 0-1-2-3-4, row 1: 5-6-7-8-9, cross: 0-5,1-6,2-7,3-8,4-9
-        world_sys.initialize_world(
-            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  // tile_shapes
-            array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1],  // sector_ids
-            array![2, 2, 2, 2, 2, 2, 2, 2, 2, 2],  // zones (all frontier)
-            array![
-                0, 0, 1,   1, 0, 0,   1, 1, 2,   2, 0, 1,   2, 1, 3,   3, 0, 2,   3, 1, 4,   4, 0, 3,
-                5, 0, 6,   6, 0, 5,   6, 1, 7,   7, 0, 6,   7, 1, 8,   8, 0, 7,   8, 1, 9,   9, 0, 8,
-                0, 1, 5,   5, 1, 0,   1, 2, 6,   6, 2, 1,   2, 2, 7,   7, 2, 2,   3, 2, 8,   8, 2, 3,   4, 2, 9,   9, 2, 4,
-            ],
-        );
+        // Grid: 2 rows, 5 cols each (10 parcels)
+        // parcels 0-4: (0,0)..(4,0)  parcels 5-9: (0,1)..(4,1)
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        world_sys.initialize_world(cols, rows);
 
         let player_a = deploy_user();
         starknet::testing::set_contract_address(player_a);
@@ -341,8 +328,8 @@ mod tests {
         conquest_sys.set_preset_defense(1, 0, 0, 0, 1, 1, 1);
         conquest_sys.set_preset_defense(2, 0, 0, 0, 1, 1, 1);
 
-        // Give B parcel 9 as a non-home parcel to target.
-        // Player A has parcel 8 which is adjacent to parcel 9 (via TileAdjacency).
+        // Give B parcel 9 (col=4,row=1) as a non-home parcel to target.
+        // Player A has parcel 8 (col=3,row=1) which is adjacent to parcel 9.
         let mut tp: Parcel = world.read_model(9_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
@@ -351,6 +338,10 @@ mod tests {
         world.write_model_test(@kb);
 
         // Attacker launches conquest with overwhelming attack on gate 0
+        // atk: p0=10, p1=0, p2=0 (total=10), def: g0=0,g1=0,g2=0
+        // Damage to defender: max(0, 10-1)=9 + 0 + 0 = 9 → def_hp = 15-9 = 6
+        // Damage to attacker: def_p0=0 vs g0=0 → 0, etc. → atk_hp = 15
+        // 15 > 6 → attacker wins
         starknet::testing::set_contract_address(player_a);
         conquest_sys.initiate_conquest(
             9,
@@ -374,8 +365,8 @@ mod tests {
         conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
         conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
 
-        // Give B parcel 9 as a non-home parcel to target.
-        // Player A has parcel 8 which is adjacent.
+        // Give B parcel 9 (col=4,row=1) as a non-home parcel to target.
+        // Player A has parcel 8 (col=3,row=1) which is adjacent.
         let mut tp: Parcel = world.read_model(9_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
@@ -430,8 +421,19 @@ mod tests {
         conquest_sys.set_preset_defense(1, 4, 4, 4, 0, 0, 0);
         conquest_sys.set_preset_defense(2, 4, 4, 4, 0, 0, 0);
 
-        // Give B parcel 6 as target. Player_a's home parcel 1 is adjacent
-        // to parcel 6 (via TileAdjacency edge 1-2-6).
+        // Give B parcel 9 (col=4,row=1) as a non-home parcel to target.
+        // We need player_a to have a parcel adjacent to parcel 9 for the adjacency check.
+        // Player_a's home parcels are at parcels 0,1,2 (col=0,1,2 row=0).
+        // Is any home parcel adjacent to parcel 9 (col=4,row=1)?
+        // hex_distance((2,0),(4,1)): r1=0 even: x1=2,z1=0,y1=-2; r2=1 odd: x2=4-(0)/2=4,z2=1,y2=-5
+        // dx=2,dy=3,dz=1 → max=3. Not adjacent.
+        // hex_distance((1,0),(4,1)): dx=3. Not adjacent.
+        // We need a different target that IS adjacent to player_a's home parcels.
+        // Parcel 6 is at (1,1). Is it adjacent to home parcel 1 at (1,0)?
+        // hex_distance((1,0),(1,1)): r1=0 even, r2=1 odd.
+        // x1=1-(0)/2=1, z1=0, y1=-1; x2=1-(0)/2=1, z2=1, y2=-2
+        // dx=0, dy=1, dz=1 → max=1. Adjacent!
+        // Give B parcel 6 (col=1,row=1) as target instead.
         let mut tp: Parcel = world.read_model(6_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
@@ -440,6 +442,7 @@ mod tests {
         world.write_model_test(@kb);
 
         // Attacker (home-only) launches weak attack and loses
+        // Player_a's home parcel 1 at (1,0) is adjacent to target parcel 6 at (1,1)
         starknet::testing::set_contract_address(player_a);
         conquest_sys.initiate_conquest(6, 1, 1, 1, 0, 0, 0, 0, 0);
 
@@ -465,7 +468,7 @@ mod tests {
         conquest_sys.set_preset_defense(1, 0, 0, 0, 4, 4, 4);
         conquest_sys.set_preset_defense(2, 0, 0, 0, 4, 4, 4);
 
-        // Give B parcel 9 as a non-home parcel (adjacent to A's parcel 8)
+        // Give B parcel 9 as a non-home parcel
         let mut tp: Parcel = world.read_model(9_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
@@ -741,7 +744,7 @@ mod tests {
             last_leave_time: 0,
         });
 
-        // Ally owns parcel 6, adjacent to target parcel 7 (via TileAdjacency).
+        // Ally owns parcel 6 at (col=1,row=1), adjacent to target parcel 7 at (col=2,row=1).
         // Parcel 6 is unclaimed after conquest_setup (only parcel 8 was assigned).
         let mut ally_parcel: Parcel = world.read_model(6_u32);
         ally_parcel.owner = ally;
@@ -757,8 +760,8 @@ mod tests {
             preset_count: 1,
         });
 
-        // Give player_b parcel 7 as the target. Player_a already has
-        // parcel 2 (home) adjacent to parcel 7 (via TileAdjacency), so attacker adjacency holds.
+        // Give player_b parcel 7 at (2,1) as the target. Player_a already has
+        // parcel 2 (home at (2,0)) adjacent to parcel 7, so attacker adjacency holds.
         let mut tp: Parcel = world.read_model(7_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);

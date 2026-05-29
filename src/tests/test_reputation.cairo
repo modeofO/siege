@@ -65,9 +65,6 @@ mod tests {
     use siege_dojo::models::parcel::{Parcel, m_Parcel};
     use siege_dojo::models::player_kingdom::{PlayerKingdom, m_PlayerKingdom};
     use siege_dojo::models::world_config::{WorldConfig, m_WorldConfig};
-    use siege_dojo::models::tile_adjacency::m_TileAdjacency;
-    use siege_dojo::models::sector_environment::m_SectorEnvironment;
-    use siege_dojo::models::fold_event::m_FoldEvent;
     use siege_dojo::models::match_stakes_1v1::{MatchStakes1v1, m_MatchStakes1v1};
     use siege_dojo::models::preset_defense::m_PresetDefense;
     use siege_dojo::models::match_state::MatchStatus;
@@ -136,9 +133,6 @@ mod tests {
                 TestResource::Model(m_Parcel::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Model(m_WorldConfig::TEST_CLASS_HASH),
-                TestResource::Model(m_TileAdjacency::TEST_CLASS_HASH),
-                TestResource::Model(m_SectorEnvironment::TEST_CLASS_HASH),
-                TestResource::Model(m_FoldEvent::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchStakes1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchAbilities1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_PresetDefense::TEST_CLASS_HASH),
@@ -218,17 +212,10 @@ mod tests {
         // Reset to world owner before initialize_world (requires is_owner)
         starknet::testing::set_contract_address(contract_address_const::<0>());
 
-        // Init world with 10 tiles
-        world_sys.initialize_world(
-            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1],
-            array![2, 2, 2, 2, 2, 2, 2, 2, 2, 2],
-            array![
-                0, 0, 1,   1, 0, 0,   1, 1, 2,   2, 0, 1,   2, 1, 3,   3, 0, 2,   3, 1, 4,   4, 0, 3,
-                5, 0, 6,   6, 0, 5,   6, 1, 7,   7, 0, 6,   7, 1, 8,   8, 0, 7,   8, 1, 9,   9, 0, 8,
-                0, 1, 5,   5, 1, 0,   1, 2, 6,   6, 2, 1,   2, 2, 7,   7, 2, 2,   3, 2, 8,   8, 2, 3,   4, 2, 9,   9, 2, 4,
-            ],
-        );
+        // Init world with 10 parcels (2 rows of 5)
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        world_sys.initialize_world(cols, rows);
 
         // Register player A
         let player_a = deploy_user();

@@ -74,9 +74,6 @@ mod tests {
     use siege_dojo::models::parcel::{Parcel, m_Parcel};
     use siege_dojo::models::player_kingdom::{PlayerKingdom, m_PlayerKingdom};
     use siege_dojo::models::world_config::{WorldConfig, m_WorldConfig};
-    use siege_dojo::models::tile_adjacency::{TileAdjacency, m_TileAdjacency};
-    use siege_dojo::models::sector_environment::m_SectorEnvironment;
-    use siege_dojo::models::fold_event::m_FoldEvent;
     use siege_dojo::models::events::{
         e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished,
     };
@@ -141,9 +138,6 @@ mod tests {
                 TestResource::Model(m_Parcel::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Model(m_WorldConfig::TEST_CLASS_HASH),
-                TestResource::Model(m_TileAdjacency::TEST_CLASS_HASH),
-                TestResource::Model(m_SectorEnvironment::TEST_CLASS_HASH),
-                TestResource::Model(m_FoldEvent::TEST_CLASS_HASH),
                 TestResource::Model(m_PlayerCosmetics::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
@@ -180,77 +174,34 @@ mod tests {
         (world, ws)
     }
 
-    /// Standard 10-tile grid initialization (2 rows x 5 cols).
-    /// All tiles are squares (shape 0), frontier zone (2), sectors split 0/1.
-    /// Adjacency: row 0: 0-1-2-3-4, row 1: 5-6-7-8-9, cross: 0-5,1-6,2-7,3-8,4-9.
-    fn init_10_tile_grid(ws: IWorldSystemDispatcher) {
-        ws.initialize_world(
-            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  // tile_shapes (all squares)
-            array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1],  // sector_ids
-            array![2, 2, 2, 2, 2, 2, 2, 2, 2, 2],  // zones (all frontier)
-            array![
-                // Row 0 horizontal
-                0, 0, 1,   1, 0, 0,   1, 1, 2,   2, 0, 1,   2, 1, 3,   3, 0, 2,   3, 1, 4,   4, 0, 3,
-                // Row 1 horizontal
-                5, 0, 6,   6, 0, 5,   6, 1, 7,   7, 0, 6,   7, 1, 8,   8, 0, 7,   8, 1, 9,   9, 0, 8,
-                // Cross-row vertical
-                0, 1, 5,   5, 1, 0,   1, 2, 6,   6, 2, 1,   2, 2, 7,   7, 2, 2,   3, 2, 8,   8, 2, 3,   4, 2, 9,   9, 2, 4,
-            ],
-        );
-    }
-
-    /// Standard 6-tile grid initialization (2 rows x 3 cols).
-    fn init_6_tile_grid(ws: IWorldSystemDispatcher) {
-        ws.initialize_world(
-            array![0, 0, 0, 0, 0, 0],  // tile_shapes
-            array![0, 0, 0, 1, 1, 1],  // sector_ids
-            array![2, 2, 2, 2, 2, 2],  // zones (all frontier)
-            array![
-                0, 0, 1,   1, 0, 0,   1, 1, 2,   2, 0, 1,
-                3, 0, 4,   4, 0, 3,   4, 1, 5,   5, 0, 4,
-                0, 1, 3,   3, 1, 0,   1, 2, 4,   4, 2, 1,   2, 2, 5,   5, 2, 2,
-            ],
-        );
-    }
-
     #[test]
     fn test_initialize_world() {
         let (mut world, ws) = setup();
 
-        // Init with 4 parcels — all squares, sector 0, frontier zone
+        // Init with 4 parcels: (col, row) — all untyped (255)
         ws.initialize_world(
-            array![0, 0, 0, 0],        // tile_shapes
-            array![0, 0, 0, 0],        // sector_ids
-            array![2, 2, 2, 2],        // zones (frontier)
-            array![
-                0, 0, 1,   1, 0, 0,   // 0 <-> 1
-                2, 0, 3,   3, 0, 2,   // 2 <-> 3
-                0, 1, 2,   2, 1, 0,   // 0 <-> 2
-                1, 1, 3,   3, 1, 1,   // 1 <-> 3
-            ],
+            array![0_u16, 1_u16, 0_u16, 1_u16],
+            array![0_u16, 0_u16, 1_u16, 1_u16],
         );
 
         let config: WorldConfig = world.read_model(0_u8);
         assert(config.total_parcels == 4, 'total_parcels should be 4');
         assert(config.initialized, 'should be initialized');
-        assert(!config.is_world_folded, 'should start unfolded');
-        assert(config.fold_epoch == 0, 'fold_epoch should be 0');
 
         let parcel_0: Parcel = world.read_model(0_u32);
-        assert(parcel_0.tile_id == 0, 'parcel 0 tile_id wrong');
-        assert(parcel_0.sector_id == 0, 'parcel 0 sector_id wrong');
-        assert(parcel_0.tile_shape == 0, 'parcel 0 tile_shape wrong');
-        assert(parcel_0.zone == 2, 'parcel 0 zone wrong');
+        assert(parcel_0.col == 0, 'parcel 0 col wrong');
+        assert(parcel_0.row == 0, 'parcel 0 row wrong');
         assert(parcel_0.parcel_type == 255, 'parcel 0 should be untyped');
-        assert(!parcel_0.is_stranded, 'parcel 0 not stranded');
     }
 
     #[test]
     fn test_register_player() {
         let (mut world, ws) = setup();
 
-        // Init world with 10 parcels
-        init_10_tile_grid(ws);
+        // Init world with 10 parcels (2 rows of 5, all untyped)
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        ws.initialize_world(cols, rows);
 
         // Deploy AbilityToken
         let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
@@ -291,27 +242,15 @@ mod tests {
     }
 
     #[test]
-    fn test_register_player_no_collision() {
-        // Two sequential registrations should not share any home tiles.
-        // With sector-based allocation, both players get tiles from the
-        // sector with the most unclaimed frontier tiles. After player A
-        // takes 3 tiles, player B should get 3 different tiles.
+    fn test_register_player_spatial_separation() {
+        // Two sequential registrations on the same 2x5 grid should end up in
+        // separated corners — not adjacent. Reproduces the bug from issue #1
+        // where sequential picks put new players directly on top of existing.
         let (mut world, ws) = setup();
 
-        // Use a larger grid so two players can both register.
-        // 4 sectors x 3 frontier tiles each = 12 tiles.
-        ws.initialize_world(
-            array![0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  // tile_shapes
-            array![0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3],  // sector_ids (3 tiles per sector)
-            array![2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2],  // zones (all frontier)
-            array![
-                // Minimal adjacency — each group of 3 connected
-                0, 0, 1,   1, 0, 0,   1, 1, 2,   2, 0, 1,
-                3, 0, 4,   4, 0, 3,   4, 1, 5,   5, 0, 4,
-                6, 0, 7,   7, 0, 6,   7, 1, 8,   8, 0, 7,
-                9, 0, 10,  10, 0, 9,  10, 1, 11, 11, 0, 10,
-            ],
-        );
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        ws.initialize_world(cols, rows);
 
         let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
         let ability_token = deploy_ability_token(admin);
@@ -323,6 +262,8 @@ mod tests {
         rc.ability_token = ability_token.contract_address;
         world.write_model_test(@rc);
 
+        // Two distinct player addresses — use different deploy salts so both
+        // contracts can coexist.
         let (player_a, _) = starknet::syscalls::deploy_syscall(
             MockAccount::TEST_CLASS_HASH.try_into().unwrap(),
             1,
@@ -355,6 +296,26 @@ mod tests {
         assert(kingdom_a.home_2 != kingdom_b.home_0, 'A-home_2 vs B-home_0');
         assert(kingdom_a.home_2 != kingdom_b.home_1, 'A-home_2 vs B-home_1');
         assert(kingdom_a.home_2 != kingdom_b.home_2, 'home_2 collision');
+
+        // Minimum distance between any A-home and any B-home must be >= 2
+        // (no adjacency between newly-registered players on a fresh world).
+        let a_ids: Array<u32> = array![kingdom_a.home_0, kingdom_a.home_1, kingdom_a.home_2];
+        let b_ids: Array<u32> = array![kingdom_b.home_0, kingdom_b.home_1, kingdom_b.home_2];
+
+        let mut min_cross: u16 = 65535_u16;
+        let mut i: u32 = 0;
+        while i < 3 {
+            let ap: Parcel = world.read_model(*a_ids.at(i));
+            let mut j: u32 = 0;
+            while j < 3 {
+                let bp: Parcel = world.read_model(*b_ids.at(j));
+                let d = siege_dojo::utils::hex::hex_distance(ap.col, ap.row, bp.col, bp.row);
+                if d < min_cross { min_cross = d; }
+                j += 1;
+            };
+            i += 1;
+        };
+        assert(min_cross >= 2, 'players too close');
     }
 
     #[test]
@@ -363,7 +324,9 @@ mod tests {
         let (mut world, ws) = setup();
 
         // Init world with 10 parcels
-        init_10_tile_grid(ws);
+        let cols: Array<u16> = array![0, 1, 2, 3, 4, 0, 1, 2, 3, 4];
+        let rows: Array<u16> = array![0, 0, 0, 0, 0, 1, 1, 1, 1, 1];
+        ws.initialize_world(cols, rows);
 
         // Deploy AbilityToken
         let admin: starknet::ContractAddress = 0xADAD.try_into().unwrap();
@@ -403,7 +366,7 @@ mod tests {
         world.write_model_test(@rc);
 
         starknet::testing::set_contract_address(0.try_into().unwrap());
-        init_6_tile_grid(ws);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
         starknet::testing::set_contract_address(user);
@@ -432,7 +395,7 @@ mod tests {
         world.write_model_test(@rc);
 
         starknet::testing::set_contract_address(0.try_into().unwrap());
-        init_6_tile_grid(ws);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
         starknet::testing::set_contract_address(user);
@@ -463,7 +426,7 @@ mod tests {
         world.write_model_test(@rc);
 
         starknet::testing::set_contract_address(0.try_into().unwrap());
-        init_6_tile_grid(ws);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
         starknet::testing::set_contract_address(user);
@@ -503,7 +466,7 @@ mod tests {
         world.write_model_test(@rc);
 
         starknet::testing::set_contract_address(0.try_into().unwrap());
-        init_6_tile_grid(ws);
+        ws.initialize_world(array![0, 1, 2, 3, 4, 5], array![0, 0, 0, 1, 1, 1]);
 
         let user = deploy_user();
         starknet::testing::set_contract_address(user);

@@ -30,7 +30,6 @@ pub mod resolution_1v1 {
     use siege_dojo::models::round_traps_1v1::RoundTraps1v1;
     use siege_dojo::models::events::{RoundResolved, MatchFinished};
     use siege_dojo::models::resource_config::ResourceConfig;
-    use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::tokens::resource_token::{IResourceTokenDispatcher, IResourceTokenDispatcherTrait};
     use super::{IVrfProviderResDispatcher, IVrfProviderResDispatcherTrait, Source};
 
@@ -85,8 +84,6 @@ pub mod resolution_1v1 {
         fn resolve_round(ref self: ContractState, match_id: u64) {
             let mut world = self.world_default();
             let mut state: MatchState1v1 = world.read_model(match_id);
-            let world_config: WorldConfig = world.read_model(0_u8);
-            let fold_mult: u8 = if world_config.is_world_folded { 2 } else { 1 };
             assert(state.status == MatchStatus::Active, 'Match not active');
 
             let round = state.current_round;
@@ -154,32 +151,32 @@ pub mod resolution_1v1 {
 
                 if a_type == 5 {
                     if a_tier == 1 {
-                        ad = ad + 1 * fold_mult;
+                        ad = ad + 1;
                     } else {
-                        ad = ad * 2 * fold_mult;
+                        ad = ad * 2;
                     }
                 }
                 if b_type == 5 {
                     if b_tier == 1 {
-                        bd = bd + 1 * fold_mult;
+                        bd = bd + 1;
                     } else {
-                        bd = bd * 2 * fold_mult;
+                        bd = bd * 2;
                     }
                 }
 
                 // --- ABILITY: Siege Sword — tier-aware attack override ---
                 if a_type == 1 && g == a_target.into() {
                     if a_tier == 1 {
-                        aa = 5 * fold_mult;
+                        aa = 5;
                     } else {
-                        aa = 10 * fold_mult;
+                        aa = 10;
                     }
                 }
                 if b_type == 1 && g == b_target.into() {
                     if b_tier == 1 {
-                        ba = 5 * fold_mult;
+                        ba = 5;
                     } else {
-                        ba = 10 * fold_mult;
+                        ba = 10;
                     }
                 }
 
@@ -335,7 +332,7 @@ pub mod resolution_1v1 {
             let b_tier_hex = ability_tier_from_token(b_ability);
 
             if a_type_hex == 4 {
-                let reduction: u8 = if a_tier_hex == 1 { 3 * fold_mult } else { 8 * fold_mult };
+                let reduction: u8 = if a_tier_hex == 1 { 3 } else { 8 };
                 if total_dmg_to_a > reduction {
                     total_dmg_to_a = total_dmg_to_a - reduction;
                 } else {
@@ -343,7 +340,7 @@ pub mod resolution_1v1 {
                 }
             }
             if b_type_hex == 4 {
-                let reduction: u8 = if b_tier_hex == 1 { 3 * fold_mult } else { 8 * fold_mult };
+                let reduction: u8 = if b_tier_hex == 1 { 3 } else { 8 };
                 if total_dmg_to_b > reduction {
                     total_dmg_to_b = total_dmg_to_b - reduction;
                 } else {
@@ -373,11 +370,11 @@ pub mod resolution_1v1 {
             let b_tier_ember = ability_tier_from_token(b_ability);
 
             if a_type_ember == 3 {
-                let dmg: u8 = if a_tier_ember == 1 { 2 * fold_mult } else { 6 * fold_mult };
+                let dmg: u8 = if a_tier_ember == 1 { 2 } else { 6 };
                 if hp_b > dmg { hp_b = hp_b - dmg; } else { hp_b = 0; }
             }
             if b_type_ember == 3 {
-                let dmg: u8 = if b_tier_ember == 1 { 2 * fold_mult } else { 6 * fold_mult };
+                let dmg: u8 = if b_tier_ember == 1 { 2 } else { 6 };
                 if hp_a > dmg { hp_a = hp_a - dmg; } else { hp_a = 0; }
             }
 
