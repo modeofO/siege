@@ -1,0 +1,81 @@
+<h2>Animation Sandbox — Architecture Approaches</h2>
+<p class="subtitle">How to structure the sandbox directory and its relationship to the main battle UI</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Next.js Route Sandbox (Recommended)</h3>
+      <p>Add <code>/sandbox/animations</code> route inside the existing Next.js app. Reuses the real <code>BattlefieldView</code>, <code>TroopSprite</code>, and sprite assets. A control panel triggers animations with mock game data.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Uses real components — animations transfer directly to production</li>
+            <li>Access to all existing sprites, styles, and Tailwind config</li>
+            <li>No separate build step or dev server</li>
+            <li>Easy to share — just visit /sandbox/animations on the dev server</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Sandbox code ships in the bundle unless excluded in production build</li>
+            <li>Tied to Next.js — can't iterate without the full app running</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Standalone Vite Playground</h3>
+      <p>A separate <code>frontend/sandbox/</code> directory with its own <code>vite.config.ts</code>. Imports animation modules from the main app but renders in a minimal harness — no Next.js overhead.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Instant HMR — Vite is faster than Next.js for pure component iteration</li>
+            <li>Clean separation — sandbox never pollutes production bundle</li>
+            <li>Can be a plain React app or even vanilla JS + anime.js</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Needs its own build config, duplicates some setup</li>
+            <li>Must manually keep sprite paths and shared types in sync</li>
+            <li>Components may need shimming (Next.js Image → plain img)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid — Next.js Route + Extracted Animation Library</h3>
+      <p>Create <code>frontend/src/lib/animations/</code> as a pure animation library (no React deps). The sandbox is a Next.js route that composes these with the battlefield. Production components import from the same library.</p>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Clean architecture — animations are testable functions, not component internals</li>
+            <li>Sandbox uses real components for preview</li>
+            <li>Animation logic can be unit tested without rendering</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>More upfront structure before you can start playing with effects</li>
+            <li>Abstraction may be premature until you know which animations stick</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
