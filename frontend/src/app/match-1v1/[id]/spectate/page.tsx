@@ -14,7 +14,7 @@ import {
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1, NodeOwner } from "@/lib/gameState1v1";
 import { BattlefieldView } from "@/components/BattlefieldView";
-import { ResolutionOverlay } from "@/components/ResolutionOverlay";
+import { BattleAnimation } from "@/components/BattleAnimation";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
 import { usePlayerCosmetics } from "@/lib/cosmetics";
@@ -387,16 +387,18 @@ export default function SpectatorPage() {
               committed={true}
               modifiers={modifiers}
               opponentAllocations={bAllocations}
-            />
-            {pendingResult && (
-              <ResolutionOverlay
-                result={pendingResult}
-                prevNodes={prevNodes}
-                newNodes={state.nodes}
-                isPlayerA={true}
-                onComplete={handleResolutionComplete}
-              />
-            )}
+            >
+              {pendingResult && heldHp && (
+                <BattleAnimation
+                  result={pendingResult}
+                  prevNodes={prevNodes}
+                  newNodes={state.nodes}
+                  isPlayerA={true}
+                  heldHp={heldHp}
+                  onComplete={handleResolutionComplete}
+                />
+              )}
+            </BattlefieldView>
           </div>
 
           {/* War Dispatch Log */}
