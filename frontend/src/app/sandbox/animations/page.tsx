@@ -535,7 +535,6 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
   const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const nodeBurstRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const abilityRef = useRef<HTMLDivElement | null>(null);
   const hpRefA = useRef<HTMLDivElement | null>(null);
   const hpRefB = useRef<HTMLDivElement | null>(null);
 
@@ -567,7 +566,7 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
       ringEls: ringRefs.current.filter(Boolean) as HTMLElement[],
       sparkEls: sparkRefs.current.map((arr) => arr.filter(Boolean) as HTMLElement[]),
       damageNumberEls: dmgRefs.current.filter(Boolean) as HTMLElement[],
-      abilityEl: abilityRef.current,
+      abilityEl: null,
       abilitySecondaryEl: null,
       nodeEls: nodeRefs.current.filter(Boolean) as HTMLElement[],
       nodeBurstEls: nodeBurstRefs.current.filter(Boolean) as HTMLElement[],
@@ -733,17 +732,6 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           }}
         />
       ))}
-      <div
-        ref={abilityRef}
-        className="absolute rounded-full"
-        style={{
-          left: `${POSITIONS.gates[0].x}%`, top: `${POSITIONS.gates[0].y}%`,
-          width: 80, height: 80,
-          transform: "translate(-50%, -50%) scale(0.1)",
-          background: "radial-gradient(circle, rgba(218,165,32,0.8) 0%, rgba(255,136,0,0.4) 50%, transparent 100%)",
-          opacity: 0,
-        }}
-      />
       <div
         ref={hpRefA}
         className="absolute font-mono font-bold text-lg"
