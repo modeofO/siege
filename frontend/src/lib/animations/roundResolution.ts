@@ -14,7 +14,8 @@ export interface RoundElements {
   abilitySecondaryEl: HTMLElement | SVGElement | null;
   nodeEls: HTMLElement[];
   nodeBurstEls: HTMLElement[];
-  vaultHpEl: HTMLElement | null;
+  vaultHpElA: HTMLElement | null;
+  vaultHpElB: HTMLElement | null;
 }
 
 export interface RoundConfig {
@@ -23,8 +24,10 @@ export interface RoundConfig {
   abilityType: number;
   gateDamages: { dmgToA: number; dmgToB: number }[];
   nodesChanged: boolean[];
-  vaultHpFrom: number;
-  vaultHpTo: number;
+  vaultAHpFrom: number;
+  vaultAHpTo: number;
+  vaultBHpFrom: number;
+  vaultBHpTo: number;
 }
 
 export function createRoundTimeline(
@@ -245,39 +248,45 @@ export function createRoundTimeline(
     }
   }
 
-  // Phase 5: Vault HP drain — count down with shake (4000ms)
-  if (els.vaultHpEl) {
-    const hpDiff = config.vaultHpFrom - config.vaultHpTo;
-    if (hpDiff > 0) {
-      // Shake the HP text
-      tl.add(els.vaultHpEl, {
-        translateX: [0, -4, 5, -3, 2, -1, 0],
-        duration: 300,
-        ease: "inOutQuad",
-      }, 4000);
-      // Scale pulse
-      tl.add(els.vaultHpEl, {
-        scale: [1, 1.3, 1],
-        opacity: [1, 0.5, 1],
-        duration: 500,
-        ease: "inOutQuad",
-      }, 4000);
-      // Animate text counting down via onUpdate
-      const hpEl = els.vaultHpEl;
-      const startVal = config.vaultHpFrom;
-      const endVal = config.vaultHpTo;
-      tl.add(hpEl, {
-        // Dummy property to drive the counter — uses innerHTML update in onUpdate
-        color: ["#ef4444", "#ff6666", "#ef4444"],
-        duration: 500,
-        ease: "linear",
-        onUpdate: (anim) => {
-          const progress = anim.progress / 100;
-          const current = Math.round(startVal - (startVal - endVal) * progress);
-          hpEl.textContent = `${current} HP`;
-        },
-      }, 4000);
-    }
+  // Phase 5: Vault HP drain — both vaults count down with shake (4000ms)
+  const animateVaultHp = (
+    el: HTMLElement,
+    from: number,
+    to: number,
+    color: string,
+    colorFlash: string,
+    offset: number,
+  ) => {
+    const diff = from - to;
+    if (diff <= 0) return;
+    tl.add(el, {
+      translateX: [0, -4, 5, -3, 2, -1, 0],
+      duration: 300,
+      ease: "inOutQuad",
+    }, offset);
+    tl.add(el, {
+      scale: [1, 1.3, 1],
+      opacity: [1, 0.5, 1],
+      duration: 500,
+      ease: "inOutQuad",
+    }, offset);
+    tl.add(el, {
+      color: [color, colorFlash, color],
+      duration: 500,
+      ease: "linear",
+      onUpdate: (anim) => {
+        const progress = anim.progress / 100;
+        const current = Math.round(from - diff * progress);
+        el.textContent = `${current} HP`;
+      },
+    }, offset);
+  };
+
+  if (els.vaultHpElA) {
+    animateVaultHp(els.vaultHpElA, config.vaultAHpFrom, config.vaultAHpTo, "#ef4444", "#ff6666", 4000);
+  }
+  if (els.vaultHpElB) {
+    animateVaultHp(els.vaultHpElB, config.vaultBHpFrom, config.vaultBHpTo, "#ef4444", "#ff6666", 4000);
   }
 
   // Phase 6: Vignette fade-out at end (4800ms)

@@ -536,7 +536,8 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const nodeBurstRefs = useRef<(HTMLDivElement | null)[]>([]);
   const abilityRef = useRef<HTMLDivElement | null>(null);
-  const hpRef = useRef<HTMLDivElement | null>(null);
+  const hpRefA = useRef<HTMLDivElement | null>(null);
+  const hpRefB = useRef<HTMLDivElement | null>(null);
 
   const marchGroups = getMarchGroups();
   const base = POSITIONS.baseA;
@@ -570,7 +571,8 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
       abilitySecondaryEl: null,
       nodeEls: nodeRefs.current.filter(Boolean) as HTMLElement[],
       nodeBurstEls: nodeBurstRefs.current.filter(Boolean) as HTMLElement[],
-      vaultHpEl: hpRef.current,
+      vaultHpElA: hpRefA.current,
+      vaultHpElB: hpRefB.current,
     };
     const config: RoundConfig = {
       abilityId: MOCK_RESULT.aAbilityId,
@@ -582,8 +584,10 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
         MOCK_PREV_NODES[1] !== MOCK_NEW_NODES[1],
         MOCK_PREV_NODES[2] !== MOCK_NEW_NODES[2],
       ],
-      vaultHpFrom: 42,
-      vaultHpTo: 38,
+      vaultAHpFrom: 45,
+      vaultAHpTo: 45 - MOCK_RESULT.damageToA,
+      vaultBHpFrom: 42,
+      vaultBHpTo: 42 - MOCK_RESULT.damageToB,
     };
     const tl = createRoundTimeline(roundEls, config, onComplete);
     tl.play();
@@ -741,7 +745,19 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
         }}
       />
       <div
-        ref={hpRef}
+        ref={hpRefA}
+        className="absolute font-mono font-bold text-lg"
+        style={{
+          left: `${POSITIONS.baseA.x}%`, top: `${POSITIONS.baseA.y - 12}%`,
+          transform: "translateX(-50%)",
+          color: "#ef4444",
+          textShadow: "0 2px 8px rgba(0,0,0,0.9)",
+        }}
+      >
+        45 HP
+      </div>
+      <div
+        ref={hpRefB}
         className="absolute font-mono font-bold text-lg"
         style={{
           left: `${POSITIONS.baseB.x}%`, top: `${POSITIONS.baseB.y - 12}%`,
