@@ -210,6 +210,14 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+const ABILITY_ICONS: Record<number, string> = {
+  1: "/sprites/abilities/siege-sword.svg",
+  2: "/sprites/abilities/stone-cloak.svg",
+  3: "/sprites/abilities/ember-blast.svg",
+  4: "/sprites/abilities/hex.svg",
+  5: "/sprites/abilities/fortify.svg",
+};
+
 function AbilityScene({
   abilityId,
   onComplete,
@@ -217,10 +225,9 @@ function AbilityScene({
   abilityId: number;
   onComplete: () => void;
 }) {
-  const effectRef = useRef<HTMLDivElement | SVGSVGElement | null>(null);
-  const secondaryRef = useRef<HTMLDivElement | SVGLineElement | null>(null);
+  const effectRef = useRef<HTMLDivElement>(null);
+  const secondaryRef = useRef<HTMLDivElement>(null);
   const abilityType = ((abilityId - 1) % 5) + 1;
-  const tier = Math.floor((abilityId - 1) / 5) + 1;
 
   useEffect(() => {
     const el = effectRef.current;
@@ -235,111 +242,90 @@ function AbilityScene({
   const myBase = POSITIONS.baseA;
   const enemyBase = POSITIONS.baseB;
 
+  // Determine icon position based on ability type
+  const iconSrc = ABILITY_ICONS[abilityType];
+  let posX: number;
+  let posY: number;
   switch (abilityType) {
-    case 1: { // Siege Sword
-      const size = tier === 2 ? 16 : 10;
-      return (
-        <div className="absolute inset-0 pointer-events-none z-20">
-          <svg
-            className="absolute"
-            style={{ left: `${gatePos.x}%`, top: `${gatePos.y}%`, width: `${size}%`, height: `${size}%`, transform: "translate(-50%, -50%)", overflow: "visible" }}
-            viewBox="-10 -10 20 20"
-          >
-            <line ref={effectRef as React.Ref<SVGLineElement>} x1="-8" y1="-8" x2="8" y2="8" stroke="#daa520" strokeWidth={tier === 2 ? 3 : 2} strokeLinecap="round" strokeDasharray="60" strokeDashoffset="60" opacity="0" />
-            <line ref={secondaryRef as React.Ref<SVGLineElement>} x1="8" y1="-8" x2="-8" y2="8" stroke="#ff8800" strokeWidth={tier === 2 ? 3 : 2} strokeLinecap="round" strokeDasharray="60" strokeDashoffset="60" opacity="0" />
-          </svg>
-        </div>
-      );
-    }
-    case 2: { // Stone Cloak
-      const w = tier === 2 ? 18 : 13;
-      const h = tier === 2 ? 22 : 16;
-      return (
-        <div className="absolute inset-0 pointer-events-none z-20">
-          <div
-            ref={effectRef as React.Ref<HTMLDivElement>}
-            className="absolute rounded-full"
-            style={{
-              left: `${myBase.x}%`, top: `${myBase.y}%`,
-              width: `${w}%`, height: `${h}%`,
-              transform: "translate(-50%, -50%) scaleY(0.3)",
-              border: `3px solid ${tier === 2 ? "#c8a44e" : "#a0c4ff"}`,
-              boxShadow: `0 0 16px 6px ${tier === 2 ? "rgba(200,164,78,0.5)" : "rgba(160,196,255,0.4)"}`,
-              opacity: 0,
-            }}
-          />
-        </div>
-      );
-    }
-    case 3: { // Ember Blast
-      const sz = tier === 2 ? 140 : 100;
-      return (
-        <div className="absolute inset-0 pointer-events-none z-20">
-          <div
-            ref={effectRef as React.Ref<HTMLDivElement>}
-            className="absolute rounded-full"
-            style={{
-              left: `${enemyBase.x}%`, top: `${enemyBase.y}%`,
-              width: sz, height: sz,
-              transform: "translate(-50%, -50%) scale(0.1)",
-              background: "radial-gradient(circle, rgba(255,100,20,0.9) 0%, rgba(255,50,10,0.6) 40%, transparent 100%)",
-              opacity: 0,
-            }}
-          />
-        </div>
-      );
-    }
-    case 4: { // Hex
-      const sz = tier === 2 ? 180 : 130;
-      return (
-        <div className="absolute inset-0 pointer-events-none z-20">
-          <div
-            ref={effectRef as React.Ref<HTMLDivElement>}
-            className="absolute rounded-full"
-            style={{
-              left: "50%", top: "50%",
-              width: sz, height: sz,
-              transform: "translate(-50%, -50%) scale(0.3)",
-              border: `3px solid ${tier === 2 ? "#ff3344" : "#cc2233"}`,
-              boxShadow: `0 0 24px 10px ${tier === 2 ? "rgba(255,51,68,0.4)" : "rgba(204,34,51,0.3)"}`,
-              opacity: 0,
-            }}
-          />
-          <div
-            ref={secondaryRef as React.Ref<HTMLDivElement>}
-            className="absolute rounded-full"
-            style={{
-              left: "50%", top: "50%",
-              width: sz * 0.7, height: sz * 0.7,
-              transform: "translate(-50%, -50%) scale(0.2)",
-              border: `2px solid ${tier === 2 ? "#ff3344" : "#cc2233"}`,
-              opacity: 0,
-            }}
-          />
-        </div>
-      );
-    }
-    case 5: { // Fortify
-      return (
-        <div className="absolute inset-0 pointer-events-none z-20">
-          <div
-            ref={effectRef as React.Ref<HTMLDivElement>}
-            className="absolute"
-            style={{
-              left: `${myBase.x}%`, top: `${myBase.y}%`,
-              width: tier === 2 ? 8 : 5,
-              height: tier === 2 ? 160 : 120,
-              transform: "translate(-50%, -50%) scaleY(0.3)",
-              background: `linear-gradient(to bottom, transparent, ${tier === 2 ? "#c8a44e" : "#a0c4ff"}, transparent)`,
-              opacity: 0,
-            }}
-          />
-        </div>
-      );
-    }
-    default:
-      return null;
+    case 1: posX = gatePos.x; posY = gatePos.y; break;     // Siege Sword: at gate
+    case 2: posX = myBase.x; posY = myBase.y; break;        // Stone Cloak: player base
+    case 3: posX = enemyBase.x; posY = enemyBase.y; break;  // Ember Blast: enemy base
+    case 4: posX = 50; posY = 50; break;                     // Hex: center
+    case 5: posX = myBase.x; posY = myBase.y; break;        // Fortify: player base
+    default: return null;
   }
+
+  // Secondary effect styles per ability type
+  const secondaryStyles: Record<number, React.CSSProperties> = {
+    1: { // Gold slash trail
+      left: `${posX}%`, top: `${posY}%`, width: 160, height: 40,
+      transform: "translate(-50%, -50%) rotate(-30deg) scaleX(0.1)",
+      background: "linear-gradient(90deg, transparent, rgba(218,165,32,0.8), rgba(255,136,0,0.6), transparent)",
+      borderRadius: "50%",
+      opacity: 0,
+    },
+    2: { // Blue/silver shimmer dome
+      left: `${posX}%`, top: `${posY}%`, width: 200, height: 200,
+      transform: "translate(-50%, -50%) scale(0.3)",
+      background: "radial-gradient(circle, rgba(160,196,255,0.5) 0%, rgba(100,160,255,0.2) 40%, transparent 70%)",
+      border: "2px solid rgba(160,196,255,0.4)",
+      borderRadius: "50%",
+      opacity: 0,
+    },
+    3: { // Orange radial explosion burst
+      left: `${posX}%`, top: `${posY}%`, width: 220, height: 220,
+      transform: "translate(-50%, -50%) scale(0.2)",
+      background: "radial-gradient(circle, rgba(255,100,20,0.9) 0%, rgba(255,50,10,0.5) 40%, transparent 70%)",
+      borderRadius: "50%",
+      opacity: 0,
+    },
+    4: { // Red ripple rings
+      left: `${posX}%`, top: `${posY}%`, width: 240, height: 240,
+      transform: "translate(-50%, -50%) scale(0.3)",
+      border: "3px solid rgba(204,34,51,0.6)",
+      boxShadow: "0 0 30px 15px rgba(255,51,68,0.3), inset 0 0 20px rgba(255,51,68,0.2)",
+      borderRadius: "50%",
+      opacity: 0,
+    },
+    5: { // Golden shimmer particles rising
+      left: `${posX}%`, top: `${posY}%`, width: 80, height: 160,
+      transform: "translate(-50%, -50%) scaleY(0.3)",
+      background: "linear-gradient(to top, rgba(200,164,78,0.6), rgba(218,165,32,0.3), transparent)",
+      borderRadius: "40%",
+      opacity: 0,
+    },
+  };
+
+  return (
+    <div className="absolute inset-0 pointer-events-none z-20">
+      {/* Secondary environmental effect (behind icon) */}
+      <div
+        ref={secondaryRef}
+        className="absolute"
+        style={secondaryStyles[abilityType]}
+      />
+      {/* Primary ability icon */}
+      <div
+        ref={effectRef}
+        className="absolute"
+        style={{
+          left: `${posX}%`,
+          top: `${posY}%`,
+          width: 100,
+          height: 100,
+          transform: "translate(-50%, -50%) scale(0.2)",
+          opacity: 0,
+          filter: "drop-shadow(0 0 12px rgba(218,165,32,0.6))",
+        }}
+      >
+        <img
+          src={iconSrc}
+          alt={`Ability ${abilityType}`}
+          style={{ width: "100%", height: "100%" }}
+        />
+      </div>
+    </div>
+  );
 }
 
 function VaultBreachScene({ onComplete }: { onComplete: () => void }) {
