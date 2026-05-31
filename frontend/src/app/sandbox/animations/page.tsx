@@ -89,8 +89,16 @@ function getMarchGroups(): MarchGroup[] {
   return groups;
 }
 
+const TROOP_TYPE_DELAY: Record<string, number> = {
+  attack: 0,
+  defense: 200,
+  node: 350,
+  healer: 450,
+};
+
 function TroopMarchScene({ onComplete }: { onComplete: () => void }) {
   const troopRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const labelRef = useRef<HTMLDivElement>(null);
   const groups = getMarchGroups();
   const base = POSITIONS.baseA;
 
@@ -104,14 +112,41 @@ function TroopMarchScene({ onComplete }: { onComplete: () => void }) {
       el,
       toX: groups[i].toX,
       toY: groups[i].toY,
+      delay: TROOP_TYPE_DELAY[groups[i].type] ?? 0,
     }));
-    const tl = createMarchTimeline(targets, onComplete);
+
+    // Fade in DEPLOYING label, fade out when march completes
+    const label = labelRef.current;
+    if (label) {
+      label.style.opacity = "0";
+      label.animate(
+        [{ opacity: 0 }, { opacity: 1 }],
+        { duration: 300, fill: "forwards" },
+      );
+    }
+
+    const tl = createMarchTimeline(targets, () => {
+      if (label) {
+        label.animate(
+          [{ opacity: 1 }, { opacity: 0 }],
+          { duration: 300, fill: "forwards" },
+        );
+      }
+      setTimeout(onComplete, 350);
+    });
     tl.play();
     return () => { tl.pause(); };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="absolute inset-0 pointer-events-none z-20">
+      <div
+        ref={labelRef}
+        className="absolute top-2 left-1/2 -translate-x-1/2 text-[10px] tracking-[3px] font-serif text-[#c8a44e] select-none"
+        style={{ opacity: 0 }}
+      >
+        DEPLOYING...
+      </div>
       {groups.map((g, i) => (
         <div
           key={`march-${i}`}
@@ -141,11 +176,22 @@ function TroopMarchScene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+const CLASH_SPARK_DIRECTIONS = [
+  { x: -30, y: -25 },
+  { x: 25, y: -35 },
+  { x: 35, y: 20 },
+  { x: -20, y: 30 },
+  { x: 15, y: -40 },
+];
+
 function GateClashScene({ onComplete }: { onComplete: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gateRefs = useRef<(HTMLDivElement | null)[]>([]);
   const whiteFlashRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const ringRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const sparkRefs = useRef<(HTMLDivElement | null)[][]>([[], [], []]);
   const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const vignetteRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -155,7 +201,10 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
       container,
       gates: gateRefs.current.filter(Boolean) as HTMLElement[],
       whiteFlashes: whiteFlashRefs.current.filter(Boolean) as HTMLElement[],
+      rings: ringRefs.current.filter(Boolean) as HTMLElement[],
+      sparks: sparkRefs.current.map((arr) => arr.filter(Boolean) as HTMLElement[]),
       damageNumbers: dmgRefs.current.filter(Boolean) as HTMLElement[],
+      vignetteEl: vignetteRef.current,
     };
     const tl = createClashTimeline(els, MOCK_RESULT, true, onComplete);
     tl.play();
@@ -171,6 +220,15 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none z-20">
+      {/* Red vignette overlay for damage taken */}
+      <div
+        ref={vignetteRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at center, transparent 30%, rgba(200,30,30,0.5) 100%)",
+          opacity: 0,
+        }}
+      />
       {/* White flash on impact */}
       {POSITIONS.gates.map((pos, i) => (
         <div
@@ -187,6 +245,46 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
             opacity: 0,
           }}
         />
+      ))}
+      {/* Ring shockwave per gate */}
+      {POSITIONS.gates.map((pos, i) => (
+        <div
+          key={`ring-${i}`}
+          ref={(el) => { ringRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`,
+            top: `${pos.y}%`,
+            width: 60,
+            height: 60,
+            transform: "translate(-50%, -50%) scale(0.3)",
+            border: "2px solid rgba(255,255,255,0.7)",
+            opacity: 0,
+          }}
+        />
+      ))}
+      {/* Spark particles per gate */}
+      {POSITIONS.gates.map((pos, gateIdx) => (
+        CLASH_SPARK_DIRECTIONS.map((_, sparkIdx) => (
+          <div
+            key={`spark-${gateIdx}-${sparkIdx}`}
+            ref={(el) => {
+              if (!sparkRefs.current[gateIdx]) sparkRefs.current[gateIdx] = [];
+              sparkRefs.current[gateIdx][sparkIdx] = el;
+            }}
+            className="absolute rounded-full"
+            style={{
+              left: `${pos.x}%`,
+              top: `${pos.y}%`,
+              width: 4,
+              height: 4,
+              transform: "translate(-50%, -50%)",
+              background: "rgba(255,200,80,0.9)",
+              opacity: 0,
+              willChange: "transform",
+            }}
+          />
+        ))
       ))}
       {/* Orange gate flashes */}
       {POSITIONS.gates.map((pos, i) => (
@@ -205,7 +303,7 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
           }}
         />
       ))}
-      {/* Damage numbers - bigger text with scale effect */}
+      {/* Damage numbers - dealt appears before taken */}
       {dmgNumbers.map((d, i) => {
         const pos = POSITIONS.gates[d.gateIndex];
         const offsetX = d.variant === "dealt" ? -20 : 20;
@@ -418,13 +516,25 @@ function VaultBreachScene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+const SPARK_DIRECTIONS = [
+  { x: -30, y: -25 },
+  { x: 25, y: -35 },
+  { x: 35, y: 20 },
+  { x: -20, y: 30 },
+  { x: 15, y: -40 },
+];
+
 function FullRoundScene({ onComplete }: { onComplete: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const vignetteRef = useRef<HTMLDivElement>(null);
   const troopRefs = useRef<(HTMLDivElement | null)[]>([]);
   const gateRefs = useRef<(HTMLDivElement | null)[]>([]);
   const whiteFlashRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const ringRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const sparkRefs = useRef<(HTMLDivElement | null)[][]>([[], [], []]);
   const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const nodeBurstRefs = useRef<(HTMLDivElement | null)[]>([]);
   const abilityRef = useRef<HTMLDivElement | null>(null);
   const hpRef = useRef<HTMLDivElement | null>(null);
 
@@ -444,14 +554,22 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
 
     const roundEls: RoundElements = {
       container,
+      vignetteEl: vignetteRef.current,
       troopEls: troopRefs.current.filter(Boolean) as HTMLElement[],
-      troopTargets: marchGroups.map((g) => ({ toX: g.toX, toY: g.toY })),
+      troopTargets: marchGroups.map((g) => ({
+        toX: g.toX,
+        toY: g.toY,
+        delay: TROOP_TYPE_DELAY[g.type] ?? 0,
+      })),
       gateFlashEls: gateRefs.current.filter(Boolean) as HTMLElement[],
       whiteFlashEls: whiteFlashRefs.current.filter(Boolean) as HTMLElement[],
+      ringEls: ringRefs.current.filter(Boolean) as HTMLElement[],
+      sparkEls: sparkRefs.current.map((arr) => arr.filter(Boolean) as HTMLElement[]),
       damageNumberEls: dmgRefs.current.filter(Boolean) as HTMLElement[],
       abilityEl: abilityRef.current,
       abilitySecondaryEl: null,
       nodeEls: nodeRefs.current.filter(Boolean) as HTMLElement[],
+      nodeBurstEls: nodeBurstRefs.current.filter(Boolean) as HTMLElement[],
       vaultHpEl: hpRef.current,
     };
     const config: RoundConfig = {
@@ -474,6 +592,15 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none z-20">
+      {/* Dark cinematic vignette */}
+      <div
+        ref={vignetteRef}
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background: "radial-gradient(ellipse at center, transparent 40%, rgba(0,0,0,0.7) 100%)",
+          opacity: 0,
+        }}
+      />
       {marchGroups.map((g, i) => (
         <div
           key={`round-troop-${i}`}
@@ -505,6 +632,41 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           }}
         />
       ))}
+      {/* Ring shockwaves per gate */}
+      {POSITIONS.gates.map((pos, i) => (
+        <div
+          key={`round-ring-${i}`}
+          ref={(el) => { ringRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`, top: `${pos.y}%`, width: 60, height: 60,
+            transform: "translate(-50%, -50%) scale(0.3)",
+            border: "2px solid rgba(255,255,255,0.7)",
+            opacity: 0,
+          }}
+        />
+      ))}
+      {/* Sparks per gate */}
+      {POSITIONS.gates.map((pos, gateIdx) => (
+        SPARK_DIRECTIONS.map((_, sparkIdx) => (
+          <div
+            key={`round-spark-${gateIdx}-${sparkIdx}`}
+            ref={(el) => {
+              if (!sparkRefs.current[gateIdx]) sparkRefs.current[gateIdx] = [];
+              sparkRefs.current[gateIdx][sparkIdx] = el;
+            }}
+            className="absolute rounded-full"
+            style={{
+              left: `${pos.x}%`, top: `${pos.y}%`,
+              width: 4, height: 4,
+              transform: "translate(-50%, -50%)",
+              background: "rgba(255,200,80,0.9)",
+              opacity: 0,
+              willChange: "transform",
+            }}
+          />
+        ))
+      ))}
       {/* Orange gate flashes */}
       {POSITIONS.gates.map((pos, i) => (
         <div
@@ -519,7 +681,7 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           }}
         />
       ))}
-      {/* Damage numbers - bigger text with scale effect */}
+      {/* Damage numbers */}
       {dmgNumbers.map((d, i) => {
         const pos = POSITIONS.gates[d.gateIndex];
         const offsetX = d.variant === "dealt" ? -20 : 20;
@@ -538,6 +700,7 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           </div>
         );
       })}
+      {/* Nodes */}
       {POSITIONS.nodes.map((pos, i) => (
         <div
           key={`round-node-${i}`}
@@ -548,6 +711,20 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
             transform: "translate(-50%, -50%)",
             background: `radial-gradient(circle, ${MOCK_NEW_NODES[i] === "teamA" ? "#c8a44e" : "#ef4444"}99 0%, transparent 70%)`,
             border: `2px solid ${MOCK_NEW_NODES[i] === "teamA" ? "#c8a44e" : "#ef4444"}`,
+            opacity: 0,
+          }}
+        />
+      ))}
+      {/* Node burst elements */}
+      {POSITIONS.nodes.map((pos, i) => (
+        <div
+          key={`round-node-burst-${i}`}
+          ref={(el) => { nodeBurstRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`, top: `${pos.y}%`, width: 60, height: 60,
+            transform: "translate(-50%, -50%) scale(0.3)",
+            background: `radial-gradient(circle, ${MOCK_NEW_NODES[i] === "teamA" ? "rgba(200,164,78,0.8)" : "rgba(239,68,68,0.8)"} 0%, transparent 70%)`,
             opacity: 0,
           }}
         />
@@ -573,7 +750,7 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           textShadow: "0 2px 8px rgba(0,0,0,0.9)",
         }}
       >
-        -4 HP
+        42 HP
       </div>
     </div>
   );

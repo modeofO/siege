@@ -5,7 +5,10 @@ export interface ClashElements {
   container: HTMLElement;
   gates: HTMLElement[];
   whiteFlashes: HTMLElement[];
+  rings: HTMLElement[];
+  sparks: HTMLElement[][];  // sparks[gateIndex] = array of spark elements
   damageNumbers: HTMLElement[];
+  vignetteEl: HTMLElement | null;
 }
 
 export function createClashTimeline(
@@ -35,6 +38,56 @@ export function createClashTimeline(
       },
       0,
     );
+  }
+
+  // Phase 0b: Ring shockwave expanding from each gate (30ms)
+  for (let i = 0; i < 3; i++) {
+    const gate = result.gateBreakdown[i];
+    const totalDmg = gate.dmgToA + gate.dmgToB;
+    if (totalDmg === 0 || !els.rings[i]) continue;
+    tl.add(
+      els.rings[i],
+      {
+        scale: [0.3, 2.5],
+        opacity: [0.8, 0],
+        duration: 500,
+        ease: "outQuad",
+      },
+      30,
+    );
+  }
+
+  // Phase 0c: Sparks scatter outward from each gate (30ms)
+  const sparkDirections = [
+    { x: -30, y: -25 },
+    { x: 25, y: -35 },
+    { x: 35, y: 20 },
+    { x: -20, y: 30 },
+    { x: 15, y: -40 },
+  ];
+  for (let i = 0; i < els.sparks.length; i++) {
+    const gate = result.gateBreakdown[i];
+    if (!gate) continue;
+    const totalDmg = gate.dmgToA + gate.dmgToB;
+    if (totalDmg === 0) continue;
+    const sparks = els.sparks[i];
+    if (!sparks) continue;
+    for (let s = 0; s < sparks.length; s++) {
+      if (!sparks[s]) continue;
+      const dir = sparkDirections[s % sparkDirections.length];
+      tl.add(
+        sparks[s],
+        {
+          translateX: [0, dir.x],
+          translateY: [0, dir.y],
+          opacity: [1, 0],
+          scale: [1, 0.3],
+          duration: 400,
+          ease: "outQuad",
+        },
+        30,
+      );
+    }
   }
 
   // Phase 1: Orange gate flashes (50ms)
@@ -67,10 +120,37 @@ export function createClashTimeline(
     100,
   );
 
-  // Phase 3: Damage numbers scale up and float (350ms)
+  // Phase 2b: Red vignette pulse when damage is taken (150ms)
+  if (els.vignetteEl) {
+    const totalDmgToPlayer = result.gateBreakdown.reduce(
+      (sum, g) => sum + (isPlayerA ? g.dmgToA : g.dmgToB),
+      0,
+    );
+    if (totalDmgToPlayer > 0) {
+      tl.add(
+        els.vignetteEl,
+        {
+          opacity: [0, 0.5, 0],
+          duration: 500,
+          ease: "inOutQuad",
+        },
+        150,
+      );
+    }
+  }
+
+  // Phase 3: Damage numbers — dealt appears 100ms before taken (350ms)
+  // Numbers are ordered: dealt first, then taken, per gate
+  let dealtIdx = 0;
+  let takenIdx = 0;
   for (let i = 0; i < els.damageNumbers.length; i++) {
     const numEl = els.damageNumbers[i];
     if (!numEl) continue;
+    // Check data attribute or alternating pattern: dealt entries come first per gate
+    const text = numEl.textContent ?? "";
+    const isDealt = text.startsWith("+");
+    const groupDelay = isDealt ? dealtIdx++ * 80 : takenIdx++ * 80;
+    const typeOffset = isDealt ? 0 : 100;
     tl.add(
       numEl,
       {
@@ -80,7 +160,7 @@ export function createClashTimeline(
         duration: 1000,
         ease: "outQuad",
       },
-      350 + i * 80,
+      350 + typeOffset + groupDelay,
     );
   }
 
