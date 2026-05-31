@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
+import Image from "next/image";
 import { BattlefieldView, POSITIONS } from "@/components/BattlefieldView";
+import { createMarchTimeline, type TroopTarget } from "@/lib/animations/troopMarch";
 import {
   MOCK_ALLOCATIONS_A,
   MOCK_ALLOCATIONS_B,
@@ -43,7 +45,106 @@ void MOCK_PREV_NODES;
 void MOCK_NEW_NODES;
 void MOCK_VAULT_BREACH_RESULT;
 void mockResultWithAbility;
-void POSITIONS;
+
+const TROOP_SPRITES: Record<string, Record<string, string>> = {
+  attack: { a: "/sprites/troops/troop_attacka.png", b: "/sprites/troops/troop_attackb.png" },
+  defense: { a: "/sprites/troops/troop_defensea.png", b: "/sprites/troops/troop_defenseb.png" },
+  healer: { a: "/sprites/troops/troop_healera.png", b: "/sprites/troops/troop_healerb.png" },
+  node: { a: "/sprites/troops/troop_nodea.png", b: "/sprites/troops/troop_nodeb.png" },
+};
+
+interface MarchGroup {
+  type: string;
+  team: "a" | "b";
+  count: number;
+  toX: number;
+  toY: number;
+}
+
+function getMarchGroups(): MarchGroup[] {
+  const atk = MOCK_ALLOCATIONS_A;
+  const attackPos = [
+    { x: POSITIONS.baseB.x - 8, y: POSITIONS.gates[0].y },
+    { x: POSITIONS.baseB.x, y: POSITIONS.gates[1].y },
+    { x: POSITIONS.baseB.x - 8, y: 48 },
+  ];
+  const defensePos = [
+    { x: POSITIONS.baseA.x + 5, y: POSITIONS.gates[0].y },
+    { x: POSITIONS.baseA.x + 5, y: POSITIONS.gates[1].y },
+    { x: POSITIONS.baseA.x + 8, y: 48 },
+  ];
+  const nodePos = POSITIONS.nodes.map((n) => ({ x: n.x - 2, y: n.y }));
+  const repairPos = POSITIONS.repairA;
+
+  const groups: MarchGroup[] = [];
+  for (let i = 0; i < 3; i++) {
+    if (atk[i] > 0)
+      groups.push({ type: "attack", team: "a", count: atk[i], toX: attackPos[i].x, toY: attackPos[i].y });
+  }
+  for (let i = 0; i < 3; i++) {
+    if (atk[3 + i] > 0)
+      groups.push({ type: "defense", team: "a", count: atk[3 + i], toX: defensePos[i].x, toY: defensePos[i].y });
+  }
+  if (atk[6] > 0)
+    groups.push({ type: "healer", team: "a", count: atk[6], toX: repairPos.x, toY: repairPos.y });
+  for (let i = 0; i < 3; i++) {
+    if (atk[7 + i] > 0)
+      groups.push({ type: "node", team: "a", count: atk[7 + i], toX: nodePos[i].x, toY: nodePos[i].y });
+  }
+  return groups;
+}
+
+function TroopMarchScene({ onComplete }: { onComplete: () => void }) {
+  const troopRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const groups = getMarchGroups();
+  const base = POSITIONS.baseA;
+
+  useEffect(() => {
+    const els = troopRefs.current.filter(Boolean) as HTMLElement[];
+    if (els.length === 0) {
+      onComplete();
+      return;
+    }
+    const targets: TroopTarget[] = els.map((el, i) => ({
+      el,
+      toX: groups[i].toX,
+      toY: groups[i].toY,
+    }));
+    const tl = createMarchTimeline(targets, onComplete);
+    tl.play();
+    return () => { tl.pause(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="absolute inset-0 pointer-events-none z-20">
+      {groups.map((g, i) => (
+        <div
+          key={`march-${i}`}
+          ref={(el) => { troopRefs.current[i] = el; }}
+          className="absolute pointer-events-none"
+          style={{
+            left: `${base.x}%`,
+            top: `${base.y}%`,
+            transform: "translate(-50%, -50%)",
+            width: "7%",
+            opacity: 0.5,
+          }}
+        >
+          <Image
+            src={TROOP_SPRITES[g.type]["a"]}
+            alt={`${g.type}`}
+            width={64}
+            height={64}
+            className="w-full h-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+          />
+          <span className="block text-center text-[9px] text-[#d4cfc6] bg-[#1a1714]/80 border border-[#3d3428] rounded px-1 mt-0.5">
+            x{g.count}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export default function AnimationSandboxPage() {
   const [activeScene, setActiveScene] = useState<Scene>("idle");
@@ -83,16 +184,27 @@ export default function AnimationSandboxPage() {
       <div className="max-w-4xl mx-auto p-4">
         <div ref={containerRef} className="relative">
           <BattlefieldView
-            allocations={activeScene === "idle" ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] : MOCK_ALLOCATIONS_A}
+            allocations={
+              activeScene === "idle" || activeScene === "troop-march"
+                ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                : MOCK_ALLOCATIONS_A
+            }
             isPlayerA={true}
-            committed={activeScene !== "idle"}
+            committed={activeScene !== "idle" && activeScene !== "troop-march"}
             modifiers={MOCK_MODIFIERS}
-            opponentAllocations={activeScene === "idle" ? null : MOCK_ALLOCATIONS_B}
+            opponentAllocations={
+              activeScene === "idle" || activeScene === "troop-march"
+                ? null
+                : MOCK_ALLOCATIONS_B
+            }
           />
-          {activeScene !== "idle" && (
+          {activeScene === "troop-march" && (
+            <TroopMarchScene onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene !== "idle" && activeScene !== "troop-march" && (
             <div className="absolute inset-0 pointer-events-none z-20">
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-[#c8a44e]/60 tracking-wider font-mono pointer-events-auto">
-                Playing: {activeScene}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-[#c8a44e]/60 tracking-wider font-mono">
+                TODO: {activeScene}
               </div>
             </div>
           )}
