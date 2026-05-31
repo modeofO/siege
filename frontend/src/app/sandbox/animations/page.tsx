@@ -4,6 +4,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { BattlefieldView, POSITIONS } from "@/components/BattlefieldView";
 import { createMarchTimeline, type TroopTarget } from "@/lib/animations/troopMarch";
+import { createClashTimeline, type ClashElements } from "@/lib/animations/gateClash";
 import {
   MOCK_ALLOCATIONS_A,
   MOCK_ALLOCATIONS_B,
@@ -40,7 +41,6 @@ const SCENES: { key: Scene; label: string }[] = [
 ];
 
 // Suppress unused-import warnings for mock data that will be wired up in later tasks
-void MOCK_RESULT;
 void MOCK_PREV_NODES;
 void MOCK_NEW_NODES;
 void MOCK_VAULT_BREACH_RESULT;
@@ -146,6 +146,75 @@ function TroopMarchScene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+function GateClashScene({ onComplete }: { onComplete: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const gateRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) { onComplete(); return; }
+
+    const els: ClashElements = {
+      container,
+      gates: gateRefs.current.filter(Boolean) as HTMLElement[],
+      damageNumbers: dmgRefs.current.filter(Boolean) as HTMLElement[],
+    };
+    const tl = createClashTimeline(els, MOCK_RESULT, true, onComplete);
+    tl.play();
+    return () => { tl.pause(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const dmgNumbers: { gateIndex: number; value: number; color: string; variant: string }[] = [];
+  for (let i = 0; i < 3; i++) {
+    const gate = MOCK_RESULT.gateBreakdown[i];
+    if (gate.dmgToB > 0) dmgNumbers.push({ gateIndex: i, value: gate.dmgToB, color: "#4ade80", variant: "dealt" });
+    if (gate.dmgToA > 0) dmgNumbers.push({ gateIndex: i, value: gate.dmgToA, color: "#ef4444", variant: "taken" });
+  }
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-20">
+      {POSITIONS.gates.map((pos, i) => (
+        <div
+          key={`gate-flash-${i}`}
+          ref={(el) => { gateRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`,
+            top: `${pos.y}%`,
+            width: 80,
+            height: 80,
+            transform: "translate(-50%, -50%) scale(0.3)",
+            background: "radial-gradient(circle, rgba(255,200,80,0.8) 0%, rgba(255,80,20,0.5) 50%, transparent 100%)",
+            opacity: 0,
+          }}
+        />
+      ))}
+      {dmgNumbers.map((d, i) => {
+        const pos = POSITIONS.gates[d.gateIndex];
+        const offsetX = d.variant === "dealt" ? -16 : 16;
+        return (
+          <div
+            key={`dmg-${i}`}
+            ref={(el) => { dmgRefs.current[i] = el; }}
+            className="absolute font-mono font-bold text-sm select-none"
+            style={{
+              left: `calc(${pos.x}% + ${offsetX}px)`,
+              top: `${pos.y}%`,
+              transform: "translate(-50%, 0)",
+              color: d.color,
+              opacity: 0,
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            }}
+          >
+            {d.variant === "dealt" ? `+${d.value}` : `-${d.value}`}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function AnimationSandboxPage() {
   const [activeScene, setActiveScene] = useState<Scene>("idle");
   const [playing, setPlaying] = useState(false);
@@ -201,7 +270,10 @@ export default function AnimationSandboxPage() {
           {activeScene === "troop-march" && (
             <TroopMarchScene onComplete={() => setPlaying(false)} />
           )}
-          {activeScene !== "idle" && activeScene !== "troop-march" && (
+          {activeScene === "gate-clash" && (
+            <GateClashScene onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene !== "idle" && activeScene !== "troop-march" && activeScene !== "gate-clash" && (
             <div className="absolute inset-0 pointer-events-none z-20">
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-[#c8a44e]/60 tracking-wider font-mono">
                 TODO: {activeScene}
