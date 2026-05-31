@@ -7,6 +7,7 @@ import { createMarchTimeline, type TroopTarget } from "@/lib/animations/troopMar
 import { createClashTimeline, type ClashElements } from "@/lib/animations/gateClash";
 import { createAbilityTimeline, type AbilityElements } from "@/lib/animations/abilityEffects";
 import { createBreachTimeline, type BreachElements } from "@/lib/animations/vaultBreach";
+import { createRoundTimeline, type RoundElements, type RoundConfig } from "@/lib/animations/roundResolution";
 import {
   MOCK_ALLOCATIONS_A,
   MOCK_ALLOCATIONS_B,
@@ -43,8 +44,6 @@ const SCENES: { key: Scene; label: string }[] = [
 ];
 
 // Suppress unused-import warnings for mock data that will be wired up in later tasks
-void MOCK_PREV_NODES;
-void MOCK_NEW_NODES;
 void MOCK_VAULT_BREACH_RESULT;
 void mockResultWithAbility;
 
@@ -418,6 +417,149 @@ function VaultBreachScene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+function FullRoundScene({ onComplete }: { onComplete: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const troopRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const gateRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const nodeRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const abilityRef = useRef<HTMLDivElement | null>(null);
+  const hpRef = useRef<HTMLDivElement | null>(null);
+
+  const marchGroups = getMarchGroups();
+  const base = POSITIONS.baseA;
+
+  const dmgNumbers: { gateIndex: number; value: number; color: string; variant: string }[] = [];
+  for (let i = 0; i < 3; i++) {
+    const gate = MOCK_RESULT.gateBreakdown[i];
+    if (gate.dmgToB > 0) dmgNumbers.push({ gateIndex: i, value: gate.dmgToB, color: "#4ade80", variant: "dealt" });
+    if (gate.dmgToA > 0) dmgNumbers.push({ gateIndex: i, value: gate.dmgToA, color: "#ef4444", variant: "taken" });
+  }
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) { onComplete(); return; }
+
+    const roundEls: RoundElements = {
+      container,
+      troopEls: troopRefs.current.filter(Boolean) as HTMLElement[],
+      troopTargets: marchGroups.map((g) => ({ toX: g.toX, toY: g.toY })),
+      gateFlashEls: gateRefs.current.filter(Boolean) as HTMLElement[],
+      damageNumberEls: dmgRefs.current.filter(Boolean) as HTMLElement[],
+      abilityEl: abilityRef.current,
+      abilitySecondaryEl: null,
+      nodeEls: nodeRefs.current.filter(Boolean) as HTMLElement[],
+      vaultHpEl: hpRef.current,
+    };
+    const config: RoundConfig = {
+      abilityId: MOCK_RESULT.aAbilityId,
+      abilityTier: 1,
+      abilityType: ((MOCK_RESULT.aAbilityId - 1) % 5) + 1,
+      gateDamages: MOCK_RESULT.gateBreakdown,
+      nodesChanged: [
+        MOCK_PREV_NODES[0] !== MOCK_NEW_NODES[0],
+        MOCK_PREV_NODES[1] !== MOCK_NEW_NODES[1],
+        MOCK_PREV_NODES[2] !== MOCK_NEW_NODES[2],
+      ],
+      vaultHpFrom: 42,
+      vaultHpTo: 38,
+    };
+    const tl = createRoundTimeline(roundEls, config, onComplete);
+    tl.play();
+    return () => { tl.pause(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-20">
+      {marchGroups.map((g, i) => (
+        <div
+          key={`round-troop-${i}`}
+          ref={(el) => { troopRefs.current[i] = el; }}
+          className="absolute pointer-events-none"
+          style={{
+            left: `${base.x}%`, top: `${base.y}%`,
+            transform: "translate(-50%, -50%)", width: "7%", opacity: 0.5,
+          }}
+        >
+          <Image
+            src={TROOP_SPRITES[g.type]["a"]}
+            alt={g.type} width={64} height={64}
+            className="w-full h-auto drop-shadow-[0_2px_4px_rgba(0,0,0,0.6)]"
+          />
+        </div>
+      ))}
+      {POSITIONS.gates.map((pos, i) => (
+        <div
+          key={`round-gate-${i}`}
+          ref={(el) => { gateRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`, top: `${pos.y}%`, width: 80, height: 80,
+            transform: "translate(-50%, -50%) scale(0.3)",
+            background: "radial-gradient(circle, rgba(255,200,80,0.8) 0%, rgba(255,80,20,0.5) 50%, transparent 100%)",
+            opacity: 0,
+          }}
+        />
+      ))}
+      {dmgNumbers.map((d, i) => {
+        const pos = POSITIONS.gates[d.gateIndex];
+        const offsetX = d.variant === "dealt" ? -16 : 16;
+        return (
+          <div
+            key={`round-dmg-${i}`}
+            ref={(el) => { dmgRefs.current[i] = el; }}
+            className="absolute font-mono font-bold text-sm select-none"
+            style={{
+              left: `calc(${pos.x}% + ${offsetX}px)`, top: `${pos.y}%`,
+              transform: "translate(-50%, 0)", color: d.color, opacity: 0,
+              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            }}
+          >
+            {d.variant === "dealt" ? `+${d.value}` : `-${d.value}`}
+          </div>
+        );
+      })}
+      {POSITIONS.nodes.map((pos, i) => (
+        <div
+          key={`round-node-${i}`}
+          ref={(el) => { nodeRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`, top: `${pos.y}%`, width: 36, height: 36,
+            transform: "translate(-50%, -50%)",
+            background: `radial-gradient(circle, ${MOCK_NEW_NODES[i] === "teamA" ? "#c8a44e" : "#ef4444"}99 0%, transparent 70%)`,
+            border: `2px solid ${MOCK_NEW_NODES[i] === "teamA" ? "#c8a44e" : "#ef4444"}`,
+            opacity: 0,
+          }}
+        />
+      ))}
+      <div
+        ref={abilityRef}
+        className="absolute rounded-full"
+        style={{
+          left: `${POSITIONS.gates[0].x}%`, top: `${POSITIONS.gates[0].y}%`,
+          width: 80, height: 80,
+          transform: "translate(-50%, -50%) scale(0.1)",
+          background: "radial-gradient(circle, rgba(218,165,32,0.8) 0%, rgba(255,136,0,0.4) 50%, transparent 100%)",
+          opacity: 0,
+        }}
+      />
+      <div
+        ref={hpRef}
+        className="absolute font-mono font-bold text-lg"
+        style={{
+          left: `${POSITIONS.baseB.x}%`, top: `${POSITIONS.baseB.y - 12}%`,
+          transform: "translateX(-50%)",
+          color: "#ef4444",
+          textShadow: "0 2px 8px rgba(0,0,0,0.9)",
+        }}
+      >
+        -4 HP
+      </div>
+    </div>
+  );
+}
+
 export default function AnimationSandboxPage() {
   const [activeScene, setActiveScene] = useState<Scene>("idle");
   const [playing, setPlaying] = useState(false);
@@ -495,11 +637,7 @@ export default function AnimationSandboxPage() {
             <VaultBreachScene onComplete={() => setPlaying(false)} />
           )}
           {activeScene === "full-round" && (
-            <div className="absolute inset-0 pointer-events-none z-20">
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-[#c8a44e]/60 tracking-wider font-mono">
-                TODO: {activeScene}
-              </div>
-            </div>
+            <FullRoundScene onComplete={() => setPlaying(false)} />
           )}
         </div>
       </div>
