@@ -6,6 +6,7 @@ import { BattlefieldView, POSITIONS } from "@/components/BattlefieldView";
 import { createMarchTimeline, type TroopTarget } from "@/lib/animations/troopMarch";
 import { createClashTimeline, type ClashElements } from "@/lib/animations/gateClash";
 import { createAbilityTimeline, type AbilityElements } from "@/lib/animations/abilityEffects";
+import { createBreachTimeline, type BreachElements } from "@/lib/animations/vaultBreach";
 import {
   MOCK_ALLOCATIONS_A,
   MOCK_ALLOCATIONS_B,
@@ -348,6 +349,75 @@ function AbilityScene({
   }
 }
 
+function VaultBreachScene({ onComplete }: { onComplete: () => void }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const vaultRef = useRef<HTMLDivElement>(null);
+  const flashRef = useRef<HTMLDivElement>(null);
+  const bannerRef = useRef<HTMLDivElement>(null);
+  const bannerTextRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    const vault = vaultRef.current;
+    const flash = flashRef.current;
+    const banner = bannerRef.current;
+    const bannerText = bannerTextRef.current;
+    if (!container || !vault || !flash || !banner || !bannerText) {
+      onComplete();
+      return;
+    }
+    const els: BreachElements = { container, vault, flash, banner, bannerText };
+    const tl = createBreachTimeline(els, true, onComplete);
+    tl.play();
+    return () => { tl.pause(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div ref={containerRef} className="absolute inset-0 pointer-events-none z-20">
+      <div
+        ref={vaultRef}
+        className="absolute"
+        style={{
+          left: `${POSITIONS.baseB.x}%`,
+          top: `${POSITIONS.baseB.y}%`,
+          transform: "translate(-50%, -50%)",
+          width: 60,
+          height: 60,
+          borderRadius: 8,
+          background: "radial-gradient(circle, rgba(255,50,20,0.6) 0%, rgba(200,40,10,0.3) 60%, transparent 100%)",
+          border: "2px solid rgba(255,80,30,0.5)",
+        }}
+      />
+      <div
+        ref={flashRef}
+        className="absolute inset-0"
+        style={{ background: "rgba(255,220,150,0.8)", opacity: 0 }}
+      />
+      <div
+        ref={bannerRef}
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        style={{
+          background: "linear-gradient(135deg, #1a1714 0%, #2a2420 100%)",
+          border: "2px solid #c8a44e",
+          borderRadius: 8,
+          padding: "20px 40px",
+          opacity: 0,
+          boxShadow: "0 0 40px rgba(200,164,78,0.3)",
+        }}
+      >
+        <div
+          ref={bannerTextRef}
+          className="text-center"
+          style={{ opacity: 0 }}
+        >
+          <div className="text-[#c8a44e] text-2xl font-serif tracking-wider">VICTORY</div>
+          <div className="text-[#7a7060] text-xs mt-1">Enemy vault destroyed</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AnimationSandboxPage() {
   const [activeScene, setActiveScene] = useState<Scene>("idle");
   const [playing, setPlaying] = useState(false);
@@ -421,7 +491,10 @@ export default function AnimationSandboxPage() {
           {activeScene === "fortify" && (
             <AbilityScene abilityId={5} onComplete={() => setPlaying(false)} />
           )}
-          {activeScene !== "idle" && activeScene !== "troop-march" && activeScene !== "gate-clash" && activeScene !== "siege-sword" && activeScene !== "stone-cloak" && activeScene !== "ember-blast" && activeScene !== "hex" && activeScene !== "fortify" && (
+          {activeScene === "vault-breach" && (
+            <VaultBreachScene onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene === "full-round" && (
             <div className="absolute inset-0 pointer-events-none z-20">
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-[#c8a44e]/60 tracking-wider font-mono">
                 TODO: {activeScene}
