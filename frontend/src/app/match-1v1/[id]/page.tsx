@@ -29,7 +29,7 @@ import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import { toriiSql, sqlInt, toNum } from "@/lib/toriiSql";
 import { ABILITIES } from "@/lib/craftingContracts";
-import { ResolutionOverlay } from "@/components/ResolutionOverlay";
+import { BattleAnimation } from "@/components/BattleAnimation";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -753,16 +753,18 @@ export default function Match1v1Page() {
               committed={effectiveCommitted}
               modifiers={modifiers}
               opponentAllocations={opponentAllocations}
-            />
-            {pendingResult && (
-              <ResolutionOverlay
-                result={pendingResult}
-                prevNodes={prevNodes}
-                newNodes={state.nodes}
-                isPlayerA={isPlayerA}
-                onComplete={handleResolutionComplete}
-              />
-            )}
+            >
+              {pendingResult && heldHp && (
+                <BattleAnimation
+                  result={pendingResult}
+                  prevNodes={prevNodes}
+                  newNodes={state.nodes}
+                  isPlayerA={isPlayerA}
+                  heldHp={heldHp}
+                  onComplete={handleResolutionComplete}
+                />
+              )}
+            </BattlefieldView>
           </div>
 
           {/* War Dispatch Log */}
