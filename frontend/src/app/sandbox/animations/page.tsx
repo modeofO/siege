@@ -144,6 +144,7 @@ function TroopMarchScene({ onComplete }: { onComplete: () => void }) {
 function GateClashScene({ onComplete }: { onComplete: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const gateRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const whiteFlashRefs = useRef<(HTMLDivElement | null)[]>([]);
   const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -153,6 +154,7 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
     const els: ClashElements = {
       container,
       gates: gateRefs.current.filter(Boolean) as HTMLElement[],
+      whiteFlashes: whiteFlashRefs.current.filter(Boolean) as HTMLElement[],
       damageNumbers: dmgRefs.current.filter(Boolean) as HTMLElement[],
     };
     const tl = createClashTimeline(els, MOCK_RESULT, true, onComplete);
@@ -169,6 +171,24 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div ref={containerRef} className="absolute inset-0 pointer-events-none z-20">
+      {/* White flash on impact */}
+      {POSITIONS.gates.map((pos, i) => (
+        <div
+          key={`white-flash-${i}`}
+          ref={(el) => { whiteFlashRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`,
+            top: `${pos.y}%`,
+            width: 60,
+            height: 60,
+            transform: "translate(-50%, -50%) scale(0.5)",
+            background: "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 40%, transparent 70%)",
+            opacity: 0,
+          }}
+        />
+      ))}
+      {/* Orange gate flashes */}
       {POSITIONS.gates.map((pos, i) => (
         <div
           key={`gate-flash-${i}`}
@@ -185,21 +205,22 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
           }}
         />
       ))}
+      {/* Damage numbers - bigger text with scale effect */}
       {dmgNumbers.map((d, i) => {
         const pos = POSITIONS.gates[d.gateIndex];
-        const offsetX = d.variant === "dealt" ? -16 : 16;
+        const offsetX = d.variant === "dealt" ? -20 : 20;
         return (
           <div
             key={`dmg-${i}`}
             ref={(el) => { dmgRefs.current[i] = el; }}
-            className="absolute font-mono font-bold text-sm select-none"
+            className="absolute font-mono font-bold text-lg select-none"
             style={{
               left: `calc(${pos.x}% + ${offsetX}px)`,
               top: `${pos.y}%`,
-              transform: "translate(-50%, 0)",
+              transform: "translate(-50%, 0) scale(0.5)",
               color: d.color,
               opacity: 0,
-              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+              textShadow: "0 2px 6px rgba(0,0,0,0.9)",
             }}
           >
             {d.variant === "dealt" ? `+${d.value}` : `-${d.value}`}
@@ -401,6 +422,7 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const troopRefs = useRef<(HTMLDivElement | null)[]>([]);
   const gateRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const whiteFlashRefs = useRef<(HTMLDivElement | null)[]>([]);
   const dmgRefs = useRef<(HTMLDivElement | null)[]>([]);
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([]);
   const abilityRef = useRef<HTMLDivElement | null>(null);
@@ -425,6 +447,7 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
       troopEls: troopRefs.current.filter(Boolean) as HTMLElement[],
       troopTargets: marchGroups.map((g) => ({ toX: g.toX, toY: g.toY })),
       gateFlashEls: gateRefs.current.filter(Boolean) as HTMLElement[],
+      whiteFlashEls: whiteFlashRefs.current.filter(Boolean) as HTMLElement[],
       damageNumberEls: dmgRefs.current.filter(Boolean) as HTMLElement[],
       abilityEl: abilityRef.current,
       abilitySecondaryEl: null,
@@ -468,6 +491,21 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           />
         </div>
       ))}
+      {/* White flash on impact */}
+      {POSITIONS.gates.map((pos, i) => (
+        <div
+          key={`round-white-${i}`}
+          ref={(el) => { whiteFlashRefs.current[i] = el; }}
+          className="absolute rounded-full"
+          style={{
+            left: `${pos.x}%`, top: `${pos.y}%`, width: 60, height: 60,
+            transform: "translate(-50%, -50%) scale(0.5)",
+            background: "radial-gradient(circle, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.6) 40%, transparent 70%)",
+            opacity: 0,
+          }}
+        />
+      ))}
+      {/* Orange gate flashes */}
       {POSITIONS.gates.map((pos, i) => (
         <div
           key={`round-gate-${i}`}
@@ -481,18 +519,19 @@ function FullRoundScene({ onComplete }: { onComplete: () => void }) {
           }}
         />
       ))}
+      {/* Damage numbers - bigger text with scale effect */}
       {dmgNumbers.map((d, i) => {
         const pos = POSITIONS.gates[d.gateIndex];
-        const offsetX = d.variant === "dealt" ? -16 : 16;
+        const offsetX = d.variant === "dealt" ? -20 : 20;
         return (
           <div
             key={`round-dmg-${i}`}
             ref={(el) => { dmgRefs.current[i] = el; }}
-            className="absolute font-mono font-bold text-sm select-none"
+            className="absolute font-mono font-bold text-lg select-none"
             style={{
               left: `calc(${pos.x}% + ${offsetX}px)`, top: `${pos.y}%`,
-              transform: "translate(-50%, 0)", color: d.color, opacity: 0,
-              textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+              transform: "translate(-50%, 0) scale(0.5)", color: d.color, opacity: 0,
+              textShadow: "0 2px 6px rgba(0,0,0,0.9)",
             }}
           >
             {d.variant === "dealt" ? `+${d.value}` : `-${d.value}`}
