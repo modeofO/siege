@@ -807,34 +807,35 @@ export default function AnimationSandboxPage() {
                 ? null
                 : MOCK_ALLOCATIONS_B
             }
-          />
-          {activeScene === "troop-march" && (
-            <TroopMarchScene onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "gate-clash" && (
-            <GateClashScene onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "siege-sword" && (
-            <AbilityScene abilityId={1} onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "stone-cloak" && (
-            <AbilityScene abilityId={2} onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "ember-blast" && (
-            <AbilityScene abilityId={3} onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "hex" && (
-            <AbilityScene abilityId={4} onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "fortify" && (
-            <AbilityScene abilityId={5} onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "vault-breach" && (
-            <VaultBreachScene onComplete={() => setPlaying(false)} />
-          )}
-          {activeScene === "full-round" && (
-            <FullRoundScene onComplete={() => setPlaying(false)} />
-          )}
+          >
+            {activeScene === "troop-march" && (
+              <TroopMarchScene onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "gate-clash" && (
+              <GateClashScene onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "siege-sword" && (
+              <AbilityScene abilityId={1} onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "stone-cloak" && (
+              <AbilityScene abilityId={2} onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "ember-blast" && (
+              <AbilityScene abilityId={3} onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "hex" && (
+              <AbilityScene abilityId={4} onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "fortify" && (
+              <AbilityScene abilityId={5} onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "vault-breach" && (
+              <VaultBreachScene onComplete={() => setPlaying(false)} />
+            )}
+            {activeScene === "full-round" && (
+              <FullRoundScene onComplete={() => setPlaying(false)} />
+            )}
+          </BattlefieldView>
         </div>
       </div>
     </div>

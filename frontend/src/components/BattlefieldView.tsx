@@ -10,6 +10,7 @@ interface BattlefieldViewProps {
   committed: boolean;
   modifiers: [number, number, number];
   opponentAllocations?: number[] | null;
+  children?: React.ReactNode;
 }
 
 const GATE_NAMES = ["East Gate", "West Gate", "Underground"];
@@ -73,6 +74,7 @@ export function BattlefieldView({
   committed,
   modifiers,
   opponentAllocations,
+  children,
 }: BattlefieldViewProps) {
   const myTeam: Team = isPlayerA ? "a" : "b";
   const enemyTeam: Team = isPlayerA ? "b" : "a";
@@ -289,6 +291,7 @@ export function BattlefieldView({
             boxShadow: "inset 0 0 80px 30px rgba(180, 80, 10, 0.35), inset 0 0 160px 60px rgba(0, 0, 0, 0.5)",
           }}
         />
+        {children}
       </div>
     </div>
   );
