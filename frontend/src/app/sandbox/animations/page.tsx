@@ -15,8 +15,6 @@ import {
   MOCK_RESULT,
   MOCK_PREV_NODES,
   MOCK_NEW_NODES,
-  MOCK_VAULT_BREACH_RESULT,
-  mockResultWithAbility,
 } from "./mockData";
 
 type Scene =
@@ -42,10 +40,6 @@ const SCENES: { key: Scene; label: string }[] = [
   { key: "fortify", label: "Fortify" },
   { key: "vault-breach", label: "Vault Breach" },
 ];
-
-// Suppress unused-import warnings for mock data that will be wired up in later tasks
-void MOCK_VAULT_BREACH_RESULT;
-void mockResultWithAbility;
 
 const TROOP_SPRITES: Record<string, Record<string, string>> = {
   attack: { a: "/sprites/troops/troop_attacka.png", b: "/sprites/troops/troop_attackb.png" },
@@ -599,15 +593,15 @@ export default function AnimationSandboxPage() {
         <div ref={containerRef} className="relative">
           <BattlefieldView
             allocations={
-              activeScene === "idle" || activeScene === "troop-march"
+              activeScene === "idle" || activeScene === "troop-march" || activeScene === "full-round"
                 ? [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
                 : MOCK_ALLOCATIONS_A
             }
             isPlayerA={true}
-            committed={activeScene !== "idle" && activeScene !== "troop-march"}
+            committed={activeScene !== "idle" && activeScene !== "troop-march" && activeScene !== "full-round"}
             modifiers={MOCK_MODIFIERS}
             opponentAllocations={
-              activeScene === "idle" || activeScene === "troop-march"
+              activeScene === "idle" || activeScene === "troop-march" || activeScene === "full-round"
                 ? null
                 : MOCK_ALLOCATIONS_B
             }
