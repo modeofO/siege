@@ -5,6 +5,7 @@ import Image from "next/image";
 import { BattlefieldView, POSITIONS } from "@/components/BattlefieldView";
 import { createMarchTimeline, type TroopTarget } from "@/lib/animations/troopMarch";
 import { createClashTimeline, type ClashElements } from "@/lib/animations/gateClash";
+import { createAbilityTimeline, type AbilityElements } from "@/lib/animations/abilityEffects";
 import {
   MOCK_ALLOCATIONS_A,
   MOCK_ALLOCATIONS_B,
@@ -215,6 +216,138 @@ function GateClashScene({ onComplete }: { onComplete: () => void }) {
   );
 }
 
+function AbilityScene({
+  abilityId,
+  onComplete,
+}: {
+  abilityId: number;
+  onComplete: () => void;
+}) {
+  const effectRef = useRef<HTMLDivElement | SVGSVGElement | null>(null);
+  const secondaryRef = useRef<HTMLDivElement | SVGLineElement | null>(null);
+  const abilityType = ((abilityId - 1) % 5) + 1;
+  const tier = Math.floor((abilityId - 1) / 5) + 1;
+
+  useEffect(() => {
+    const el = effectRef.current;
+    if (!el) { onComplete(); return; }
+    const els: AbilityElements = { effectEl: el, secondaryEl: secondaryRef.current };
+    const tl = createAbilityTimeline(abilityId, els, onComplete);
+    tl.play();
+    return () => { tl.pause(); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const gatePos = POSITIONS.gates[0];
+  const myBase = POSITIONS.baseA;
+  const enemyBase = POSITIONS.baseB;
+
+  switch (abilityType) {
+    case 1: { // Siege Sword
+      const size = tier === 2 ? 16 : 10;
+      return (
+        <div className="absolute inset-0 pointer-events-none z-20">
+          <svg
+            className="absolute"
+            style={{ left: `${gatePos.x}%`, top: `${gatePos.y}%`, width: `${size}%`, height: `${size}%`, transform: "translate(-50%, -50%)", overflow: "visible" }}
+            viewBox="-10 -10 20 20"
+          >
+            <line ref={effectRef as React.Ref<SVGLineElement>} x1="-8" y1="-8" x2="8" y2="8" stroke="#daa520" strokeWidth={tier === 2 ? 3 : 2} strokeLinecap="round" strokeDasharray="60" strokeDashoffset="60" opacity="0" />
+            <line ref={secondaryRef as React.Ref<SVGLineElement>} x1="8" y1="-8" x2="-8" y2="8" stroke="#ff8800" strokeWidth={tier === 2 ? 3 : 2} strokeLinecap="round" strokeDasharray="60" strokeDashoffset="60" opacity="0" />
+          </svg>
+        </div>
+      );
+    }
+    case 2: { // Stone Cloak
+      const w = tier === 2 ? 18 : 13;
+      const h = tier === 2 ? 22 : 16;
+      return (
+        <div className="absolute inset-0 pointer-events-none z-20">
+          <div
+            ref={effectRef as React.Ref<HTMLDivElement>}
+            className="absolute rounded-full"
+            style={{
+              left: `${myBase.x}%`, top: `${myBase.y}%`,
+              width: `${w}%`, height: `${h}%`,
+              transform: "translate(-50%, -50%) scaleY(0.3)",
+              border: `3px solid ${tier === 2 ? "#c8a44e" : "#a0c4ff"}`,
+              boxShadow: `0 0 16px 6px ${tier === 2 ? "rgba(200,164,78,0.5)" : "rgba(160,196,255,0.4)"}`,
+              opacity: 0,
+            }}
+          />
+        </div>
+      );
+    }
+    case 3: { // Ember Blast
+      const sz = tier === 2 ? 140 : 100;
+      return (
+        <div className="absolute inset-0 pointer-events-none z-20">
+          <div
+            ref={effectRef as React.Ref<HTMLDivElement>}
+            className="absolute rounded-full"
+            style={{
+              left: `${enemyBase.x}%`, top: `${enemyBase.y}%`,
+              width: sz, height: sz,
+              transform: "translate(-50%, -50%) scale(0.1)",
+              background: "radial-gradient(circle, rgba(255,100,20,0.9) 0%, rgba(255,50,10,0.6) 40%, transparent 100%)",
+              opacity: 0,
+            }}
+          />
+        </div>
+      );
+    }
+    case 4: { // Hex
+      const sz = tier === 2 ? 180 : 130;
+      return (
+        <div className="absolute inset-0 pointer-events-none z-20">
+          <div
+            ref={effectRef as React.Ref<HTMLDivElement>}
+            className="absolute rounded-full"
+            style={{
+              left: "50%", top: "50%",
+              width: sz, height: sz,
+              transform: "translate(-50%, -50%) scale(0.3)",
+              border: `3px solid ${tier === 2 ? "#ff3344" : "#cc2233"}`,
+              boxShadow: `0 0 24px 10px ${tier === 2 ? "rgba(255,51,68,0.4)" : "rgba(204,34,51,0.3)"}`,
+              opacity: 0,
+            }}
+          />
+          <div
+            ref={secondaryRef as React.Ref<HTMLDivElement>}
+            className="absolute rounded-full"
+            style={{
+              left: "50%", top: "50%",
+              width: sz * 0.7, height: sz * 0.7,
+              transform: "translate(-50%, -50%) scale(0.2)",
+              border: `2px solid ${tier === 2 ? "#ff3344" : "#cc2233"}`,
+              opacity: 0,
+            }}
+          />
+        </div>
+      );
+    }
+    case 5: { // Fortify
+      return (
+        <div className="absolute inset-0 pointer-events-none z-20">
+          <div
+            ref={effectRef as React.Ref<HTMLDivElement>}
+            className="absolute"
+            style={{
+              left: `${myBase.x}%`, top: `${myBase.y}%`,
+              width: tier === 2 ? 8 : 5,
+              height: tier === 2 ? 160 : 120,
+              transform: "translate(-50%, -50%) scaleY(0.3)",
+              background: `linear-gradient(to bottom, transparent, ${tier === 2 ? "#c8a44e" : "#a0c4ff"}, transparent)`,
+              opacity: 0,
+            }}
+          />
+        </div>
+      );
+    }
+    default:
+      return null;
+  }
+}
+
 export default function AnimationSandboxPage() {
   const [activeScene, setActiveScene] = useState<Scene>("idle");
   const [playing, setPlaying] = useState(false);
@@ -273,7 +406,22 @@ export default function AnimationSandboxPage() {
           {activeScene === "gate-clash" && (
             <GateClashScene onComplete={() => setPlaying(false)} />
           )}
-          {activeScene !== "idle" && activeScene !== "troop-march" && activeScene !== "gate-clash" && (
+          {activeScene === "siege-sword" && (
+            <AbilityScene abilityId={1} onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene === "stone-cloak" && (
+            <AbilityScene abilityId={2} onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene === "ember-blast" && (
+            <AbilityScene abilityId={3} onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene === "hex" && (
+            <AbilityScene abilityId={4} onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene === "fortify" && (
+            <AbilityScene abilityId={5} onComplete={() => setPlaying(false)} />
+          )}
+          {activeScene !== "idle" && activeScene !== "troop-march" && activeScene !== "gate-clash" && activeScene !== "siege-sword" && activeScene !== "stone-cloak" && activeScene !== "ember-blast" && activeScene !== "hex" && activeScene !== "fortify" && (
             <div className="absolute inset-0 pointer-events-none z-20">
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] text-[#c8a44e]/60 tracking-wider font-mono">
                 TODO: {activeScene}
