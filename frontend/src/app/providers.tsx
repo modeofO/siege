@@ -5,6 +5,7 @@ import { RpcProvider, Account, type AccountInterface } from "starknet";
 import { sepolia } from "@starknet-react/chains";
 import { StarknetConfig, jsonRpcProvider, cartridge, useAccount as useStarknetAccount } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
+import { FeeSource } from "@cartridge/controller";
 import type { SessionPolicies } from "@cartridge/presets";
 import { DojoProvider } from "@/lib/dojoSdk";
 import { CONTRACTS } from "@/lib/contracts";
@@ -195,6 +196,8 @@ const sepoliaConnector = IS_DEVNET
       chains: [{ rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" }],
       defaultChainId: "0x" + sepolia.id.toString(16),
       slot: "siege-dojo",
+      feeSource: FeeSource.PAYMASTER,
+      propagateSessionErrors: true,
     });
 
 const sepoliaRpcProvider = jsonRpcProvider({
