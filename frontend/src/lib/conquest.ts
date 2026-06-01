@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
+import { CONQUEST_ADDRESS } from "./contractAddresses";
 import { toriiSql, toNum, sqlHex } from "./toriiSql";
 
 const POLL_INTERVAL = 4000;
 
-export const CONQUEST_ADDRESS = process.env.NEXT_PUBLIC_CONQUEST_ADDRESS || "";
+export { CONQUEST_ADDRESS };
 
 export interface PresetSlot {
   p0: number;

@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
 import { cairo } from "starknet";
 import type { AccountInterface, UniversalDetails } from "starknet";
+import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
 import { toriiSql, feltToStr, sqlHex } from "./toriiSql";
 import type { CircuitKey, CosmeticType } from "./forge/circuits";
-
-const WORLD_SYSTEM_ADDRESS =
-  process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "0x0";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 

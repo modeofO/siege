@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import type { AccountInterface } from "starknet";
+import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
 import { toriiSql, toNum, sqlHex } from "./toriiSql";
 
 const POLL_INTERVAL = 4000;
 
-export const WORLD_SYSTEM_ADDRESS = process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "";
+export { WORLD_SYSTEM_ADDRESS };
 
 export interface PillageData {
   homeParcelId: number;

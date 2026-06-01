@@ -12,15 +12,13 @@ import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
+import { WORLD_SYSTEM_ADDRESS } from "@/lib/contractAddresses";
 import { toriiSql, toNum } from "@/lib/toriiSql";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import styles from "./parchment.module.css";
 
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
-
-// World system contract address — will need env var for Sepolia
-const WORLD_SYSTEM_ADDRESS = process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "0x0";
 
 const PARCEL_TYPE_NAMES: Record<number, string> = {
   0: "Forge",

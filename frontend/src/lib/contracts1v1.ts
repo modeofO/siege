@@ -1,18 +1,19 @@
 import type { AccountInterface, UniversalDetails } from "starknet";
+import {
+  ACTIONS_1V1_ADDRESS,
+  COMMIT_REVEAL_1V1_ADDRESS,
+  RESOLUTION_1V1_ADDRESS,
+  WORLD_SYSTEM_ADDRESS,
+} from "@/lib/contractAddresses";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
 export const VRF_PROVIDER_ADDRESS = "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
 
 export const CONTRACTS_1V1 = {
-  ACTIONS:
-    process.env.NEXT_PUBLIC_ACTIONS_1V1_ADDRESS || "0xa503dbf655e21fe7e65c42f18662edc584aa6b3e8c8bb19e35fa57f62492ab",
-  COMMIT_REVEAL:
-    process.env.NEXT_PUBLIC_COMMIT_REVEAL_1V1_ADDRESS ||
-    "0x5304e2568417d2e67d63caab54db914900afbf23035687c63b4962d2f5d8f5b",
-  RESOLUTION:
-    process.env.NEXT_PUBLIC_RESOLUTION_1V1_ADDRESS ||
-    "0x7d42eb63561f6f25315833d674002e3a53accd00bd02e243154009890122e3d",
+  ACTIONS: ACTIONS_1V1_ADDRESS,
+  COMMIT_REVEAL: COMMIT_REVEAL_1V1_ADDRESS,
+  RESOLUTION: RESOLUTION_1V1_ADDRESS,
 };
 
 const DEVNET_TX_OPTS: UniversalDetails = {
@@ -182,7 +183,7 @@ export async function resolveRound1v1(account: AccountInterface, matchId: string
 }
 
 export const CONTRACTS_WORLD = {
-  WORLD_SYSTEM: process.env.NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS || "",
+  WORLD_SYSTEM: WORLD_SYSTEM_ADDRESS,
 };
 
 export async function upgradeKingdom(account: AccountInterface) {
