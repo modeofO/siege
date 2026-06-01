@@ -31,6 +31,7 @@ import type { StateClient } from "./state.js";
 import { buildMoveCommitHash1v1, generateSalt, revealCalldata } from "./hash.js";
 import { moveAllocationFromInput, moveShape, validateMove, type MoveInput } from "./move.js";
 import { call, extractTxError, vrfRequestRandom } from "./tx.js";
+import { buildCreateStakedMatchCalls, buildJoinStakedMatchCalls } from "./stakedCalls.js";
 
 const ROLE_A = 0;
 const ROLE_B = 1;
@@ -1143,13 +1144,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           `Too many abilities for tier ${kingdom.tier}: ${abilities.length}/${tierAbilitySlots(kingdom.tier)}`,
         );
       }
-      const tx = await execute(ctx.signer!, [
-        vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.actions1v1),
-        call(ctx.config.contracts.worldSystem, "create_staked_match", [
-          opponent,
-          ...feltArray(abilities),
-        ]),
-      ]);
+      const tx = await execute(ctx.signer!, buildCreateStakedMatchCalls(ctx.config, opponent, abilities));
       const match_id = ctx.agentAddress
         ? await ctx.state.findLatestMatchForPlayers(ctx.agentAddress, opponent)
         : null;
@@ -1187,12 +1182,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           `Too many abilities for tier ${kingdom.tier}: ${abilities.length}/${tierAbilitySlots(kingdom.tier)}`,
         );
       }
-      const tx = await execute(ctx.signer!, [
-        call(ctx.config.contracts.worldSystem, "join_staked_match", [
-          String(match_id),
-          ...feltArray(abilities),
-        ]),
-      ]);
+      const tx = await execute(ctx.signer!, buildJoinStakedMatchCalls(ctx.config, match_id, abilities));
       return { tx_hash: tx, match_id, abilities };
     },
   );

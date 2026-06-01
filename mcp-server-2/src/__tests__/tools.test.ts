@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { shortString } from "starknet";
+import { buildCreateStakedMatchCalls, buildJoinStakedMatchCalls } from "../stakedCalls.js";
+import type { Config } from "../config.js";
 
 const ABILITY_COSTS: Record<number, Record<string, number>> = {
   1: { iron: 8, wood: 5 },
@@ -32,6 +34,18 @@ const RESOURCE_TOKENS: Record<string, string> = {
 };
 
 const CRAFTING_ADDRESS = "0xCRAFTING";
+
+const TEST_CONFIG = {
+  vrfAddress: "0xVRF",
+  contracts: {
+    actions1v1: "0xACTIONS1V1",
+    commitReveal1v1: "0xCOMMIT",
+    conquest: "0xCONQUEST",
+    crafting1v1: "0xCRAFTING",
+    resolution1v1: "0xRESOLUTION",
+    worldSystem: "0xWORLD",
+  },
+} as Config;
 
 function buildCraftCalls(abilityId: number, quantity: number) {
   const tier = abilityTier(abilityId);
@@ -173,6 +187,35 @@ describe("siege_craft_ability call construction", () => {
         }
       }
     }
+  });
+});
+
+describe("staked match call construction", () => {
+  it("creates staked matches with VRF request_random as the first call", () => {
+    const calls = buildCreateStakedMatchCalls(TEST_CONFIG, "0xOPPONENT", [1, 2]);
+
+    expect(calls[0]).toEqual({
+      contractAddress: TEST_CONFIG.vrfAddress,
+      entrypoint: "request_random",
+      calldata: [TEST_CONFIG.contracts.actions1v1, "0", TEST_CONFIG.contracts.actions1v1],
+    });
+    expect(calls[1]).toEqual({
+      contractAddress: TEST_CONFIG.contracts.worldSystem,
+      entrypoint: "create_staked_match",
+      calldata: ["0xOPPONENT", "2", "1", "2"],
+    });
+  });
+
+  it("joins staked matches without a VRF request because creation initializes round-one modifiers", () => {
+    const calls = buildJoinStakedMatchCalls(TEST_CONFIG, 42, [3]);
+
+    expect(calls).toEqual([
+      {
+        contractAddress: TEST_CONFIG.contracts.worldSystem,
+        entrypoint: "join_staked_match",
+        calldata: ["42", "1", "3"],
+      },
+    ]);
   });
 });
 

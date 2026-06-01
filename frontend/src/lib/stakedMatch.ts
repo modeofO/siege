@@ -42,11 +42,12 @@ function approveAbilityTokenForWorldSystem() {
 // ---------- Call builders ----------
 
 export async function createStakedMatch(account: AccountInterface, opponent: string, abilities: number[]) {
-  // vRF source must be actions_1v1 — create_staked_match forwards to create_match_1v1 where consume_random runs.
+  // vRF must be the first multicall item. create_staked_match forwards to
+  // create_match_1v1, where actions_1v1 consumes Source::Nonce(actions_1v1).
   const tx = await account.execute(
     [
-      approveAbilityTokenForWorldSystem(),
       vrfRequestRandomCall(CONTRACTS_1V1.ACTIONS),
+      approveAbilityTokenForWorldSystem(),
       {
         contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
         entrypoint: "create_staked_match",
