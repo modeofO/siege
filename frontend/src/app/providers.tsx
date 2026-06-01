@@ -6,15 +6,8 @@ import { sepolia } from "@starknet-react/chains";
 import { StarknetConfig, jsonRpcProvider, cartridge, useAccount as useStarknetAccount } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
 import { FeeSource } from "@cartridge/controller";
-import type { SessionPolicies } from "@cartridge/presets";
 import { DojoProvider } from "@/lib/dojoSdk";
-import { CONTRACTS } from "@/lib/contracts";
-import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
-import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
-import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
-import { WORLD_SYSTEM_ADDRESS } from "@/lib/pillage";
-import { CONQUEST_ADDRESS } from "@/lib/conquest";
-import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
+import { SESSION_POLICIES } from "@/lib/sessionPolicies";
 
 // ---------- Network mode ----------
 
@@ -102,92 +95,6 @@ function DevProvider({ children }: { children: React.ReactNode }) {
 }
 
 // ---------- Sepolia mode (Cartridge Controller) ----------
-
-// Session policies must cover every user-signed entrypoint. Missing entries
-// trigger an in-wallet approval prompt; if the user dismisses it, the tx fails
-// with "User canceled" and the frontend silently stalls (see issue #5).
-const SESSION_POLICIES: SessionPolicies = {
-  contracts: {
-    // --- Legacy 2v2 match flow ---
-    [CONTRACTS.ACTIONS]: {
-      methods: [{ name: "Create Match", entrypoint: "create_match" }],
-    },
-    [CONTRACTS.COMMIT_REVEAL]: {
-      methods: [
-        { name: "Commit Move", entrypoint: "commit" },
-        { name: "Reveal Attacker", entrypoint: "reveal_attacker" },
-        { name: "Reveal Defender", entrypoint: "reveal_defender" },
-      ],
-    },
-
-    // --- 1v1 match flow ---
-    [CONTRACTS_1V1.ACTIONS]: {
-      methods: [{ name: "Create 1v1 Match", entrypoint: "create_match_1v1" }],
-    },
-    [CONTRACTS_1V1.COMMIT_REVEAL]: {
-      methods: [
-        { name: "Commit 1v1", entrypoint: "commit" },
-        { name: "Reveal 1v1", entrypoint: "reveal" },
-      ],
-    },
-    [CONTRACTS_1V1.RESOLUTION]: {
-      methods: [{ name: "Resolve Round", entrypoint: "resolve_round" }],
-    },
-
-    // --- Cartridge vRF ---
-    [VRF_PROVIDER_ADDRESS]: {
-      methods: [{ name: "Request Random", entrypoint: "request_random" }],
-    },
-
-    // --- Crafting (both tiers + approvals for each resource token) ---
-    [CRAFTING_1V1_ADDRESS]: {
-      methods: [
-        { name: "Craft Ability", entrypoint: "craft_ability" },
-        { name: "Craft Ability (T2)", entrypoint: "craft_ability_tier2" },
-        { name: "Craft Ability Batch", entrypoint: "craft_ability_batch" },
-        { name: "Craft Ability T2 Batch", entrypoint: "craft_ability_tier2_batch" },
-      ],
-    },
-    ...Object.fromEntries(
-      Object.values(RESOURCE_TOKENS).map((addr) => [addr, { methods: [{ name: "Approve", entrypoint: "approve" }, { name: "Transfer", entrypoint: "transfer" }] }]),
-    ),
-
-    // --- World metagame (kingdom, staked matches, parcels, drip, pillage, factions) ---
-    [WORLD_SYSTEM_ADDRESS]: {
-      methods: [
-        { name: "Register Hold", entrypoint: "register_player" },
-        { name: "Upgrade Hold", entrypoint: "upgrade_kingdom" },
-        { name: "Claim Resource Drip", entrypoint: "claim_drip" },
-        { name: "Claim Parcel", entrypoint: "claim_parcel" },
-        { name: "Create Staked Match", entrypoint: "create_staked_match" },
-        { name: "Join Staked Match", entrypoint: "join_staked_match" },
-        { name: "Settle Match", entrypoint: "settle_match" },
-        { name: "Initiate Pillage", entrypoint: "initiate_pillage" },
-        { name: "Claim Pillage Drip", entrypoint: "claim_pillage_drip" },
-        { name: "Create Faction", entrypoint: "create_faction" },
-        { name: "Invite Member", entrypoint: "invite_member" },
-        { name: "Accept Invite", entrypoint: "accept_invite" },
-        { name: "Leave Faction", entrypoint: "leave_faction" },
-        { name: "Kick Member", entrypoint: "kick_member" },
-        { name: "Toggle Reinforcement", entrypoint: "set_faction_reinforcement" },
-        { name: "Set Cosmetic", entrypoint: "set_cosmetic" },
-      ],
-    },
-
-    // --- Conquest (async preset-defense attacks) ---
-    [CONQUEST_ADDRESS]: {
-      methods: [
-        { name: "Set Preset Defense", entrypoint: "set_preset_defense" },
-        { name: "Initiate Conquest", entrypoint: "initiate_conquest" },
-      ],
-    },
-
-    // --- AbilityToken: world_system needs operator approval to escrow staked abilities ---
-    [ABILITY_TOKEN_ADDRESS]: {
-      methods: [{ name: "Approve Ability Operator", entrypoint: "set_approval_for_all" }],
-    },
-  },
-};
 
 const sepoliaConnector = IS_DEVNET
   ? null
