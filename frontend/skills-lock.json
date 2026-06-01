@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "skills": {
+    "dojo-client": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "computedHash": "e1e0aca472a2c766d263608dd134090aea6a20c142f580eb8fb58c6f4ce641f0"
+    },
+    "dojo-system": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "computedHash": "738709059c324fe19d370de88a5188cd52309bd08cbdae02888193a5e3321635"
+    },
+    "streamdown": {
+      "source": "vercel/streamdown",
+      "sourceType": "github",
+      "computedHash": "c842552c75b80abb74ef8f92481d34684c709884dd2df22c2ab3b183aee582fe"
+    }
+  }
+}

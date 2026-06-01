@@ -1,6 +1,5 @@
 target/
 *.env
-.codex/
 
 # Logs
 logs
@@ -171,7 +170,4 @@ dojo_*.toml
 scripts/play-round.js
 
 .DS_Store
-.agents
-.claude
-skills-lock.json
 docs/mcp/

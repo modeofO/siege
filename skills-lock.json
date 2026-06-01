@@ -1,0 +1,175 @@
+{
+  "version": 1,
+  "skills": {
+    "build-mcp-app": {
+      "source": "anthropics/claude-plugins-official",
+      "sourceType": "github",
+      "skillPath": "plugins/mcp-server-dev/skills/build-mcp-app/SKILL.md",
+      "computedHash": "b6c70a7b3d3c685e813706d94a0383cd0d2eff4d7a9eb963efd22445a8d946c6"
+    },
+    "build-mcp-server": {
+      "source": "anthropics/claude-plugins-official",
+      "sourceType": "github",
+      "skillPath": "plugins/mcp-server-dev/skills/build-mcp-server/SKILL.md",
+      "computedHash": "b98ddf5944e3a1e2bdaad3d6fc3d2afbe29941595817721971cf41d6da81c81e"
+    },
+    "build-mcpb": {
+      "source": "anthropics/claude-plugins-official",
+      "sourceType": "github",
+      "skillPath": "plugins/mcp-server-dev/skills/build-mcpb/SKILL.md",
+      "computedHash": "97eaeeffb27721ffe5fc4ada6e3c15cffbf4121616603cd1b5f3f5da41102a7b"
+    },
+    "building-agent-team-prompts": {
+      "source": "frontboat/agent-teams",
+      "sourceType": "github",
+      "computedHash": "85d842bc8e3a9aaa762cafca3ad4fd4c11635a6ddb964ac034cccecadb67204f"
+    },
+    "dojo-client": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-client/SKILL.md",
+      "computedHash": "e1e0aca472a2c766d263608dd134090aea6a20c142f580eb8fb58c6f4ce641f0"
+    },
+    "dojo-config": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-config/SKILL.md",
+      "computedHash": "81f724fea662d5cd067e9b312823924c36fcd78db417f2e899407c44cf30fadf"
+    },
+    "dojo-deploy": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-deploy/SKILL.md",
+      "computedHash": "64a4914ca51508231eb8d54392b8bdec36c1be07b464757c342ef4af01698409"
+    },
+    "dojo-indexer": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-indexer/SKILL.md",
+      "computedHash": "b33c1c982011b0f0a4ea955b4f32111f94cd45f90006990f47f624de1a143206"
+    },
+    "dojo-init": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-init/SKILL.md",
+      "computedHash": "68a1c0ed76ab8d6323688b655bcd24fb2549f9f22f5dba701eba6956011026d0"
+    },
+    "dojo-migrate": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-migrate/SKILL.md",
+      "computedHash": "6e7be3150a5d1325ca66b61484245967eaec5ad0fa9123fffe77aaefd1d5fc57"
+    },
+    "dojo-model": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-model/SKILL.md",
+      "computedHash": "385ea93cc42e27c0d431f5ed485b590f5c2e87bdd6a5de9402e9238ed1665b6f"
+    },
+    "dojo-review": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-review/SKILL.md",
+      "computedHash": "50b13bb70e8eb8d4097e5787043faaa2bf6a3bab4ae168180f43916318ac3642"
+    },
+    "dojo-system": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-system/SKILL.md",
+      "computedHash": "738709059c324fe19d370de88a5188cd52309bd08cbdae02888193a5e3321635"
+    },
+    "dojo-test": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-test/SKILL.md",
+      "computedHash": "fbd363ed6ee2937f20bc4205d4b0984cbf3514b52149df184b819a4cc187ff0f"
+    },
+    "dojo-token": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-token/SKILL.md",
+      "computedHash": "de851ec3a71bce280f39c5d0097975859c1335bd38c6006c851bc09c38a6f7d1"
+    },
+    "dojo-world": {
+      "source": "dojoengine/book",
+      "sourceType": "github",
+      "skillPath": "skills/dojo-world/SKILL.md",
+      "computedHash": "bb3ebcbd4622e5632a5406cde84a2e5235a1a2dea9614299febfd14a6c21cddf"
+    },
+    "make-interfaces-feel-better": {
+      "source": "jakubkrehel/make-interfaces-feel-better",
+      "sourceType": "github",
+      "computedHash": "41c2416e08bc9ec3c696585d31bd1243481a7a81615b810b1b8a32aded9360b5"
+    },
+    "react-state-management": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "7c63f9bf6ce2e2884b2da61e899a2701068b53ef6e87fc29e3c04a199e3092cb"
+    },
+    "streamdown": {
+      "source": "vercel/streamdown",
+      "sourceType": "github",
+      "computedHash": "c842552c75b80abb74ef8f92481d34684c709884dd2df22c2ab3b183aee582fe"
+    },
+    "threejs-animation": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-animation/SKILL.md",
+      "computedHash": "8c50b1493812bd88f3ed0637c0c3c5d846afdb322157b67b2ffba4ce8e552835"
+    },
+    "threejs-fundamentals": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-fundamentals/SKILL.md",
+      "computedHash": "e08d49571071f0f54ef2a76fdfcb96c16673e4fda478067727def4659feb80ca"
+    },
+    "threejs-geometry": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-geometry/SKILL.md",
+      "computedHash": "4e5757bf80a329810545c237e557e362fa14fd3a3e6a567ec1d75435be6b2dda"
+    },
+    "threejs-interaction": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-interaction/SKILL.md",
+      "computedHash": "988d235b7ebd85276a584c6f81ce7c801280ebc45b401017b334136dc8a7ec82"
+    },
+    "threejs-lighting": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-lighting/SKILL.md",
+      "computedHash": "9303d1b8a9704e88415e5a98c98ad7b6e0f654f8029a3606af7947c0efcb86cc"
+    },
+    "threejs-loaders": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-loaders/SKILL.md",
+      "computedHash": "f2cceed635fd7a2119acf6e5b1a2fcba63a0e52cf2514c1830a69e4744554fcc"
+    },
+    "threejs-materials": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-materials/SKILL.md",
+      "computedHash": "201cf0f3720c0ea9e415e6376b8ad389aa86b483875e87ca0e51aa2770c856aa"
+    },
+    "threejs-postprocessing": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-postprocessing/SKILL.md",
+      "computedHash": "48e04ff507582a18e0d509c2738b9d9466881b00e8ca2600727910a0d52abf75"
+    },
+    "threejs-shaders": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-shaders/SKILL.md",
+      "computedHash": "649ceb058edfb5cfd51e80fb3a6c57aca9bab4a9d3a03f6077aa9502be0c0771"
+    },
+    "threejs-textures": {
+      "source": "cloudai-x/threejs-skills",
+      "sourceType": "github",
+      "skillPath": "skills/threejs-textures/SKILL.md",
+      "computedHash": "772a0bfc1d64cfcbc5347d206584a8fa412983201ad7a2cfb8766097b4936db9"
+    }
+  }
+}
