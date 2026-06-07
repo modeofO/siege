@@ -1,8 +1,8 @@
 {
   "world": {
     "class_hash": "0x613551abceb2b37073b1149bb862ea70cf029981ce1ca47e9dd7c7ab97cb65d",
-    "address": "0x4134697f1327052025f01786d97effdf5de98528802aaaf3dc3c8896b57bc61",
-    "seed": "siege_dojo_v8",
+    "address": "0x31b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73",
+    "seed": "siege_dojo_v9",
     "name": "siege_dojo",
     "entrypoints": [
       "uuid",
@@ -33,7 +33,7 @@
   },
   "contracts": [
     {
-      "address": "0x37389e3cdbede705a17881ec47994de6ab3a39938713b5fde10ac656e48614f",
+      "address": "0x3c1676622425e68c3ec6e4be8098da01e86e741e66fba890c7d4d4f76022c4a",
       "class_hash": "0x2c414649782347837df2e227d2227d6d948eb8300409ec5c986c38a5c18f5a5",
       "init_calldata": [],
       "tag": "siege_dojo-actions",
@@ -44,13 +44,14 @@
       ]
     },
     {
-      "address": "0x286267bdebd4b4d3ada22ecb563518787298798e8da9036403668d9c0f58e3",
-      "class_hash": "0x986c6f1c06be585cc6a4408be218fb288f341bf7d891360cc7ca896e5ec9a4",
+      "address": "0x5def5daa769122af26d2b6fdb1ab8aa5485232a6cebc32053e19e715a2ffab2",
+      "class_hash": "0x42d3d3296541705e2727d695ba93e1f97c0db50d81c3be3ce445c200114e637",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
       "selector": "0x26e0eeadcc0c8f020b1da157b4d0f038ca209cb1d1ed9b6b52248376703705",
       "systems": [
         "create_match_1v1",
+        "create_match_1v1_delegated",
         "set_resource_config",
         "set_ability_token",
         "set_vrf_provider",
@@ -58,7 +59,7 @@
       ]
     },
     {
-      "address": "0x42a88215f2d1bc22d211700893f21604741bd0e56d8145741ac27aa5568d175",
+      "address": "0x2c56252fcbed4698deab599e8c2b2455667d98ba67ec2e18e365cf48d46d933",
       "class_hash": "0x25c918d33577b814103793959e779eea266d5d44acf0a3d546fb468704139f8",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal",
@@ -72,7 +73,7 @@
       ]
     },
     {
-      "address": "0x4d97c45dce38f3157a04bc886b343e5516b06aadc97c1aa5878cfed2568de05",
+      "address": "0x7a11369feb1812c88b1b027d1f5a3493c2f09c03612460372664dae7fbe4ff5",
       "class_hash": "0x33e705e3843f796d7c5c5fc872795db0606748634d53576b80626881e2f5c24",
       "init_calldata": [],
       "tag": "siege_dojo-commit_reveal_1v1",
@@ -85,7 +86,7 @@
       ]
     },
     {
-      "address": "0x48f1be212d1273f6797304b35b9a1c8b8b9602844137e200489d0ce1d86fec1",
+      "address": "0x5d9d790df9b1003b144521d1bf9821a1c9dca7332a5a6c99f003af5b2ca4394",
       "class_hash": "0x2b667b280d5b563b3a3bacd9f72c70ce787cb0a98180744e4a90a8e67fd2ba8",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
@@ -97,7 +98,7 @@
       ]
     },
     {
-      "address": "0x19ea09d20d2575caf9472de37c62872fbc5d88c5390596cb48bbb9c8bb258b2",
+      "address": "0x1f8085720ec1c5b153c273b522878365c2c19d55a22141c70e907e27df19ad3",
       "class_hash": "0x4a29e3e854cfc87d65746b01cc663e7fd5d10ae72dd6fec80de07282d1027c7",
       "init_calldata": [],
       "tag": "siege_dojo-crafting_1v1",
@@ -111,7 +112,7 @@
       ]
     },
     {
-      "address": "0x77426dcb85593b43e3508cea7062922676a8e45913772d632c7e6d85b0d80a4",
+      "address": "0x5108fb49fa428bb16ec786dcb96dc4f4086d9d8948a44f866e17ee7d04d1d89",
       "class_hash": "0x636964b849eb0e4f5eb97fc13541ec84fc39d8c8825e42b0a4c47ba957e01da",
       "init_calldata": [],
       "tag": "siege_dojo-resolution",
@@ -122,7 +123,7 @@
       ]
     },
     {
-      "address": "0x4d514e20212824f10f4dfeab2a701ca4aaedaddc3f06cbf2e47f299faa81641",
+      "address": "0x227d85f88211383106235553ee51e96dfa795ca4dcff86a734e63e9bb20f39e",
       "class_hash": "0x7ddf9fb2b1e1fda8e014fd43c1cf0c00d0287b9bbad5a2442017cd3b728932f",
       "init_calldata": [],
       "tag": "siege_dojo-resolution_1v1",
@@ -133,8 +134,8 @@
       ]
     },
     {
-      "address": "0x16bb80d4dae3f3b0468ec5d93368908e2b6a50a621b55dafeead99f38725ef6",
-      "class_hash": "0x4f7a74026b597f425819247e29735a46317da2a698bed30a73b12829c825f5e",
+      "address": "0x1c35fca268af0253265c3ef881ec3f7d7d0afa94626a8a2ddc5bb133e8be401",
+      "class_hash": "0x220f1917b64b680b719c3e6ebc0468c2997660ad86abcfc8ce96f29e2a92139",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
@@ -6059,6 +6060,30 @@
             {
               "name": "player_b",
               "type": "core::starknet::contract_address::ContractAddress"
+            }
+          ],
+          "outputs": [
+            {
+              "type": "core::integer::u64"
+            }
+          ],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "create_match_1v1_delegated",
+          "inputs": [
+            {
+              "name": "player_a",
+              "type": "core::starknet::contract_address::ContractAddress"
+            },
+            {
+              "name": "player_b",
+              "type": "core::starknet::contract_address::ContractAddress"
+            },
+            {
+              "name": "random_value",
+              "type": "core::felt252"
             }
           ],
           "outputs": [

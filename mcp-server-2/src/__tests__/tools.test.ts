@@ -197,7 +197,7 @@ describe("staked match call construction", () => {
     expect(calls[0]).toEqual({
       contractAddress: TEST_CONFIG.vrfAddress,
       entrypoint: "request_random",
-      calldata: [TEST_CONFIG.contracts.actions1v1, "0", TEST_CONFIG.contracts.actions1v1],
+      calldata: [TEST_CONFIG.contracts.worldSystem, "0", TEST_CONFIG.contracts.worldSystem],
     });
     expect(calls[1]).toEqual({
       contractAddress: TEST_CONFIG.contracts.worldSystem,

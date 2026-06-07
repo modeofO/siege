@@ -9,7 +9,7 @@ import {
   type SchemaType,
   type MatchStakes1v1 as MatchStakes1v1Model,
 } from "@/bindings/typescript/models.gen";
-import { CONTRACTS_1V1, CONTRACTS_WORLD, vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
+import { CONTRACTS_WORLD, vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
 import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { executeControllerPaymaster } from "@/lib/controllerSession";
 import { toFeltHex } from "@/lib/gameState1v1";
@@ -48,7 +48,7 @@ export async function createStakedMatch(account: AccountInterface, opponent: str
   const tx = await executeControllerPaymaster(
     account,
     [
-      vrfRequestRandomCall(CONTRACTS_1V1.ACTIONS),
+      vrfRequestRandomCall(CONTRACTS_WORLD.WORLD_SYSTEM),
       approveAbilityTokenForWorldSystem(),
       {
         contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,

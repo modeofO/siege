@@ -82,7 +82,7 @@ pub fn burn_upgrade_resources(token_addr: starknet::ContractAddress, from: stark
 #[dojo::contract]
 pub mod world_system {
     use core::num::traits::Zero;
-    use starknet::{ContractAddress, get_caller_address, get_block_timestamp};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use dojo::model::ModelStorage;
     use dojo::world::{IWorldDispatcherTrait, WorldStorageTrait};
     use siege_dojo::models::parcel::Parcel;
@@ -90,7 +90,10 @@ pub mod world_system {
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::resource_config::ResourceConfig;
     use siege_dojo::tokens::ability_token::{IAbilityTokenDispatcher, IAbilityTokenDispatcherTrait};
-    use siege_dojo::systems::actions_1v1::{IActions1v1Dispatcher, IActions1v1DispatcherTrait};
+    use siege_dojo::systems::actions_1v1::{
+        IActions1v1Dispatcher, IActions1v1DispatcherTrait,
+        IVrfProviderDispatcher, IVrfProviderDispatcherTrait, Source,
+    };
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::MatchState1v1;
     use siege_dojo::models::match_stakes_1v1::MatchStakes1v1;
@@ -424,10 +427,20 @@ pub mod world_system {
                 i += 1;
             };
 
-            // Create match via actions_1v1
+            // Consume VRF here so the consumer is the directly-called contract
+            let vrf_addr = if rc.vrf_provider.is_non_zero() {
+                rc.vrf_provider
+            } else {
+                0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f
+                    .try_into()
+                    .unwrap()
+            };
+            let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
+            let random_value = vrf.consume_random(Source::Nonce(get_contract_address()));
+
             let (actions_addr, _) = world.dns(@"actions_1v1").unwrap();
             let actions = IActions1v1Dispatcher { contract_address: actions_addr };
-            let match_id = actions.create_match_1v1(caller, opponent);
+            let match_id = actions.create_match_1v1_delegated(caller, opponent, random_value);
 
             // But set status to Pending (not Active) until opponent joins
             let mut state: MatchState1v1 = world.read_model(match_id);

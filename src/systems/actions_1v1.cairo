@@ -7,6 +7,12 @@ pub trait IActions1v1<T> {
         player_a: ContractAddress,
         player_b: ContractAddress,
     ) -> u64;
+    fn create_match_1v1_delegated(
+        ref self: T,
+        player_a: ContractAddress,
+        player_b: ContractAddress,
+        random_value: felt252,
+    ) -> u64;
     fn get_budget_1v1(self: @T, match_id: u64, is_player_a: bool) -> u8;
     fn set_resource_config(
         ref self: T,
@@ -42,7 +48,7 @@ pub mod actions_1v1 {
     use siege_dojo::models::events::MatchCreated1v1;
     use siege_dojo::models::resource_config::ResourceConfig;
     use dojo::event::EventStorage;
-    use dojo::world::IWorldDispatcherTrait;
+    use dojo::world::{IWorldDispatcherTrait, WorldStorageTrait};
     use super::{IVrfProviderDispatcher, IVrfProviderDispatcherTrait, Source};
 
     const VRF_PROVIDER_ADDRESS: felt252 =
@@ -72,6 +78,55 @@ pub mod actions_1v1 {
         (to_modifier(roll_0), to_modifier(roll_1), to_modifier(roll_2))
     }
 
+    fn setup_match(
+        ref world: dojo::world::WorldStorage,
+        player_a: ContractAddress,
+        player_b: ContractAddress,
+        random_value: felt252,
+    ) -> u64 {
+        let mut counter: MatchCounter = world.read_model(0_u8);
+        let match_id = counter.count + 1;
+        counter.count = match_id;
+        world.write_model(@counter);
+
+        world.write_model(@MatchState1v1 {
+            match_id,
+            player_a,
+            player_b,
+            vault_a_hp: 50,
+            vault_b_hp: 50,
+            current_round: 1,
+            status: MatchStatus::Active,
+        });
+
+        let mut i: u8 = 0;
+        while i < 3 {
+            world.write_model(@NodeState {
+                match_id,
+                node_index: i,
+                owner: NodeOwner::None,
+            });
+            i += 1;
+        };
+
+        let (g0, g1, g2) = random_to_modifiers(random_value);
+        world.write_model(@RoundModifiers1v1 {
+            match_id,
+            round: 1,
+            gate_0: g0,
+            gate_1: g1,
+            gate_2: g2,
+        });
+
+        world.emit_event(@MatchCreated1v1 {
+            match_id,
+            player_a,
+            player_b,
+        });
+
+        match_id
+    }
+
     #[abi(embed_v0)]
     impl Actions1v1Impl of super::IActions1v1<ContractState> {
         fn create_match_1v1(
@@ -80,33 +135,7 @@ pub mod actions_1v1 {
             player_b: ContractAddress,
         ) -> u64 {
             let mut world = self.world_default();
-            let mut counter: MatchCounter = world.read_model(0_u8);
-            let match_id = counter.count + 1;
-            counter.count = match_id;
-            world.write_model(@counter);
 
-            world.write_model(@MatchState1v1 {
-                match_id,
-                player_a,
-                player_b,
-                vault_a_hp: 50,
-                vault_b_hp: 50,
-                current_round: 1,
-                status: MatchStatus::Active,
-            });
-
-            let mut i: u8 = 0;
-            while i < 3 {
-                world.write_model(@NodeState {
-                    match_id,
-                    node_index: i,
-                    owner: NodeOwner::None,
-                });
-                i += 1;
-            };
-
-            // Generate round 1 modifiers via vRNG
-            // Read VRF address from config; fall back to hardcoded if not set
             let config: ResourceConfig = world.read_model(0_u8);
             let vrf_addr = if config.vrf_provider.is_non_zero() {
                 config.vrf_provider
@@ -115,22 +144,22 @@ pub mod actions_1v1 {
             };
             let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
             let random_value = vrf.consume_random(Source::Nonce(get_contract_address()));
-            let (g0, g1, g2) = random_to_modifiers(random_value);
-            world.write_model(@RoundModifiers1v1 {
-                match_id,
-                round: 1,
-                gate_0: g0,
-                gate_1: g1,
-                gate_2: g2,
-            });
 
-            world.emit_event(@MatchCreated1v1 {
-                match_id,
-                player_a,
-                player_b,
-            });
+            setup_match(ref world, player_a, player_b, random_value)
+        }
 
-            match_id
+        fn create_match_1v1_delegated(
+            ref self: ContractState,
+            player_a: ContractAddress,
+            player_b: ContractAddress,
+            random_value: felt252,
+        ) -> u64 {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+            assert(caller == world_sys_addr, 'Only world_system');
+
+            setup_match(ref world, player_a, player_b, random_value)
         }
 
         fn get_budget_1v1(self: @ContractState, match_id: u64, is_player_a: bool) -> u8 {

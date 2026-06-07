@@ -46,9 +46,9 @@ RESOURCE_TOKENS=(
 
 # System contracts that mint/burn resources. Update these to the current
 # manifest_sepolia.json addresses after each migrate.
-WORLD_SYS="0x16bb80d4dae3f3b0468ec5d93368908e2b6a50a621b55dafeead99f38725ef6"
-RESOLUTION_1V1="0x4d514e20212824f10f4dfeab2a701ca4aaedaddc3f06cbf2e47f299faa81641"
-CRAFTING_1V1="0x19ea09d20d2575caf9472de37c62872fbc5d88c5390596cb48bbb9c8bb258b2"
+WORLD_SYS="0x1c35fca268af0253265c3ef881ec3f7d7d0afa94626a8a2ddc5bb133e8be401"
+RESOLUTION_1V1="0x227d85f88211383106235553ee51e96dfa795ca4dcff86a734e63e9bb20f39e"
+CRAFTING_1V1="0x1f8085720ec1c5b153c273b522878365c2c19d55a22141c70e907e27df19ad3"
 
 for TOKEN in "${RESOURCE_TOKENS[@]}"; do
   echo "→ authorizing resource operators on $TOKEN..."

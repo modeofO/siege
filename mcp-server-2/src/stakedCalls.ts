@@ -9,7 +9,7 @@ function feltArray(values: number[]): string[] {
 
 export function buildCreateStakedMatchCalls(config: Config, opponent: string, abilities: number[]): Call[] {
   return [
-    vrfRequestRandom(config.vrfAddress, config.contracts.actions1v1),
+    vrfRequestRandom(config.vrfAddress, config.contracts.worldSystem),
     call(config.contracts.worldSystem, "create_staked_match", [
       opponent,
       ...feltArray(abilities),
