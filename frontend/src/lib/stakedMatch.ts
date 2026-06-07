@@ -11,7 +11,6 @@ import {
 } from "@/bindings/typescript/models.gen";
 import { CONTRACTS_WORLD, vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
 import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityToken";
-import { executeControllerPaymaster } from "@/lib/controllerSession";
 import { toFeltHex } from "@/lib/gameState1v1";
 import { useWorldParcels, type ParcelData } from "@/lib/worldState";
 import { isNeighbor } from "@/lib/hex";
@@ -43,13 +42,13 @@ function approveAbilityTokenForWorldSystem() {
 // ---------- Call builders ----------
 
 export async function createStakedMatch(account: AccountInterface, opponent: string, abilities: number[]) {
-  // vRF must be the first multicall item. create_staked_match forwards to
-  // create_match_1v1, where actions_1v1 consumes Source::Nonce(actions_1v1).
-  const tx = await executeControllerPaymaster(
-    account,
+  // Approval must be separate — the Cartridge Paymaster VRF wrapping requires
+  // request_random as call[0] and the game call as call[1] with nothing between.
+  await account.execute(approveAbilityTokenForWorldSystem(), TX_OPTS);
+
+  const tx = await account.execute(
     [
       vrfRequestRandomCall(CONTRACTS_WORLD.WORLD_SYSTEM),
-      approveAbilityTokenForWorldSystem(),
       {
         contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
         entrypoint: "create_staked_match",

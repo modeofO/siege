@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import type { AccountInterface } from "starknet";
+import { executeControllerPaymaster } from "@/lib/controllerSession";
 
 interface RegisterKingdomProps {
   account: AccountInterface;
@@ -46,7 +47,7 @@ export function RegisterKingdom({ account, worldSystemAddress, onRegistered }: R
     setSubmitting(true);
     setError("");
     try {
-      await account.execute({
+      await executeControllerPaymaster(account, {
         contractAddress: worldSystemAddress,
         entrypoint: "register_player",
         calldata: [selections.length.toString(), ...selections.map((s) => s.toString())],

@@ -12,8 +12,8 @@ importers:
         specifier: ^0.13.9
         version: 0.13.12(@types/react@19.2.14)(typescript@5.9.3)(zod@3.25.76)
       '@cartridge/controller-wasm':
-        specifier: ^0.10.0
-        version: 0.10.0
+        specifier: 0.9.6
+        version: 0.9.6
       '@dojoengine/torii-client':
         specifier: ^1.8.2
         version: 1.8.2
@@ -53,6 +53,9 @@ packages:
 
   '@cartridge/controller-wasm@0.10.0':
     resolution: {integrity: sha512-msmQFjZRRAcAbcGf0mt4z4bTvUY6H3ypgYz+imJp+S36SCabvh42vog7FttuvcVKQoVjS5hNKb3rf0YwU/plig==}
+
+  '@cartridge/controller-wasm@0.9.6':
+    resolution: {integrity: sha512-BkFth1LuS4Im27mdjxkiCk3fP2t4X3KXsEO9k1U0V8OtnLuRtH2P0X4fKklLyOSfmZ7GKk5KTDwcdR/LhJA03Q==}
 
   '@cartridge/controller@0.13.12':
     resolution: {integrity: sha512-bNhjRcIvMoi3BkaLPBXVGlHJwR7zHLaRp1SoOOeiRCXXX/Dos6eClE1T0Hy3SCBSqm16dOr2EdV518+vMEmZ6Q==}
@@ -2609,6 +2612,8 @@ snapshots:
     optional: true
 
   '@cartridge/controller-wasm@0.10.0': {}
+
+  '@cartridge/controller-wasm@0.9.6': {}
 
   '@cartridge/controller@0.13.12(@types/react@19.2.14)(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
