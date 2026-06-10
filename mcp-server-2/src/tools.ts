@@ -297,10 +297,30 @@ async function pollReceipt(rpcUrl: string, txHash: string): Promise<void> {
 }
 
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
-  // The node SessionProvider's WalletAccount.execute tries executeFromOutside
-  // (paymaster path) then silently falls back to direct execute, swallowing
-  // the paymaster error. Call executeFromOutside directly so paymaster
-  // failures surface and we never accidentally pay fees from the agent.
+  process.stderr.write(`[exec-debug] signer.address: ${signer.address}\n`);
+  const signerAny = signer as any;
+  try {
+    const keys = Object.getOwnPropertyNames(Object.getPrototypeOf(signerAny) ?? {}).concat(Object.keys(signerAny));
+    process.stderr.write(`[exec-debug] signer keys: ${keys.join(', ')}\n`);
+  } catch {}
+  if (signerAny.controller) {
+    const ctrl = signerAny.controller;
+    try {
+      const ckeys = Object.getOwnPropertyNames(Object.getPrototypeOf(ctrl) ?? {}).concat(Object.keys(ctrl));
+      process.stderr.write(`[exec-debug] controller keys: ${ckeys.join(', ')}\n`);
+    } catch {}
+    try {
+      const addr = typeof ctrl.address === 'function' ? ctrl.address() : ctrl.address;
+      process.stderr.write(`[exec-debug] controller.address: ${addr}\n`);
+    } catch (e: any) { process.stderr.write(`[exec-debug] controller.address error: ${e.message}\n`); }
+    try {
+      const cAddr = typeof ctrl.cartridgeAccount === 'function' ? ctrl.cartridgeAccount() : ctrl.cartridgeAccount;
+      process.stderr.write(`[exec-debug] controller.cartridgeAccount: ${JSON.stringify(cAddr)}\n`);
+    } catch {}
+    try {
+      process.stderr.write(`[exec-debug] controller.constructor.name: ${ctrl.constructor?.name}\n`);
+    } catch {}
+  }
   const controller = (signer as unknown as { controller?: {
     executeFromOutside: (calls: Array<{ contractAddress: string; entrypoint: string; calldata: string[] }>) => Promise<{ transaction_hash: string }>;
   } }).controller;
@@ -312,7 +332,40 @@ async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
     contractAddress: addAddressPadding(c.contractAddress),
     calldata: CallData.toHex(c.calldata),
   }));
-  const res = await controller.executeFromOutside(normalized);
+  // Intercept fetch to capture what address the WASM targets
+  const origFetch = globalThis.fetch;
+  const fetchLog: string[] = [];
+  globalThis.fetch = async (input: any, init?: any) => {
+    const url = typeof input === 'string' ? input : input?.url ?? String(input);
+    let bodyStr = '';
+    if (init?.body) {
+      bodyStr = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
+    } else if (typeof input === 'object' && input !== null) {
+      try { bodyStr = await input.clone?.().text?.() ?? ''; } catch {}
+    }
+    // Also check for Request objects
+    if (!bodyStr && input instanceof Request) {
+      try { bodyStr = await input.clone().text(); } catch {}
+    }
+    const snippet = bodyStr.length > 2000 ? bodyStr.slice(0, 2000) : bodyStr;
+    // Look for any hex strings that could be addresses (shorter pattern)
+    const hexMatches = bodyStr.match(/0x[0-9a-fA-F]{10,}/g);
+    fetchLog.push(`url=${url} bodyLen=${bodyStr.length} hexes=${JSON.stringify([...new Set(hexMatches ?? [])].slice(0, 8))} snippet=${snippet.slice(0, 500)}`);
+    return origFetch(input, init);
+  };
+  let res: { transaction_hash: string };
+  try {
+    res = await controller.executeFromOutside(normalized);
+  } catch (e: any) {
+    globalThis.fetch = origFetch;
+    const debugInfo = {
+      signerAddress: signer.address,
+      fetchLog,
+    };
+    e.message = `${e.message} [DEBUG: ${JSON.stringify(debugInfo)}]`;
+    throw e;
+  }
+  globalThis.fetch = origFetch;
   if (rpcUrlForReceipts) await pollReceipt(rpcUrlForReceipts, res.transaction_hash);
   return res.transaction_hash;
 }
@@ -1907,6 +1960,11 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     async ({ match_id }, ctx) => {
       const calls = [
         vrfRequestRandom(ctx.config.vrfAddress, ctx.config.contracts.resolution1v1),
+        // The VRF server keys the submitted seed to the contract called right
+        // after request_random, but force_timeout reaches resolution_1v1 (the
+        // consumer) only via commit_reveal_1v1 — so insert a harmless direct
+        // view call to resolution_1v1 or consume reverts 'not fulfilled'.
+        call(ctx.config.contracts.resolution1v1, "dojo_name", []),
         call(ctx.config.contracts.commitReveal1v1, "force_timeout", [String(match_id)]),
       ];
       try {

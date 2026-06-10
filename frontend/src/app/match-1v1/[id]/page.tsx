@@ -27,7 +27,7 @@ import { useMatchStakes1v1 } from "@/lib/gameState1v1";
 import { usePlayerCosmetics } from "@/lib/cosmetics";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
-import { toriiSql, sqlInt, toNum } from "@/lib/toriiSql";
+import { toriiSql, sqlInt, sqlU64, toNum } from "@/lib/toriiSql";
 import { ABILITIES } from "@/lib/craftingContracts";
 import { BattleAnimation } from "@/components/BattleAnimation";
 
@@ -435,7 +435,7 @@ export default function Match1v1Page() {
       (async () => {
         try {
           const rows = await toriiSql<{ reveal_count: unknown }>(
-            `SELECT reveal_count FROM "siege_dojo-RoundMoves1v1" WHERE match_id = ${sqlInt(matchId)} AND round = ${sqlInt(currentRound)}`,
+            `SELECT reveal_count FROM "siege_dojo-RoundMoves1v1" WHERE match_id = ${sqlU64(matchId)} AND round = ${sqlInt(currentRound)}`,
           );
           const onChainReveals = rows.length > 0 ? toNum(rows[0].reveal_count) : 0;
           if (onChainReveals < 2) {

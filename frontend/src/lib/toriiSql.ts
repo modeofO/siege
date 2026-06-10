@@ -21,6 +21,16 @@ export function sqlInt(v: number | string): string {
   return String(n);
 }
 
+/**
+ * Torii stores u64 key columns (e.g. match_id) as zero-padded hex text like
+ * "0x0000000000000002" — integer comparisons silently match nothing.
+ */
+export function sqlU64(v: number | string): string {
+  const n = BigInt(v);
+  if (n < BigInt(0)) throw new Error("invalid u64 value");
+  return `'0x${n.toString(16).padStart(16, "0")}'`;
+}
+
 export function toNum(v: unknown): number {
   if (typeof v === "number") return v;
   if (typeof v === "string") return Number(v);
