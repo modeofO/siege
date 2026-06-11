@@ -52,9 +52,12 @@ if [ "${PERMS_SYNCED:-0}" = "0" ]; then
   echo ""
   echo "  Granting writer permissions..."
   docker compose run --rm builder sozo auth grant writer \
-    siege_dojo,siege_dojo-actions \
-    siege_dojo,siege_dojo-commit_reveal \
-    siege_dojo,siege_dojo-resolution \
+    siege_dojo,siege_dojo-actions_1v1 \
+    siege_dojo,siege_dojo-commit_reveal_1v1 \
+    siege_dojo,siege_dojo-resolution_1v1 \
+    siege_dojo,siege_dojo-crafting_1v1 \
+    siege_dojo,siege_dojo-world_system \
+    siege_dojo,siege_dojo-conquest \
     --rpc-url http://katana:5050 --wait 2>&1 | grep -v "^time=" | tail -3
 fi
 
@@ -77,7 +80,7 @@ echo ""
 echo "[4/4] Starting Torii..."
 WORLD_ADDRESS="$WORLD_ADDRESS" docker compose up -d torii 2>&1 | grep -v "WORLD_ADDRESS"
 sleep 3
-echo "  Torii GraphQL: http://localhost:8080/graphql"
+echo "  Torii GraphQL: http://localhost:8080/sql"
 
 # ── Update frontend .env.local ───────────────────────────────────
 echo ""
@@ -129,7 +132,7 @@ echo ""
 echo "=== Done! ==="
 echo ""
 echo "  Katana:  http://localhost:5050"
-echo "  Torii:   http://localhost:8080/graphql"
+echo "  Torii:   http://localhost:8080/sql"
 echo ""
 echo "  To start the frontend:"
 echo "    cd frontend && npm run dev"

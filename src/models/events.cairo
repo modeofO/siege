@@ -2,17 +2,6 @@ use starknet::ContractAddress;
 
 #[dojo::event]
 #[derive(Drop, Serde)]
-pub struct MatchCreated {
-    #[key]
-    pub match_id: u64,
-    pub team_a_attacker: ContractAddress,
-    pub team_a_defender: ContractAddress,
-    pub team_b_attacker: ContractAddress,
-    pub team_b_defender: ContractAddress,
-}
-
-#[dojo::event]
-#[derive(Drop, Serde)]
 pub struct MoveCommitted {
     #[key]
     pub match_id: u64,

@@ -1,7 +1,6 @@
 "use client";
 
 import type { SessionPolicies } from "@cartridge/presets";
-import { CONTRACTS } from "@/lib/contracts";
 import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
 import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
 import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
@@ -12,17 +11,6 @@ import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
 // keep their approved policy set until the player reconnects or updates it.
 export const SESSION_POLICIES: SessionPolicies = {
   contracts: {
-    [CONTRACTS.ACTIONS]: {
-      methods: [{ name: "Create Match", entrypoint: "create_match" }],
-    },
-    [CONTRACTS.COMMIT_REVEAL]: {
-      methods: [
-        { name: "Commit Move", entrypoint: "commit" },
-        { name: "Reveal Attacker", entrypoint: "reveal_attacker" },
-        { name: "Reveal Defender", entrypoint: "reveal_defender" },
-      ],
-    },
-
     [CONTRACTS_1V1.ACTIONS]: {
       methods: [{ name: "Create 1v1 Match", entrypoint: "create_match_1v1" }],
     },

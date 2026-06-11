@@ -1,5 +1,5 @@
 import { describe, test, expect } from "vitest";
-import { generateSalt, computeAttackerCommitment, computeDefenderCommitment } from "../crypto";
+import { generateSalt, computeCommitment1v1 } from "../crypto";
 
 describe("generateSalt", () => {
   test("returns hex string starting with 0x", () => {
@@ -18,59 +18,34 @@ describe("generateSalt", () => {
   });
 });
 
-describe("computeAttackerCommitment", () => {
-  test("returns a hex string", () => {
-    const commitment = computeAttackerCommitment("0xaaa", 5, 3, 2, 0, 0, 0);
-    expect(commitment).toMatch(/^0x[0-9a-f]+$/);
+describe("computeCommitment1v1", () => {
+  const commit = (salt: string, fields: number[]) =>
+    computeCommitment1v1(
+      salt,
+      fields[0], fields[1], fields[2],
+      fields[3], fields[4], fields[5],
+      fields[6],
+      fields[7], fields[8], fields[9],
+      fields[10], fields[11], fields[12],
+      fields[13], fields[14],
+    );
+  const baseMove = [5, 3, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+  test("returns a felt hex string", () => {
+    expect(commit("0xaaa", baseMove)).toMatch(/^0x[0-9a-f]+$/);
   });
 
-  test("same inputs produce same hash", () => {
-    const a = computeAttackerCommitment("0xaaa", 5, 3, 2, 0, 0, 0);
-    const b = computeAttackerCommitment("0xaaa", 5, 3, 2, 0, 0, 0);
-    expect(a).toBe(b);
+  test("is deterministic for identical inputs", () => {
+    expect(commit("0xaaa", baseMove)).toBe(commit("0xaaa", baseMove));
   });
 
-  test("different salt produces different hash", () => {
-    const a = computeAttackerCommitment("0xaaa", 5, 3, 2, 0, 0, 0);
-    const b = computeAttackerCommitment("0xbbb", 5, 3, 2, 0, 0, 0);
-    expect(a).not.toBe(b);
+  test("differs when salt differs", () => {
+    expect(commit("0xaaa", baseMove)).not.toBe(commit("0xbbb", baseMove));
   });
 
-  test("different moves produce different hash", () => {
-    const a = computeAttackerCommitment("0xaaa", 5, 3, 2, 0, 0, 0);
-    const b = computeAttackerCommitment("0xaaa", 2, 3, 5, 0, 0, 0);
-    expect(a).not.toBe(b);
-  });
-
-  test("element order matters", () => {
-    const a = computeAttackerCommitment("0xaaa", 1, 2, 3, 4, 5, 6);
-    const b = computeAttackerCommitment("0xaaa", 6, 5, 4, 3, 2, 1);
-    expect(a).not.toBe(b);
-  });
-});
-
-describe("computeDefenderCommitment", () => {
-  test("returns a hex string", () => {
-    const commitment = computeDefenderCommitment("0xaaa", 3, 3, 2, 1, 1, 0, 0);
-    expect(commitment).toMatch(/^0x[0-9a-f]+$/);
-  });
-
-  test("same inputs produce same hash", () => {
-    const a = computeDefenderCommitment("0xaaa", 3, 3, 2, 1, 1, 0, 0);
-    const b = computeDefenderCommitment("0xaaa", 3, 3, 2, 1, 1, 0, 0);
-    expect(a).toBe(b);
-  });
-
-  test("different repair value produces different hash", () => {
-    const a = computeDefenderCommitment("0xaaa", 3, 3, 2, 1, 1, 0, 0);
-    const b = computeDefenderCommitment("0xaaa", 3, 3, 2, 3, 1, 0, 0);
-    expect(a).not.toBe(b);
-  });
-
-  test("attacker and defender hashes differ for same inputs", () => {
-    // Defender has 8 elements (includes repair), attacker has 7
-    const atk = computeAttackerCommitment("0xaaa", 3, 3, 2, 1, 0, 0);
-    const def = computeDefenderCommitment("0xaaa", 3, 3, 2, 1, 1, 0, 0);
-    expect(atk).not.toBe(def);
+  test("differs when any allocation differs", () => {
+    const moved = [...baseMove];
+    moved[14] = 1; // ability target
+    expect(commit("0xaaa", baseMove)).not.toBe(commit("0xaaa", moved));
   });
 });
