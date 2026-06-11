@@ -14,11 +14,9 @@ Active systems:
 - Frontend: Next app under `frontend/`.
 - Active MCP server: `mcp-server-2/`.
 
-Legacy systems:
+The legacy 2v2 system (`actions`, `commit_reveal`, `resolution`) was removed from the source tree — it was never used. The deployed Sepolia v9 world still has those contracts registered from earlier migrations; ignore them.
 
-- 2v2 contracts remain in `actions`, `commit_reveal`, and `resolution`.
-- `mcp-server/` is older and not the main MCP implementation.
-- `src/utils/hex.cairo` remains tested but the current world map uses `tile_graph.cairo`.
+`mcp-server/` is older and not the main MCP implementation.
 
 ## Terminology
 
@@ -34,14 +32,9 @@ Do not rename Cairo models or entrypoints to match UI copy.
 
 ## Known Current Mismatches
 
-Keep these in mind before debugging symptoms as game logic bugs:
-
-- Commit `9b0f050` regenerated `frontend/src/lib/tileGeometry.json` and `scripts/tiling-generator/seed.json` and says the frontend fix needs updated contracts. Sepolia v7 may not match the newest tile geometry until the world is reinitialized with that seed.
-- `frontend/src/lib/contracts1v1.ts` and `frontend/src/lib/craftingContracts.ts` still contain older Sepolia fallback addresses. Set env vars explicitly for Sepolia.
-- Resource token addresses differ between `scripts/init-sepolia-resource-config.sh`/`torii_sepolia.toml` and `frontend/src/lib/useResourceBalances.ts`/MCP defaults.
-- Cairo currently caps staked-match ability slots at 1, 2, 3, 3 by tier. `frontend/src/lib/tiers.ts` says tier 3 has 4 ability slots.
-- T2 crafting calls `AbilityToken.burn`, so the live AbilityToken `burner` must be set to `crafting_1v1`. If T2 crafting reverts with `Not burner`, rerun the ability-token setup script.
-- `scripts/local-dev.sh` still has legacy Torii GraphQL text and only grants legacy writers in its fallback grant block.
+- T2 crafting calls `AbilityToken.burn`, so the live AbilityToken `burner` must be set to `crafting_1v1`. If T2 crafting reverts with `Not burner`, rerun `scripts/setup-ability-token.sh`.
+- `frontend/src/bindings/typescript/*.gen.ts` are generated and still contain removed 2v2 types until the next codegen; don't hand-edit them.
+- `frontend/src/lib/__tests__/stakedMatch.test.ts` fails when `NEXT_PUBLIC_NETWORK` is devnet and `manifest_dev.json` lacks `world_system` (address resolves to ""). Pre-existing; not a regression signal by itself.
 
 ## Toolchain
 
@@ -50,12 +43,17 @@ Keep these in mind before debugging symptoms as game logic bugs:
 | Cairo                | 2.13.1                      |
 | Scarb                | 2.13.1                      |
 | Dojo dependency      | v1.8.0                      |
-| sozo                 | v1.8.6 expected for Sepolia |
-| Katana container     | Dojo v1.8.0, Katana 1.7.0   |
-| Torii container      | Dojo v1.8.0, Torii 1.8.3    |
+| Katana/Torii         | `ghcr.io/dojoengine/dojo:v1.8.0` containers |
 | Frontend             | Next 16.2.6, React 19.2.3   |
 | Starknet.js frontend | 8.9.2                       |
 | Starknet.js MCP      | 8.5.2                       |
+
+Always run sozo through the Docker builder — the locally installed sozo is older than the project toolchain:
+
+```bash
+docker compose run --rm builder sozo build
+docker compose run --rm builder sozo test
+```
 
 ## Core Battle Rules
 
@@ -66,6 +64,8 @@ Each round:
 1. Both players commit a Poseidon hash.
 2. Both players reveal the exact allocation.
 3. `resolution_1v1.resolve_round` applies modifiers, abilities, repair, damage, node contests, traps, resource mints, and next-round modifiers.
+
+Commit and reveal deadlines are 300 seconds each (`commit_reveal_1v1.cairo`).
 
 Reveal hash order:
 
@@ -98,35 +98,29 @@ Ability IDs:
 - 4/9 Hex.
 - 5/10 Fortify.
 
-World fold doubles numeric ability effects in `resolution_1v1` and `conquest`.
-
 ## The Marches
 
-The Marches is a tile graph, not a hex grid.
+The Marches is an offset hex grid (`col`/`row` per parcel, `utils/hex.cairo` distance metric). The Sepolia v9 world is initialized by `scripts/init-hex-world.sh` as 8 columns x 4 rows = 32 parcels. There is no fold mechanic, no zones, and no sectors — older docs describing a tile graph with folds are obsolete.
 
 Important models:
 
-- `Parcel`: `tile_id`, `sector_id`, `tile_shape`, `zone`, `parcel_type`, `owner`, `is_home`, `is_stranded`.
-- `TileAdjacency`: `(tile_id, edge_index) -> neighbor_tile_id`.
-- `WorldConfig`: `total_parcels`, `next_parcel_id`, `initialized`, `is_world_folded`, `fold_epoch`, `total_folds`.
-- `FoldEvent`: records sector and world folds.
-- `PlayerKingdom`: homes, parcel count, tier, wins, drip timestamp, free craft flag, faction reinforcement toggle.
+- `Parcel`: `parcel_id`, `col`, `row`, `parcel_type` (0=Forge, 1=Quarry, 2=Grove; 255=untyped at init), `owner`, `is_home`.
+- `WorldConfig`: `total_parcels`, `next_parcel_id`, `initialized`.
+- `PlayerKingdom`: three home ids, `parcel_count`, `registered`, `free_craft_used`, `last_drip_time`, `tier`, `total_wins`, `faction_reinforcement_enabled`.
 
-The current generated seed has 40 tiles and 128 adjacency triples. `NO_NEIGHBOR` is `0xFFFFFFFF`.
+Registration claims three home parcels: the first maximizes distance to already-claimed parcels, the other two cluster near it. The caller selects home parcel types, not positions. Registration mints starter abilities.
 
-Registration chooses three unclaimed frontier tiles in the sector with the most available frontier tiles. The caller selects home parcel types, not positions.
-
-`claim_drip` mints for the player's three homes, not every owned parcel. It skips active pillages and stranded homes. Zone multiplier: core 3, mid 2, frontier 1.
+`claim_drip` mints for the player's three homes once per hour (`DRIP_INTERVAL = 3600`), skipping actively pillaged homes. There is no zone multiplier.
 
 `settle_match` handles ability transfer/refund, win stats, reputation, match records, resource drip, loser's non-home release, and pillage eligibility.
 
-`claim_parcel` claims one unclaimed adjacent tile after a settled staked-match win and assigns its parcel type.
+`claim_parcel` claims one unclaimed adjacent parcel after a settled staked-match win and assigns its parcel type.
 
-Conquest attacks adjacent non-home parcels in one transaction. Attacker budget is 10, defender preset budget is 12, attacker HP is 10, defender HP is 15, and ties go to the defender.
+Conquest attacks adjacent non-home parcels in one transaction. Attacker budget is 10, defender preset budget is 12, attacker HP is 10, defender HP is 15, and ties go to the defender. Pillage window is 24 hours (`PILLAGE_WINDOW = 86400`).
 
 ## Tiers
 
-Cairo tier functions:
+Cairo tier functions (`world_system.cairo`):
 
 | Tier | Name      | Wins required | Match ability slots | Defense presets |
 | ---- | --------- | ------------- | ------------------- | --------------- |
@@ -134,6 +128,8 @@ Cairo tier functions:
 | 1    | Strategos | 10            | 2                   | 2               |
 | 2    | Hegemonia | 30            | 3                   | 3               |
 | 3    | Basileia  | 60            | 3                   | 4               |
+
+`MatchStakes1v1` stores at most 3 stake slots per player; tier 3 caps at 3 ability slots everywhere (Cairo, frontend `tiers.ts`, MCP).
 
 Upgrade costs:
 
@@ -145,21 +141,24 @@ Upgrade costs:
 
 Current config files point at:
 
-- Seed: `siege_dojo_v7`
-- World: `0x05ae03c23b817afa096a51e3b04e31c176f168ee8193465229d08fa67366a942`
+- Seed: `siege_dojo_v9`
+- World: `0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73`
 - RPC: `https://api.cartridge.gg/x/starknet/sepolia`
 - Torii: `https://api.cartridge.gg/x/siege-dojo/torii`
-- Torii start block: `10009090`
+- Torii start block: `10547399`
 
 Contract addresses should come from `manifest_sepolia.json`. Current important tags:
 
-- `siege_dojo-actions_1v1`: `0x4242c71cda43bdc6f24e0baa6eb353f1cca6e960cb3e622787c46e5083ff516`
-- `siege_dojo-commit_reveal_1v1`: `0x6a6b677b9dea4f766b10dcfe2907ad60861103263aa85c2ca2122db86eb2c52`
-- `siege_dojo-resolution_1v1`: `0x7f57549212a1db5b5cf8a1ac29eeed62f7e8566a5c08f16c737eedf54aa1842`
-- `siege_dojo-crafting_1v1`: `0x4d14cd36d9ab960de7b88da7421e87e16d028c1ab4b973d4b5892d1d193e130`
-- `siege_dojo-world_system`: `0x4d52c26bd2b9ff241807fd94d7a2cf53e97e126e560bbd987864099be742cea`
-- `siege_dojo-conquest`: `0x305fdf6f2fe07c08436fea5ea4e7c77b9f7515654e4e764af7c131d848b441f`
+- `siege_dojo-actions_1v1`: `0x5def5daa769122af26d2b6fdb1ab8aa5485232a6cebc32053e19e715a2ffab2`
+- `siege_dojo-commit_reveal_1v1`: `0x7a11369feb1812c88b1b027d1f5a3493c2f09c03612460372664dae7fbe4ff5`
+- `siege_dojo-resolution_1v1`: `0x227d85f88211383106235553ee51e96dfa795ca4dcff86a734e63e9bb20f39e`
+- `siege_dojo-crafting_1v1`: `0x1f8085720ec1c5b153c273b522878365c2c19d55a22141c70e907e27df19ad3`
+- `siege_dojo-world_system`: `0x1c35fca268af0253265c3ef881ec3f7d7d0afa94626a8a2ddc5bb133e8be401`
+- `siege_dojo-conquest`: `0x5d9d790df9b1003b144521d1bf9821a1c9dca7332a5a6c99f003af5b2ca4394`
 - `AbilityToken`: `0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05`
+- Cartridge VRF provider: `0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f`
+
+Resource token addresses live in `scripts/init-sepolia-resource-config.sh` and `frontend/src/lib/useResourceBalances.ts` (kept in sync).
 
 Deployment sequence:
 
@@ -167,12 +166,9 @@ Deployment sequence:
 export DOJO_ACCOUNT_ADDRESS="0x..."
 export DOJO_PRIVATE_KEY="0x..."
 
-sozo build -P sepolia
-sozo -P sepolia migrate
-sozo -P sepolia auth grant writer \
-  siege_dojo,siege_dojo-actions \
-  siege_dojo,siege_dojo-commit_reveal \
-  siege_dojo,siege_dojo-resolution \
+docker compose run --rm builder sozo build -P sepolia
+docker compose run --rm builder sozo -P sepolia migrate
+docker compose run --rm builder sozo -P sepolia auth grant writer \
   siege_dojo,siege_dojo-actions_1v1 \
   siege_dojo,siege_dojo-commit_reveal_1v1 \
   siege_dojo,siege_dojo-resolution_1v1 \
@@ -181,10 +177,11 @@ sozo -P sepolia auth grant writer \
   siege_dojo,siege_dojo-conquest
 ```
 
-Post-migration setup:
+Post-migration setup (fresh world only):
 
 ```bash
-npx tsx scripts/deploy-v7.ts
+bash scripts/init-hex-world.sh
+bash scripts/setup-ability-token.sh
 bash scripts/init-sepolia-resource-config.sh
 ```
 
@@ -201,14 +198,17 @@ The frontend supports `devnet` and `sepolia` modes through `src/app/providers.ts
 - Devnet uses local Katana accounts.
 - Sepolia uses Cartridge Controller and `SESSION_POLICIES`.
 - Session policies are fixed when the player connects. After adding policies, tell players to reconnect.
-- Current world UI uses `TilingMap`, not `HexGrid`.
+- The world UI renders `HexGrid`.
 - Torii SQL is the default polling read path. Do not add new GraphQL queries.
+- Torii stores u64 key columns (e.g. `match_id`) as zero-padded hex text; use `sqlU64()` from `toriiSql.ts` for comparisons.
 
 Use `BigInt(0)` rather than `0n` in frontend code.
 
 ## MCP Notes
 
 Use `mcp-server-2/`. It registers 39 tools and signs writes through a Cartridge session. It reads Dojo contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses come from env/defaults.
+
+Cartridge VRF quirk: the VRF server keys the seed to the contract called immediately after `request_random` in the multicall. When the consumer is reached through a nested call (e.g. `force_timeout` → `resolve_round`), sandwich a harmless direct view call to the consumer between the VRF request and the real call. See issue #44.
 
 Build and test:
 
@@ -223,7 +223,6 @@ pnpm run test
 Contract tests:
 
 ```bash
-sozo test
 docker compose run --rm builder sozo test
 ```
 

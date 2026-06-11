@@ -5,7 +5,7 @@ export const TIER_INFO = [
   { name: "Polis", abilitySlots: 1, defensePresets: 1 },
   { name: "Strategos", abilitySlots: 2, defensePresets: 2 },
   { name: "Hegemonia", abilitySlots: 3, defensePresets: 3 },
-  { name: "Basileia", abilitySlots: 4, defensePresets: 4 },
+  { name: "Basileia", abilitySlots: 3, defensePresets: 4 },
 ] as const;
 
 export interface UpgradeCost {
