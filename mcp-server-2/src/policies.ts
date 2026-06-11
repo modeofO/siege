@@ -80,6 +80,7 @@ export function buildPolicies(
           m("claim_parcel", "Claim an adjacent parcel after a settled staked-match win"),
           m("create_staked_match", "Create a 1v1 match with ability stakes"),
           m("join_staked_match", "Join a pending staked match with ability stakes"),
+          m("cancel_staked_match", "Cancel your own unjoined staked match and refund your stakes"),
           m("settle_match", "Settle a finished staked match and distribute rewards"),
           m("initiate_pillage", "Start pillaging an eligible loser home parcel"),
           m("claim_pillage_drip", "Claim resource drip from an active pillage"),

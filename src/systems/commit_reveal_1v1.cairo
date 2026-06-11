@@ -265,7 +265,32 @@ pub mod commit_reveal_1v1 {
             let now = get_block_timestamp();
             let mut rm: RoundMoves1v1 = world.read_model((match_id, round));
 
-            if rm.commit_count < 2 && rm.commit_count > 0 {
+            // Zero-commit abandon: nothing armed a deadline (commits do that),
+            // so the first call arms one and a second call after it elapses
+            // ends the match as a draw with equalized vaults, letting
+            // settle_match refund both sides' stakes. Any commit from either
+            // player closes this path.
+            if rm.commit_count == 0 {
+                if rm.commit_deadline == 0 {
+                    rm.commit_deadline = now + COMMIT_TIMEOUT;
+                    world.write_model(@rm);
+                    return;
+                }
+                assert(now >= rm.commit_deadline, 'Commit deadline not reached');
+                let mut state_mut: MatchState1v1 = world.read_model(match_id);
+                let hp = if state_mut.vault_a_hp < state_mut.vault_b_hp {
+                    state_mut.vault_a_hp
+                } else {
+                    state_mut.vault_b_hp
+                };
+                state_mut.vault_a_hp = hp;
+                state_mut.vault_b_hp = hp;
+                state_mut.status = MatchStatus::Finished;
+                world.write_model(@state_mut);
+                return;
+            }
+
+            if rm.commit_count < 2 {
                 assert(now >= rm.commit_deadline, 'Commit deadline not reached');
                 let mut r: u8 = 0;
                 while r < 2 {
@@ -283,10 +308,14 @@ pub mod commit_reveal_1v1 {
                 rm.commit_count = 2;
                 rm.reveal_deadline = now + REVEAL_TIMEOUT;
                 world.write_model(@rm);
+                // The reveal phase starts now; forcing reveals in the same
+                // call would always trip the fresh reveal deadline.
+                return;
             }
 
-            if rm.commit_count == 2 && rm.reveal_count < 2 {
+            if rm.reveal_count < 2 {
                 assert(now >= rm.reveal_deadline, 'Reveal deadline not reached');
+                let mut abilities: MatchAbilities1v1 = world.read_model(match_id);
                 let mut r: u8 = 0;
                 while r < 2 {
                     let c: Commitment = world.read_model((match_id, round, r));
@@ -298,10 +327,23 @@ pub mod commit_reveal_1v1 {
                             revealed: true,
                         });
                         rm.reveal_count += 1;
+                        // Deserting a reveal forfeits the whole loadout: the
+                        // committed ability is hidden inside the hash, so per
+                        // slot consumption is impossible to attribute.
+                        if r == ROLE_A {
+                            abilities.a_used_1 = true;
+                            abilities.a_used_2 = true;
+                            abilities.a_used_3 = true;
+                        } else {
+                            abilities.b_used_1 = true;
+                            abilities.b_used_2 = true;
+                            abilities.b_used_3 = true;
+                        }
                     }
                     r += 1;
                 };
                 world.write_model(@rm);
+                world.write_model(@abilities);
 
                 let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
                 let res = IResolution1v1Dispatcher { contract_address: res_addr };

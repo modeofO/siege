@@ -105,6 +105,7 @@ Write tools:
 - `siege_upgrade_kingdom`
 - `siege_create_staked_match`
 - `siege_join_staked_match`
+- `siege_cancel_staked_match`
 - `siege_settle_match`
 - `siege_claim_parcel`
 - `siege_set_preset_defense`

@@ -206,7 +206,7 @@ Use `BigInt(0)` rather than `0n` in frontend code.
 
 ## MCP Notes
 
-Use `mcp-server-2/`. It registers 39 tools and signs writes through a Cartridge session. It reads Dojo contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses come from env/defaults.
+Use `mcp-server-2/`. It registers 40 tools and signs writes through a Cartridge session. It reads Dojo contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses come from env/defaults.
 
 Cartridge VRF quirk: the VRF server keys the seed to the contract called immediately after `request_random` in the multicall. When the consumer is reached through a nested call (e.g. `force_timeout` → `resolve_round`), sandwich a harmless direct view call to the consumer between the VRF request and the real call. See issue #44.
 

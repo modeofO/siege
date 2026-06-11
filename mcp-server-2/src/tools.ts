@@ -1241,6 +1241,24 @@ export function registerSiegeTools(reg: RegisterArgs): void {
   );
 
   register(
+    "siege_cancel_staked_match",
+    {
+      description:
+        "Cancel a staked match you created that the opponent has not joined yet. Refunds your escrowed abilities and closes the match permanently.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+    },
+    async ({ match_id }, ctx) => {
+      const tx = await execute(ctx.signer!, [
+        call(ctx.config.contracts.worldSystem, "cancel_staked_match", [String(match_id)]),
+      ]);
+      return { tx_hash: tx, match_id };
+    },
+  );
+
+  register(
     "siege_settle_match",
     {
       description:

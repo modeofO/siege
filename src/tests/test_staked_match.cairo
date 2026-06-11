@@ -485,4 +485,88 @@ mod tests {
         // B has 1 ability
         assert(abilities.b_ability_1 == 1, 'b should have ability 1');
     }
+
+    // -------- cancel_staked_match (#46) --------
+
+    #[test]
+    fn test_cancel_unjoined_staked_match_refunds_creator() {
+        let (mut world, world_sys, player_a, player_b, erc1155) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1, 2]);
+        assert(erc1155.balance_of(player_a, 1_u256) == 0_u256, 'id 1 escrowed');
+        assert(erc1155.balance_of(player_a, 2_u256) == 0_u256, 'id 2 escrowed');
+
+        world_sys.cancel_staked_match(match_id);
+
+        assert(erc1155.balance_of(player_a, 1_u256) == 1_u256, 'id 1 refunded');
+        assert(erc1155.balance_of(player_a, 2_u256) == 1_u256, 'id 2 refunded');
+
+        let state: MatchState1v1 = world.read_model(match_id);
+        assert(state.status == MatchStatus::Finished, 'match terminal');
+        let stakes: MatchStakes1v1 = world.read_model(match_id);
+        assert(stakes.settled, 'stakes settled');
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_cancel_by_non_creator_panics() {
+        let (_, world_sys, player_a, player_b, _) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.cancel_staked_match(match_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_cancel_after_join_panics() {
+        let (_, world_sys, player_a, player_b, _) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        starknet::testing::set_contract_address(player_a);
+        world_sys.cancel_staked_match(match_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_join_after_cancel_panics() {
+        let (_, world_sys, player_a, player_b, _) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        world_sys.cancel_staked_match(match_id);
+
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_settle_after_cancel_panics() {
+        let (_, world_sys, player_a, player_b, _) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        world_sys.cancel_staked_match(match_id);
+
+        world_sys.settle_match(match_id);
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_double_cancel_panics() {
+        let (_, world_sys, player_a, player_b, _) = full_setup();
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        world_sys.cancel_staked_match(match_id);
+        world_sys.cancel_staked_match(match_id);
+    }
 }

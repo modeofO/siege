@@ -7,6 +7,7 @@ pub trait IWorldSystem<T> {
     fn set_ability_token(ref self: T, ability_token: ContractAddress);
     fn create_staked_match(ref self: T, opponent: ContractAddress, abilities: Array<u8>) -> u64;
     fn join_staked_match(ref self: T, match_id: u64, abilities: Array<u8>);
+    fn cancel_staked_match(ref self: T, match_id: u64);
     fn settle_match(ref self: T, match_id: u64);
     fn claim_parcel(ref self: T, match_id: u64, parcel_id: u32, parcel_type: u8);
     fn claim_drip(ref self: T);
@@ -562,6 +563,47 @@ pub mod world_system {
             let mut state_mut: MatchState1v1 = world.read_model(match_id);
             state_mut.status = MatchStatus::Active;
             world.write_model(@state_mut);
+        }
+
+        fn cancel_staked_match(ref self: ContractState, match_id: u64) {
+            let mut world = self.world_default();
+            let caller = get_caller_address();
+
+            let mut state: MatchState1v1 = world.read_model(match_id);
+            assert(state.status == MatchStatus::Pending, 'Match not pending');
+            assert(caller == state.player_a, 'Not the creator');
+
+            let mut stakes: MatchStakes1v1 = world.read_model(match_id);
+            assert(stakes.staked, 'Not a staked match');
+            assert(!stakes.settled, 'Already settled');
+            // stake_count is only set when the opponent escrows in
+            // join_staked_match, so 0 means nothing of B's is held.
+            assert(stakes.stake_count == 0, 'Opponent already joined');
+
+            // Terminal before the refund: blocks a join or re-cancel landing
+            // in the same block, and settle_match via the settled flag.
+            stakes.settled = true;
+            world.write_model(@stakes);
+            state.status = MatchStatus::Finished;
+            world.write_model(@state);
+
+            let rc: ResourceConfig = world.read_model(0_u8);
+            let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
+            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+
+            let a_stakes: Array<u8> = array![stakes.a_stake_1, stakes.a_stake_2, stakes.a_stake_3];
+            let mut i: u32 = 0;
+            while i < 3 {
+                let ability_id = *a_stakes.at(i);
+                if ability_id > 0 {
+                    erc1155.safe_transfer_from(
+                        world_sys_addr, caller,
+                        ability_id.into(), 1_u256,
+                        array![].span(),
+                    );
+                }
+                i += 1;
+            };
         }
 
         fn settle_match(ref self: ContractState, match_id: u64) {

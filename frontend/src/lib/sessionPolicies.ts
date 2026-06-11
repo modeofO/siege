@@ -18,6 +18,7 @@ export const SESSION_POLICIES: SessionPolicies = {
       methods: [
         { name: "Commit 1v1", entrypoint: "commit" },
         { name: "Reveal 1v1", entrypoint: "reveal" },
+        { name: "Force Timeout", entrypoint: "force_timeout" },
       ],
     },
     [CONTRACTS_1V1.RESOLUTION]: {
@@ -55,6 +56,7 @@ export const SESSION_POLICIES: SessionPolicies = {
         { name: "Claim Parcel", entrypoint: "claim_parcel" },
         { name: "Create Staked Match", entrypoint: "create_staked_match" },
         { name: "Join Staked Match", entrypoint: "join_staked_match" },
+        { name: "Cancel Staked Match", entrypoint: "cancel_staked_match" },
         { name: "Settle Match", entrypoint: "settle_match" },
         { name: "Initiate Pillage", entrypoint: "initiate_pillage" },
         { name: "Claim Pillage Drip", entrypoint: "claim_pillage_drip" },
