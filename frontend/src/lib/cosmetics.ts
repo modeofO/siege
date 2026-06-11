@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { cairo } from "starknet";
 import type { AccountInterface, UniversalDetails } from "starknet";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
-import { toriiSql, feltToStr, sqlHex } from "./toriiSql";
+import { toriiSql, feltToStr, sqlAddr } from "./toriiSql";
+import { usePoll } from "./usePoll";
 import type { CircuitKey, CosmeticType } from "./forge/circuits";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
@@ -48,21 +49,17 @@ export function usePlayerCosmetics(
 ): PlayerCosmeticsData {
   const [data, setData] = useState<PlayerCosmeticsData>(EMPTY_COSMETICS);
 
-  useEffect(() => {
-    if (!playerAddress) return;
-
-    let cancelled = false;
-
-    const fetchCosmetics = async () => {
+  usePoll(
+    async (alive) => {
+      if (!playerAddress) return;
       const rows = await toriiSql<{
         banner: string;
         parcel_skin: string;
         hold_decoration: string;
       }>(
-        `SELECT banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player = ${sqlHex(playerAddress)}`,
+        `SELECT banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player = ${sqlAddr(playerAddress)}`,
       );
-
-      if (cancelled) return;
+      if (!alive()) return;
 
       if (rows.length === 0) {
         setData(EMPTY_COSMETICS);
@@ -75,15 +72,11 @@ export function usePlayerCosmetics(
         parcelSkin: feltToCircuitKey(row.parcel_skin),
         holdDecoration: feltToCircuitKey(row.hold_decoration),
       });
-    };
-
-    fetchCosmetics();
-    const interval = setInterval(fetchCosmetics, 4000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [playerAddress, refreshKey]);
+    },
+    4000,
+    [playerAddress, refreshKey],
+    !!playerAddress,
+  );
 
   return data;
 }
@@ -94,20 +87,32 @@ export function useBulkPlayerCosmetics(
 ): Record<string, PlayerCosmeticsData> {
   const [data, setData] = useState<Record<string, PlayerCosmeticsData>>({});
 
-  useEffect(() => {
-    if (playerAddresses.length === 0) return;
+  // Stable key so the poll restarts when the set of addresses actually
+  // changes, not just its length.
+  const addrsKey = useMemo(() => {
+    const normalized: string[] = [];
+    for (const a of playerAddresses) {
+      try {
+        normalized.push(sqlAddr(a));
+      } catch {
+        // skip malformed addresses
+      }
+    }
+    return normalized.sort().join(",");
+  }, [playerAddresses]);
 
-    let cancelled = false;
-
-    const fetchAll = async () => {
+  usePoll(
+    async (alive) => {
+      if (!addrsKey) return;
       const rows = await toriiSql<{
         player: string;
         banner: string;
         parcel_skin: string;
         hold_decoration: string;
-      }>(`SELECT player, banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics"`);
-
-      if (cancelled) return;
+      }>(
+        `SELECT player, banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player IN (${addrsKey})`,
+      );
+      if (!alive()) return;
 
       const map: Record<string, PlayerCosmeticsData> = {};
       for (const row of rows) {
@@ -118,15 +123,11 @@ export function useBulkPlayerCosmetics(
         };
       }
       setData(map);
-    };
-
-    fetchAll();
-    const interval = setInterval(fetchAll, 4000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [playerAddresses.length, refreshKey]);
+    },
+    4000,
+    [addrsKey, refreshKey],
+    addrsKey.length > 0,
+  );
 
   return data;
 }

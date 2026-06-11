@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
-import { toriiSql, toNum, feltToStr, sqlHex, sqlInt } from "./toriiSql";
+import { toriiSql, toNum, feltToStr, sqlAddr, sqlInt } from "./toriiSql";
+import { usePoll } from "./usePoll";
 
 const POLL_INTERVAL = 4000;
 
@@ -35,10 +36,9 @@ export interface FactionInviteData {
 export function useFaction(factionId: number | null): FactionData | null {
   const [data, setData] = useState<FactionData | null>(null);
 
-  useEffect(() => {
-    if (!factionId) return;
-
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
+      if (!factionId) return;
       const rows = await toriiSql<{
         faction_id: number;
         leader: string;
@@ -48,6 +48,7 @@ export function useFaction(factionId: number | null): FactionData | null {
         created_at: number;
         dissolved: number | boolean;
       }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${sqlInt(factionId)}`);
+      if (!alive()) return;
 
       const row = rows[0];
       if (!row) {
@@ -64,19 +65,11 @@ export function useFaction(factionId: number | null): FactionData | null {
         createdAt: toNum(row.created_at),
         dissolved: !!row.dissolved,
       });
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [factionId]);
+    },
+    POLL_INTERVAL,
+    [factionId],
+    !!factionId,
+  );
 
   return data;
 }
@@ -92,50 +85,48 @@ export function usePlayerFaction(playerAddress: string | null): {
     cooldownRemaining: number;
   }>({ member: null, faction: null, cooldownRemaining: 0 });
 
-  useEffect(() => {
-    if (!playerAddress) return;
-
-    const doFetch = async () => {
-      const memberRows = await toriiSql<{
+  usePoll(
+    async (alive) => {
+      if (!playerAddress) return;
+      // Single round-trip: member row joined with its faction row.
+      const rows = await toriiSql<{
         player: string;
         faction_id: number;
         joined_at: number;
         last_leave_time: number;
-      }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE player = ${sqlHex(playerAddress)}`);
+        f_faction_id: number | null;
+        leader: string | null;
+        name: string | null;
+        tag: string | null;
+        member_count: number | null;
+        created_at: number | null;
+        dissolved: number | boolean | null;
+      }>(
+        `SELECT m.player, m.faction_id, m.joined_at, m.last_leave_time, f.faction_id AS f_faction_id, f.leader, f.name, f.tag, f.member_count, f.created_at, f.dissolved FROM "siege_dojo-FactionMember" m LEFT JOIN "siege_dojo-Faction" f ON f.faction_id = m.faction_id WHERE m.player = ${sqlAddr(playerAddress)}`,
+      );
+      if (!alive()) return;
 
-      const memberRow = memberRows[0];
-      const member: FactionMemberData | null = memberRow
+      const row = rows[0];
+      const member: FactionMemberData | null = row
         ? {
-            player: memberRow.player,
-            factionId: toNum(memberRow.faction_id),
-            joinedAt: toNum(memberRow.joined_at),
-            lastLeaveTime: toNum(memberRow.last_leave_time),
+            player: row.player,
+            factionId: toNum(row.faction_id),
+            joinedAt: toNum(row.joined_at),
+            lastLeaveTime: toNum(row.last_leave_time),
           }
         : null;
 
       let faction: FactionData | null = null;
-      if (member && member.factionId > 0) {
-        const factionRows = await toriiSql<{
-          faction_id: number;
-          leader: string;
-          name: string;
-          tag: string;
-          member_count: number;
-          created_at: number;
-          dissolved: number | boolean;
-        }>(`SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction" WHERE faction_id = ${sqlInt(member.factionId)}`);
-        const fn = factionRows[0];
-        if (fn && !fn.dissolved) {
-          faction = {
-            factionId: toNum(fn.faction_id),
-            leader: fn.leader,
-            name: feltToStr(fn.name),
-            tag: feltToStr(fn.tag),
-            memberCount: toNum(fn.member_count),
-            createdAt: toNum(fn.created_at),
-            dissolved: !!fn.dissolved,
-          };
-        }
+      if (member && member.factionId > 0 && row.f_faction_id !== null && !row.dissolved) {
+        faction = {
+          factionId: toNum(row.f_faction_id),
+          leader: row.leader ?? "0x0",
+          name: feltToStr(row.name ?? ""),
+          tag: feltToStr(row.tag ?? ""),
+          memberCount: toNum(row.member_count),
+          createdAt: toNum(row.created_at),
+          dissolved: !!row.dissolved,
+        };
       }
 
       const now = Math.floor(Date.now() / 1000);
@@ -143,19 +134,11 @@ export function usePlayerFaction(playerAddress: string | null): {
         member && member.lastLeaveTime > 0 ? Math.max(0, member.lastLeaveTime + 86400 - now) : 0;
 
       setState({ member, faction, cooldownRemaining });
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [playerAddress]);
+    },
+    POLL_INTERVAL,
+    [playerAddress],
+    !!playerAddress,
+  );
 
   return state;
 }
@@ -163,17 +146,17 @@ export function usePlayerFaction(playerAddress: string | null): {
 export function usePendingInvites(playerAddress: string | null): FactionInviteData[] {
   const [data, setData] = useState<FactionInviteData[]>([]);
 
-  useEffect(() => {
-    if (!playerAddress) return;
-
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
+      if (!playerAddress) return;
       const rows = await toriiSql<{
         target: string;
         faction_id: number;
         invited_by: string;
         invited_at: number;
         used: number | boolean;
-      }>(`SELECT target, faction_id, invited_by, invited_at, used FROM "siege_dojo-FactionInvite" WHERE target = ${sqlHex(playerAddress)}`);
+      }>(`SELECT target, faction_id, invited_by, invited_at, used FROM "siege_dojo-FactionInvite" WHERE target = ${sqlAddr(playerAddress)}`);
+      if (!alive()) return;
 
       const entries = rows
         .map((r) => ({
@@ -186,19 +169,11 @@ export function usePendingInvites(playerAddress: string | null): FactionInviteDa
         .filter((inv) => !inv.used);
 
       setData(entries);
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [playerAddress]);
+    },
+    POLL_INTERVAL,
+    [playerAddress],
+    !!playerAddress,
+  );
 
   return data;
 }
@@ -206,8 +181,8 @@ export function usePendingInvites(playerAddress: string | null): FactionInviteDa
 export function useAllFactions(): FactionData[] {
   const [data, setData] = useState<FactionData[]>([]);
 
-  useEffect(() => {
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
       const rows = await toriiSql<{
         faction_id: number;
         leader: string;
@@ -217,6 +192,7 @@ export function useAllFactions(): FactionData[] {
         created_at: number;
         dissolved: number | boolean;
       }>('SELECT faction_id, leader, name, tag, member_count, created_at, dissolved FROM "siege_dojo-Faction"');
+      if (!alive()) return;
 
       const entries = rows
         .map((r) => ({
@@ -232,19 +208,10 @@ export function useAllFactions(): FactionData[] {
 
       entries.sort((a, b) => b.memberCount - a.memberCount);
       setData(entries);
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, []);
+    },
+    POLL_INTERVAL,
+    [],
+  );
 
   return data;
 }
@@ -252,16 +219,16 @@ export function useAllFactions(): FactionData[] {
 export function useFactionMembers(factionId: number | null): FactionMemberData[] {
   const [data, setData] = useState<FactionMemberData[]>([]);
 
-  useEffect(() => {
-    if (!factionId || factionId <= 0) return;
-
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
+      if (!factionId || factionId <= 0) return;
       const rows = await toriiSql<{
         player: string;
         faction_id: number;
         joined_at: number;
         last_leave_time: number;
       }>(`SELECT player, faction_id, joined_at, last_leave_time FROM "siege_dojo-FactionMember" WHERE faction_id = ${sqlInt(factionId)}`);
+      if (!alive()) return;
 
       const entries = rows.map((r) => ({
         player: r.player,
@@ -272,19 +239,11 @@ export function useFactionMembers(factionId: number | null): FactionMemberData[]
 
       entries.sort((a, b) => a.joinedAt - b.joinedAt);
       setData(entries);
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [factionId]);
+    },
+    POLL_INTERVAL,
+    [factionId],
+    !!factionId && factionId > 0,
+  );
 
   return data;
 }

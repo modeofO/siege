@@ -13,34 +13,15 @@ import {
   type Commitment,
   type MatchAbilities1v1,
 } from "@/bindings/typescript/models.gen";
-
 // The SDK's entity store occasionally contains placeholder / partial entries
-// (e.g., fresh subscription results before fields are hydrated). Guard every
-// conversion so a render-time throw can't nuke the whole match page.
-function safeBigIntEq(v: unknown, target: bigint): boolean {
-  if (v === undefined || v === null) return false;
-  try {
-    return BigInt(v as string | number | bigint) === target;
-  } catch (e) {
-    if (process.env.NODE_ENV === "development") console.warn("[gameState1v1] safeBigIntEq coercion failed:", v, e);
-    return false;
-  }
-}
+// (e.g., fresh subscription results before fields are hydrated). The shared
+// helpers guard every conversion so a render-time throw can't nuke the page.
+import { safeNum, safeBigIntEq, flatModels } from "@/lib/modelUtils";
 
 function safeNumEq(v: unknown, target: number): boolean {
   if (v === undefined || v === null) return false;
   const n = Number(v);
   return Number.isFinite(n) && n === target;
-}
-
-function safeNum(v: unknown): number {
-  if (v === undefined || v === null) return 0;
-  const n = Number(v);
-  if (!Number.isFinite(n)) {
-    if (process.env.NODE_ENV === "development") console.warn("[gameState1v1] safeNum coerced to 0:", v);
-    return 0;
-  }
-  return n;
 }
 
 /**
@@ -69,23 +50,6 @@ function enumVariant(e: unknown): string {
     return Object.keys(v.variant).find((k) => v.variant![k] !== undefined) || "";
   }
   return "";
-}
-
-/**
- * `useModels` claims to return `{ [entityId]: ModelData }` but actually returns
- * `Array<{ [entityId]: ModelData }>`. Normalize both shapes to a flat array of
- * model values so callers can just `.find()` / `.filter()`.
- */
-function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
-  const out: T[] = [];
-  for (const entry of iter) {
-    if (!entry || typeof entry !== "object") continue;
-    for (const v of Object.values(entry as Record<string, unknown>)) {
-      if (v && typeof v === "object") out.push(v as T);
-    }
-  }
-  return out;
 }
 
 export type NodeOwner = "neutral" | "teamA" | "teamB";

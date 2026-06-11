@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
-import { toriiSql, toNum, sqlHex } from "./toriiSql";
+import { toriiSql, toNum, sqlAddr } from "./toriiSql";
+import { usePoll } from "./usePoll";
 
 const POLL_INTERVAL = 4000;
 
@@ -35,10 +36,10 @@ export function useActivePillages(playerAddress: string | null): {
     asTarget: [],
   });
 
-  useEffect(() => {
-    if (!playerAddress) return;
-
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
+      if (!playerAddress) return;
+      const me = sqlAddr(playerAddress);
       const rows = await toriiSql<{
         home_parcel_id: number;
         pillager: string;
@@ -47,7 +48,10 @@ export function useActivePillages(playerAddress: string | null): {
         expires_at: number;
         last_claim_time: number;
         active: number | boolean;
-      }>('SELECT home_parcel_id, pillager, target, start_time, expires_at, last_claim_time, active FROM "siege_dojo-Pillage"');
+      }>(
+        `SELECT home_parcel_id, pillager, target, start_time, expires_at, last_claim_time, active FROM "siege_dojo-Pillage" WHERE pillager = ${me} OR target = ${me}`,
+      );
+      if (!alive()) return;
 
       const now = Math.floor(Date.now() / 1000);
       const entries = rows
@@ -67,19 +71,11 @@ export function useActivePillages(playerAddress: string | null): {
         asPillager: entries.filter((p) => p.pillager.toLowerCase() === addr),
         asTarget: entries.filter((p) => p.target.toLowerCase() === addr),
       });
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [playerAddress]);
+    },
+    POLL_INTERVAL,
+    [playerAddress],
+    !!playerAddress,
+  );
 
   return data;
 }
@@ -87,10 +83,9 @@ export function useActivePillages(playerAddress: string | null): {
 export function usePillageEligibilities(playerAddress: string | null): PillageEligibilityData[] {
   const [data, setData] = useState<PillageEligibilityData[]>([]);
 
-  useEffect(() => {
-    if (!playerAddress) return;
-
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
+      if (!playerAddress) return;
       const rows = await toriiSql<{
         winner: string;
         match_id: number;
@@ -98,7 +93,8 @@ export function usePillageEligibilities(playerAddress: string | null): PillageEl
         granted_at: number;
         expires_at: number;
         used: number | boolean;
-      }>(`SELECT winner, match_id, loser, granted_at, expires_at, used FROM "siege_dojo-PillageEligibility" WHERE winner = ${sqlHex(playerAddress)}`);
+      }>(`SELECT winner, match_id, loser, granted_at, expires_at, used FROM "siege_dojo-PillageEligibility" WHERE winner = ${sqlAddr(playerAddress)}`);
+      if (!alive()) return;
 
       const now = Math.floor(Date.now() / 1000);
       const entries = rows
@@ -113,19 +109,11 @@ export function usePillageEligibilities(playerAddress: string | null): PillageEl
         .filter((eli) => !eli.used && eli.expiresAt > now);
 
       setData(entries);
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [playerAddress]);
+    },
+    POLL_INTERVAL,
+    [playerAddress],
+    !!playerAddress,
+  );
 
   return data;
 }

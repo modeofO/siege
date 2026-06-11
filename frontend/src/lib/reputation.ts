@@ -9,23 +9,7 @@ import {
   type MatchRecord,
 } from "@/bindings/typescript/models.gen";
 
-function safeNum(v: unknown): number {
-  if (v === undefined || v === null) return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
-  const out: T[] = [];
-  for (const entry of iter) {
-    if (!entry || typeof entry !== "object") continue;
-    for (const v of Object.values(entry as Record<string, unknown>)) {
-      if (v && typeof v === "object") out.push(v as T);
-    }
-  }
-  return out;
-}
+import { safeNum, flatModels } from "@/lib/modelUtils";
 
 export const BRACKET_NAMES = ["Newcomer", "Developing", "Experienced", "Veteran", "Elite"] as const;
 export type BracketName = (typeof BRACKET_NAMES)[number];

@@ -12,6 +12,7 @@ import {
 import { CONTRACTS_WORLD, vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
 import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { toFeltHex } from "@/lib/gameState1v1";
+import { safeNum, safeBigIntEq, flatModels } from "@/lib/modelUtils";
 import { useWorldParcels, type ParcelData } from "@/lib/worldState";
 import { isNeighbor } from "@/lib/hex";
 
@@ -105,37 +106,6 @@ export async function claimParcel(account: AccountInterface, matchId: string, pa
 }
 
 // ---------- Reads ----------
-
-function safeBigIntEq(a: unknown, b: bigint): boolean {
-  try {
-    return BigInt(a as string | number | bigint) === b;
-  } catch (e) {
-    if (process.env.NODE_ENV === "development") console.warn("[stakedMatch] safeBigIntEq coercion failed:", a, e);
-    return false;
-  }
-}
-
-function safeNum(v: unknown): number {
-  if (v === undefined || v === null) return 0;
-  const n = Number(v);
-  if (!Number.isFinite(n)) {
-    if (process.env.NODE_ENV === "development") console.warn("[stakedMatch] safeNum coerced to 0:", v);
-    return 0;
-  }
-  return n;
-}
-
-function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
-  const out: T[] = [];
-  for (const entry of iter) {
-    if (!entry || typeof entry !== "object") continue;
-    for (const v of Object.values(entry as Record<string, unknown>)) {
-      if (v && typeof v === "object") out.push(v as T);
-    }
-  }
-  return out;
-}
 
 export interface MatchEscrowData {
   a: [number, number, number];

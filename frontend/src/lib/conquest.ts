@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import { CONQUEST_ADDRESS } from "./contractAddresses";
-import { toriiSql, toNum, sqlHex } from "./toriiSql";
+import { toriiSql, toNum, sqlAddr } from "./toriiSql";
+import { usePoll } from "./usePoll";
 
 const POLL_INTERVAL = 4000;
 
@@ -24,13 +25,13 @@ export interface PresetDefenseData {
 export function usePresetDefense(playerAddress: string | null): PresetDefenseData | null {
   const [data, setData] = useState<PresetDefenseData | null>(null);
 
-  useEffect(() => {
-    if (!playerAddress) return;
-
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
+      if (!playerAddress) return;
       const rows = await toriiSql<Record<string, number | string>>(
-        `SELECT p0_p0, p0_p1, p0_p2, p0_g0, p0_g1, p0_g2, p1_p0, p1_p1, p1_p2, p1_g0, p1_g1, p1_g2, p2_p0, p2_p1, p2_p2, p2_g0, p2_g1, p2_g2, p3_p0, p3_p1, p3_p2, p3_g0, p3_g1, p3_g2, preset_count FROM "siege_dojo-PresetDefense" WHERE player = ${sqlHex(playerAddress)}`,
+        `SELECT p0_p0, p0_p1, p0_p2, p0_g0, p0_g1, p0_g2, p1_p0, p1_p1, p1_p2, p1_g0, p1_g1, p1_g2, p2_p0, p2_p1, p2_p2, p2_g0, p2_g1, p2_g2, p3_p0, p3_p1, p3_p2, p3_g0, p3_g1, p3_g2, preset_count FROM "siege_dojo-PresetDefense" WHERE player = ${sqlAddr(playerAddress)}`,
       );
+      if (!alive()) return;
 
       const node = rows[0];
       if (!node) {
@@ -46,19 +47,11 @@ export function usePresetDefense(playerAddress: string | null): PresetDefenseDat
       ];
 
       setData({ slots, presetCount: toNum(node.preset_count) });
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [playerAddress]);
+    },
+    POLL_INTERVAL,
+    [playerAddress],
+    !!playerAddress,
+  );
 
   return data;
 }

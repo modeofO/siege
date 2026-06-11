@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isDevMode } from "@/app/providers";
+import { useToriiHealth } from "@/lib/usePoll";
 import { AccountSelector } from "./AccountSelector";
 import { ConnectWallet } from "./ConnectWallet";
 
@@ -28,6 +29,7 @@ function useTrackLastMatch() {
 
 export function Navbar() {
   useTrackLastMatch();
+  const toriiHealthy = useToriiHealth();
 
   return (
     <nav className="border-b border-[#3d3428] bg-[#0d0b0a]/80 backdrop-blur-sm sticky top-0 z-50">
@@ -46,7 +48,17 @@ export function Navbar() {
             WORLD
           </Link>
         </div>
-        {isDevMode() ? <AccountSelector /> : <ConnectWallet />}
+        <div className="flex items-center gap-3">
+          {!toriiHealthy && (
+            <span
+              className="text-[10px] tracking-wider text-[#b5523a] border border-[#b5523a]/40 rounded px-2 py-0.5"
+              title="Game data is not refreshing — the indexer is unreachable. Shown values may be stale."
+            >
+              CONNECTION LOST
+            </span>
+          )}
+          {isDevMode() ? <AccountSelector /> : <ConnectWallet />}
+        </div>
       </div>
     </nav>
   );

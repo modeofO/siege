@@ -34,7 +34,6 @@ Do not rename Cairo models or entrypoints to match UI copy.
 
 - T2 crafting calls `AbilityToken.burn`, so the live AbilityToken `burner` must be set to `crafting_1v1`. If T2 crafting reverts with `Not burner`, rerun `scripts/setup-ability-token.sh`.
 - `frontend/src/bindings/typescript/*.gen.ts` are generated and still contain removed 2v2 types until the next codegen; don't hand-edit them.
-- `frontend/src/lib/__tests__/stakedMatch.test.ts` fails when `NEXT_PUBLIC_NETWORK` is devnet and `manifest_dev.json` lacks `world_system` (address resolves to ""). Pre-existing; not a regression signal by itself.
 
 ## Toolchain
 

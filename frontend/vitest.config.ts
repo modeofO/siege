@@ -9,5 +9,10 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    env: {
+      // manifest_dev.json predates world_system, so the devnet address
+      // resolves to "" without this; tests need a deterministic value.
+      NEXT_PUBLIC_WORLD_SYSTEM_ADDRESS: "0x7757e57e3ad277057757e57e3ad27705",
+    },
   },
 });

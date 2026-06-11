@@ -1,7 +1,7 @@
 // frontend/src/lib/worldState.ts
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder, KeysClause } from "@dojoengine/sdk";
 import {
@@ -10,26 +10,10 @@ import {
   type PlayerKingdom as PlayerKingdomModel,
 } from "@/bindings/typescript/models.gen";
 import { toriiSql, toNum } from "./toriiSql";
+import { safeNum, flatModels } from "./modelUtils";
+import { usePoll } from "./usePoll";
 
 const POLL_INTERVAL = 4000;
-
-function safeNum(v: unknown): number {
-  if (v === undefined || v === null) return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-}
-
-function flatModels<T extends object>(store: unknown): T[] {
-  const iter = Array.isArray(store) ? store : Object.values(store as Record<string, unknown>);
-  const out: T[] = [];
-  for (const entry of iter) {
-    if (!entry || typeof entry !== "object") continue;
-    for (const v of Object.values(entry as Record<string, unknown>)) {
-      if (v && typeof v === "object") out.push(v as T);
-    }
-  }
-  return out;
-}
 
 // --- Parcel data ---
 
@@ -46,8 +30,8 @@ export function useWorldParcels(refreshKey?: number) {
   const [parcels, setParcels] = useState<ParcelData[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const doFetch = async () => {
+  usePoll(
+    async (alive) => {
       const rows = await toriiSql<{
         parcel_id: number;
         col: number;
@@ -56,6 +40,7 @@ export function useWorldParcels(refreshKey?: number) {
         owner: string;
         is_home: number;
       }>('SELECT parcel_id, col, row, parcel_type, owner, is_home FROM "siege_dojo-Parcel"');
+      if (!alive()) return;
 
       if (rows.length > 0) {
         setParcels(
@@ -70,19 +55,10 @@ export function useWorldParcels(refreshKey?: number) {
         );
       }
       setLoading(false);
-    };
-
-    const t = setTimeout(() => {
-      void doFetch();
-    }, 0);
-    const i = setInterval(() => {
-      void doFetch();
-    }, POLL_INTERVAL);
-    return () => {
-      clearTimeout(t);
-      clearInterval(i);
-    };
-  }, [refreshKey]);
+    },
+    POLL_INTERVAL,
+    [refreshKey],
+  );
 
   return { parcels, loading };
 }
