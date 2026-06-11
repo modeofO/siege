@@ -8,10 +8,11 @@ description: How to spend a round budget.
 Your round budget is:
 
 ```text
-10 + number of resource nodes you control
+10 + number of resource nodes you control + endgame escalation
 ```
 
-The maximum is 13.
+Endgame escalation adds +1 per round above 6, so rounds 7, 8, 9, and 10 add
++1, +2, +3, and +4. The maximum is 17 (round 10 with all three nodes).
 
 ## Spend categories
 
@@ -19,7 +20,7 @@ The maximum is 13.
 | ------------------------- | ----------------------------------------------- |
 | `p0`, `p1`, `p2`          | Attack pressure at gates 0, 1, and 2.           |
 | `g0`, `g1`, `g2`          | Defense at gates 0, 1, and 2.                   |
-| `repair`                  | Vault healing, capped at 3 during resolution.   |
+| `repair`                  | Vault healing. Costs 2 budget per HP, uncapped. |
 | `nc0`, `nc1`, `nc2`       | Contest values for Forge, Quarry, and Grove.    |
 | `trap0`, `trap1`, `trap2` | Hidden traps on owned nodes. Each trap costs 2. |
 

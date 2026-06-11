@@ -174,7 +174,15 @@ pub mod actions_1v1 {
                 }
                 i += 1;
             };
-            10 + bonus
+            // Endgame escalation, mirrored from commit_reveal_1v1::calc_budget:
+            // rounds 7-10 add +1 budget per round above 6.
+            let state: MatchState1v1 = world.read_model(match_id);
+            let escalation: u8 = if state.current_round > 6 {
+                (state.current_round - 6).try_into().unwrap()
+            } else {
+                0
+            };
+            10 + bonus + escalation
         }
 
         fn set_resource_config(

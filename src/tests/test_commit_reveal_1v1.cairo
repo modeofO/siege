@@ -176,10 +176,10 @@ mod tests {
         let (mut world, _, cr_sys, match_id) = setup();
 
         let salt: felt252 = 42;
-        // Player A: atk [3,2,1], def [2,1,0], repair 1, nodes [0,0,0] = total 10
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
-        // Player B: atk [2,2,2], def [2,1,0], repair 1, nodes [0,0,0] = total 10
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        // Player A: atk [3,2,1], def [2,1,0], repair 0, nodes [0,0,0] = total 9
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        // Player B: atk [2,2,2], def [2,1,0], repair 0, nodes [0,0,0] = total 9
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -187,9 +187,9 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         testing::set_contract_address(contract_address_const::<0x2>());
-        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         // Explicitly call resolve_round after both reveals
         let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
@@ -199,7 +199,7 @@ mod tests {
         let state: siege_dojo::models::match_state_1v1::MatchState1v1 = world.read_model(match_id);
         // Damage to B: max(0,3-2)+max(0,2-1)+max(0,1-0) = 1+1+1 = 3
         // Damage to A: max(0,2-2)+max(0,2-1)+max(0,2-0) = 0+1+2 = 3
-        // Repair A=1, B=1. HP_A = 50+1->50(cap), -3 = 47. HP_B = 50+1->50(cap), -3 = 47
+        // No repair. HP_A = 50 - 3 = 47. HP_B = 50 - 3 = 47
         assert(state.vault_a_hp == 47, 'vault_a should be 47');
         assert(state.vault_b_hp == 47, 'vault_b should be 47');
         assert(state.current_round == 2, 'should advance to round 2');
@@ -230,7 +230,7 @@ mod tests {
 
         let salt: felt252 = 42;
         // Commit with one set of values
-        let h = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h);
@@ -257,8 +257,8 @@ mod tests {
 
         let salt: felt252 = 42;
         // Player A activates ability 1 (Siege Sword) targeting gate 0
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -266,7 +266,7 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
 
         // Verify ability stored in RoundMoves1v1
         let rm: RoundMoves1v1 = world.read_model((match_id, 1_u32));
@@ -293,8 +293,8 @@ mod tests {
         });
 
         let salt: felt252 = 42;
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -302,7 +302,7 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
     }
 
     #[test]
@@ -310,10 +310,10 @@ mod tests {
         let (mut world, _, cr_sys, match_id) = setup();
 
         let salt: felt252 = 42;
-        // Player A: atk [3,2,1], def [2,1,0], repair 1, nodes [0,0,0] = total 10
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
-        // Player B: atk [2,2,2], def [2,1,0], repair 1, nodes [0,0,0] = total 10
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        // Player A: atk [3,2,1], def [2,1,0], repair 0, nodes [0,0,0] = total 9
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        // Player B: atk [2,2,2], def [2,1,0], repair 0, nodes [0,0,0] = total 9
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -321,9 +321,9 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         testing::set_contract_address(contract_address_const::<0x2>());
-        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         // After both reveals, the round should NOT have advanced — resolve_round was not called.
         let state: siege_dojo::models::match_state_1v1::MatchState1v1 = world.read_model(match_id);
@@ -335,8 +335,8 @@ mod tests {
         let (mut world, _, cr_sys, match_id) = setup();
 
         let salt: felt252 = 42;
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -344,9 +344,9 @@ mod tests {
         cr_sys.commit(match_id, h_b);
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         testing::set_contract_address(contract_address_const::<0x2>());
-        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         // Explicitly call resolve_round — this should advance the round.
         let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();
@@ -363,8 +363,8 @@ mod tests {
         let (mut world, _, cr_sys, match_id) = setup();
 
         let salt: felt252 = 42;
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
-        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_b = hash_1v1_move(salt, 2, 2, 2, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
@@ -373,7 +373,7 @@ mod tests {
 
         // Only player A reveals
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         // Calling resolve_round with only one reveal should panic
         let (res_addr, _) = world.dns(@"resolution_1v1").unwrap();

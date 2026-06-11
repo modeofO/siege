@@ -72,7 +72,11 @@ Reveal hash order:
 salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, ability_id, ability_target
 ```
 
-Budget is `10 + owned_resource_nodes`. Trap cost is 2 each. Repair is capped at 3 during resolution.
+Budget is `10 + owned_resource_nodes + max(0, round - 6)` (endgame escalation, rounds 7-10). Trap cost is 2 each. Repair costs 2 budget per HP and is uncapped during resolution.
+
+Node contests resolve before gate damage: owning node `i` grants +1 defense at gate `i` the same round it is captured or held, plus +1 budget next round.
+
+Stone Cloak T1 halves gate damage; T2 halves gate, trap, and Ember Blast damage (full gate immunity was removed in the balance pass).
 
 Gate modifier codes:
 

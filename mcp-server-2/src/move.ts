@@ -21,7 +21,13 @@ const tripleBinary = z.array(z.number().int().min(0).max(1)).length(3);
 export const moveShape = {
   attack: tripleNonNeg.describe("[p0, p1, p2] — pressure on each gate"),
   defense: tripleNonNeg.describe("[g0, g1, g2] — garrison on each gate"),
-  repair: z.number().int().min(0).max(3).default(0).describe("Repair allocation, max 3"),
+  repair: z
+    .number()
+    .int()
+    .min(0)
+    .max(8)
+    .default(0)
+    .describe("Vault HP to repair. Costs 2 budget per HP; limited only by budget."),
   nodes: tripleNonNeg.describe("[nc0, nc1, nc2] — node contest pressure"),
   traps: tripleBinary
     .default([0, 0, 0])
@@ -69,7 +75,17 @@ export function moveAllocationFromInput(input: MoveInput): MoveAllocation1v1 {
 }
 
 /**
+ * Round budget, mirroring commit_reveal_1v1::calc_budget: 10 base,
+ * +1 per owned node, +1 per round above 6 (endgame escalation, rounds 7-10).
+ */
+export function roundBudget(ownedNodes: number, round: number): number {
+  const escalation = round > 6 ? round - 6 : 0;
+  return 10 + ownedNodes + escalation;
+}
+
+/**
  * Verify a move fits within `budget`. Returns the total spent.
+ * Repair costs 2 budget per HP; traps cost 2 each; everything else is 1.
  * Throws with a precise message on overspend so the agent gets a usable signal.
  */
 export function validateMove(move: MoveAllocation1v1, budget: number): number {
@@ -77,7 +93,7 @@ export function validateMove(move: MoveAllocation1v1, budget: number): number {
   const total =
     move.attack.reduce((s, n) => s + n, 0) +
     move.defense.reduce((s, n) => s + n, 0) +
-    move.repair +
+    move.repair * 2 +
     move.nodes.reduce((s, n) => s + n, 0) +
     trapCost;
 

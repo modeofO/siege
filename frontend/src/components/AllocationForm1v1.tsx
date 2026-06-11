@@ -59,8 +59,15 @@ export function AllocationForm1v1({
   onAbilitySelect,
 }: AllocationForm1v1Props) {
   const busy = submitting || confirming;
+  // Repair (index 6) costs 2 budget per HP; traps (10-12) cost 2 each.
+  const spendOf = (alloc: number[]) => {
+    const trapCost = ((alloc[10] || 0) + (alloc[11] || 0) + (alloc[12] || 0)) * 2;
+    const repairCost = (alloc[6] || 0) * 2;
+    const pointCost = alloc.slice(0, 10).reduce((a, b) => a + b, 0) - (alloc[6] || 0);
+    return pointCost + repairCost + trapCost;
+  };
   const trapCost = ((allocations[10] || 0) + (allocations[11] || 0) + (allocations[12] || 0)) * 2;
-  const allocationTotal = allocations.slice(0, 10).reduce((a, b) => a + b, 0);
+  const allocationTotal = spendOf(allocations) - trapCost;
   const total = allocationTotal + trapCost;
   const remaining = budget - total;
   const budgetExact = remaining === 0;
@@ -71,9 +78,7 @@ export function AllocationForm1v1({
     const clamped = Math.max(0, value);
     const newAlloc = [...allocations];
     newAlloc[index] = clamped;
-    const newTrapCost = ((newAlloc[10] || 0) + (newAlloc[11] || 0) + (newAlloc[12] || 0)) * 2;
-    const newTotal = newAlloc.slice(0, 10).reduce((a, b) => a + b, 0) + newTrapCost;
-    if (newTotal <= budget) {
+    if (spendOf(newAlloc) <= budget) {
       onChange(newAlloc);
     }
   };
@@ -87,9 +92,7 @@ export function AllocationForm1v1({
       newAlloc[trapIdx] = 1;
       newAlloc[7 + nodeIndex] = 0;
     }
-    const newTrapCost = ((newAlloc[10] || 0) + (newAlloc[11] || 0) + (newAlloc[12] || 0)) * 2;
-    const newTotal = newAlloc.slice(0, 10).reduce((a, b) => a + b, 0) + newTrapCost;
-    if (newTotal <= budget) {
+    if (spendOf(newAlloc) <= budget) {
       onChange(newAlloc);
     }
   };
@@ -217,7 +220,7 @@ export function AllocationForm1v1({
           <input
             type="range"
             min={0}
-            max={3}
+            max={Math.floor(budget / 2)}
             value={allocations[6] || 0}
             onChange={(e) => handleChange(6, parseInt(e.target.value))}
             className="flex-1 accent-[#66cc66] text-[#66cc66] h-2 cursor-pointer"
@@ -225,12 +228,12 @@ export function AllocationForm1v1({
           <input
             type="number"
             min={0}
-            max={3}
+            max={Math.floor(budget / 2)}
             value={allocations[6] || 0}
             onChange={(e) => handleChange(6, Math.max(0, parseInt(e.target.value) || 0))}
             className="w-8 text-center bg-[#252019] border border-[#3d3428] rounded text-sm py-0.5 text-[#66cc66]"
           />
-          <span className="text-[10px] text-[#7a7060]">max 3</span>
+          <span className="text-[10px] text-[#7a7060]">2 pts / HP</span>
         </div>
       </div>
 

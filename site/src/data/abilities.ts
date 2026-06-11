@@ -146,7 +146,7 @@ export const ABILITIES: Ability[] = [
     name: "Stone Cloak",
     tier: 2,
     flavor: "Quarry and thread woven so tight the stones hold their breath.",
-    effect: "Reduces all gate damage taken this round to zero.",
+    effect: "Halves all gate, trap, and Ember Blast damage taken this round.",
     cost: [
       { token: "stone", amount: 30 },
       { token: "linen", amount: 20 },

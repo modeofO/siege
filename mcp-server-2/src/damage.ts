@@ -21,10 +21,30 @@ export interface DamageBreakdown {
 
 const min3 = (n: number) => (n > 3 ? 3 : n);
 
+/** Per-gate node owner used for the +1 node defense bonus: "a", "b", or null. */
+export type NodeDefenseOwner = "a" | "b" | null;
+
+/**
+ * Node contests resolve before gate damage on-chain: the winner of node g
+ * (ties keep the previous owner) gets +1 defense at gate g the same round.
+ */
+export function postContestOwners(
+  pre: NodeDefenseOwner[],
+  aContests: number[],
+  bContests: number[],
+): NodeDefenseOwner[] {
+  return [0, 1, 2].map((g) => {
+    if (aContests[g] > bContests[g]) return "a";
+    if (bContests[g] > aContests[g]) return "b";
+    return pre[g];
+  });
+}
+
 export function effectiveMoves(
   gates: number[] | null | undefined,
   a: { attack: number[]; defense: number[] } | null | undefined,
   b: { attack: number[]; defense: number[] } | null | undefined,
+  nodeOwners?: NodeDefenseOwner[],
 ): { player_a: MovePerGate[]; player_b: MovePerGate[] } | null {
   if (!gates || !a || !b) return null;
   const out_a: MovePerGate[] = [];
@@ -42,6 +62,9 @@ export function effectiveMoves(
       [aa, ad] = [ad, aa];
       [ba, bd] = [bd, ba];
     }
+    // Node defense applies after caps/swaps, mirroring resolution_1v1.
+    if (nodeOwners?.[g] === "a") ad += 1;
+    if (nodeOwners?.[g] === "b") bd += 1;
     out_a.push({ attack: aa, defense: ad });
     out_b.push({ attack: ba, defense: bd });
   }
@@ -111,6 +134,6 @@ export function predictedDamage(
     unused_def_b: unused_b,
     total_to_a: dmg_a[0] + dmg_a[1] + dmg_a[2],
     total_to_b: dmg_b[0] + dmg_b[1] + dmg_b[2],
-    note: "Excludes ability effects (Fortify, Stone Cloak, Hex, Ember Blast, Siege Sword) and trap damage. Exact when both ability_id == 0.",
+    note: "Excludes ability effects (Fortify, Stone Cloak, Hex, Ember Blast, Siege Sword) and trap damage. Includes +1 node defense when node owners are supplied. Exact when both ability_id == 0.",
   };
 }

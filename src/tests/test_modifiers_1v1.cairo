@@ -181,7 +181,9 @@ mod tests {
     fn test_mirror_gate_swaps_values() {
         // Gate 0 has Mirror (2), others Normal
         // A: atk [0,0,0], def [5,0,0], repair 0, nodes [2,2,1] = 10
-        // B: atk [0,0,0], def [0,0,0], repair 0, nodes [5,3,2] = 10
+        // B: atk [0,0,0], def [0,0,0], repair 0, nodes [0,0,0] = 0
+        // (B contests no nodes so A's captures, not B's, decide node defense;
+        //  B owns nothing, so no +1 node defense interferes with the swap)
         // At gate 0 with Mirror: A's attack(0) becomes defense, A's defense(5) becomes attack
         // B's attack(0) becomes defense, B's defense(0) becomes attack
         // Damage to B at gate 0: max(0, 5-0) = 5 (A's defense became attack, B's attack became defense)
@@ -189,7 +191,7 @@ mod tests {
         let (mut world, match_id) = setup_with_modifiers(
             2, 0, 0,
             (0, 0, 0, 5, 0, 0, 0, 2, 2, 1),
-            (0, 0, 0, 0, 0, 0, 0, 5, 3, 2),
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
@@ -218,7 +220,9 @@ mod tests {
     fn test_overflow_splits_damage() {
         // Gate 0 has Overflow (4), others Normal
         // A: atk [6,0,0], def [0,2,2], repair 0, nodes [0,0,0] = 10
-        // B: atk [0,2,2], def [0,0,0], repair 0, nodes [3,2,1] = 10
+        // B: atk [0,2,2], def [0,0,0], repair 0, nodes [0,0,0] = 4
+        // (no node contests: captured nodes would grant +1 defense and
+        //  absorb the overflow being asserted here)
         // Gate 0 overflow: A attacks 6, B defends 0 -> overflow = 6
         // 6/2 = 3 per gate -> gates 1 and 2 each get +3 bonus damage
         // Gate 1 normal: A atk 0 vs B def 0 = 0 + 3 overflow = 3
@@ -227,7 +231,7 @@ mod tests {
         let (mut world, match_id) = setup_with_modifiers(
             4, 0, 0,
             (6, 0, 0, 0, 2, 2, 0, 0, 0, 0),
-            (0, 2, 2, 0, 0, 0, 0, 3, 2, 1),
+            (0, 2, 2, 0, 0, 0, 0, 0, 0, 0),
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
@@ -242,13 +246,15 @@ mod tests {
     fn test_overflow_odd_rounds_down() {
         // Gate 0 has Overflow (4), others Normal
         // A: atk [5,0,0], def [0,0,0], repair 0, nodes [2,2,1] = 10
-        // B: atk [0,0,0], def [0,0,0], repair 0, nodes [5,3,2] = 10
+        // B: atk [0,0,0], def [0,0,0], repair 0, nodes [0,0,0] = 0
+        // (A captures all nodes; B never attacks, so A's node defense is
+        //  irrelevant and B has no node defense to blunt the overflow)
         // Overflow at gate 0: 5 - 0 = 5. 5/2 = 2 per gate (rounded down)
         // Total damage to B: 2 + 2 = 4
         let (mut world, match_id) = setup_with_modifiers(
             4, 0, 0,
             (5, 0, 0, 0, 0, 0, 0, 2, 2, 1),
-            (0, 0, 0, 0, 0, 0, 0, 5, 3, 2),
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         );
 
         let state: MatchState1v1 = world.read_model(match_id);

@@ -211,13 +211,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_trap_over_budget_rejected() {
-        // Player A owns node 0 (budget = 11).
-        // A: atk [5,4,0], def [0,0,0], repair 0, nodes [1,0,0], traps [1,0,0]
-        // Total = 5+4+0 + 0+0+0 + 0 + 1+0+0 + (1*2) = 10+2 = 12 > 11. Should panic.
+        // Round 10 budget = 10 + 1 node + 4 escalation = 15.
+        // A: atk [5,5,4], def [0,0,0], repair 0, nodes [0,0,0], traps [1,0,0]
+        // Total = 5+5+4 + (1*2) = 16 > 15. Should panic.
         // B: atk [0,0,0], def [0,0,0], repair 0, nodes [0,0,0], traps [0,0,0]
         let (_world, _match_id) = setup_with_traps(
             [NodeOwner::TeamA, NodeOwner::None, NodeOwner::None],
-            (5, 4, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0),
+            (5, 5, 4, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0),
             (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         );
     }

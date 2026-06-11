@@ -56,7 +56,18 @@ pub mod commit_reveal_1v1 {
         }
     }
 
-    fn calc_budget(world: @dojo::world::WorldStorage, match_id: u64, is_player_a: bool) -> u8 {
+    // Endgame escalation: rounds 7-10 add +1 budget per round above 6, so
+    // late rounds open up bigger plays instead of stalling out.
+    // Mirrored in actions_1v1::get_budget_1v1; keep both in sync.
+    fn round_escalation(round: u32) -> u8 {
+        if round > 6 {
+            (round - 6).try_into().unwrap()
+        } else {
+            0
+        }
+    }
+
+    fn calc_budget(world: @dojo::world::WorldStorage, match_id: u64, is_player_a: bool, round: u32) -> u8 {
         let target = if is_player_a { NodeOwner::TeamA } else { NodeOwner::TeamB };
         let mut bonus: u8 = 0;
         let mut i: u8 = 0;
@@ -67,7 +78,7 @@ pub mod commit_reveal_1v1 {
             }
             i += 1;
         };
-        10 + bonus
+        10 + bonus + round_escalation(round)
     }
 
     #[abi(embed_v0)]
@@ -153,13 +164,15 @@ pub mod commit_reveal_1v1 {
             let computed = h.finalize();
             assert(computed == c.hash, 'Invalid reveal');
 
-            // Budget check: allocations + trap costs <= budget
+            // Budget check: allocations + trap costs <= budget.
+            // Repair costs 2 budget per HP; traps cost 2 each.
             let is_player_a = role == ROLE_A;
-            let budget = calc_budget(@world, match_id, is_player_a);
+            let budget = calc_budget(@world, match_id, is_player_a, round);
             let trap_cost: u16 = (trap0.into() + trap1.into() + trap2.into()) * 2;
+            let repair_cost: u16 = repair.into() * 2;
             let total: u16 = p0.into() + p1.into() + p2.into()
                 + g0.into() + g1.into() + g2.into()
-                + repair.into()
+                + repair_cost
                 + nc0.into() + nc1.into() + nc2.into()
                 + trap_cost;
             assert(total <= budget.into(), 'Over budget');

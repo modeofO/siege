@@ -105,8 +105,11 @@ function ownerToNode(owner: string): NodeOwner {
   return "neutral";
 }
 
-function computeBudget(nodes: NodeOwner[], team: "teamA" | "teamB"): number {
-  return 10 + nodes.filter((n) => n === team).length;
+// Mirrors commit_reveal_1v1::calc_budget: 10 base, +1 per owned node,
+// +1 per round above 6 (endgame escalation, rounds 7-10).
+export function computeBudget(nodes: NodeOwner[], team: "teamA" | "teamB", round: number): number {
+  const escalation = round > 6 ? round - 6 : 0;
+  return 10 + nodes.filter((n) => n === team).length + escalation;
 }
 
 function computeGateBreakdown(
@@ -297,8 +300,8 @@ export function useMatchState1v1(matchId: string | null) {
       vaultAHp,
       vaultBHp,
       nodes,
-      budgetA: computeBudget(nodes, "teamA"),
-      budgetB: computeBudget(nodes, "teamB"),
+      budgetA: computeBudget(nodes, "teamA", round),
+      budgetB: computeBudget(nodes, "teamB", round),
       winner,
     };
   }, [matchId, matchStates, nodeStates, roundMoves]);

@@ -106,6 +106,39 @@ pub mod resolution_1v1 {
             let b_atk: [u8; 3] = [rm.b_p0, rm.b_p1, rm.b_p2];
             let b_def: [u8; 3] = [rm.b_g0, rm.b_g1, rm.b_g2];
 
+            // Snapshot node owners before contest resolution (for trap detection)
+            let pre_n0: NodeState = world.read_model((match_id, 0_u8));
+            let pre_n1: NodeState = world.read_model((match_id, 1_u8));
+            let pre_n2: NodeState = world.read_model((match_id, 2_u8));
+            let pre_node_owners: [NodeOwner; 3] = [pre_n0.owner, pre_n1.owner, pre_n2.owner];
+
+            // Node contests resolve BEFORE gate damage: owning node i grants
+            // +1 defense at gate i in the same round it is captured, so node
+            // investment pays off immediately (budget bonus still lands next
+            // round, via calc_budget reading post-contest ownership).
+            let mut n: u8 = 0;
+            while n < 3 {
+                let (contest_a, contest_b) = if n == 0 {
+                    (rm.a_nc0, rm.b_nc0)
+                } else if n == 1 {
+                    (rm.a_nc1, rm.b_nc1)
+                } else {
+                    (rm.a_nc2, rm.b_nc2)
+                };
+
+                if contest_a > contest_b {
+                    world.write_model(@NodeState { match_id, node_index: n, owner: NodeOwner::TeamA });
+                } else if contest_b > contest_a {
+                    world.write_model(@NodeState { match_id, node_index: n, owner: NodeOwner::TeamB });
+                }
+                n += 1;
+            };
+
+            let post_n0: NodeState = world.read_model((match_id, 0_u8));
+            let post_n1: NodeState = world.read_model((match_id, 1_u8));
+            let post_n2: NodeState = world.read_model((match_id, 2_u8));
+            let post_node_owners: [NodeOwner; 3] = [post_n0.owner, post_n1.owner, post_n2.owner];
+
             // Per-gate damage calculation with modifiers
             // damage_to_b[i] = damage dealt by A to B's vault at gate i
             // damage_to_a[i] = damage dealt by B to A's vault at gate i
@@ -180,6 +213,15 @@ pub mod resolution_1v1 {
                     }
                 }
 
+                // --- Node defense: owning node g grants +1 defense at gate g.
+                // Applied after modifier caps/swaps, like Fortify.
+                let node_owner = *post_node_owners.span()[g];
+                if node_owner == NodeOwner::TeamA {
+                    ad = ad + 1;
+                } else if node_owner == NodeOwner::TeamB {
+                    bd = bd + 1;
+                }
+
                 if modifier == MOD_DEADLOCK {
                     // No damage at this gate
                     // damage stays 0
@@ -239,41 +281,32 @@ pub mod resolution_1v1 {
             let b_type_cloak = ability_type_from_token(b_ability);
             let b_tier_cloak = ability_tier_from_token(b_ability);
 
+            // T1 and T2 both halve gate damage (floor). T2 additionally halves
+            // trap damage and Ember Blast direct damage further down — full
+            // gate immunity made a T2 cloak round a free turn.
             if a_type_cloak == 2 {
-                if a_tier_cloak == 1 {
-                    // T1: halve (integer division, floor)
-                    damage_to_a = [
-                        *damage_to_a.span()[0] / 2,
-                        *damage_to_a.span()[1] / 2,
-                        *damage_to_a.span()[2] / 2,
-                    ];
-                    overflow_to_a = [
-                        *overflow_to_a.span()[0] / 2,
-                        *overflow_to_a.span()[1] / 2,
-                        *overflow_to_a.span()[2] / 2,
-                    ];
-                } else {
-                    // T2: zero
-                    damage_to_a = [0, 0, 0];
-                    overflow_to_a = [0, 0, 0];
-                }
+                damage_to_a = [
+                    *damage_to_a.span()[0] / 2,
+                    *damage_to_a.span()[1] / 2,
+                    *damage_to_a.span()[2] / 2,
+                ];
+                overflow_to_a = [
+                    *overflow_to_a.span()[0] / 2,
+                    *overflow_to_a.span()[1] / 2,
+                    *overflow_to_a.span()[2] / 2,
+                ];
             }
             if b_type_cloak == 2 {
-                if b_tier_cloak == 1 {
-                    damage_to_b = [
-                        *damage_to_b.span()[0] / 2,
-                        *damage_to_b.span()[1] / 2,
-                        *damage_to_b.span()[2] / 2,
-                    ];
-                    overflow_to_b = [
-                        *overflow_to_b.span()[0] / 2,
-                        *overflow_to_b.span()[1] / 2,
-                        *overflow_to_b.span()[2] / 2,
-                    ];
-                } else {
-                    damage_to_b = [0, 0, 0];
-                    overflow_to_b = [0, 0, 0];
-                }
+                damage_to_b = [
+                    *damage_to_b.span()[0] / 2,
+                    *damage_to_b.span()[1] / 2,
+                    *damage_to_b.span()[2] / 2,
+                ];
+                overflow_to_b = [
+                    *overflow_to_b.span()[0] / 2,
+                    *overflow_to_b.span()[1] / 2,
+                    *overflow_to_b.span()[2] / 2,
+                ];
             }
 
             // Distribute reflection: each reflection gate splits damage to other gates,
@@ -348,9 +381,10 @@ pub mod resolution_1v1 {
                 }
             }
 
-            // Repairs (capped at 3)
-            let repair_a = if rm.a_repair > 3 { 3_u8 } else { rm.a_repair };
-            let repair_b = if rm.b_repair > 3 { 3_u8 } else { rm.b_repair };
+            // Repairs: uncapped here — the reveal budget check already prices
+            // repair at 2 budget per HP, so budget is the only limit.
+            let repair_a = rm.a_repair;
+            let repair_b = rm.b_repair;
 
             let mut hp_a = state.vault_a_hp;
             let mut hp_b = state.vault_b_hp;
@@ -370,38 +404,16 @@ pub mod resolution_1v1 {
             let b_tier_ember = ability_tier_from_token(b_ability);
 
             if a_type_ember == 3 {
-                let dmg: u8 = if a_tier_ember == 1 { 2 } else { 6 };
+                let mut dmg: u8 = if a_tier_ember == 1 { 2 } else { 6 };
+                // T2 Stone Cloak halves incoming Ember Blast damage
+                if b_type_cloak == 2 && b_tier_cloak == 2 { dmg = dmg / 2; }
                 if hp_b > dmg { hp_b = hp_b - dmg; } else { hp_b = 0; }
             }
             if b_type_ember == 3 {
-                let dmg: u8 = if b_tier_ember == 1 { 2 } else { 6 };
+                let mut dmg: u8 = if b_tier_ember == 1 { 2 } else { 6 };
+                if a_type_cloak == 2 && a_tier_cloak == 2 { dmg = dmg / 2; }
                 if hp_a > dmg { hp_a = hp_a - dmg; } else { hp_a = 0; }
             }
-
-            // Snapshot node owners before contest resolution (for trap detection)
-            let pre_n0: NodeState = world.read_model((match_id, 0_u8));
-            let pre_n1: NodeState = world.read_model((match_id, 1_u8));
-            let pre_n2: NodeState = world.read_model((match_id, 2_u8));
-            let pre_node_owners: [NodeOwner; 3] = [pre_n0.owner, pre_n1.owner, pre_n2.owner];
-
-            // Node contests (unaffected by gate modifiers)
-            let mut n: u8 = 0;
-            while n < 3 {
-                let (contest_a, contest_b) = if n == 0 {
-                    (rm.a_nc0, rm.b_nc0)
-                } else if n == 1 {
-                    (rm.a_nc1, rm.b_nc1)
-                } else {
-                    (rm.a_nc2, rm.b_nc2)
-                };
-
-                if contest_a > contest_b {
-                    world.write_model(@NodeState { match_id, node_index: n, owner: NodeOwner::TeamA });
-                } else if contest_b > contest_a {
-                    world.write_model(@NodeState { match_id, node_index: n, owner: NodeOwner::TeamB });
-                }
-                n += 1;
-            };
 
             // Trap damage: if a node changed owner and the previous owner had a trap, deal 5 damage
             let traps: RoundTraps1v1 = world.read_model((match_id, round));
@@ -413,8 +425,7 @@ pub mod resolution_1v1 {
             let mut tn: u8 = 0;
             while tn < 3 {
                 let pre_owner = *pre_node_owners.span()[tn.into()];
-                let post_node: NodeState = world.read_model((match_id, tn));
-                let post_owner = post_node.owner;
+                let post_owner = *post_node_owners.span()[tn.into()];
 
                 // Node ownership changed?
                 if pre_owner != post_owner {
@@ -430,6 +441,10 @@ pub mod resolution_1v1 {
                 }
                 tn += 1;
             };
+
+            // T2 Stone Cloak halves trap damage too
+            if a_type_cloak == 2 && a_tier_cloak == 2 { trap_dmg_to_a = trap_dmg_to_a / 2; }
+            if b_type_cloak == 2 && b_tier_cloak == 2 { trap_dmg_to_b = trap_dmg_to_b / 2; }
 
             // Apply trap damage (post-repair, cannot be repaired)
             if trap_dmg_to_a >= hp_a { hp_a = 0; } else { hp_a = hp_a - trap_dmg_to_a; }

@@ -70,7 +70,7 @@ export const ABILITIES: readonly AbilityDef[] = [
     type: 2,
     tier: 2,
     name: "Stone Cloak (T2)",
-    effect: "Zero all gate damage taken",
+    effect: "Halve all gate, trap, and Ember Blast damage taken",
     cost: { stone: 30, linen: 20, seeds: 10 },
     requiresT1: true,
   },

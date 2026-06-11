@@ -167,11 +167,11 @@ mod tests {
     }
 
     #[test]
-    fn test_t2_stone_cloak_zeros_damage() {
+    fn test_t2_stone_cloak_halves_damage() {
         // Player B has T2 Stone Cloak (token ID 7)
         // A: atk [5,3,2], budget=10
         // B: ability=7, budget=0
-        // T2 cloak zeros all gate damage. B HP: 50
+        // T2 cloak halves gate damage: 5/2 + 3/2 + 2/2 = 2+1+1 = 4. B HP: 46
         let (mut world, match_id) = setup(
             (0, 0, 0),
             (7, 0, 0),
@@ -179,7 +179,7 @@ mod tests {
             (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0),
         );
         let state: MatchState1v1 = world.read_model(match_id);
-        assert(state.vault_b_hp == 50, 'T2 cloak: B should be 50');
+        assert(state.vault_b_hp == 46, 'T2 cloak: B should be 46');
     }
 
     #[test]

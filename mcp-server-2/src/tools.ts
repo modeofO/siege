@@ -29,7 +29,7 @@ import { z } from "zod";
 import type { Config } from "./config.js";
 import type { StateClient } from "./state.js";
 import { buildMoveCommitHash1v1, generateSalt, revealCalldata } from "./hash.js";
-import { moveAllocationFromInput, moveShape, validateMove, type MoveInput } from "./move.js";
+import { moveAllocationFromInput, moveShape, roundBudget, validateMove, type MoveInput } from "./move.js";
 import { call, extractTxError, vrfRequestRandom } from "./tx.js";
 import { buildCreateStakedMatchCalls, buildJoinStakedMatchCalls } from "./stakedCalls.js";
 
@@ -80,9 +80,18 @@ function roleName(role: number): string {
   return `Unknown(${role})`;
 }
 
-function budgetFor(nodes: { owner: string }[], role: number): number {
+function nodeOwnersForDefense(nodes: { node_index: number; owner: string }[]): NodeDefenseOwner[] {
+  return [0, 1, 2].map((i) => {
+    const owner = nodes.find((n) => n.node_index === i)?.owner;
+    if (owner === "TeamA") return "a";
+    if (owner === "TeamB") return "b";
+    return null;
+  });
+}
+
+function budgetFor(nodes: { owner: string }[], role: number, round: number): number {
   const team = role === ROLE_A ? "TeamA" : "TeamB";
-  return 10 + nodes.filter((n) => n.owner === team).length;
+  return roundBudget(nodes.filter((n) => n.owner === team).length, round);
 }
 
 function phaseFor(
@@ -128,10 +137,12 @@ function describeModifiers(gates: number[] | null | undefined): Array<{
 
 import {
   effectiveMoves,
+  postContestOwners,
   predictedDamage,
   MOD_NARROW_PASS,
   MOD_MIRROR,
   type DamageBreakdown,
+  type NodeDefenseOwner,
 } from "./damage.js";
 
 const MAX_VAULT_HP = 50;
@@ -150,7 +161,7 @@ const ABILITY_TYPES: Record<number, { name: string; t1: string; t2: string }> = 
   2: {
     name: "StoneCloak",
     t1: "halve all gate damage taken",
-    t2: "zero all gate damage taken",
+    t2: "halve all gate, trap, and Ember Blast damage taken",
   },
   3: {
     name: "EmberBlast",
@@ -579,8 +590,8 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         vault_b_hp: state.vault_b_hp,
         my_role: myRole,
         my_role_name: myRole === null ? null : roleName(myRole),
-        player_a: { address: state.player_a, budget: budgetFor(nodes, ROLE_A) },
-        player_b: { address: state.player_b, budget: budgetFor(nodes, ROLE_B) },
+        player_a: { address: state.player_a, budget: budgetFor(nodes, ROLE_A, state.current_round) },
+        player_b: { address: state.player_b, budget: budgetFor(nodes, ROLE_B, state.current_round) },
         commits: round?.commit_count ?? 0,
         reveals: round?.reveal_count ?? 0,
         modifiers,
@@ -670,8 +681,21 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         defense: [moves.b_g0, moves.b_g1, moves.b_g2],
       };
       const both_revealed = moves.reveal_count >= 2;
+      // Node defense owners: for the current (unresolved) round, current node
+      // state is pre-contest, so apply this round's contests. For past rounds
+      // current ownership is already post-contest (exact for the most recent).
+      const nodeStates = await ctx.state.nodeStates(match_id).catch(() => null);
+      const owners = nodeStates
+        ? r === state.current_round
+          ? postContestOwners(
+              nodeOwnersForDefense(nodeStates),
+              [moves.a_nc0, moves.a_nc1, moves.a_nc2],
+              [moves.b_nc0, moves.b_nc1, moves.b_nc2],
+            )
+          : nodeOwnersForDefense(nodeStates)
+        : undefined;
       const effective = both_revealed
-        ? effectiveMoves(modifiers?.gates, a_move, b_move)
+        ? effectiveMoves(modifiers?.gates, a_move, b_move, owners)
         : null;
       const predicted =
         both_revealed && effective && modifiers?.gates
@@ -757,9 +781,13 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         phase: phaseFor(state, round),
         committed,
         revealed,
-        budget: budgetFor(nodes, role),
+        budget: budgetFor(nodes, role, state.current_round),
         vault_hp,
-        max_useful_repair: Math.min(3, Math.max(0, MAX_VAULT_HP - vault_hp)),
+        // Repair costs 2 budget per HP, so half the budget is the spend ceiling.
+        max_useful_repair: Math.min(
+          Math.floor(budgetFor(nodes, role, state.current_round) / 2),
+          Math.max(0, MAX_VAULT_HP - vault_hp),
+        ),
       };
     },
   );
@@ -1615,7 +1643,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           const r = roleFor(st, ctx.agentAddress);
           if (r !== null) {
             const ns = await ctx.state.nodeStates(args.match_id);
-            budget = budgetFor(ns, r);
+            budget = budgetFor(ns, r, st.current_round);
           }
         } catch { /* fall back to args.budget */ }
       }
@@ -1820,7 +1848,12 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           attack: [round.b_p0, round.b_p1, round.b_p2],
           defense: [round.b_g0, round.b_g1, round.b_g2],
         };
-        const eff = effectiveMoves(mods.gates, a_move, b_move);
+        const owners = postContestOwners(
+          nodeOwnersForDefense(preNodes),
+          [round.a_nc0, round.a_nc1, round.a_nc2],
+          [round.b_nc0, round.b_nc1, round.b_nc2],
+        );
+        const eff = effectiveMoves(mods.gates, a_move, b_move, owners);
         if (eff) predicted = predictedDamage(mods.gates, eff.player_a, eff.player_b);
       }
 

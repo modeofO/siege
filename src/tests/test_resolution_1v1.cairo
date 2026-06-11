@@ -163,34 +163,19 @@ mod tests {
 
     #[test]
     fn test_damage_calculation_1v1() {
-        // A: atk [5,3,2], def [0,0,0], repair 0, nodes [0,0,0]
-        // B: atk [0,0,0], def [2,2,2], repair 4, nodes [0,0,0]
+        // A: atk [5,3,2], def [0,0,0], repair 0, nodes [0,0,0] = 10
+        // B: atk [0,0,0], def [2,2,2], repair 2 (costs 4), nodes [0,0,0] = 10
         let (mut world, match_id) = setup_and_play_round(
             (5, 3, 2, 0, 0, 0, 0, 0, 0, 0),
-            (0, 0, 0, 2, 2, 2, 4, 0, 0, 0),
+            (0, 0, 0, 2, 2, 2, 2, 0, 0, 0),
         );
 
         let state: MatchState1v1 = world.read_model(match_id);
         // Damage to B: (5-2)+(3-2)+(2-2) = 3+1+0 = 4
         // Damage to A: (0-0)+(0-0)+(0-0) = 0
-        // Repair A=0, B=3 (capped). HP_A = 50+0=50, -0=50. HP_B = 50+3->50(cap), -4=46
+        // Repair A=0, B=2. HP_A = 50+0=50, -0=50. HP_B = 50+2->50(cap), -4=46
         assert(state.vault_a_hp == 50, 'vault_a should be 50');
         assert(state.vault_b_hp == 46, 'vault_b should be 46');
-    }
-
-    #[test]
-    fn test_repair_capped_at_3_1v1() {
-        // A: atk [0,0,0], def [0,0,0], repair 0, nodes [0,0,0]
-        // B: atk [0,0,0], def [0,0,0], repair 10, nodes [0,0,0]
-        let (mut world, match_id) = setup_and_play_round(
-            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0),
-            (0, 0, 0, 0, 0, 0, 10, 0, 0, 0),
-        );
-
-        let state: MatchState1v1 = world.read_model(match_id);
-        // Both take 0 damage. B repair capped at 3, but vault is already at 50, so still 50.
-        assert(state.vault_a_hp == 50, 'vault_a should be 50');
-        assert(state.vault_b_hp == 50, 'vault_b should be 50');
     }
 
     #[test]

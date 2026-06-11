@@ -189,20 +189,20 @@ mod tests {
         testing::set_block_timestamp(0);
         testing::set_contract_address(contract_address_const::<0x1>());
         let salt: felt252 = 42;
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
         cr_sys.commit(match_id, h_a);
 
         testing::set_block_timestamp(COMMIT_TIMEOUT);
         cr_sys.force_timeout(match_id);
 
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
         testing::set_block_timestamp(COMMIT_TIMEOUT + REVEAL_TIMEOUT);
         cr_sys.force_timeout(match_id);
 
         let state: MatchState1v1 = world.read_model(match_id);
         // A: atk 3+2+1=6 vs B zero defense -> B takes 6 (50-6=44).
-        // B zeroed: A takes 0, repairs 1 (capped at 50).
+        // B zeroed: A takes 0.
         assert(state.vault_a_hp == 50, 'a vault untouched');
         assert(state.vault_b_hp == 44, 'b vault takes full attack');
         assert(state.current_round == 2, 'round advanced');
@@ -304,14 +304,14 @@ mod tests {
         testing::set_block_timestamp(0);
         let salt: felt252 = 42;
         // A reveals honestly with ability 1; B commits but never reveals.
-        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+        let h_a = hash_1v1_move(salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
         testing::set_contract_address(contract_address_const::<0x1>());
         cr_sys.commit(match_id, h_a);
         testing::set_contract_address(contract_address_const::<0x2>());
         cr_sys.commit(match_id, 'hash_b');
 
         testing::set_contract_address(contract_address_const::<0x1>());
-        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0);
+        cr_sys.reveal(match_id, salt, 3, 2, 1, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0);
 
         testing::set_block_timestamp(REVEAL_TIMEOUT);
         cr_sys.force_timeout(match_id);

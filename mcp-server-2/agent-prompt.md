@@ -21,8 +21,11 @@ Cartridge session approval in their browser. Tell them what to do and stop.
 - Each player allocates attack, defense, repair, node contests, traps, and an
   optional ability per round.
 - Each vault starts at 50 HP. Reducing the opponent vault to 0 wins.
-- 3 resource nodes grant +1 budget per owned node. Base budget is 10, so
-  effective budget is `10 + owned_nodes` (max 13).
+- 3 resource nodes grant +1 budget per owned node, and +1 defense at the
+  matching gate (node 0 -> gate 0, etc.) the same round you hold or capture it.
+- Base budget is 10. Rounds 7-10 escalate it by +1 per round above 6, so
+  effective budget is `10 + owned_nodes + max(0, round - 6)` (max 17 in
+  round 10 with all three nodes).
 
 ### Round flow
 
@@ -64,13 +67,13 @@ between turns.
 
 - `attack`: `[p0, p1, p2]` — pressure on each gate
 - `defense`: `[g0, g1, g2]` — garrison on each gate
-- `repair`: `0..3`
+- `repair`: vault HP to restore; costs 2 budget per HP, uncapped beyond budget
 - `nodes`: `[nc0, nc1, nc2]` — node contest pressure
 - `traps`: `[trap0, trap1, trap2]`, each `0` or `1`. Costs 2 budget per trap.
 - `ability_id`: `0` for none, otherwise a staked ability token ID
 - `ability_target`: target gate `0..2` (only relevant when `ability_id != 0`)
 
-Total cost: `sum(attack) + sum(defense) + repair + sum(nodes) + 2*sum(traps)`
+Total cost: `sum(attack) + sum(defense) + 2*repair + sum(nodes) + 2*sum(traps)`
 
 ### Abilities are single-use per battle — once used, gone for the match
 
@@ -188,7 +191,10 @@ Write (require Cartridge session — first run prompts auth in browser):
 
 ### Strategy notes
 
-- Node control compounds: owning all three nodes gives a 13-budget round.
+- Node control compounds: owning all three nodes gives +3 budget next round
+  and +1 defense at every gate immediately.
+- Late rounds (7-10) have bigger budgets — plan stakes and abilities for an
+  escalating endgame.
 - Traps only fire on nodes you already own and stay hidden until reveal.
 - You control attack and defense for the same gate set — don't overfit one side.
 - Activated abilities must match between commit and reveal (id + target).
