@@ -380,35 +380,59 @@ mod tests {
         assert(state.vault_a_hp == 50, 'A untouched');
     }
 
-    // --- Stone Cloak T2: halves damage instead of zeroing ------------------
+    // --- Stone Cloak T2: halves gate damage and negates enemy healing ------
 
     #[test]
-    fn test_stone_cloak_t2_halves_ember_damage() {
-        // A fires T2 Ember Blast (6 direct) into B's T2 Stone Cloak: B takes 3.
+    fn test_stone_cloak_t2_negates_enemy_repair() {
+        // B starts at 40 HP and repairs 5; A's T2 Stone Cloak negates it.
+        // B heals nothing and takes no damage -> stays at 40.
         let (mut world, cr_sys, _, match_id) = setup_match(
-            1, 50, 50, [NodeOwner::None, NodeOwner::None, NodeOwner::None],
+            1, 50, 40, [NodeOwner::None, NodeOwner::None, NodeOwner::None],
         );
         world.write_model_test(@MatchAbilities1v1 {
             match_id,
-            a_ability_1: 8, a_ability_2: 0, a_ability_3: 0,
-            b_ability_1: 7, b_ability_2: 0, b_ability_3: 0,
+            a_ability_1: 7, a_ability_2: 0, a_ability_3: 0,
+            b_ability_1: 0, b_ability_2: 0, b_ability_3: 0,
             a_used_1: false, a_used_2: false, a_used_3: false,
             b_used_1: false, b_used_2: false, b_used_3: false,
         });
         play_round(
             cr_sys, match_id,
-            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0),
-            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0),
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 0), // A: cloak T2
+            (0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0), // B: repair 5
         );
         resolve(@world, match_id);
         let state: MatchState1v1 = world.read_model(match_id);
-        assert(state.vault_b_hp == 47, 'T2 cloak halves ember to 3');
+        assert(state.vault_b_hp == 40, 'T2 cloak negates enemy repair');
     }
 
     #[test]
-    fn test_stone_cloak_t2_halves_trap_damage() {
-        // A owns and traps node 0; B captures it with T2 Stone Cloak active.
-        // Trap damage 5 is halved (floor) to 2 -> B at 48.
+    fn test_stone_cloak_t1_does_not_negate_repair() {
+        // Same setup with a T1 cloak: B's repair 5 lands -> 45.
+        let (mut world, cr_sys, _, match_id) = setup_match(
+            1, 50, 40, [NodeOwner::None, NodeOwner::None, NodeOwner::None],
+        );
+        world.write_model_test(@MatchAbilities1v1 {
+            match_id,
+            a_ability_1: 2, a_ability_2: 0, a_ability_3: 0,
+            b_ability_1: 0, b_ability_2: 0, b_ability_3: 0,
+            a_used_1: false, a_used_2: false, a_used_3: false,
+            b_used_1: false, b_used_2: false, b_used_3: false,
+        });
+        play_round(
+            cr_sys, match_id,
+            (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0), // A: cloak T1
+            (0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 0), // B: repair 5
+        );
+        resolve(@world, match_id);
+        let state: MatchState1v1 = world.read_model(match_id);
+        assert(state.vault_b_hp == 45, 'T1 cloak lets repair land');
+    }
+
+    #[test]
+    fn test_stone_cloak_t2_does_not_block_ember_or_traps() {
+        // T2 cloak is gate damage + healing denial only: A's trapped node 0
+        // still deals the full 5 to B when captured under a T2 cloak.
         let (mut world, cr_sys, _, match_id) = setup_match(
             1, 50, 50, [NodeOwner::TeamA, NodeOwner::None, NodeOwner::None],
         );
@@ -428,7 +452,7 @@ mod tests {
         let state: MatchState1v1 = world.read_model(match_id);
         let n0: NodeState = world.read_model((match_id, 0_u8));
         assert(n0.owner == NodeOwner::TeamB, 'B captured node 0');
-        assert(state.vault_b_hp == 48, 'T2 cloak halves trap to 2');
+        assert(state.vault_b_hp == 45, 'trap deals full 5 thru T2');
     }
 
     // --- Next round's modifiers are announced at resolution ----------------

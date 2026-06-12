@@ -161,7 +161,7 @@ const ABILITY_TYPES: Record<number, { name: string; t1: string; t2: string }> = 
   2: {
     name: "StoneCloak",
     t1: "halve all gate damage taken",
-    t2: "halve all gate, trap, and Ember Blast damage taken",
+    t2: "halve all gate damage taken and negate the opponent's repair this round",
   },
   3: {
     name: "EmberBlast",

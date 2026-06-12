@@ -281,9 +281,9 @@ pub mod resolution_1v1 {
             let b_type_cloak = ability_type_from_token(b_ability);
             let b_tier_cloak = ability_tier_from_token(b_ability);
 
-            // T1 and T2 both halve gate damage (floor). T2 additionally halves
-            // trap damage and Ember Blast direct damage further down — full
-            // gate immunity made a T2 cloak round a free turn.
+            // T1 and T2 both halve gate damage (floor). T2 additionally
+            // negates the opponent's repair this round (see the repair step) —
+            // full gate immunity made a T2 cloak round a free turn.
             if a_type_cloak == 2 {
                 damage_to_a = [
                     *damage_to_a.span()[0] / 2,
@@ -383,8 +383,9 @@ pub mod resolution_1v1 {
 
             // Repairs: uncapped here — the reveal budget check already prices
             // repair at 2 budget per HP, so budget is the only limit.
-            let repair_a = rm.a_repair;
-            let repair_b = rm.b_repair;
+            // An enemy T2 Stone Cloak negates this round's repair entirely.
+            let repair_a = if b_type_cloak == 2 && b_tier_cloak == 2 { 0 } else { rm.a_repair };
+            let repair_b = if a_type_cloak == 2 && a_tier_cloak == 2 { 0 } else { rm.b_repair };
 
             let mut hp_a = state.vault_a_hp;
             let mut hp_b = state.vault_b_hp;
@@ -404,14 +405,11 @@ pub mod resolution_1v1 {
             let b_tier_ember = ability_tier_from_token(b_ability);
 
             if a_type_ember == 3 {
-                let mut dmg: u8 = if a_tier_ember == 1 { 2 } else { 6 };
-                // T2 Stone Cloak halves incoming Ember Blast damage
-                if b_type_cloak == 2 && b_tier_cloak == 2 { dmg = dmg / 2; }
+                let dmg: u8 = if a_tier_ember == 1 { 2 } else { 6 };
                 if hp_b > dmg { hp_b = hp_b - dmg; } else { hp_b = 0; }
             }
             if b_type_ember == 3 {
-                let mut dmg: u8 = if b_tier_ember == 1 { 2 } else { 6 };
-                if a_type_cloak == 2 && a_tier_cloak == 2 { dmg = dmg / 2; }
+                let dmg: u8 = if b_tier_ember == 1 { 2 } else { 6 };
                 if hp_a > dmg { hp_a = hp_a - dmg; } else { hp_a = 0; }
             }
 
@@ -441,10 +439,6 @@ pub mod resolution_1v1 {
                 }
                 tn += 1;
             };
-
-            // T2 Stone Cloak halves trap damage too
-            if a_type_cloak == 2 && a_tier_cloak == 2 { trap_dmg_to_a = trap_dmg_to_a / 2; }
-            if b_type_cloak == 2 && b_tier_cloak == 2 { trap_dmg_to_b = trap_dmg_to_b / 2; }
 
             // Apply trap damage (post-repair, cannot be repaired)
             if trap_dmg_to_a >= hp_a { hp_a = 0; } else { hp_a = hp_a - trap_dmg_to_a; }

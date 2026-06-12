@@ -76,7 +76,7 @@ Budget is `10 + owned_resource_nodes + max(0, round - 6)` (endgame escalation, r
 
 Node contests resolve before gate damage: owning node `i` grants +1 defense at gate `i` the same round it is captured or held, plus +1 budget next round.
 
-Stone Cloak T1 halves gate damage; T2 halves gate, trap, and Ember Blast damage (full gate immunity was removed in the balance pass).
+Stone Cloak T1 halves gate damage; T2 halves gate damage and negates the opponent's repair that round (full gate immunity was removed in the balance pass).
 
 Gate modifier codes:
 
