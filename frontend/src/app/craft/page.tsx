@@ -8,6 +8,7 @@ import { useAccount } from "@/app/providers";
 import { useResourceBalances, RESOURCE_TOKENS, type ResourceBalances } from "@/lib/useResourceBalances";
 import { ABILITIES, canAfford, maxAffordable, craftAbility, craftAbilityTier2, abilityType, type AbilityCost } from "@/lib/craftingContracts";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
+import { resilientExecute } from "@/lib/controllerSession";
 import { toriiSql, sqlHex, toNum } from "@/lib/toriiSql";
 import { LAST_MATCH_KEY } from "@/components/Navbar";
 import { useForgeState } from "@/lib/forge/forgeState";
@@ -229,7 +230,7 @@ export default function CraftPage() {
         });
       }
 
-      const result = await account.execute(calls, IS_DEVNET ? DEVNET_TX_OPTS : undefined);
+      const result = await resilientExecute(account, calls, IS_DEVNET ? DEVNET_TX_OPTS : undefined);
       const provider = new RpcProvider({ nodeUrl: RPC_URL });
       await provider.waitForTransaction(result.transaction_hash);
       applyOptimisticCost(cost as Record<string, number>, qty);

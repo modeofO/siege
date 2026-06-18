@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
+import { resilientExecute } from "./controllerSession";
 import { toriiSql, toNum, sqlAddr } from "./toriiSql";
 import { usePoll } from "./usePoll";
 
@@ -123,7 +124,7 @@ export async function initiatePillage(
   matchId: number,
   homeParcelId: number,
 ): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "initiate_pillage",
     calldata: [matchId.toString(), homeParcelId.toString()],
@@ -132,7 +133,7 @@ export async function initiatePillage(
 }
 
 export async function claimPillageDrip(account: AccountInterface, homeParcelId: number): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "claim_pillage_drip",
     calldata: [homeParcelId.toString()],

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import { CONQUEST_ADDRESS } from "./contractAddresses";
+import { resilientExecute } from "./controllerSession";
 import { toriiSql, toNum, sqlAddr } from "./toriiSql";
 import { usePoll } from "./usePoll";
 
@@ -66,7 +67,7 @@ export async function setPresetDefense(
   g1: number,
   g2: number,
 ): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: CONQUEST_ADDRESS,
     entrypoint: "set_preset_defense",
     calldata: [
@@ -94,7 +95,7 @@ export async function initiateConquest(
   abilityId: number,
   abilityTarget: number,
 ): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: CONQUEST_ADDRESS,
     entrypoint: "initiate_conquest",
     calldata: [

@@ -39,6 +39,16 @@ function getControllerProvider(account: AccountInterface): ControllerProviderWit
   return walletProvider;
 }
 
+function isPaymasterInfraError(e: unknown): boolean {
+  const msg =
+    e instanceof Error
+      ? e.message
+      : e && typeof e === "object" && "message" in e
+        ? String((e as { message: unknown }).message)
+        : "";
+  return msg.includes("AVNU sponsorship failed") || msg.includes("paymaster");
+}
+
 function throwSessionError(reply: ExecuteReply): never {
   const err = "error" in reply ? reply.error : undefined;
   if (err) throw err;
@@ -49,9 +59,39 @@ function throwSessionError(reply: ExecuteReply): never {
   throw new Error(message);
 }
 
-async function executeSessionOnly(controller: ControllerProviderWithSession, calls: Call[]): Promise<ExecuteReply> {
+function isSuccess(reply: ExecuteReply): reply is InvokeFunctionResponse & { code?: string } {
+  return reply.code === ResponseCodes.SUCCESS || "transaction_hash" in reply;
+}
+
+async function keychainExecute(
+  controller: ControllerProviderWithSession,
+  calls: Call[],
+  feeSource: FeeSource,
+): Promise<ExecuteReply> {
   if (!controller.keychain) throw new Error("Controller keychain is not ready");
-  return controller.keychain.execute(calls, undefined, undefined, false, FeeSource.PAYMASTER);
+  return controller.keychain.execute(calls, undefined, undefined, false, feeSource);
+}
+
+async function executeWithSession(
+  controller: ControllerProviderWithSession,
+  calls: Call[],
+  feeSource: FeeSource,
+): Promise<InvokeFunctionResponse> {
+  let reply = await keychainExecute(controller, calls, feeSource);
+  if (isSuccess(reply)) return reply as InvokeFunctionResponse;
+
+  if (reply.code === ResponseCodes.USER_INTERACTION_REQUIRED) {
+    await controller.updateSession?.({ policies: SESSION_POLICIES });
+    reply = await keychainExecute(controller, calls, feeSource);
+    if (isSuccess(reply)) return reply as InvokeFunctionResponse;
+    if (reply.code === ResponseCodes.USER_INTERACTION_REQUIRED) {
+      throw new Error(
+        "Controller session is not approved for the ranked match call set. Approve the updated Cartridge session and try again; no transaction was submitted.",
+      );
+    }
+  }
+
+  throwSessionError(reply);
 }
 
 export async function executeControllerPaymaster(
@@ -63,24 +103,32 @@ export async function executeControllerPaymaster(
   if (!controller) return account.execute(calls, details);
 
   const callArray = toArray(calls);
-  let reply = await executeSessionOnly(controller, callArray);
-  if (reply.code === ResponseCodes.SUCCESS || "transaction_hash" in reply) {
-    return reply as InvokeFunctionResponse;
+  try {
+    return await executeWithSession(controller, callArray, FeeSource.PAYMASTER);
+  } catch (e) {
+    if (!isPaymasterInfraError(e)) throw e;
+    console.warn("[siege] Paymaster unavailable, retrying with CREDITS:", e);
+    return executeWithSession(controller, callArray, FeeSource.CREDITS);
+  }
+}
+
+export async function resilientExecute(
+  account: AccountInterface,
+  calls: AllowArray<Call>,
+  details?: UniversalDetails,
+): Promise<InvokeFunctionResponse> {
+  const controller = getControllerProvider(account);
+
+  if (controller) {
+    const callArray = toArray(calls);
+    try {
+      return await executeWithSession(controller, callArray, FeeSource.PAYMASTER);
+    } catch (e) {
+      if (!isPaymasterInfraError(e)) throw e;
+      console.warn("[siege] Paymaster unavailable, retrying with CREDITS:", e);
+      return executeWithSession(controller, callArray, FeeSource.CREDITS);
+    }
   }
 
-  if (reply.code === ResponseCodes.USER_INTERACTION_REQUIRED) {
-    await controller.updateSession?.({ policies: SESSION_POLICIES });
-    reply = await executeSessionOnly(controller, callArray);
-
-    if (reply.code === ResponseCodes.SUCCESS || "transaction_hash" in reply) {
-      return reply as InvokeFunctionResponse;
-    }
-    if (reply.code === ResponseCodes.USER_INTERACTION_REQUIRED) {
-      throw new Error(
-        "Controller session is not approved for the ranked match call set. Approve the updated Cartridge session and try again; no transaction was submitted.",
-      );
-    }
-  }
-
-  throwSessionError(reply);
+  return account.execute(calls, details);
 }

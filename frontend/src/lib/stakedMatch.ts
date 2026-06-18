@@ -10,6 +10,7 @@ import {
   type MatchStakes1v1 as MatchStakes1v1Model,
 } from "@/bindings/typescript/models.gen";
 import { CONTRACTS_WORLD, vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
+import { resilientExecute } from "@/lib/controllerSession";
 import { ABILITY_TOKEN_ADDRESS, fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { toFeltHex } from "@/lib/gameState1v1";
 import { safeNum, safeBigIntEq, flatModels } from "@/lib/modelUtils";
@@ -45,9 +46,9 @@ function approveAbilityTokenForWorldSystem() {
 export async function createStakedMatch(account: AccountInterface, opponent: string, abilities: number[]) {
   // Approval must be separate — the Cartridge Paymaster VRF wrapping requires
   // request_random as call[0] and the game call as call[1] with nothing between.
-  await account.execute(approveAbilityTokenForWorldSystem(), TX_OPTS);
+  await resilientExecute(account, approveAbilityTokenForWorldSystem(), TX_OPTS);
 
-  const tx = await account.execute(
+  const tx = await resilientExecute(account,
     [
       vrfRequestRandomCall(CONTRACTS_WORLD.WORLD_SYSTEM),
       {
@@ -63,7 +64,7 @@ export async function createStakedMatch(account: AccountInterface, opponent: str
 }
 
 export async function joinStakedMatch(account: AccountInterface, matchId: string, abilities: number[]) {
-  const tx = await account.execute(
+  const tx = await resilientExecute(account,
     [
       approveAbilityTokenForWorldSystem(),
       {
@@ -80,7 +81,7 @@ export async function joinStakedMatch(account: AccountInterface, matchId: string
 
 // Safe on practice matches: Dojo read_model returns a zeroed MatchStakes1v1 default, so the stake-transfer loop iterates zero times.
 export async function settleMatch(account: AccountInterface, matchId: string) {
-  const tx = await account.execute(
+  const tx = await resilientExecute(account,
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
       entrypoint: "settle_match",
@@ -93,7 +94,7 @@ export async function settleMatch(account: AccountInterface, matchId: string) {
 }
 
 export async function claimParcel(account: AccountInterface, matchId: string, parcelId: number, parcelType: number) {
-  const tx = await account.execute(
+  const tx = await resilientExecute(account,
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
       entrypoint: "claim_parcel",

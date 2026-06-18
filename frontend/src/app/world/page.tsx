@@ -13,6 +13,7 @@ import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/contractAddresses";
+import { resilientExecute } from "@/lib/controllerSession";
 import { toriiSql, toNum } from "@/lib/toriiSql";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
@@ -227,7 +228,7 @@ export default function WorldPage() {
     setClaiming(true);
     setClaimError("");
     try {
-      await account.execute({
+      await resilientExecute(account, {
         contractAddress: WORLD_SYSTEM_ADDRESS,
         entrypoint: "claim_drip",
         calldata: [],

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AccountInterface } from "starknet";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
+import { resilientExecute } from "./controllerSession";
 import { toriiSql, toNum, feltToStr, sqlAddr, sqlInt } from "./toriiSql";
 import { usePoll } from "./usePoll";
 
@@ -257,7 +258,7 @@ function strToFelt(s: string): string {
 }
 
 export async function createFaction(account: AccountInterface, name: string, tag: string): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "create_faction",
     calldata: [strToFelt(name), strToFelt(tag)],
@@ -266,7 +267,7 @@ export async function createFaction(account: AccountInterface, name: string, tag
 }
 
 export async function inviteMember(account: AccountInterface, target: string): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "invite_member",
     calldata: [target],
@@ -275,7 +276,7 @@ export async function inviteMember(account: AccountInterface, target: string): P
 }
 
 export async function acceptInvite(account: AccountInterface, factionId: number): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "accept_invite",
     calldata: [factionId.toString()],
@@ -284,7 +285,7 @@ export async function acceptInvite(account: AccountInterface, factionId: number)
 }
 
 export async function leaveFaction(account: AccountInterface): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "leave_faction",
     calldata: [],
@@ -293,7 +294,7 @@ export async function leaveFaction(account: AccountInterface): Promise<string> {
 }
 
 export async function kickMember(account: AccountInterface, target: string): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "kick_member",
     calldata: [target],
@@ -302,7 +303,7 @@ export async function kickMember(account: AccountInterface, target: string): Pro
 }
 
 export async function setFactionReinforcement(account: AccountInterface, enabled: boolean): Promise<string> {
-  const result = await account.execute({
+  const result = await resilientExecute(account, {
     contractAddress: WORLD_SYSTEM_ADDRESS,
     entrypoint: "set_faction_reinforcement",
     calldata: [enabled ? "1" : "0"],

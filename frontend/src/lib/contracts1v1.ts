@@ -5,6 +5,7 @@ import {
   RESOLUTION_1V1_ADDRESS,
   WORLD_SYSTEM_ADDRESS,
 } from "@/lib/contractAddresses";
+import { resilientExecute } from "@/lib/controllerSession";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
@@ -67,7 +68,8 @@ export function vrfRequestRandomCall(callerContract: string) {
 }
 
 export async function createMatch1v1(account: AccountInterface, playerA: string, playerB: string) {
-  return account.execute(
+  return resilientExecute(
+    account,
     [
       vrfRequestRandomCall(CONTRACTS_1V1.ACTIONS),
       {
@@ -81,7 +83,8 @@ export async function createMatch1v1(account: AccountInterface, playerA: string,
 }
 
 export async function commitMove1v1(account: AccountInterface, matchId: string, commitment: string) {
-  return account.execute(
+  return resilientExecute(
+    account,
     {
       contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
       entrypoint: "commit",
@@ -111,7 +114,8 @@ export async function revealMove1v1(
   abilityId: string,
   abilityTarget: string,
 ) {
-  const tx = await account.execute(
+  const tx = await resilientExecute(
+    account,
     {
       contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
       entrypoint: "reveal",
@@ -146,7 +150,8 @@ export async function resolveRound1v1(account: AccountInterface, matchId: string
   // skips consume_random (match ends, no next-round modifiers needed).
   let firstError: unknown;
   try {
-    const tx = await account.execute(
+    const tx = await resilientExecute(
+      account,
       {
         contractAddress: CONTRACTS_1V1.RESOLUTION,
         entrypoint: "resolve_round",
@@ -163,7 +168,8 @@ export async function resolveRound1v1(account: AccountInterface, matchId: string
   // Fall back to VRF-wrapped multicall — needed on non-final rounds where
   // the contract calls consume_random to generate next-round gate modifiers.
   try {
-    const tx = await account.execute(
+    const tx = await resilientExecute(
+      account,
       [
         vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION),
         {
@@ -187,7 +193,8 @@ export const CONTRACTS_WORLD = {
 };
 
 export async function upgradeKingdom(account: AccountInterface) {
-  return account.execute(
+  return resilientExecute(
+    account,
     {
       contractAddress: CONTRACTS_WORLD.WORLD_SYSTEM,
       entrypoint: "upgrade_kingdom",

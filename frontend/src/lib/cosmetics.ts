@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { cairo } from "starknet";
 import type { AccountInterface, UniversalDetails } from "starknet";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
+import { resilientExecute } from "./controllerSession";
 import { toriiSql, feltToStr, sqlAddr } from "./toriiSql";
 import { usePoll } from "./usePoll";
 import type { CircuitKey, CosmeticType } from "./forge/circuits";
@@ -147,7 +148,8 @@ export async function setCosmetic(
   const typeFelt = cairo.felt(typeStr);
   const keyFelt = circuitKey ? cairo.felt(circuitKey) : "0x0";
 
-  const result = await account.execute(
+  const result = await resilientExecute(
+    account,
     [
       {
         contractAddress: WORLD_SYSTEM_ADDRESS,
