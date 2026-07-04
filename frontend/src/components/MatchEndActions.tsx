@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useAccount } from "@/app/providers";
 import { AbilityIcon } from "./AbilityIcon";
+import { ClaimParcelMap } from "./ClaimParcelMap";
 import { useMatchEscrow, useClaimCandidates, settleMatch, claimParcel } from "@/lib/stakedMatch";
 import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
@@ -23,19 +24,6 @@ interface MatchEndActionsProps {
 
 const PARCEL_TYPE_LABELS = ["Forge", "Quarry", "Grove"] as const;
 const PARCEL_TYPE_COLORS = ["#b87333", "#8a8a9a", "#4a7c59"] as const;
-
-function ParcelBadge({ type, col, row }: { type: number; col: number; row: number }) {
-  const isUntyped = type === 255;
-  const label = isUntyped ? "Unclaimed" : (PARCEL_TYPE_LABELS[type] ?? `Type ${type}`);
-  return (
-    <div className="flex flex-col items-center gap-0.5 border border-[#3d3428] rounded px-2 py-1.5 bg-[#1a1714] min-w-[72px]">
-      <span className={`text-[10px] font-serif tracking-wider ${isUntyped ? "text-[#7a7060]" : "text-[#c8a44e]"}`}>{label}</span>
-      <span className="text-[10px] text-[#7a7060] font-mono">
-        ({col},{row})
-      </span>
-    </div>
-  );
-}
 
 function StakeRow({ label, ids }: { label: string; ids: [number, number, number] }) {
   const owned = ids.filter((id) => id > 0);
@@ -75,6 +63,7 @@ export function MatchEndActions({
   const winnerKingdom = usePlayerKingdom(didWin ? (address ?? null) : null);
   const {
     candidates,
+    parcels: worldParcels,
     loading: candidatesLoading,
   } = useClaimCandidates(didWin ? winnerAddr : null);
 
@@ -115,9 +104,14 @@ export function MatchEndActions({
   const title = isDraw ? "DRAW" : didWin ? "VICTORY" : "DEFEAT";
   const titleColor = isDraw ? "text-[#daa520]" : didWin ? "text-[#c8a44e]" : "text-[#ff3344]";
 
+  const showClaimMap =
+    didWin && escrow.loaded && escrow.settled && claimed === null && !candidatesLoading && candidates.length > 0;
+
+  const selectedParcel = selectedCandidate === null ? null : candidates.find((p) => p.parcelId === selectedCandidate) ?? null;
+
   return (
     <div className="fixed inset-0 bg-[#0d0b0a]/95 z-50 flex items-center justify-center overflow-y-auto py-8">
-      <div className="text-center space-y-6 max-w-md w-full px-4">
+      <div className={`text-center space-y-6 w-full px-4 ${showClaimMap ? "max-w-lg" : "max-w-md"}`}>
         <div className="space-y-2">
           <div className={`text-6xl font-bold tracking-widest font-serif ${titleColor}`}>{title}</div>
           {didWin && !isDraw && (
@@ -181,21 +175,26 @@ export function MatchEndActions({
               </div>
             ) : (
               <>
-                <div className="text-[10px] text-[#7a7060] mb-1">Select a parcel location:</div>
-                <div className="flex flex-wrap gap-2 justify-center">
-                  {candidates.map((p) => (
-                    <button
-                      key={p.parcelId}
-                      onClick={() => { setSelectedCandidate(p.parcelId); setSelectedType(null); }}
-                      disabled={claiming !== null}
-                      className={`disabled:opacity-40 hover:scale-105 transition-transform disabled:cursor-not-allowed rounded ${
-                        selectedCandidate === p.parcelId ? "ring-2 ring-[#c8a44e]" : ""
-                      }`}
-                    >
-                      <ParcelBadge type={p.parcelType} col={p.col} row={p.row} />
-                    </button>
-                  ))}
+                <div className="text-[10px] text-[#7a7060] mb-1">Select a parcel on the map:</div>
+                <div className="border border-[#3d3428] rounded p-2 bg-[#1a1714]">
+                  <ClaimParcelMap
+                    parcels={worldParcels}
+                    candidates={candidates}
+                    winnerAddress={winnerAddr ?? ""}
+                    selectedId={selectedCandidate}
+                    onSelect={(id) => {
+                      if (claiming !== null) return;
+                      setSelectedCandidate(id);
+                      setSelectedType(null);
+                    }}
+                  />
                 </div>
+
+                {selectedParcel !== null && (
+                  <div className="text-[11px] text-[#c8a44e] font-serif">
+                    Claiming parcel at ({selectedParcel.col},{selectedParcel.row}) — currently Unclaimed
+                  </div>
+                )}
 
                 {selectedCandidate !== null && (
                   <div className="space-y-2 mt-3">

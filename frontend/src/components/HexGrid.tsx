@@ -7,48 +7,13 @@ import type { PlayerCosmeticsData } from "@/lib/cosmetics";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import { projectToHex, traceToHexPoints, getWardTint } from "@/lib/forge/wardProjection";
 import { WardGlyph } from "@/components/forge/WardGlyph";
+import { HEX_SIZE, hexToPixel, hexPoints, PARCEL_TYPE_COLORS, PARCEL_TYPE_NAMES } from "@/lib/hexRender";
 
 interface HexGridProps {
   parcels: ParcelData[];
   playerAddress: string | null;
   homeParcelIds: number[]; // [home0, home1, home2]
   cosmeticsMap?: Record<string, PlayerCosmeticsData>;
-}
-
-const PARCEL_TYPE_COLORS: Record<number, string> = {
-  0: "#b87333", // Forge — copper
-  1: "#8a8a9a", // Quarry — grey
-  2: "#4a7c59", // Grove — green
-  255: "#4a4a4a", // Untyped — neutral dark grey
-};
-
-const PARCEL_TYPE_NAMES: Record<number, string> = {
-  0: "Forge",
-  1: "Quarry",
-  2: "Grove",
-  255: "Untyped",
-};
-
-const HEX_SIZE = 36;
-
-const HEX_WIDTH = Math.sqrt(3) * HEX_SIZE;
-const HEX_HEIGHT = 2 * HEX_SIZE;
-
-function hexToPixel(col: number, row: number): { x: number; y: number } {
-  const x = col * HEX_WIDTH + (row % 2 === 1 ? HEX_WIDTH / 2 : 0);
-  const y = row * (HEX_HEIGHT * 0.75);
-  return { x, y };
-}
-
-function hexPoints(cx: number, cy: number, size = HEX_SIZE): string {
-  const points: string[] = [];
-  for (let i = 0; i < 6; i++) {
-    const angle = (Math.PI / 180) * (60 * i + 30);
-    const px = cx + size * Math.cos(angle);
-    const py = cy + size * Math.sin(angle);
-    points.push(`${px},${py}`);
-  }
-  return points.join(" ");
 }
 
 function normalizeAddr(a: string): string {

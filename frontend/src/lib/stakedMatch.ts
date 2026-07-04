@@ -186,6 +186,8 @@ export function useMatchEscrow(matchId: string | null): MatchEscrowData {
 export interface ClaimCandidatesResult {
   /** Unclaimed parcels adjacent to any of the winner's existing parcels. */
   candidates: ParcelData[];
+  /** Every parcel in the world — for rendering the claim map. */
+  parcels: ParcelData[];
   loading: boolean;
 }
 
@@ -196,14 +198,14 @@ export function useClaimCandidates(
 
   return useMemo<ClaimCandidatesResult>(() => {
     if (!winnerAddress || loading) {
-      return { candidates: [], loading };
+      return { candidates: [], parcels, loading };
     }
 
     let winnerBig: bigint;
     try {
       winnerBig = BigInt(winnerAddress);
     } catch {
-      return { candidates: [], loading };
+      return { candidates: [], parcels, loading };
     }
 
     const ownerBig = (addr: string): bigint | null => {
@@ -216,7 +218,7 @@ export function useClaimCandidates(
 
     const winnerParcels = parcels.filter((p) => ownerBig(p.owner) === winnerBig);
     if (winnerParcels.length === 0) {
-      return { candidates: [], loading };
+      return { candidates: [], parcels, loading };
     }
 
     const candidates = parcels.filter((p) => {
@@ -224,7 +226,7 @@ export function useClaimCandidates(
       return winnerParcels.some((w) => isNeighbor(w, p));
     });
 
-    return { candidates, loading };
+    return { candidates, parcels, loading };
   }, [parcels, loading, winnerAddress]);
 }
 
