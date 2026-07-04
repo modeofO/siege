@@ -17,6 +17,7 @@ import {
 // (e.g., fresh subscription results before fields are hydrated). The shared
 // helpers guard every conversion so a render-time throw can't nuke the page.
 import { safeNum, safeBigIntEq, flatModels } from "@/lib/modelUtils";
+import { resolveRoundLocal } from "@/lib/resolution1v1";
 
 function safeNumEq(v: unknown, target: number): boolean {
   if (v === undefined || v === null) return false;
@@ -110,105 +111,6 @@ function ownerToNode(owner: string): NodeOwner {
 export function computeBudget(nodes: NodeOwner[], team: "teamA" | "teamB", round: number): number {
   const escalation = round > 6 ? round - 6 : 0;
   return 10 + nodes.filter((n) => n === team).length + escalation;
-}
-
-function computeGateBreakdown(
-  aAtk: number[],
-  aDef: number[],
-  bAtk: number[],
-  bDef: number[],
-  mods: [number, number, number],
-): { gateBreakdown: GateDamage[]; damageToA: number; damageToB: number } {
-  const dmgToB = [0, 0, 0];
-  const dmgToA = [0, 0, 0];
-  const ovfToB = [0, 0, 0];
-  const ovfToA = [0, 0, 0];
-  const unusedDefB = [0, 0, 0]; // B's defense not consumed by direct attack
-  const unusedDefA = [0, 0, 0]; // A's defense not consumed by direct attack
-
-  for (let g = 0; g < 3; g++) {
-    let aa = aAtk[g],
-      ad = aDef[g],
-      ba = bAtk[g],
-      bd = bDef[g];
-    const mod = mods[g];
-
-    if (mod === 1) {
-      // Narrow Pass
-      aa = Math.min(aa, 3);
-      ad = Math.min(ad, 3);
-      ba = Math.min(ba, 3);
-      bd = Math.min(bd, 3);
-    }
-    if (mod === 2) {
-      // Mirror
-      [aa, ad] = [ad, aa];
-      [ba, bd] = [bd, ba];
-    }
-    if (mod === 3) {
-      // Deadlock
-      // no damage — but defense is still "unused" for reflection blocking
-      unusedDefB[g] = bd;
-      unusedDefA[g] = ad;
-    } else if (mod === 4) {
-      // Reflection
-      if (aa > bd) ovfToB[g] = aa - bd;
-      if (ba > ad) ovfToA[g] = ba - ad;
-    } else {
-      if (aa > bd) {
-        dmgToB[g] = aa - bd;
-      } else {
-        unusedDefB[g] = bd - aa;
-      }
-      if (ba > ad) {
-        dmgToA[g] = ba - ad;
-      } else {
-        unusedDefA[g] = ad - ba;
-      }
-    }
-  }
-
-  // Distribute reflection — reduced by unused defense at receiving gate
-  // Deadlock gates block reflected damage entirely
-  for (let g = 0; g < 3; g++) {
-    if (ovfToB[g] > 0) {
-      const per = Math.floor(ovfToB[g] / 2);
-      for (let t = 0; t < 3; t++) {
-        if (t !== g && mods[t] !== 3) {
-          // 3 = Deadlock
-          const blocked = Math.min(per, unusedDefB[t]);
-          dmgToB[t] += per - blocked;
-        }
-      }
-    }
-    if (ovfToA[g] > 0) {
-      const per = Math.floor(ovfToA[g] / 2);
-      for (let t = 0; t < 3; t++) {
-        if (t !== g && mods[t] !== 3) {
-          // 3 = Deadlock
-          const blocked = Math.min(per, unusedDefA[t]);
-          dmgToA[t] += per - blocked;
-        }
-      }
-    }
-  }
-
-  const gateBreakdown: GateDamage[] = [0, 1, 2].map((g) => ({
-    gate: g,
-    modifier: mods[g],
-    attackA: aAtk[g],
-    defenseA: aDef[g],
-    attackB: bAtk[g],
-    defenseB: bDef[g],
-    dmgToA: dmgToA[g],
-    dmgToB: dmgToB[g],
-  }));
-
-  return {
-    gateBreakdown,
-    damageToA: dmgToA[0] + dmgToA[1] + dmgToA[2],
-    damageToB: dmgToB[0] + dmgToB[1] + dmgToB[2],
-  };
 }
 
 /**
@@ -387,16 +289,63 @@ export function useRoundHistory1v1(matchId: string | null): RoundResult1v1[] {
       .slice(0, 10)
       .map((n): RoundResult1v1 => {
         const rnd = safeNum(n.round);
-        const aAtk = [safeNum(n.a_p0), safeNum(n.a_p1), safeNum(n.a_p2)];
-        const aDef = [safeNum(n.a_g0), safeNum(n.a_g1), safeNum(n.a_g2)];
-        const bAtk = [safeNum(n.b_p0), safeNum(n.b_p1), safeNum(n.b_p2)];
-        const bDef = [safeNum(n.b_g0), safeNum(n.b_g1), safeNum(n.b_g2)];
+        const aAtk: [number, number, number] = [safeNum(n.a_p0), safeNum(n.a_p1), safeNum(n.a_p2)];
+        const aDef: [number, number, number] = [safeNum(n.a_g0), safeNum(n.a_g1), safeNum(n.a_g2)];
+        const bAtk: [number, number, number] = [safeNum(n.b_p0), safeNum(n.b_p1), safeNum(n.b_p2)];
+        const bDef: [number, number, number] = [safeNum(n.b_g0), safeNum(n.b_g1), safeNum(n.b_g2)];
         const mods: [number, number, number] = modsByRound[rnd] || [0, 0, 0];
-        const { gateBreakdown, damageToA, damageToB } = computeGateBreakdown(aAtk, aDef, bAtk, bDef, mods);
         const traps = trapsByRound[rnd] || {
           a: [0, 0, 0] as [number, number, number],
           b: [0, 0, 0] as [number, number, number],
         };
+        const aAbilityId = safeNum(n.a_ability_id);
+        const aAbilityTarget = safeNum(n.a_ability_target);
+        const bAbilityId = safeNum(n.b_ability_id);
+        const bAbilityTarget = safeNum(n.b_ability_target);
+
+        // History rows don't carry each past round's PRE-round node ownership,
+        // so we pass neutral nodes and vault HP of 50 with the row's round. The
+        // engine call here only supplies the per-gate breakdown and damage
+        // totals (now ability-aware); node defense was never reflected in the
+        // history breakdown before either, so this preserves that limitation
+        // explicitly. Per-round HP display remains driven by RoundResolved data.
+        const outcome = resolveRoundLocal({
+          moveA: {
+            attack: aAtk,
+            defense: aDef,
+            repair: safeNum(n.a_repair),
+            nodeContest: [safeNum(n.a_nc0), safeNum(n.a_nc1), safeNum(n.a_nc2)],
+            traps: traps.a,
+            abilityId: aAbilityId,
+            abilityTarget: aAbilityTarget,
+          },
+          moveB: {
+            attack: bAtk,
+            defense: bDef,
+            repair: safeNum(n.b_repair),
+            nodeContest: [safeNum(n.b_nc0), safeNum(n.b_nc1), safeNum(n.b_nc2)],
+            traps: traps.b,
+            abilityId: bAbilityId,
+            abilityTarget: bAbilityTarget,
+          },
+          nodeOwners: ["neutral", "neutral", "neutral"],
+          modifiers: mods,
+          vaultAHp: 50,
+          vaultBHp: 50,
+          round: rnd,
+        });
+        const gateBreakdown: GateDamage[] = outcome.gates.map((g) => ({
+          gate: g.gate,
+          modifier: g.modifier,
+          attackA: g.attackA,
+          defenseA: g.defenseA,
+          attackB: g.attackB,
+          defenseB: g.defenseB,
+          dmgToA: g.dmgToA,
+          dmgToB: g.dmgToB,
+        }));
+        const damageToA = outcome.totalDamageToA;
+        const damageToB = outcome.totalDamageToB;
         return {
           round: rnd,
           aAttack: aAtk,
@@ -411,10 +360,10 @@ export function useRoundHistory1v1(matchId: string | null): RoundResult1v1[] {
           bTraps: traps.b,
           trapDmgToA: 0,
           trapDmgToB: 0,
-          aAbilityId: safeNum(n.a_ability_id),
-          aAbilityTarget: safeNum(n.a_ability_target),
-          bAbilityId: safeNum(n.b_ability_id),
-          bAbilityTarget: safeNum(n.b_ability_target),
+          aAbilityId,
+          aAbilityTarget,
+          bAbilityId,
+          bAbilityTarget,
         };
       });
   }, [matchId, roundMoves, roundMods, roundTraps]);
