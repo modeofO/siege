@@ -261,10 +261,28 @@ export function AllocationForm1v1({
             const nodeIdx = 7 + ni;
             const trapIdx = 10 + ni;
             const isTrapped = allocations[trapIdx] === 1;
-            const canTrap = nodes[ni] === myTeam;
+            const isMine = nodes[ni] === myTeam;
+            const isEnemy = nodes[ni] !== myTeam && nodes[ni] !== "neutral";
+            const canTrap = isMine;
 
             return (
-              <div key={ni} className="bg-[#252019] rounded-lg p-2 space-y-1.5 flex flex-col items-center">
+              <div
+                key={ni}
+                className={`bg-[#252019] rounded-lg p-2 space-y-1.5 flex flex-col items-center border ${
+                  isMine ? "border-[#c8a44e]/50" : isEnemy ? "border-[#ff3344]/40" : "border-transparent"
+                }`}
+              >
+                <div
+                  className={`w-full text-center text-[9px] tracking-widest font-bold rounded py-0.5 ${
+                    isMine
+                      ? "bg-[#c8a44e]/15 text-[#c8a44e]"
+                      : isEnemy
+                        ? "bg-[#ff3344]/15 text-[#ff3344]"
+                        : "bg-[#3d3428]/40 text-[#7a7060]"
+                  }`}
+                >
+                  {isMine ? "YOUR NODE" : isEnemy ? "ENEMY NODE" : "UNCLAIMED"}
+                </div>
                 <Image
                   src={NODE_SPRITES[ni]}
                   alt={name}

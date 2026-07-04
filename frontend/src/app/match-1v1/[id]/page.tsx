@@ -659,7 +659,14 @@ export default function Match1v1Page() {
             <span className="text-xs text-[#7a7060]">#{matchId}</span>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-[#daa520] font-bold text-sm">{budget} pts</span>
+            <span className="text-[#daa520] font-bold text-sm">
+              {budget} pts
+              {state.round > 6 && (
+                <span className="ml-1.5 text-[10px] text-[#ff8800] font-normal tracking-wider">
+                  +{state.round - 6} ENDGAME
+                </span>
+              )}
+            </span>
             <span className="text-[10px] text-[#7a7060] border border-[#3d3428] rounded px-2 py-0.5">
               Player {isPlayerA ? "A" : "B"}
             </span>
