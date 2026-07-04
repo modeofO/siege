@@ -99,7 +99,7 @@
     },
     {
       "address": "0x1c35fca268af0253265c3ef881ec3f7d7d0afa94626a8a2ddc5bb133e8be401",
-      "class_hash": "0x487588806f32fb40f5faf6b6163b90f4f694d095fb9fa0be059ba2f92e631a7",
+      "class_hash": "0x20d8f473112be3d561d8f258b5df1d93303fe6d6541121bdca62e61ef22049c",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",

@@ -686,8 +686,57 @@ pub mod world_system {
                     i += 1;
                 };
 
-                // Loser loses their furthest-from-home parcel
-                self.release_furthest_parcel(loser);
+                // Single pass over the map: find the loser's furthest-from-home
+                // parcel to release AND whether the winner borders any of the
+                // loser's homes (pillage eligibility). Each parcel model read is
+                // an external world call (~520k L2 gas), so settle must not scan
+                // the map more than once — three separate scans made this tx too
+                // heavy for paymaster sponsorship.
+                let mut loser_kingdom: PlayerKingdom = world.read_model(loser);
+                let config: WorldConfig = world.read_model(0_u8);
+                let lh0: Parcel = world.read_model(loser_kingdom.home_0);
+                let lh1: Parcel = world.read_model(loser_kingdom.home_1);
+                let lh2: Parcel = world.read_model(loser_kingdom.home_2);
+
+                let mut max_dist: u16 = 0;
+                let mut furthest_id: u32 = 0;
+                let mut found_furthest = false;
+                let mut winner_borders_loser_home = false;
+                let zero_addr: ContractAddress = 0.try_into().unwrap();
+
+                let mut p: u32 = 0;
+                while p < config.total_parcels {
+                    let parcel: Parcel = world.read_model(p);
+                    if parcel.owner == loser && !parcel.is_home {
+                        // Min distance to any of the loser's home parcels
+                        let d0 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh0.col, lh0.row);
+                        let d1 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh1.col, lh1.row);
+                        let d2 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh2.col, lh2.row);
+                        let min_d = if d0 < d1 { if d0 < d2 { d0 } else { d2 } } else { if d1 < d2 { d1 } else { d2 } };
+
+                        if min_d > max_dist || !found_furthest {
+                            max_dist = min_d;
+                            furthest_id = p;
+                            found_furthest = true;
+                        }
+                    } else if parcel.owner == winner && !winner_borders_loser_home {
+                        if siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, lh0.col, lh0.row)
+                            || siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, lh1.col, lh1.row)
+                            || siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, lh2.col, lh2.row) {
+                            winner_borders_loser_home = true;
+                        }
+                    }
+                    p += 1;
+                };
+
+                // Loser loses their furthest-from-home parcel (becomes unclaimed).
+                if found_furthest {
+                    let mut released: Parcel = world.read_model(furthest_id);
+                    released.owner = zero_addr;
+                    world.write_model(@released);
+                    loser_kingdom.parcel_count -= 1;
+                    world.write_model(@loser_kingdom);
+                }
 
                 let mut winner_kingdom: PlayerKingdom = world.read_model(winner);
                 winner_kingdom.total_wins += 1;
@@ -718,7 +767,6 @@ pub mod world_system {
 
                 // Recalculate brackets
                 rep_winner.bracket = super::calculate_bracket(winner_kingdom.total_wins, rep_winner.total_losses);
-                let loser_kingdom: PlayerKingdom = world.read_model(loser);
                 rep_loser.bracket = super::calculate_bracket(loser_kingdom.total_wins, rep_loser.total_losses);
 
                 world.write_model(@rep_winner);
@@ -736,7 +784,7 @@ pub mod world_system {
                 world.write_model(@record_lw);
 
                 // Grant pillage eligibility if the winner borders any of the loser's home parcels
-                if self.has_adjacent_to_any_home(winner, loser) {
+                if winner_borders_loser_home && loser_kingdom.registered {
                     let now = get_block_timestamp();
                     world.write_model(@PillageEligibility {
                         winner,
@@ -767,20 +815,10 @@ pub mod world_system {
                 };
             }
 
-            // Mint resources for all parcels owned by each player
-            if rc.iron.is_non_zero() {
-                let world_config: WorldConfig = world.read_model(0_u8);
-                let mut p: u32 = 0;
-                while p < world_config.total_parcels {
-                    let parcel: Parcel = world.read_model(p);
-                    if parcel.owner == state.player_a {
-                        self.mint_parcel_resources(@rc, parcel.parcel_type, state.player_a, 1_u256);
-                    } else if parcel.owner == state.player_b {
-                        self.mint_parcel_resources(@rc, parcel.parcel_type, state.player_b, 1_u256);
-                    }
-                    p += 1;
-                };
-            }
+            // No resource minting here: the per-parcel drip loop was removed —
+            // players collect resources through the hourly claim_drip instead.
+            // It scanned the whole map and minted per parcel, dominating the
+            // transaction's gas and pushing it past paymaster sponsorship limits.
 
             world.write_model(@stakes);
         }
@@ -1227,51 +1265,6 @@ pub mod world_system {
             }
         }
 
-        /// Find and release the loser's furthest-from-home parcel (becomes unclaimed).
-        /// If the player only has home parcels, no parcel is released.
-        fn release_furthest_parcel(ref self: ContractState, player: ContractAddress) {
-            let mut world = self.world_default();
-            let mut kingdom: PlayerKingdom = world.read_model(player);
-            let config: WorldConfig = world.read_model(0_u8);
-
-            // Get home parcel coordinates
-            let h0: Parcel = world.read_model(kingdom.home_0);
-            let h1: Parcel = world.read_model(kingdom.home_1);
-            let h2: Parcel = world.read_model(kingdom.home_2);
-
-            let mut max_dist: u16 = 0;
-            let mut furthest_id: u32 = 0;
-            let mut found = false;
-            let zero_addr: ContractAddress = 0.try_into().unwrap();
-
-            let mut p: u32 = 0;
-            while p < config.total_parcels {
-                let parcel: Parcel = world.read_model(p);
-                if parcel.owner == player && !parcel.is_home {
-                    // Min distance to any home parcel
-                    let d0 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, h0.col, h0.row);
-                    let d1 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, h1.col, h1.row);
-                    let d2 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, h2.col, h2.row);
-                    let min_d = if d0 < d1 { if d0 < d2 { d0 } else { d2 } } else { if d1 < d2 { d1 } else { d2 } };
-
-                    if min_d > max_dist || !found {
-                        max_dist = min_d;
-                        furthest_id = p;
-                        found = true;
-                    }
-                }
-                p += 1;
-            };
-
-            if found {
-                let mut parcel: Parcel = world.read_model(furthest_id);
-                parcel.owner = zero_addr;
-                world.write_model(@parcel);
-                kingdom.parcel_count -= 1;
-                world.write_model(@kingdom);
-            }
-        }
-
         fn is_adjacent_to_territory(
             self: @ContractState, player: ContractAddress, col: u16, row: u16,
         ) -> bool {
@@ -1292,30 +1285,6 @@ pub mod world_system {
                 p += 1;
             };
             adjacent
-        }
-
-        fn has_adjacent_to_any_home(
-            self: @ContractState, pillager: ContractAddress, target: ContractAddress,
-        ) -> bool {
-            let world = self.world_default();
-            let kingdom: PlayerKingdom = world.read_model(target);
-            if !kingdom.registered {
-                return false;
-            }
-
-            let home_ids: Array<u32> = array![kingdom.home_0, kingdom.home_1, kingdom.home_2];
-            let mut i: u32 = 0;
-            let mut found = false;
-            while i < 3 {
-                if !found {
-                    let home: Parcel = world.read_model(*home_ids.at(i));
-                    if self.is_adjacent_to_territory(pillager, home.col, home.row) {
-                        found = true;
-                    }
-                }
-                i += 1;
-            };
-            found
         }
     }
 }

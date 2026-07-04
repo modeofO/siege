@@ -89,6 +89,7 @@ mod tests {
     };
     use siege_dojo::models::resource_config::ResourceConfig;
     use siege_dojo::tokens::ability_token::{AbilityToken, IAbilityTokenDispatcher, IAbilityTokenDispatcherTrait};
+    use siege_dojo::tokens::resource_token::{ResourceToken, IResourceTokenDispatcher, IResourceTokenDispatcherTrait};
     use super::{MockVrfProvider, MockAccount};
 
     // ERC-1155 read interface for balance checks
@@ -96,6 +97,12 @@ mod tests {
     trait IERC1155Like<T> {
         fn balance_of(self: @T, account: starknet::ContractAddress, token_id: u256) -> u256;
         fn set_approval_for_all(ref self: T, operator: starknet::ContractAddress, approved: bool);
+    }
+
+    // ERC-20 read interface for resource balance checks
+    #[starknet::interface]
+    trait IERC20Bal<T> {
+        fn balance_of(self: @T, account: starknet::ContractAddress) -> u256;
     }
 
     fn deploy_mock_vrf() -> starknet::ContractAddress {
@@ -123,6 +130,33 @@ mod tests {
             MockAccount::TEST_CLASS_HASH.try_into().unwrap(), 0, array![].span(), false,
         ).unwrap_syscall();
         addr
+    }
+
+    fn deploy_resource_token(
+        name: ByteArray,
+        symbol: ByteArray,
+        minter: starknet::ContractAddress,
+    ) -> (IResourceTokenDispatcher, IERC20BalDispatcher, starknet::ContractAddress) {
+        let mut calldata: Array<felt252> = array![];
+        name.serialize(ref calldata);
+        symbol.serialize(ref calldata);
+        minter.serialize(ref calldata);
+        let (addr, _) = starknet::syscalls::deploy_syscall(
+            ResourceToken::TEST_CLASS_HASH.try_into().unwrap(), 0, calldata.span(), false,
+        ).unwrap_syscall();
+        (
+            IResourceTokenDispatcher { contract_address: addr },
+            IERC20BalDispatcher { contract_address: addr },
+            addr,
+        )
+    }
+
+    // Min hex distance from a parcel to any of the three given home parcels.
+    fn min_home_dist(parcel: @Parcel, h0: @Parcel, h1: @Parcel, h2: @Parcel) -> u16 {
+        let d0 = siege_dojo::utils::hex::hex_distance(*parcel.col, *parcel.row, *h0.col, *h0.row);
+        let d1 = siege_dojo::utils::hex::hex_distance(*parcel.col, *parcel.row, *h1.col, *h1.row);
+        let d2 = siege_dojo::utils::hex::hex_distance(*parcel.col, *parcel.row, *h2.col, *h2.row);
+        if d0 < d1 { if d0 < d2 { d0 } else { d2 } } else { if d1 < d2 { d1 } else { d2 } }
     }
 
     // Full setup: world + 10 parcels + ability token + 2 registered players
@@ -484,6 +518,139 @@ mod tests {
         assert(abilities.a_ability_3 == 0, 'a slot 3 should be empty');
         // B has 1 ability
         assert(abilities.b_ability_1 == 1, 'b should have ability 1');
+    }
+
+    #[test]
+    fn test_settle_releases_furthest_parcel_specifically() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+
+        // B's home coordinates
+        let kb: PlayerKingdom = world.read_model(player_b);
+        let h0: Parcel = world.read_model(kb.home_0);
+        let h1: Parcel = world.read_model(kb.home_1);
+        let h2: Parcel = world.read_model(kb.home_2);
+
+        // Among unclaimed parcels, pick the nearest and the furthest from B's homes
+        let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
+        let config: WorldConfig = world.read_model(0_u8);
+        let mut near_id: u32 = 0;
+        let mut near_d: u16 = 0xffff;
+        let mut far_id: u32 = 0;
+        let mut far_d: u16 = 0;
+        let mut p: u32 = 0;
+        while p < config.total_parcels {
+            let parcel: Parcel = world.read_model(p);
+            if parcel.owner == zero_addr {
+                let d = min_home_dist(@parcel, @h0, @h1, @h2);
+                if d < near_d {
+                    near_d = d;
+                    near_id = p;
+                }
+                if d > far_d {
+                    far_d = d;
+                    far_id = p;
+                }
+            }
+            p += 1;
+        };
+        // Setup sanity: the release choice is only meaningful with distinct distances
+        assert(near_d < far_d, 'need distinct distances');
+
+        // Give both to B as non-home parcels
+        let mut near: Parcel = world.read_model(near_id);
+        near.owner = player_b;
+        near.is_home = false;
+        world.write_model_test(@near);
+        let mut far: Parcel = world.read_model(far_id);
+        far.owner = player_b;
+        far.is_home = false;
+        world.write_model_test(@far);
+        let mut kb2: PlayerKingdom = world.read_model(player_b);
+        kb2.parcel_count += 2;
+        world.write_model_test(@kb2);
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        // B loses
+        world.write_model_test(@MatchState1v1 {
+            match_id, player_a, player_b,
+            vault_a_hp: 30, vault_b_hp: 0,
+            current_round: 5, status: MatchStatus::Finished,
+        });
+
+        world_sys.settle_match(match_id);
+
+        // The FURTHEST parcel is released; the nearer one stays with B
+        let far_after: Parcel = world.read_model(far_id);
+        assert(far_after.owner == zero_addr, 'far parcel released');
+        let near_after: Parcel = world.read_model(near_id);
+        assert(near_after.owner == player_b, 'near parcel kept');
+        let kb_after: PlayerKingdom = world.read_model(player_b);
+        assert(kb_after.parcel_count == kb2.parcel_count - 1, 'count down by one');
+    }
+
+    #[test]
+    fn test_settle_does_not_mint_resources() {
+        let (mut world, world_sys, player_a, player_b, _erc1155) = full_setup();
+        let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+
+        // Wire real resource tokens AFTER registration so any settle-time
+        // drip minting would be the only balance change.
+        let test_minter = contract_address_const::<0xBEEF>();
+        starknet::testing::set_contract_address(test_minter);
+        let (iron_tok, iron_bal, iron_addr) = deploy_resource_token("Iron", "IRON", test_minter);
+        let (linen_tok, linen_bal, linen_addr) = deploy_resource_token("Linen", "LINEN", test_minter);
+        let (stone_tok, stone_bal, stone_addr) = deploy_resource_token("Stone", "STONE", test_minter);
+        let (wood_tok, wood_bal, wood_addr) = deploy_resource_token("Wood", "WOOD", test_minter);
+        let (ember_tok, ember_bal, ember_addr) = deploy_resource_token("Ember", "EMBER", test_minter);
+        let (seeds_tok, seeds_bal, seeds_addr) = deploy_resource_token("Seeds", "SEEDS", test_minter);
+        iron_tok.set_minter2(world_sys_addr);
+        linen_tok.set_minter2(world_sys_addr);
+        stone_tok.set_minter2(world_sys_addr);
+        wood_tok.set_minter2(world_sys_addr);
+        ember_tok.set_minter2(world_sys_addr);
+        seeds_tok.set_minter2(world_sys_addr);
+
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.iron = iron_addr;
+        rc.linen = linen_addr;
+        rc.stone = stone_addr;
+        rc.wood = wood_addr;
+        rc.ember = ember_addr;
+        rc.seeds = seeds_addr;
+        world.write_model_test(@rc);
+
+        starknet::testing::set_contract_address(player_a);
+        let match_id = world_sys.create_staked_match(player_b, array![1]);
+        starknet::testing::set_contract_address(player_b);
+        world_sys.join_staked_match(match_id, array![2]);
+
+        // A wins
+        world.write_model_test(@MatchState1v1 {
+            match_id, player_a, player_b,
+            vault_a_hp: 30, vault_b_hp: 0,
+            current_round: 5, status: MatchStatus::Finished,
+        });
+
+        world_sys.settle_match(match_id);
+
+        // Settle must not mint any resources for either player
+        assert(iron_bal.balance_of(player_a) == 0_u256, 'no iron minted to a');
+        assert(linen_bal.balance_of(player_a) == 0_u256, 'no linen minted to a');
+        assert(stone_bal.balance_of(player_a) == 0_u256, 'no stone minted to a');
+        assert(wood_bal.balance_of(player_a) == 0_u256, 'no wood minted to a');
+        assert(ember_bal.balance_of(player_a) == 0_u256, 'no ember minted to a');
+        assert(seeds_bal.balance_of(player_a) == 0_u256, 'no seeds minted to a');
+        assert(iron_bal.balance_of(player_b) == 0_u256, 'no iron minted to b');
+        assert(stone_bal.balance_of(player_b) == 0_u256, 'no stone minted to b');
+        assert(ember_bal.balance_of(player_b) == 0_u256, 'no ember minted to b');
+
+        // ...and the settle itself completed
+        let stakes: MatchStakes1v1 = world.read_model(match_id);
+        assert(stakes.settled, 'settled');
     }
 
     // -------- cancel_staked_match (#46) --------

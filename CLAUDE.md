@@ -115,7 +115,7 @@ Registration claims three home parcels: the first maximizes distance to already-
 
 `claim_drip` mints for the player's three homes once per hour (`DRIP_INTERVAL = 3600`), skipping actively pillaged homes. There is no zone multiplier.
 
-`settle_match` handles ability transfer/refund, win stats, reputation, match records, resource drip, loser's non-home release, and pillage eligibility.
+`settle_match` handles ability transfer/refund, win stats, reputation, match records, loser's non-home release, and pillage eligibility in a single map scan — it does not mint resources (removed to keep the tx sponsorable; players use `claim_drip`).
 
 `claim_parcel` claims one unclaimed adjacent parcel after a settled staked-match win and assigns its parcel type.
 
