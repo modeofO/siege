@@ -1,6 +1,6 @@
 "use client";
 
-import type { SessionPolicies } from "@cartridge/presets";
+import type { SessionPolicies, Method } from "@cartridge/presets";
 import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
 import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
 import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
@@ -41,7 +41,16 @@ export const SESSION_POLICIES: SessionPolicies = {
         addr,
         {
           methods: [
-            { name: "Approve", entrypoint: "approve" },
+            // Cartridge requires spender + amount on approve session policies
+            // (bare approve entries are deprecated and will be rejected).
+            // Resource approvals only ever grant crafting_1v1; amounts are raw
+            // integers (no decimals), so this cap is far above any craft cost.
+            {
+              name: "Approve",
+              entrypoint: "approve",
+              spender: CRAFTING_1V1_ADDRESS,
+              amount: "0xffffffff",
+            } as Method,
             { name: "Transfer", entrypoint: "transfer" },
           ],
         },

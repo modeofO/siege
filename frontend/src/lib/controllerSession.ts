@@ -27,6 +27,7 @@ interface ControllerProviderWithSession {
   id?: string;
   keychain?: ControllerKeychain;
   updateSession?: (options: { policies: typeof SESSION_POLICIES }) => Promise<unknown>;
+  openExecute?: (calls: Call[]) => Promise<{ status: boolean; transactionHash?: string } | undefined>;
 }
 
 function toArray(calls: AllowArray<Call>): Call[] {
@@ -46,7 +47,11 @@ function isPaymasterInfraError(e: unknown): boolean {
       : e && typeof e === "object" && "message" in e
         ? String((e as { message: unknown }).message)
         : "";
-  return msg.includes("AVNU sponsorship failed") || msg.includes("paymaster");
+  return (
+    msg.includes("AVNU sponsorship failed") ||
+    msg.includes("self-funded") ||
+    msg.toLowerCase().includes("paymaster")
+  );
 }
 
 function throwSessionError(reply: ExecuteReply): never {
@@ -94,7 +99,30 @@ async function executeWithSession(
   throwSessionError(reply);
 }
 
-export async function executeControllerPaymaster(
+// With propagateSessionErrors:true, account.execute() rejects on session
+// failures without ever opening the Controller window. openExecute() is the
+// explicit interactive path: it opens the keychain UI, lets the user confirm
+// and pay the fee themselves, and returns { status, transactionHash }.
+async function manualExecute(
+  controller: ControllerProviderWithSession,
+  account: AccountInterface,
+  calls: Call[],
+  details?: UniversalDetails,
+): Promise<InvokeFunctionResponse> {
+  if (!controller.openExecute) return account.execute(calls, details);
+  const result = await controller.openExecute(calls);
+  if (!result?.status || !result.transactionHash) {
+    throw new Error("Manual transaction was cancelled or failed in the Controller window.");
+  }
+  return { transaction_hash: result.transactionHash };
+}
+
+// Fallback chain: session PAYMASTER → session CREDITS → interactive
+// Controller window (user pays fees). The last step covers the keychain's
+// "AVNU self-funded should be executed via paymaster RPC directly" failure,
+// where both session fee sources are dead but a manual transaction still
+// goes through.
+export async function resilientExecute(
   account: AccountInterface,
   calls: AllowArray<Call>,
   details?: UniversalDetails,
@@ -108,27 +136,15 @@ export async function executeControllerPaymaster(
   } catch (e) {
     if (!isPaymasterInfraError(e)) throw e;
     console.warn("[siege] Paymaster unavailable, retrying with CREDITS:", e);
-    return executeWithSession(controller, callArray, FeeSource.CREDITS);
-  }
-}
-
-export async function resilientExecute(
-  account: AccountInterface,
-  calls: AllowArray<Call>,
-  details?: UniversalDetails,
-): Promise<InvokeFunctionResponse> {
-  const controller = getControllerProvider(account);
-
-  if (controller) {
-    const callArray = toArray(calls);
     try {
-      return await executeWithSession(controller, callArray, FeeSource.PAYMASTER);
-    } catch (e) {
-      if (!isPaymasterInfraError(e)) throw e;
-      console.warn("[siege] Paymaster unavailable, retrying with CREDITS:", e);
-      return executeWithSession(controller, callArray, FeeSource.CREDITS);
+      return await executeWithSession(controller, callArray, FeeSource.CREDITS);
+    } catch (e2) {
+      if (!isPaymasterInfraError(e2)) throw e2;
+      console.warn("[siege] Session fee sources exhausted, opening manual Controller window:", e2);
+      return manualExecute(controller, account, callArray, details);
     }
   }
-
-  return account.execute(calls, details);
 }
+
+// Back-compat alias — same fallback chain.
+export const executeControllerPaymaster = resilientExecute;
