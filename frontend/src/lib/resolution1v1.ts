@@ -97,3 +97,131 @@ export function resolveNodeContests(
   }
   return { owners: after, captures };
 }
+
+export interface GateStage {
+  dmgToA: number[]; // per gate, post-cloak, post-reflection, pre-Hex
+  dmgToB: number[];
+  effective: {
+    attackA: number[];
+    defenseA: number[];
+    attackB: number[];
+    defenseB: number[];
+  };
+}
+
+const MOD_NARROW = 1;
+const MOD_MIRROR = 2;
+const MOD_DEADLOCK = 3;
+const MOD_REFLECT = 4;
+
+export function computeGateStage(
+  moveA: PlayerMove,
+  moveB: PlayerMove,
+  modifiers: [number, number, number],
+  postNodeOwners: [NodeOwner, NodeOwner, NodeOwner],
+): GateStage {
+  const aType = abilityType(moveA.abilityId);
+  const aTier = abilityTier(moveA.abilityId);
+  const bType = abilityType(moveB.abilityId);
+  const bTier = abilityTier(moveB.abilityId);
+
+  const dmgToA = [0, 0, 0];
+  const dmgToB = [0, 0, 0];
+  const ovfToA = [0, 0, 0];
+  const ovfToB = [0, 0, 0];
+  // Unused defense only recorded at Normal/Narrow/Mirror gates (Cairo parity).
+  const unusedDefA = [0, 0, 0];
+  const unusedDefB = [0, 0, 0];
+  const eff = {
+    attackA: [0, 0, 0],
+    defenseA: [0, 0, 0],
+    attackB: [0, 0, 0],
+    defenseB: [0, 0, 0],
+  };
+
+  for (let g = 0; g < 3; g++) {
+    const mod = modifiers[g];
+    let aa = moveA.attack[g];
+    let ad = moveA.defense[g];
+    let ba = moveB.attack[g];
+    let bd = moveB.defense[g];
+
+    if (mod === MOD_NARROW) {
+      aa = Math.min(aa, 3);
+      ad = Math.min(ad, 3);
+      ba = Math.min(ba, 3);
+      bd = Math.min(bd, 3);
+    }
+    if (mod === MOD_MIRROR) {
+      [aa, ad] = [ad, aa];
+      [ba, bd] = [bd, ba];
+    }
+
+    // Fortify: caster's defense at every gate. T1 +1, T2 x2.
+    if (aType === 5) ad = aTier === 1 ? ad + 1 : ad * 2;
+    if (bType === 5) bd = bTier === 1 ? bd + 1 : bd * 2;
+
+    // Siege Sword: override caster's attack at the target gate.
+    if (aType === 1 && g === moveA.abilityTarget) aa = aTier === 1 ? 5 : 10;
+    if (bType === 1 && g === moveB.abilityTarget) ba = bTier === 1 ? 5 : 10;
+
+    // Node defense: post-contest owner of node g gets +1 at gate g.
+    if (postNodeOwners[g] === "teamA") ad += 1;
+    else if (postNodeOwners[g] === "teamB") bd += 1;
+
+    eff.attackA[g] = aa;
+    eff.defenseA[g] = ad;
+    eff.attackB[g] = ba;
+    eff.defenseB[g] = bd;
+
+    if (mod === MOD_DEADLOCK) {
+      // no damage, no unused-defense bookkeeping (Cairo parity)
+    } else if (mod === MOD_REFLECT) {
+      if (aa > bd) ovfToB[g] = aa - bd;
+      if (ba > ad) ovfToA[g] = ba - ad;
+    } else {
+      if (aa > bd) dmgToB[g] = aa - bd;
+      else unusedDefB[g] = bd - aa;
+      if (ba > ad) dmgToA[g] = ba - ad;
+      else unusedDefA[g] = ad - ba;
+    }
+  }
+
+  // Stone Cloak (either tier): halve damage and overflow aimed at caster,
+  // BEFORE reflection distribution (Cairo lines 287-310).
+  if (aType === 2) {
+    for (let g = 0; g < 3; g++) {
+      dmgToA[g] = Math.floor(dmgToA[g] / 2);
+      ovfToA[g] = Math.floor(ovfToA[g] / 2);
+    }
+  }
+  if (bType === 2) {
+    for (let g = 0; g < 3; g++) {
+      dmgToB[g] = Math.floor(dmgToB[g] / 2);
+      ovfToB[g] = Math.floor(ovfToB[g] / 2);
+    }
+  }
+
+  // Reflection distribution: half of each gate's overflow to every other
+  // non-Deadlock gate, reduced by (not consuming) unused defense there.
+  for (let g = 0; g < 3; g++) {
+    if (ovfToB[g] > 0) {
+      const per = Math.floor(ovfToB[g] / 2);
+      for (let t = 0; t < 3; t++) {
+        if (t !== g && modifiers[t] !== MOD_DEADLOCK && per > unusedDefB[t]) {
+          dmgToB[t] += per - unusedDefB[t];
+        }
+      }
+    }
+    if (ovfToA[g] > 0) {
+      const per = Math.floor(ovfToA[g] / 2);
+      for (let t = 0; t < 3; t++) {
+        if (t !== g && modifiers[t] !== MOD_DEADLOCK && per > unusedDefA[t]) {
+          dmgToA[t] += per - unusedDefA[t];
+        }
+      }
+    }
+  }
+
+  return { dmgToA, dmgToB, effective: eff };
+}
