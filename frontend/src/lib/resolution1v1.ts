@@ -225,3 +225,128 @@ export function computeGateStage(
 
   return { dmgToA, dmgToB, effective: eff };
 }
+
+// Public entry point — mirrors resolution_1v1.cairo resolve_round (lines 357-537).
+// Pipeline order is load-bearing: node contests -> gate stage -> Hex on totals ->
+// repair (enemy T2 cloak negation, cap 50) -> gate damage -> Ember -> traps -> win.
+export function resolveRoundLocal(inputs: RoundInputs): RoundOutcome {
+  const { moveA, moveB, modifiers, round } = inputs;
+  const events: RoundEvent[] = [];
+
+  // 1. Node contests (before gate math — captured node defends same round).
+  const contests = resolveNodeContests(moveA.nodeContest, moveB.nodeContest, inputs.nodeOwners);
+  for (const c of contests.captures) {
+    events.push({ kind: "node_captured", node: c.node, from: c.from, to: c.to });
+  }
+
+  // 2. Gate stage (modifiers, Fortify, Siege Sword, node defense, cloak, reflection).
+  const stage = computeGateStage(moveA, moveB, modifiers, contests.owners);
+  for (let g = 0; g < 3; g++) {
+    if (stage.dmgToA[g] > 0 || stage.dmgToB[g] > 0) {
+      events.push({ kind: "troops_clash", gate: g, dmgToA: stage.dmgToA[g], dmgToB: stage.dmgToB[g] });
+    }
+  }
+
+  // 3. Hex: reduce total incoming gate damage.
+  const aType = abilityType(moveA.abilityId);
+  const aTier = abilityTier(moveA.abilityId);
+  const bType = abilityType(moveB.abilityId);
+  const bTier = abilityTier(moveB.abilityId);
+
+  let totalToA = stage.dmgToA[0] + stage.dmgToA[1] + stage.dmgToA[2];
+  let totalToB = stage.dmgToB[0] + stage.dmgToB[1] + stage.dmgToB[2];
+  if (aType === 4) totalToA = Math.max(0, totalToA - (aTier === 1 ? 3 : 8));
+  if (bType === 4) totalToB = Math.max(0, totalToB - (bTier === 1 ? 3 : 8));
+
+  // 4. Repair (enemy T2 cloak negates), capped at 50, BEFORE damage.
+  const repairA = bType === 2 && bTier === 2 ? 0 : moveA.repair;
+  const repairB = aType === 2 && aTier === 2 ? 0 : moveB.repair;
+  let hpA = inputs.vaultAHp;
+  let hpB = inputs.vaultBHp;
+  hpA = Math.min(50, hpA + repairA);
+  hpB = Math.min(50, hpB + repairB);
+  if (repairA > 0) events.push({ kind: "vault_repaired", side: "a", amount: repairA });
+  if (repairB > 0) events.push({ kind: "vault_repaired", side: "b", amount: repairB });
+
+  // 5. Gate damage (dmg >= hp -> 0, Cairo comparison).
+  hpA = totalToA >= hpA ? 0 : hpA - totalToA;
+  hpB = totalToB >= hpB ? 0 : hpB - totalToB;
+  if (totalToA > 0) events.push({ kind: "vault_damaged", side: "a", amount: totalToA });
+  if (totalToB > 0) events.push({ kind: "vault_damaged", side: "b", amount: totalToB });
+
+  // 6. Ember Blast: direct vault damage after gate damage (hp > dmg comparison).
+  let emberToA = 0;
+  let emberToB = 0;
+  if (aType === 3) {
+    emberToB = aTier === 1 ? 2 : 6;
+    hpB = hpB > emberToB ? hpB - emberToB : 0;
+    events.push({ kind: "ember_blast", side: "b", amount: emberToB });
+  }
+  if (bType === 3) {
+    emberToA = bTier === 1 ? 2 : 6;
+    hpA = hpA > emberToA ? hpA - emberToA : 0;
+    events.push({ kind: "ember_blast", side: "a", amount: emberToA });
+  }
+
+  // 7. Traps: node changed owner + previous owner armed a trap -> flat 5,
+  // applied post-repair (unhealable).
+  let trapToA = 0;
+  let trapToB = 0;
+  for (const c of contests.captures) {
+    if (c.from === "teamA" && moveA.traps[c.node] === 1) {
+      trapToB += 5;
+      events.push({ kind: "trap_detonated", node: c.node, victim: "b", amount: 5 });
+    }
+    if (c.from === "teamB" && moveB.traps[c.node] === 1) {
+      trapToA += 5;
+      events.push({ kind: "trap_detonated", node: c.node, victim: "a", amount: 5 });
+    }
+  }
+  hpA = trapToA >= hpA ? 0 : hpA - trapToA;
+  hpB = trapToB >= hpB ? 0 : hpB - trapToB;
+
+  // 8. Win condition.
+  let finished = false;
+  let winnerTeam: 0 | 1 | 2 | null = null;
+  if (hpA === 0 || hpB === 0) {
+    finished = true;
+    winnerTeam = hpB === 0 && hpA > 0 ? 1 : hpA === 0 && hpB > 0 ? 2 : 0;
+  } else if (round >= 10) {
+    finished = true;
+    winnerTeam = hpA > hpB ? 1 : hpB > hpA ? 2 : 0;
+  }
+  if (finished && winnerTeam !== null) {
+    events.push({ kind: "match_finished", winnerTeam });
+  }
+
+  const gates = [0, 1, 2].map((g) => ({
+    gate: g,
+    modifier: modifiers[g],
+    attackA: stage.effective.attackA[g],
+    defenseA: stage.effective.defenseA[g],
+    attackB: stage.effective.attackB[g],
+    defenseB: stage.effective.defenseB[g],
+    dmgToA: stage.dmgToA[g],
+    dmgToB: stage.dmgToB[g],
+  })) as [GateOutcome, GateOutcome, GateOutcome];
+
+  return {
+    nodeOwnersAfter: contests.owners,
+    nodeCaptures: contests.captures,
+    gates,
+    totalDamageToA: totalToA,
+    totalDamageToB: totalToB,
+    repairA,
+    repairB,
+    emberToA,
+    emberToB,
+    trapDamageToA: trapToA,
+    trapDamageToB: trapToB,
+    vaultAHpAfter: hpA,
+    vaultBHpAfter: hpB,
+    finished,
+    winnerTeam,
+    nextModifiersKnown: false,
+    events,
+  };
+}
