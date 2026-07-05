@@ -13,10 +13,15 @@ import {
   useRoundModifiers1v1,
   useMatchAbilities1v1,
   useRevealedMoves1v1,
+  computeBudget,
   MODIFIER_NAMES,
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1, NodeOwner } from "@/lib/gameState1v1";
 import { resolveRoundLocal } from "@/lib/resolution1v1";
+import { IntelDrawer } from "@/components/intel/IntelDrawer";
+import { useOpponentIntel } from "@/lib/intel/queries";
+import { detectDeviation } from "@/lib/intel/bluff";
+import { savePreDraft, loadPreDraft } from "@/lib/intel/predraft";
 import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, clearCommitData1v1 } from "@/lib/crypto";
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
@@ -140,6 +145,45 @@ export default function Match1v1Page() {
 
   const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined, refreshKey);
   const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined, refreshKey);
+
+  // --- War Table Intel ---
+  // Opponent address (null until roles resolve). The intel hook keeps stale data
+  // when the opponent goes null, so the drawer is only rendered when it's truthy.
+  const opponentAddr = state ? (isPlayerA ? state.playerB : state.playerA) : null;
+  const intel = useOpponentIntel(opponentAddr, address ?? null, matchId, state?.round ?? 0);
+  const bluff = useMemo(
+    () =>
+      intel.profile && intel.currentRounds.length
+        ? detectDeviation(intel.currentRounds, intel.profile)
+        : null,
+    [intel.profile, intel.currentRounds],
+  );
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  // Pre-draft sketch for the NEXT round. `preDraft` must be a STABLE reference:
+  // the drawer reseeds its scratch state by reference-comparing this prop, so a
+  // fresh array on every render would silently wipe an in-progress sketch. We
+  // hold it in state (seeded lazily from storage) and only swap the reference in
+  // two cases — a round change (reseed from that round's saved sketch, via the
+  // render-time state-adjustment pattern, no effect) and an explicit save (adopt
+  // the just-saved array). This keeps storage and the in-memory reference in
+  // sync without a memo/nonce that trips react-hooks/exhaustive-deps.
+  const preDraftForRound = (state?.round ?? 0) + 1;
+  const [preDraft, setPreDraft] = useState<number[] | null>(
+    () => loadPreDraft(matchId, preDraftForRound)?.allocations ?? null,
+  );
+  const [preDraftLoadedForRound, setPreDraftLoadedForRound] = useState(preDraftForRound);
+  if (preDraftLoadedForRound !== preDraftForRound) {
+    setPreDraftLoadedForRound(preDraftForRound);
+    setPreDraft(loadPreDraft(matchId, preDraftForRound)?.allocations ?? null);
+  }
+  const handleSavePreDraft = useCallback(
+    (alloc: number[]) => {
+      savePreDraft(matchId, preDraftForRound, alloc);
+      setPreDraft(alloc);
+    },
+    [matchId, preDraftForRound],
+  );
 
   const handleAbilitySelect = useCallback((abilityId: number, target: number) => {
     setSelectedAbility(abilityId);
@@ -785,6 +829,25 @@ export default function Match1v1Page() {
   const opponentCommitted =
     effectiveCommitCount >= 2 || (effectiveCommitCount >= 1 && !effectiveCommitted);
 
+  // --- Intel pre-draft wiring ---
+  // Budget the sketch should assume for the round it plans (state.round + 1).
+  const myTeam: "teamA" | "teamB" = isPlayerA ? "teamA" : "teamB";
+  const projectedBudget = computeBudget(state.nodes, myTeam, state.round + 1);
+  // "Load Into Orders" is only offered while we can still edit this round's
+  // commit. It copies the SAVED sketch (a 10-slot array) into the 13-slot
+  // allocation form, padding the three trap slots to 0 — the pre-draft UI has no
+  // trap inputs, and the form's own budget guard rejects any overspend, so we
+  // don't attempt to re-validate here.
+  const onLoadIntoOrders =
+    state.phase === "committing" && !effectiveCommitted
+      ? () => {
+          const next = new Array(13).fill(0);
+          const src = preDraft ?? [];
+          for (let i = 0; i < 13; i++) next[i] = src[i] || 0;
+          setAllocations(next);
+        }
+      : null;
+
   return (
     <div className="space-y-2 max-w-7xl mx-auto">
       {/* ===== 1. HEADER BANNER ===== */}
@@ -810,6 +873,19 @@ export default function Match1v1Page() {
             <span className="text-[10px] text-[#7a7060] border border-[#3d3428] rounded px-2 py-0.5">
               Player {isPlayerA ? "A" : "B"}
             </span>
+            {opponentAddr && (
+              <button
+                id="intel-toggle"
+                onClick={() => setDrawerOpen((o) => !o)}
+                aria-label="Toggle war table intel"
+                aria-pressed={drawerOpen}
+                className={`text-[10px] tracking-wider uppercase font-serif font-bold text-[#c8a44e] border border-[#c8a44e]/60 rounded px-2 py-0.5 hover:bg-[#c8a44e]/10 transition-colors ${
+                  phaseText ? "animate-pulse" : ""
+                }`}
+              >
+                Intel
+              </button>
+            )}
           </div>
         </div>
 
@@ -1196,6 +1272,20 @@ export default function Match1v1Page() {
       <div className="text-[10px] text-[#3d3428] text-center pb-4">
         Move data stored in localStorage until revealed. Auto-reveal triggers when both players commit.
       </div>
+
+      {opponentAddr && (
+        <IntelDrawer
+          open={drawerOpen}
+          onClose={() => setDrawerOpen(false)}
+          intel={intel}
+          bluff={bluff}
+          opponentLabel={`${opponentAddr.slice(0, 6)}…${opponentAddr.slice(-4)}`}
+          projectedBudget={projectedBudget}
+          preDraft={preDraft}
+          onSavePreDraft={handleSavePreDraft}
+          onLoadIntoOrders={onLoadIntoOrders}
+        />
+      )}
     </div>
   );
 }
