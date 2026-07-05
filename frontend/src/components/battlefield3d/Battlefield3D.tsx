@@ -5,6 +5,7 @@ import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
 import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
 import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
+import { TroopFormations } from "./TroopFormations";
 
 const GATES: Array<0 | 1 | 2> = [0, 1, 2];
 
@@ -41,6 +42,9 @@ export default function Battlefield3D({
   children,
   allocations,
   isPlayerA,
+  committed,
+  opponentCommitted,
+  opponentAllocations,
   modifiers,
   nodes,
   vaultAHp,
@@ -50,6 +54,12 @@ export default function Battlefield3D({
   // vault HP onto player/enemy citadels by which slot the viewer holds.
   const playerHp = isPlayerA ? vaultAHp : vaultBHp;
   const enemyHp = isPlayerA ? vaultBHp : vaultAHp;
+
+  // Enemy cloak state: reveal true formations once opponentAllocations arrive;
+  // otherwise show 3 shrouded ghost pawns while they're committed-but-secret;
+  // render nothing before they commit.
+  const enemyRevealed = opponentAllocations != null;
+  const enemyCloaked = !enemyRevealed && opponentCommitted;
 
   return (
     <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg bg-[#1a1714]">
@@ -114,6 +124,17 @@ export default function Battlefield3D({
             position={nodePosition(g)}
           />
         ))}
+
+        {/* Troop formations bound to allocations. Player pieces come straight
+            from the viewer's allocation; enemy pieces are cloaked or revealed
+            per the fog-of-war rules above. */}
+        <TroopFormations side="player" allocations={allocations} committed={committed} cloaked={false} />
+        <TroopFormations
+          side="enemy"
+          allocations={enemyRevealed ? opponentAllocations : null}
+          committed={opponentCommitted}
+          cloaked={enemyCloaked}
+        />
       </Canvas>
       {/* DOM overlay: badges etc. render on top of the canvas. The overlay itself
           is pass-through; its own children opt back into pointer events. */}

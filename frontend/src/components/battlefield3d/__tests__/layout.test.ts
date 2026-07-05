@@ -83,6 +83,19 @@ describe("formationSlots", () => {
     for (const [, y] of slots) expect(y).toBeCloseTo(0.5, 9);
   });
 
+  it("uses a custom spacing when provided (shield-wall 0.14)", () => {
+    const slots = formationSlots([0, 0, 0], 4, -1, 0.14);
+    expect(slots.map(([x]) => x)).toEqual([-0.21, -0.07, 0.07, 0.21].map((v) => expect.closeTo(v, 9)));
+
+    // Second rank steps by the custom spacing along facing, not the 0.18 default.
+    const slots5 = formationSlots([0, 0, 0], 5, -1, 0.14);
+    expect(slots5[4][2]).toBeCloseTo(-0.14, 9);
+  });
+
+  it("defaults spacing to 0.18 when the argument is omitted", () => {
+    expect(formationSlots([0, 0, 0], 2, -1)).toEqual(formationSlots([0, 0, 0], 2, -1, 0.18));
+  });
+
   it("produces unique slot positions", () => {
     for (const facing of [1, -1] as const) {
       for (let n = 1; n <= 12; n++) {

@@ -41,14 +41,15 @@ const RANK_SIZE = 4;
 const SPACING = 0.18;
 
 /**
- * Distribute `n` pieces in ranks of 4, `SPACING` apart, centered on the
- * anchor's x. Successive ranks step `SPACING` AWAY from the anchor along the
+ * Distribute `n` pieces in ranks of 4, `spacing` apart, centered on the
+ * anchor's x. Successive ranks step `spacing` AWAY from the anchor along the
  * facing direction: `facing` is the sign of the Z direction the formation
  * extends toward (+1 → +Z for enemy pieces, −1 → −Z for player pieces).
- * Rank 0 sits at the anchor's z; rank r sits at `anchor.z + facing * r * SPACING`.
+ * Rank 0 sits at the anchor's z; rank r sits at `anchor.z + facing * r * spacing`.
+ * `spacing` defaults to 0.18; defensive shield-walls pass a tighter 0.14.
  * y is preserved from the anchor. n = 0 yields []. All slots are unique.
  */
-export function formationSlots(anchor: Vec3, n: number, facing: 1 | -1): Vec3[] {
+export function formationSlots(anchor: Vec3, n: number, facing: 1 | -1, spacing: number = SPACING): Vec3[] {
   const [ax, ay, az] = anchor;
   const slots: Vec3[] = [];
   for (let i = 0; i < n; i++) {
@@ -56,8 +57,8 @@ export function formationSlots(anchor: Vec3, n: number, facing: 1 | -1): Vec3[] 
     const posInRank = i % RANK_SIZE;
     const rankCount = Math.min(RANK_SIZE, n - rank * RANK_SIZE);
     // Center this rank's members on the anchor x.
-    const x = ax + (posInRank - (rankCount - 1) / 2) * SPACING;
-    const z = az + facing * rank * SPACING;
+    const x = ax + (posInRank - (rankCount - 1) / 2) * spacing;
+    const z = az + facing * rank * spacing;
     slots.push([x, ay, z]);
   }
   return slots;
