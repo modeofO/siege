@@ -19,6 +19,13 @@ function webglAvailable(): boolean {
 // NEXT_PUBLIC_BATTLE_3D=0 force-disables (dev escape hatch); default on.
 const FLAG_ON = process.env.NEXT_PUBLIC_BATTLE_3D !== "0";
 
+// True when the 3D battlefield path renders (flag on + WebGL available). The
+// page uses this to know the 3D scene — not the 2D BattleAnimation — is showing
+// the resolution, so it can skip 2D-only animation state.
+export function isBattle3DActive(): boolean {
+  return FLAG_ON && webglAvailable();
+}
+
 // `fallbackOnly` renders ONLY in the 2D fallback path (as BattlefieldView's
 // children). In the 3D path the scene plays the resolution itself, so this slot
 // — the 2D BattleAnimation overlay — is dropped. Anything that must appear in
@@ -29,7 +36,7 @@ export function Battlefield3DGate(
   props: Battlefield3DProps & { fallbackOnly?: ReactNode },
 ) {
   const { fallbackOnly, ...rest } = props;
-  const use3d = useMemo(() => FLAG_ON && webglAvailable(), []);
+  const use3d = useMemo(() => isBattle3DActive(), []);
 
   if (!use3d) {
     return (

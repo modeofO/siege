@@ -21,7 +21,7 @@ import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
-import { Battlefield3DGate } from "@/components/battlefield3d/Battlefield3DGate";
+import { Battlefield3DGate, isBattle3DActive } from "@/components/battlefield3d/Battlefield3DGate";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
 import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
@@ -328,6 +328,12 @@ export default function Match1v1Page() {
     }
   }, [state?.round, setAllocations, setAutoRevealStatus, setAutoRevealError, setRevealRetry, setSubmitting, setConfirming, setError]);
 
+  // Which battlefield path renders. When 3D is active the scene plays the
+  // resolution and the top HP bars read chain-correct raw vault props, so the
+  // 2D BattleAnimation state (heldHp/pendingResult) must not be set — nothing
+  // clears it in the 3D path, and a stuck heldHp would freeze the HP bars.
+  const battle3DActive = useMemo(() => isBattle3DActive(), []);
+
   // Detect round transitions and capture pre-resolution HP for the overlay.
   // Also reconciles the optimistic outcome against the chain resolve: if we
   // already animated this round optimistically, we skip the replay and just
@@ -361,7 +367,10 @@ export default function Match1v1Page() {
         }
         // Optimistic animation already played — don't replay. Chain-derived
         // HP bars (heldHp stays null) snap to the authoritative values.
-      } else if (justResolved) {
+      } else if (justResolved && !battle3DActive) {
+        // 2D path only: the BattleAnimation overlay consumes this state and
+        // handleResolutionComplete clears heldHp. In the 3D path that animation
+        // never mounts, so setting heldHp here would leave it stuck forever.
         setHeldHp({
           a: state.vaultAHp + justResolved.damageToA,
           b: state.vaultBHp + justResolved.damageToB,
@@ -373,7 +382,7 @@ export default function Match1v1Page() {
       setPrevNodes(state.nodes);
       prevRoundRef.current = currentRound;
     }
-  }, [state?.round, history, state, isPlayerA]);
+  }, [state?.round, history, state, isPlayerA, battle3DActive]);
 
   // Capture the optimistic outcome for later reconcile. Ref-only write (no
   // setState) so this effect doesn't run afoul of react-hooks/set-state-in-effect.
