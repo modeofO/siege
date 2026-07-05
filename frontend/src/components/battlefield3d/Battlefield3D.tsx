@@ -3,7 +3,18 @@
 import { Canvas } from "@react-three/fiber";
 import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
-import { PALETTE } from "./layout";
+import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
+import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
+
+const GATES: Array<0 | 1 | 2> = [0, 1, 2];
+
+// Remap a node owner into the viewer's perspective so teamA always reads as the
+// player (gold) and teamB as the enemy (crimson), whichever slot the viewer is.
+function perspectiveOwner(owner: NodeOwner, isPlayerA: boolean): NodeOwner {
+  if (owner === "neutral") return "neutral";
+  const playerTeam: NodeOwner = isPlayerA ? "teamA" : "teamB";
+  return owner === playerTeam ? "teamA" : "teamB";
+}
 
 export interface Battlefield3DProps {
   allocations: number[]; // 13-slot: [p0..p2, g0..g2, repair, nc0..nc2, trap0..trap2]
@@ -26,7 +37,20 @@ export interface Battlefield3DProps {
 // formations, and choreography arrive in later tasks. The map plane is 10 x 6
 // world units on XZ; the table surface is y = 0. See layout.ts / the Shared
 // Visual Language for the coordinate system.
-export default function Battlefield3D({ children }: Battlefield3DProps) {
+export default function Battlefield3D({
+  children,
+  allocations,
+  isPlayerA,
+  modifiers,
+  nodes,
+  vaultAHp,
+  vaultBHp,
+}: Battlefield3DProps) {
+  // The viewer always fights from the +Z (player) side, so map the raw A/B
+  // vault HP onto player/enemy citadels by which slot the viewer holds.
+  const playerHp = isPlayerA ? vaultAHp : vaultBHp;
+  const enemyHp = isPlayerA ? vaultBHp : vaultAHp;
+
   return (
     <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg bg-[#1a1714]">
       <Canvas
@@ -69,6 +93,27 @@ export default function Battlefield3D({ children }: Battlefield3DProps) {
           <planeGeometry args={[10, 6]} />
           <meshStandardMaterial color={PALETTE.parchment} roughness={0.8} />
         </mesh>
+
+        {/* Citadels: viewer's keep on +Z, enemy on −Z. */}
+        <CitadelPiece side="player" hp={playerHp} position={citadelPosition("player")} />
+        <CitadelPiece side="enemy" hp={enemyHp} position={citadelPosition("enemy")} />
+
+        {/* Gates left→right (data order 0/2/1) with their round modifiers. */}
+        {GATES.map((g) => (
+          <GatePiece key={g} gate={g} modifier={modifiers[g]} scorch={0} position={gatePosition(g)} />
+        ))}
+
+        {/* Node markers behind each gate; owner in viewer perspective, trap flag
+            from the viewer's own allocation (slots 10–12). */}
+        {GATES.map((g) => (
+          <NodeMarker
+            key={g}
+            node={g}
+            owner={perspectiveOwner(nodes[g], isPlayerA)}
+            trapped={allocations[10 + g] === 1}
+            position={nodePosition(g)}
+          />
+        ))}
       </Canvas>
       {/* DOM overlay: badges etc. render on top of the canvas. The overlay itself
           is pass-through; its own children opt back into pointer events. */}
