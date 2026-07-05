@@ -21,8 +21,11 @@ import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
 // and directions are all built once.
 //
 // This component owns ITS OWN effect meshes and the drei <Text> HP counters. It
-// does not reach into pieces / TroopFormations internals — it reads only the
-// shared layout positions and the outcome.
+// does not reach into pieces / TroopFormations internals — cross-component
+// signals flow through composition-root-owned refs instead: the displayed HP is
+// mirrored into `playerHpRef` / `enemyHpRef` (read by CitadelPiece for tier
+// visuals), and clash lunge envelopes are written into `playerLungeRef` /
+// `enemyLungeRef` (read by TroopFormations for the 0.2u attack-group lunge).
 //
 // HP display follows choreography.ts's HP SUMMATION CONTRACT exactly: start HP
 // (captured when the outcome appears) then, in order, + repair (clamp 50),
@@ -60,6 +63,16 @@ export interface ResolutionPlayerProps {
   // counts to the outcome's final HP.
   vaultAHp: number;
   vaultBHp: number;
+  // Shared displayed-HP refs (composition-root owned). The ticking HP shown on
+  // the <Text> counters is mirrored here every frame so CitadelPiece can drive
+  // its damage tiers from the same value.
+  playerHpRef?: React.RefObject<number>;
+  enemyHpRef?: React.RefObject<number>;
+  // Shared clash-lunge signals (composition-root owned): per-gate progress
+  // 0..1 for each side's attack formations. During a clash step the side that
+  // DEALT damage gets a 0→1→0 bell envelope at that gate.
+  playerLungeRef?: React.RefObject<[number, number, number]>;
+  enemyLungeRef?: React.RefObject<[number, number, number]>;
   onResolutionComplete?: () => void;
 }
 
@@ -68,6 +81,10 @@ export default function ResolutionPlayer({
   isPlayerA,
   vaultAHp,
   vaultBHp,
+  playerHpRef,
+  enemyHpRef,
+  playerLungeRef,
+  enemyLungeRef,
   onResolutionComplete,
 }: ResolutionPlayerProps) {
   // Built once per round (memo on outcome identity). Null when idle.
@@ -93,6 +110,10 @@ export default function ResolutionPlayer({
   const repairRefs = useMemo(() => [createRef<THREE.Mesh>(), createRef<THREE.Mesh>()], []); // [player, enemy]
   const emberRefs = useMemo(() => [createRef<THREE.Mesh>(), createRef<THREE.Mesh>()], []); // [player, enemy] victim
   const trapRefs = useMemo(() => GATES.map(() => createRef<THREE.Mesh>()), []);
+
+  // Per-banner last-set color: driveBanner re-tints a banner's material only
+  // when its owner color actually changes (never re-parses hex per frame).
+  const bannerColorCache = useMemo(() => GATES.map(() => ({ value: "" })), []);
 
   // Spark buffers + stable outward directions, allocated once per gate.
   const sparkData = useMemo(
@@ -126,6 +147,10 @@ export default function ResolutionPlayer({
     const idlePlayer = isPlayerA ? vaultAHp : vaultBHp;
     const idleEnemy = isPlayerA ? vaultBHp : vaultAHp;
 
+    // Lunge signals rest at 0 every frame; active clash steps rewrite below.
+    resetLunge(playerLungeRef);
+    resetLunge(enemyLungeRef);
+
     // ---- Idle / round-advanced: snap HP to live props, hide effects ----
     if (!timeline || !outcome) {
       if (lastOutcomeRef.current !== null) {
@@ -134,8 +159,8 @@ export default function ResolutionPlayer({
         elapsedRef.current = 0;
         completedRef.current = false;
       }
-      setHpText(playerText.current, Math.round(idlePlayer), lastPlayerShown);
-      setHpText(enemyText.current, Math.round(idleEnemy), lastEnemyShown);
+      setHpText(playerText.current, Math.round(idlePlayer), lastPlayerShown, playerHpRef);
+      setHpText(enemyText.current, Math.round(idleEnemy), lastEnemyShown, enemyHpRef);
       return;
     }
 
@@ -167,10 +192,16 @@ export default function ResolutionPlayer({
       switch (a.kind) {
         case "clash": {
           driveClash(flashRefs[a.gate].current, sparkRefs[a.gate].current, sparkData[a.gate], p, a.dmgToA + a.dmgToB);
+          // Lunge: the side that DEALT damage lunges toward the gate. dmgToB>0
+          // means side A's attackers connected (and vice versa); map a/b onto
+          // the player/enemy display sides via playerSide. Both may lunge.
+          const env = bell(p);
+          if (a.dmgToB > 0) writeLunge(playerSide === "a" ? playerLungeRef : enemyLungeRef, a.gate, env);
+          if (a.dmgToA > 0) writeLunge(playerSide === "b" ? playerLungeRef : enemyLungeRef, a.gate, env);
           break;
         }
         case "node_flip": {
-          driveBanner(bannerRefs[a.node].current, p, nodeDisplayColor(a.to, isPlayerA));
+          driveBanner(bannerRefs[a.node].current, p, nodeDisplayColor(a.to, isPlayerA), bannerColorCache[a.node]);
           break;
         }
         case "repair_glow": {
@@ -200,8 +231,8 @@ export default function ResolutionPlayer({
     const finalPlayer = isPlayerA ? outcome.vaultAHpAfter : outcome.vaultBHpAfter;
     const finalEnemy = isPlayerA ? outcome.vaultBHpAfter : outcome.vaultAHpAfter;
     if (elapsed >= total) {
-      setHpText(playerText.current, finalPlayer, lastPlayerShown);
-      setHpText(enemyText.current, finalEnemy, lastEnemyShown);
+      setHpText(playerText.current, finalPlayer, lastPlayerShown, playerHpRef);
+      setHpText(enemyText.current, finalEnemy, lastEnemyShown, enemyHpRef);
       if (!completedRef.current) {
         completedRef.current = true;
         onResolutionComplete?.();
@@ -209,8 +240,8 @@ export default function ResolutionPlayer({
     } else {
       const hpP = computeHp(steps, elapsed, startPlayerRef.current, "player", playerSide);
       const hpE = computeHp(steps, elapsed, startEnemyRef.current, "enemy", playerSide);
-      setHpText(playerText.current, Math.round(hpP), lastPlayerShown);
-      setHpText(enemyText.current, Math.round(hpE), lastEnemyShown);
+      setHpText(playerText.current, Math.round(hpP), lastPlayerShown, playerHpRef);
+      setHpText(enemyText.current, Math.round(hpE), lastEnemyShown, enemyHpRef);
     }
   });
 
@@ -412,14 +443,39 @@ function driveClash(
   }
 }
 
-/** Node capture banner pop-up (easeOutBack rise, late fade), tinted to the new owner. */
-function driveBanner(banner: THREE.Mesh | null, p: number, color: string): void {
+/** Zero a shared per-gate lunge signal in place (called at the top of every frame). */
+function resetLunge(ref: React.RefObject<[number, number, number]> | undefined): void {
+  if (!ref) return;
+  const l = ref.current;
+  l[0] = 0;
+  l[1] = 0;
+  l[2] = 0;
+}
+
+/** Write one gate's lunge envelope into a shared signal (attacker side only). */
+function writeLunge(
+  ref: React.RefObject<[number, number, number]> | undefined,
+  gate: number,
+  env: number,
+): void {
+  if (ref) ref.current[gate] = env;
+}
+
+/**
+ * Node capture banner pop-up (easeOutBack rise, late fade), tinted to the new
+ * owner. `cache` remembers the last color set on this banner's material so the
+ * hex string is parsed once on step activation, not every active frame.
+ */
+function driveBanner(banner: THREE.Mesh | null, p: number, color: string, cache: { value: string }): void {
   if (!banner) return;
   banner.visible = true;
   banner.scale.set(1, easeOutBack(Math.min(1, p / 0.6)), 1);
   const m = basicMat(banner);
   if (m) {
-    m.color.set(color);
+    if (cache.value !== color) {
+      m.color.set(color);
+      cache.value = color;
+    }
     m.opacity = p < 0.8 ? 1 : 1 - (p - 0.8) / 0.2;
   }
 }
@@ -509,12 +565,18 @@ function sideDisplay(side: "a" | "b", playerSide: "a" | "b"): "player" | "enemy"
   return side === playerSide ? "player" : "enemy";
 }
 
-/** Update a drei <Text> HP counter only when the integer changes (troika sync is costly). */
+/**
+ * Publish one side's displayed HP: mirror it into the shared ref (read by
+ * CitadelPiece's tier ticker every frame — a plain scalar write) and update the
+ * drei <Text> counter only when the integer changes (troika sync is costly).
+ */
 function setHpText(
   t: (THREE.Mesh & { text: string; sync: () => void }) | null,
   value: number,
   last: React.RefObject<number>,
+  hpRef?: React.RefObject<number>,
 ): void {
+  if (hpRef) hpRef.current = value;
   if (!t || value === last.current) return;
   t.text = String(value);
   t.sync();

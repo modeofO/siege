@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { createRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
+import { useFrame } from "@react-three/fiber";
 import { Text } from "@react-three/drei";
 import type { NodeOwner } from "@/lib/gameState1v1";
 import { PALETTE } from "./layout";
@@ -15,6 +16,9 @@ import { PALETTE } from "./layout";
 const CHARCOAL = new THREE.Color("#2a2622");
 const STONE = "#a89f8c"; // warm carved-stone base
 const STONE_DARK = "#6f6a5e"; // shaded stone for cornices / bases
+// Pre-parsed Color constants so tier changes never re-parse hex strings.
+const STONE_COLOR = new THREE.Color(STONE);
+const STONE_DARK_COLOR = new THREE.Color(STONE_DARK);
 
 /** Base stone color lerped toward charcoal by `amount` (0–1). */
 function scorchedStone(baseHex: string, amount: number): THREE.Color {
@@ -42,6 +46,29 @@ export interface CitadelPieceProps {
   side: "player" | "enemy";
   hp: number;
   position: [number, number, number];
+  // Optional shared display-HP ref (written by ResolutionPlayer every frame).
+  // When provided, a useFrame reads it and applies tier visuals (merlon tilt +
+  // stone darkening) imperatively the moment the ticking HP crosses 30 / 12 —
+  // no setState, no re-render. Without it the piece stays purely prop-driven.
+  hpRef?: React.RefObject<number>;
+}
+
+/** Apply one tier's damage visuals in place: merlon tilt + stone darkening. */
+function applyCitadelTier(
+  tier: CitadelTier,
+  merlonRefs: Array<React.RefObject<THREE.Mesh | null>>,
+  bodyMat: THREE.MeshStandardMaterial,
+  baseMat: THREE.MeshStandardMaterial,
+): void {
+  // Damage: crenellation tilt magnitude + how much the stone is dimmed.
+  const tilt = tier === "intact" ? 0 : tier === "cracked" ? 0.14 : 0.34;
+  const dim = tier === "intact" ? 0 : tier === "cracked" ? 0.18 : 0.42;
+  bodyMat.color.copy(STONE_COLOR).lerp(CHARCOAL, dim);
+  baseMat.color.copy(STONE_DARK_COLOR).lerp(CHARCOAL, dim);
+  for (let i = 0; i < merlonRefs.length; i++) {
+    const m = merlonRefs[i].current;
+    if (m) m.rotation.set(jitter(i) * tilt, jitter(i * 7) * tilt, jitter(i * 13) * tilt);
+  }
 }
 
 /**
@@ -49,18 +76,22 @@ export interface CitadelPieceProps {
  * roofs, a central tower flying a side banner. HP tiers drive battle damage:
  * intact (≥30) stands square; cracked (≥12) tilts its crenellations and dims;
  * crumbling (<12) tilts them further and darkens the stone. Side trim (roofs,
- * banner) is tinted playerGold / enemyCrimson.
+ * banner) is tinted playerGold / enemyCrimson. Tier visuals are applied
+ * imperatively (shared materials + merlon rotation) so the optional `hpRef`
+ * ticker can drive them mid-playback without re-rendering.
  */
-export function CitadelPiece({ side, hp, position }: CitadelPieceProps) {
-  const tier = citadelTier(hp);
+export function CitadelPiece({ side, hp, position, hpRef }: CitadelPieceProps) {
   const trim = side === "player" ? PALETTE.playerGold : PALETTE.enemyCrimson;
 
-  // Damage: crenellation tilt magnitude + how much the stone is dimmed.
-  const tilt = tier === "intact" ? 0 : tier === "cracked" ? 0.14 : 0.34;
-  const dim = tier === "intact" ? 0 : tier === "cracked" ? 0.18 : 0.42;
-
-  const bodyColor = useMemo(() => scorchedStone(STONE, dim), [dim]);
-  const baseColor = useMemo(() => scorchedStone(STONE_DARK, dim), [dim]);
+  // Shared stone materials, mutated in place on tier changes.
+  const bodyMat = useMemo(() => new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.9 }), []);
+  const baseMat = useMemo(() => new THREE.MeshStandardMaterial({ color: STONE_DARK, roughness: 0.95 }), []);
+  useEffect(() => {
+    return () => {
+      bodyMat.dispose();
+      baseMat.dispose();
+    };
+  }, [bodyMat, baseMat]);
 
   // Merlons around the square wall top (half-width 0.4), 4 per edge.
   const merlons = useMemo(() => {
@@ -72,6 +103,30 @@ export function CitadelPiece({ side, hp, position }: CitadelPieceProps) {
     }
     return pts;
   }, []);
+  const merlonRefs = useMemo(() => merlons.map(() => createRef<THREE.Mesh>()), [merlons]);
+
+  // Last tier whose visuals were applied — shared by the prop path (layout
+  // effect) and the ref path (useFrame) so they never fight.
+  const appliedTier = useRef<CitadelTier | null>(null);
+
+  // Prop-driven baseline: applied before paint whenever the hp prop's tier
+  // changes (the only driver when no hpRef is passed).
+  const propTier = citadelTier(hp);
+  useLayoutEffect(() => {
+    applyCitadelTier(propTier, merlonRefs, bodyMat, baseMat);
+    appliedTier.current = propTier;
+  }, [propTier, merlonRefs, bodyMat, baseMat]);
+
+  // Ref-driven ticker: retier the piece the moment the shared displayed HP
+  // crosses 30 / 12 during resolution playback. Tier-change guarded, so the
+  // per-frame cost is one citadelTier call — zero allocations.
+  useFrame(() => {
+    if (!hpRef) return;
+    const tier = citadelTier(hpRef.current);
+    if (tier === appliedTier.current) return;
+    applyCitadelTier(tier, merlonRefs, bodyMat, baseMat);
+    appliedTier.current = tier;
+  });
 
   // Enemy keep faces the center so its banner reads from across the table.
   const faceRotation = side === "player" ? 0 : Math.PI;
@@ -79,27 +134,19 @@ export function CitadelPiece({ side, hp, position }: CitadelPieceProps) {
   return (
     <group position={position} rotation={[0, faceRotation, 0]}>
       {/* Plinth */}
-      <mesh position={[0, 0.1, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.1, 0]} material={baseMat} castShadow receiveShadow>
         <boxGeometry args={[1.02, 0.2, 1.02]} />
-        <meshStandardMaterial color={baseColor} roughness={0.95} />
       </mesh>
 
       {/* Walls */}
-      <mesh position={[0, 0.53, 0]} castShadow receiveShadow>
+      <mesh position={[0, 0.53, 0]} material={bodyMat} castShadow receiveShadow>
         <boxGeometry args={[0.86, 0.66, 0.86]} />
-        <meshStandardMaterial color={bodyColor} roughness={0.9} />
       </mesh>
 
-      {/* Crenellations (merlons) — tilt with battle damage */}
+      {/* Crenellations (merlons) — rotation applied imperatively per tier */}
       {merlons.map(([x, z], i) => (
-        <mesh
-          key={i}
-          position={[x, 0.95, z]}
-          rotation={[jitter(i) * tilt, jitter(i * 7) * tilt, jitter(i * 13) * tilt]}
-          castShadow
-        >
+        <mesh key={i} ref={merlonRefs[i]} position={[x, 0.95, z]} material={bodyMat} castShadow>
           <boxGeometry args={[0.13, 0.18, 0.13]} />
-          <meshStandardMaterial color={bodyColor} roughness={0.9} />
         </mesh>
       ))}
 
@@ -111,9 +158,8 @@ export function CitadelPiece({ side, hp, position }: CitadelPieceProps) {
         [-0.43, -0.43],
       ].map(([x, z], i) => (
         <group key={i} position={[x, 0, z]}>
-          <mesh position={[0, 0.62, 0]} castShadow receiveShadow>
+          <mesh position={[0, 0.62, 0]} material={bodyMat} castShadow receiveShadow>
             <cylinderGeometry args={[0.13, 0.15, 0.85, 12]} />
-            <meshStandardMaterial color={bodyColor} roughness={0.9} />
           </mesh>
           <mesh position={[0, 1.13, 0]} castShadow>
             <coneGeometry args={[0.17, 0.2, 12]} />
@@ -123,9 +169,8 @@ export function CitadelPiece({ side, hp, position }: CitadelPieceProps) {
       ))}
 
       {/* Central keep tower */}
-      <mesh position={[0, 1.02, 0]} castShadow receiveShadow>
+      <mesh position={[0, 1.02, 0]} material={bodyMat} castShadow receiveShadow>
         <cylinderGeometry args={[0.17, 0.19, 0.34, 14]} />
-        <meshStandardMaterial color={bodyColor} roughness={0.9} />
       </mesh>
 
       {/* Flag pole + side banner atop the central tower */}

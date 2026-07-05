@@ -124,10 +124,12 @@ function RealFormations({
   side,
   allocations,
   committed,
+  lungeRef,
 }: {
   side: "player" | "enemy";
   allocations: number[];
   committed: boolean;
+  lungeRef?: React.RefObject<[number, number, number]>;
 }) {
   const sign = side === "player" ? 1 : -1;
 
@@ -208,15 +210,21 @@ function RealFormations({
     const alpha = 1 - Math.pow(0.001, dt);
 
     for (let gi = 0; gi < GROUPS.length; gi++) {
+      const g = GROUPS[gi];
       const slots = slotTargets[gi];
       const count = slots.length;
+      // Clash lunge: attack groups shift toward the gate (−sign is gate-ward
+      // for both sides) by up to 0.2u, scaled by the shared per-gate progress
+      // signal written by ResolutionPlayer. Scalar reads — no allocation.
+      const lungeZ =
+        lungeRef && g.kind === "attack" ? lungeRef.current[g.gate] * 0.2 * -sign : 0;
       for (let j = 0; j < CAP; j++) {
         const i = gi * CAP + j;
         const cur = current[i];
         const active = j < count;
         if (active) {
           const s = slots[j];
-          target.set(s[0], s[1], s[2]);
+          target.set(s[0], s[1], s[2] + lungeZ);
         } else {
           target.copy(spawn);
         }
@@ -299,12 +307,16 @@ export interface TroopFormationsProps {
   committed: boolean;
   // Enemy only: render 3 shrouded ghost pawns (committed but not yet revealed).
   cloaked: boolean;
+  // Optional shared clash-lunge signal: per-gate progress 0..1 for THIS side's
+  // attack groups (written by ResolutionPlayer, indexed by gate). Each attack
+  // group offsets its slot targets 0.2u × progress toward the gate.
+  lungeRef?: React.RefObject<[number, number, number]>;
 }
 
-export function TroopFormations({ side, allocations, committed, cloaked }: TroopFormationsProps) {
+export function TroopFormations({ side, allocations, committed, cloaked, lungeRef }: TroopFormationsProps) {
   if (cloaked) return <GhostPawns side={side} />;
   if (!allocations) return null;
-  return <RealFormations side={side} allocations={allocations} committed={committed} />;
+  return <RealFormations side={side} allocations={allocations} committed={committed} lungeRef={lungeRef} />;
 }
 
 export default TroopFormations;

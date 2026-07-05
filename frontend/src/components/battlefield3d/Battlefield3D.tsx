@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
@@ -59,6 +60,15 @@ export default function Battlefield3D({
   const playerHp = isPlayerA ? vaultAHp : vaultBHp;
   const enemyHp = isPlayerA ? vaultBHp : vaultAHp;
 
+  // Shared mutable display refs — the cross-component signal bus for playback.
+  // ResolutionPlayer writes them every frame; CitadelPiece reads the HP refs to
+  // retier mid-playback, and TroopFormations reads the lunge refs to shift its
+  // attack groups toward the gate during clashes. No setState, no re-renders.
+  const playerHpRef = useRef(playerHp);
+  const enemyHpRef = useRef(enemyHp);
+  const playerLungeRef = useRef<[number, number, number]>([0, 0, 0]);
+  const enemyLungeRef = useRef<[number, number, number]>([0, 0, 0]);
+
   // Enemy cloak state: reveal true formations once opponentAllocations arrive;
   // otherwise show 3 shrouded ghost pawns while they're committed-but-secret;
   // render nothing before they commit.
@@ -101,9 +111,10 @@ export default function Battlefield3D({
           <meshStandardMaterial color={PALETTE.parchment} roughness={0.8} />
         </mesh>
 
-        {/* Citadels: viewer's keep on +Z, enemy on −Z. */}
-        <CitadelPiece side="player" hp={playerHp} position={citadelPosition("player")} />
-        <CitadelPiece side="enemy" hp={enemyHp} position={citadelPosition("enemy")} />
+        {/* Citadels: viewer's keep on +Z, enemy on −Z. Damage tiers follow the
+            ticking display HP via the shared refs during playback. */}
+        <CitadelPiece side="player" hp={playerHp} hpRef={playerHpRef} position={citadelPosition("player")} />
+        <CitadelPiece side="enemy" hp={enemyHp} hpRef={enemyHpRef} position={citadelPosition("enemy")} />
 
         {/* Gates left→right (data order 0/2/1) with their round modifiers. */}
         {GATES.map((g) => (
@@ -125,22 +136,34 @@ export default function Battlefield3D({
         {/* Troop formations bound to allocations. Player pieces come straight
             from the viewer's allocation; enemy pieces are cloaked or revealed
             per the fog-of-war rules above. */}
-        <TroopFormations side="player" allocations={allocations} committed={committed} cloaked={false} />
+        <TroopFormations
+          side="player"
+          allocations={allocations}
+          committed={committed}
+          cloaked={false}
+          lungeRef={playerLungeRef}
+        />
         <TroopFormations
           side="enemy"
           allocations={enemyRevealed ? opponentAllocations : null}
           committed={opponentCommitted}
           cloaked={enemyCloaked}
+          lungeRef={enemyLungeRef}
         />
 
         {/* Resolution playback: plays the round's choreography timeline on the
             frame clock (clash flashes, sparks, repair glows, ember streaks, trap
-            rings) and ticks the citadel HP counters to the outcome's final HP. */}
+            rings), ticks the citadel HP counters to the outcome's final HP, and
+            drives the shared HP / lunge refs wired above. */}
         <ResolutionPlayer
           outcome={outcome}
           isPlayerA={isPlayerA}
           vaultAHp={vaultAHp}
           vaultBHp={vaultBHp}
+          playerHpRef={playerHpRef}
+          enemyHpRef={enemyHpRef}
+          playerLungeRef={playerLungeRef}
+          enemyLungeRef={enemyLungeRef}
           onResolutionComplete={onResolutionComplete}
         />
       </Canvas>
