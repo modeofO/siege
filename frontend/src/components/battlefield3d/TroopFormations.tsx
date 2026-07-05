@@ -44,7 +44,7 @@ const GROUPS: Group[] = [
 // Instances reserved per group. Fixed ranges keep an instance bound to the same
 // group across allocation changes, so a rising count spawns fresh pieces at the
 // citadel while the standing ones hold their slots (no reshuffle churn).
-const CAP = 12;
+const CAP = 17;
 const CAPACITY = GROUPS.length * CAP;
 
 /** Anchor for a group in world space. `sign` is +1 for player (+Z), -1 for enemy. */
@@ -159,6 +159,22 @@ function RealFormations({
     [spawn],
   );
 
+  // Group anchors are static per group/side — compute once, never per frame.
+  const anchors = useMemo(() => GROUPS.map((g) => groupAnchor(g, sign)), [sign]);
+
+  // Formation slot targets depend only on (anchor, count, facing, spacing).
+  // They change solely when allocations change, so precompute here on render
+  // rather than reallocating fresh arrays every frame inside useFrame.
+  const slotTargets = useMemo(
+    () =>
+      GROUPS.map((g, gi) => {
+        const raw = allocations[g.allocIdx] ?? 0;
+        const count = Math.min(CAP, Math.max(0, Math.floor(raw)));
+        return formationSlots(anchors[gi], count, sign as 1 | -1, groupSpacing(g));
+      }),
+    [allocations, anchors, sign],
+  );
+
   // Seed instance matrices (scale 0 at the citadel) and per-instance cap colors
   // before first paint so no stray pieces flash at the origin.
   useLayoutEffect(() => {
@@ -191,10 +207,9 @@ function RealFormations({
     const dt = Math.min(delta, 0.1);
     const alpha = 1 - Math.pow(0.001, dt);
 
-    GROUPS.forEach((g, gi) => {
-      const raw = allocations[g.allocIdx] ?? 0;
-      const count = Math.min(CAP, Math.max(0, Math.floor(raw)));
-      const slots = formationSlots(groupAnchor(g, sign), count, sign as 1 | -1, groupSpacing(g));
+    for (let gi = 0; gi < GROUPS.length; gi++) {
+      const slots = slotTargets[gi];
+      const count = slots.length;
       for (let j = 0; j < CAP; j++) {
         const i = gi * CAP + j;
         const cur = current[i];
@@ -215,15 +230,18 @@ function RealFormations({
         b.setMatrixAt(i, dummy.matrix);
         c.setMatrixAt(i, dummy.matrix);
       }
-    });
+    }
     b.instanceMatrix.needsUpdate = true;
     c.instanceMatrix.needsUpdate = true;
 
-    // Committed → faint gold emissive pulse across the locked formation.
+    // Committed → faint gold emissive pulse across the locked formation. This is
+    // the player's commit-lock signal, so only pulse the player's own pieces —
+    // never gild revealed enemy formations gold.
     if (bodyMat.current) {
-      bodyMat.current.emissiveIntensity = committed
-        ? 0.12 + 0.06 * Math.sin(state.clock.elapsedTime * 4)
-        : 0;
+      bodyMat.current.emissiveIntensity =
+        committed && side === "player"
+          ? 0.12 + 0.06 * Math.sin(state.clock.elapsedTime * 4)
+          : 0;
     }
 
     // Wax seal stamps down over the player's citadel in 300ms on commit.

@@ -44,7 +44,7 @@ const SPACING = 0.18;
  * Distribute `n` pieces in ranks of 4, `spacing` apart, centered on the
  * anchor's x. Successive ranks step `spacing` AWAY from the anchor along the
  * facing direction: `facing` is the sign of the Z direction the formation
- * extends toward (+1 → +Z for enemy pieces, −1 → −Z for player pieces).
+ * extends toward (+1 → +Z for player pieces, −1 → −Z for enemy pieces).
  * Rank 0 sits at the anchor's z; rank r sits at `anchor.z + facing * r * spacing`.
  * `spacing` defaults to 0.18; defensive shield-walls pass a tighter 0.14.
  * y is preserved from the anchor. n = 0 yields []. All slots are unique.
