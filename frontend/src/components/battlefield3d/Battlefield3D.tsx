@@ -7,6 +7,7 @@ import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
 import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
 import { TroopFormations } from "./TroopFormations";
 import Ambient from "./Ambient";
+import ResolutionPlayer from "./ResolutionPlayer";
 
 const GATES: Array<0 | 1 | 2> = [0, 1, 2];
 
@@ -50,6 +51,8 @@ export default function Battlefield3D({
   nodes,
   vaultAHp,
   vaultBHp,
+  outcome,
+  onResolutionComplete,
 }: Battlefield3DProps) {
   // The viewer always fights from the +Z (player) side, so map the raw A/B
   // vault HP onto player/enemy citadels by which slot the viewer holds.
@@ -128,6 +131,17 @@ export default function Battlefield3D({
           allocations={enemyRevealed ? opponentAllocations : null}
           committed={opponentCommitted}
           cloaked={enemyCloaked}
+        />
+
+        {/* Resolution playback: plays the round's choreography timeline on the
+            frame clock (clash flashes, sparks, repair glows, ember streaks, trap
+            rings) and ticks the citadel HP counters to the outcome's final HP. */}
+        <ResolutionPlayer
+          outcome={outcome}
+          isPlayerA={isPlayerA}
+          vaultAHp={vaultAHp}
+          vaultBHp={vaultBHp}
+          onResolutionComplete={onResolutionComplete}
         />
       </Canvas>
       {/* DOM overlay: badges etc. render on top of the canvas. The overlay itself
