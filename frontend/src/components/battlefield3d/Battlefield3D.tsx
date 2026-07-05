@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
@@ -76,6 +76,10 @@ export default function Battlefield3D({
   const playerLungeRef = useRef<[number, number, number]>([0, 0, 0]);
   const enemyLungeRef = useRef<[number, number, number]>([0, 0, 0]);
 
+  // Fresh-canvas epoch for WebGL context-loss recovery (see Canvas key below).
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const recoveryCount = useRef(0);
+
   // Enemy cloak state: reveal true formations once opponentAllocations arrive;
   // otherwise show 3 shrouded ghost pawns while they're committed-but-secret;
   // render nothing before they commit.
@@ -85,11 +89,28 @@ export default function Battlefield3D({
   return (
     <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg bg-[#1a1714]">
       <Canvas
+        // Context-loss recovery: React can unmount+remount the Canvas while
+        // reusing the same <canvas> element (StrictMode / Suspense effect
+        // replay). The stale root's cleanup then calls forceContextLoss() on
+        // the context the live root is using, permanently blacking it out —
+        // and a genuinely evicted GPU context in a long session looks the
+        // same. Keying the Canvas by an epoch makes recovery total: on loss
+        // we mount a FRESH canvas element with a fresh context. Retries are
+        // capped to avoid a remount loop on hardware that keeps evicting.
+        key={canvasEpoch}
         shadows
         dpr={[1, 2]}
         className="absolute inset-0"
         camera={{ fov: 45, position: [0, 6.5, 5.2] }}
-        onCreated={({ camera }) => camera.lookAt(0, 0, -0.2)}
+        onCreated={({ camera, gl }) => {
+          camera.lookAt(0, 0, -0.2);
+          gl.domElement.addEventListener("webglcontextlost", (e) => {
+            e.preventDefault();
+            if (recoveryCount.current >= 4) return;
+            recoveryCount.current += 1;
+            setTimeout(() => setCanvasEpoch((n) => n + 1), 250);
+          });
+        }}
       >
         {/* Base fill so nothing reads pure black. */}
         <ambientLight intensity={0.25} />
