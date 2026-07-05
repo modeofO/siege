@@ -6,6 +6,7 @@ import type { RoundOutcome } from "@/lib/resolution1v1";
 import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
 import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
 import { TroopFormations } from "./TroopFormations";
+import Ambient from "./Ambient";
 
 const GATES: Array<0 | 1 | 2> = [0, 1, 2];
 
@@ -72,16 +73,9 @@ export default function Battlefield3D({
       >
         {/* Base fill so nothing reads pure black. */}
         <ambientLight intensity={0.25} />
-        {/* Warm key light (candle) casting soft shadows across the table. */}
-        <pointLight
-          color={PALETTE.candle}
-          intensity={2.2}
-          position={[3.5, 3, 2.5]}
-          castShadow
-          shadow-mapSize-width={1024}
-          shadow-mapSize-height={1024}
-          shadow-bias={-0.0005}
-        />
+        {/* Warm key light (candle) + dust, holo shimmer, vault smoke, banners.
+            The flickering candle point-light lives inside Ambient. */}
+        <Ambient playerHp={playerHp} enemyHp={enemyHp} />
         {/* Cool directional fill from the far side to model the shadows. */}
         <directionalLight intensity={0.4} position={[-4, 5, -3]} />
 
