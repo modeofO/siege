@@ -438,9 +438,21 @@ function validateToolResult(result: CallToolResult): CallToolResult {
 }
 
 function notReadyMessage(state: NotReadyState): string {
-  if (state.bootstrapError) return `Server failed to start: ${state.bootstrapError}`;
+  if (state.bootstrapError) {
+    return (
+      `Server failed to start: ${state.bootstrapError} ` +
+      `Reconnect/restart the MCP server to mint a fresh auth URL, then retry a write tool immediately — ` +
+      `the 5-minute approval window starts at server launch.`
+    );
+  }
   if (state.authUrl) {
-    return `Cartridge session not approved yet. Open ${state.authUrl} in your browser to approve, then retry.`;
+    return (
+      `Cartridge session not approved yet. Open the auth URL below in a browser to approve, then retry. ` +
+      `The URL must be passed WHOLE — its policies query param is thousands of characters, and a URL ` +
+      `truncated by terminal line-wrapping approves a zero-policy session that cannot sign anything ` +
+      `(every write then fails with session/not-registered). Launch it directly, e.g. macOS: open '<url>'. ` +
+      `Approval must complete within 5 minutes of server start.\n${state.authUrl}`
+    );
   }
   return `Server is ${state.bootstrapPhase}. Try again in a moment.`;
 }

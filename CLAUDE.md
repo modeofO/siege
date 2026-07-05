@@ -211,6 +211,8 @@ Use `BigInt(0)` rather than `0n` in frontend code.
 
 Use `mcp-server-2/`. It registers 40 tools and signs writes through a Cartridge session. It reads Dojo contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses come from env/defaults.
 
+Cartridge session auth: write tools return `not_ready` with an auth URL until the session is approved in a browser. The URL's `policies` query param is thousands of characters and MUST be passed whole — launch it directly (`open '<url>'`), never copy it from wrapped terminal output. A truncated URL silently approves a zero-policy session (`allowed_policies_root = 0`) whose writes all fail with `session/not-registered`. The 5-minute approval window starts at MCP server launch and the bootstrap does not retry after "Callback timeout" — reconnect the server (`/mcp` → siege → reconnect) to mint a fresh URL, then retry a write tool immediately to get it. Approved sessions live about a week in `mcp-server-2/.cartridge/session.json` (~11 KB; a ~200-byte signer-only file means unapproved).
+
 Cartridge VRF quirk: the VRF server keys the seed to the contract called immediately after `request_random` in the multicall. When the consumer is reached through a nested call (e.g. `force_timeout` → `resolve_round`), sandwich a harmless direct view call to the consumer between the VRF request and the real call. See issue #44.
 
 Build and test:

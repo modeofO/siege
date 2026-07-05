@@ -38,12 +38,18 @@ SEEDS_TOKEN_ADDRESS=0x25372cc987ebff79ca4a781aadb02ef8853d43b496ee381f382c59f7de
 ## Claude Code
 
 ```bash
-claude mcp add siege -- node /Users/boat/Projects/siege/mcp-server-2/dist/index.js
+claude mcp add siege -- node /path/to/siege/mcp-server-2/dist/index.js
 ```
 
 The server self-locates `.env`, the manifest, `agent-prompt.md`, and the Cartridge session directory from `import.meta.url`. First write use prints a Cartridge auth URL to stderr. Approve it once; the session persists in `.cartridge/`.
 
 Read tools work as soon as Torii is reachable. Write tools return a `not_ready` status until the Cartridge session is approved.
+
+### Session approval gotchas
+
+- The auth URL's `policies` query param is thousands of characters. Pass the URL whole — launch it directly (macOS: `open '<url>'`). Copying it out of line-wrapped terminal output truncates the policies, and the keychain then approves a zero-policy session (`allowed_policies_root = 0`) whose every write fails with `session/not-registered`.
+- The approval window is 5 minutes from server launch, and the bootstrap does not retry after `Callback timeout`. Restart the server (in Claude Code: `/mcp` → siege → reconnect), then call any write tool to get the fresh URL from its `not_ready` error.
+- Approved sessions last about a week. A healthy `.cartridge/session.json` is ~11 KB with `signer`, `session`, and `policies` keys; a ~200-byte file containing only `signer` is an unapproved stub.
 
 ## Commands
 
