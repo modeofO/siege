@@ -22,6 +22,22 @@
 //
 // Zero-amount events (no clash, zero repair, zero damage) produce NO step, so
 // quiet rounds stay short. `total` is the end (at + duration) of the last step.
+//
+// HP SUMMATION CONTRACT — for the timeline player reconstructing final vault HP.
+// The steps carry every HP mutation, but two facts are implicit:
+//   * `trap_blast` steps carry NO amount; each detonation is a FLAT −5 HP to the
+//     victim side.
+//   * The running total must clamp to [0, 50]; repair near the 50 cap can imply
+//     a smaller effective gain than `repair_glow.amount`.
+// Reconstruct final HP for side X from the steps (clamped to [0, 50]) as:
+//
+//   start + Σ repair_glow.amount (side X)          [clamp at 50 after repair]
+//         − Σ |hp_tick.delta| (side X)             [gate damage; floor 0]
+//         − Σ ember.amount (side X = victim)       [floor 0]
+//         − 5 × count(trap_blast where victim = X) [flat 5 per detonation; floor 0]
+//
+// Applied in that order — matching resolution_1v1's repair → gate → ember → trap
+// sequence.
 
 import type { RoundEvent } from "@/lib/resolution1v1";
 import type { NodeOwner } from "@/lib/gameState1v1";
