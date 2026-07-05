@@ -51,11 +51,18 @@ export interface CitadelPieceProps {
   // stone darkening) imperatively the moment the ticking HP crosses 30 / 12 —
   // no setState, no re-render. Without it the piece stays purely prop-driven.
   hpRef?: React.RefObject<number>;
+  // Persistent battle wear (0–1) derived from cumulative damage across the whole
+  // round history (see aftermath.ts). Composes ON TOP of the live HP tier: it
+  // darkens the stone further and survives reloads, unlike the transient HP
+  // tier which tracks the current vault. Applied by multiplying into the tier's
+  // absolute color set so the two darkening sources never fight.
+  wear?: number;
 }
 
 /** Apply one tier's damage visuals in place: merlon tilt + stone darkening. */
 function applyCitadelTier(
   tier: CitadelTier,
+  wear: number,
   merlonRefs: Array<React.RefObject<THREE.Mesh | null>>,
   bodyMat: THREE.MeshStandardMaterial,
   baseMat: THREE.MeshStandardMaterial,
@@ -63,8 +70,12 @@ function applyCitadelTier(
   // Damage: crenellation tilt magnitude + how much the stone is dimmed.
   const tilt = tier === "intact" ? 0 : tier === "cracked" ? 0.14 : 0.34;
   const dim = tier === "intact" ? 0 : tier === "cracked" ? 0.18 : 0.42;
-  bodyMat.color.copy(STONE_COLOR).lerp(CHARCOAL, dim);
-  baseMat.color.copy(STONE_DARK_COLOR).lerp(CHARCOAL, dim);
+  // Start from the tier's absolute stone color, then lerp further toward
+  // charcoal by `wear`. Recomputing from the base each call keeps this
+  // idempotent, so the prop path and the ref path can both reapply freely.
+  const w = THREE.MathUtils.clamp(wear, 0, 1);
+  bodyMat.color.copy(STONE_COLOR).lerp(CHARCOAL, dim).lerp(CHARCOAL, w);
+  baseMat.color.copy(STONE_DARK_COLOR).lerp(CHARCOAL, dim).lerp(CHARCOAL, w);
   for (let i = 0; i < merlonRefs.length; i++) {
     const m = merlonRefs[i].current;
     if (m) m.rotation.set(jitter(i) * tilt, jitter(i * 7) * tilt, jitter(i * 13) * tilt);
@@ -80,7 +91,7 @@ function applyCitadelTier(
  * imperatively (shared materials + merlon rotation) so the optional `hpRef`
  * ticker can drive them mid-playback without re-rendering.
  */
-export function CitadelPiece({ side, hp, position, hpRef }: CitadelPieceProps) {
+export function CitadelPiece({ side, hp, position, hpRef, wear = 0 }: CitadelPieceProps) {
   const trim = side === "player" ? PALETTE.playerGold : PALETTE.enemyCrimson;
 
   // Shared stone materials, mutated in place on tier changes.
@@ -113,9 +124,9 @@ export function CitadelPiece({ side, hp, position, hpRef }: CitadelPieceProps) {
   // changes (the only driver when no hpRef is passed).
   const propTier = citadelTier(hp);
   useLayoutEffect(() => {
-    applyCitadelTier(propTier, merlonRefs, bodyMat, baseMat);
+    applyCitadelTier(propTier, wear, merlonRefs, bodyMat, baseMat);
     appliedTier.current = propTier;
-  }, [propTier, merlonRefs, bodyMat, baseMat]);
+  }, [propTier, wear, merlonRefs, bodyMat, baseMat]);
 
   // Ref-driven ticker: retier the piece the moment the shared displayed HP
   // crosses 30 / 12 during resolution playback. Tier-change guarded, so the
@@ -124,7 +135,8 @@ export function CitadelPiece({ side, hp, position, hpRef }: CitadelPieceProps) {
     if (!hpRef) return;
     const tier = citadelTier(hpRef.current);
     if (tier === appliedTier.current) return;
-    applyCitadelTier(tier, merlonRefs, bodyMat, baseMat);
+    // useFrame refreshes this closure each render, so `wear` is the latest prop.
+    applyCitadelTier(tier, wear, merlonRefs, bodyMat, baseMat);
     appliedTier.current = tier;
   });
 

@@ -1,9 +1,10 @@
 "use client";
 
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
+import { deriveAftermath } from "./aftermath";
 import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
 import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
 import { TroopFormations } from "./TroopFormations";
@@ -52,6 +53,7 @@ export default function Battlefield3D({
   nodes,
   vaultAHp,
   vaultBHp,
+  history,
   outcome,
   onResolutionComplete,
 }: Battlefield3DProps) {
@@ -59,6 +61,11 @@ export default function Battlefield3D({
   // vault HP onto player/enemy citadels by which slot the viewer holds.
   const playerHp = isPlayerA ? vaultAHp : vaultBHp;
   const enemyHp = isPlayerA ? vaultBHp : vaultAHp;
+
+  // Persistent aftermath derived from the durable round history: cumulative gate
+  // scorch and vault wear that survive reloads (unlike the transient HP tiers).
+  // Perspective-adjusted so "my" wear always maps to the viewer's citadel.
+  const aftermath = useMemo(() => deriveAftermath(history, isPlayerA), [history, isPlayerA]);
 
   // Shared mutable display refs — the cross-component signal bus for playback.
   // ResolutionPlayer writes them every frame; CitadelPiece reads the HP refs to
@@ -113,12 +120,30 @@ export default function Battlefield3D({
 
         {/* Citadels: viewer's keep on +Z, enemy on −Z. Damage tiers follow the
             ticking display HP via the shared refs during playback. */}
-        <CitadelPiece side="player" hp={playerHp} hpRef={playerHpRef} position={citadelPosition("player")} />
-        <CitadelPiece side="enemy" hp={enemyHp} hpRef={enemyHpRef} position={citadelPosition("enemy")} />
+        <CitadelPiece
+          side="player"
+          hp={playerHp}
+          hpRef={playerHpRef}
+          wear={aftermath.myVaultWear}
+          position={citadelPosition("player")}
+        />
+        <CitadelPiece
+          side="enemy"
+          hp={enemyHp}
+          hpRef={enemyHpRef}
+          wear={aftermath.enemyVaultWear}
+          position={citadelPosition("enemy")}
+        />
 
         {/* Gates left→right (data order 0/2/1) with their round modifiers. */}
         {GATES.map((g) => (
-          <GatePiece key={g} gate={g} modifier={modifiers[g]} scorch={0} position={gatePosition(g)} />
+          <GatePiece
+            key={g}
+            gate={g}
+            modifier={modifiers[g]}
+            scorch={aftermath.gateScorch[g]}
+            position={gatePosition(g)}
+          />
         ))}
 
         {/* Node markers behind each gate; owner in viewer perspective, trap flag
