@@ -17,7 +17,7 @@ import {
 // (e.g., fresh subscription results before fields are hydrated). The shared
 // helpers guard every conversion so a render-time throw can't nuke the page.
 import { safeNum, safeBigIntEq, flatModels } from "@/lib/modelUtils";
-import { resolveRoundLocal } from "@/lib/resolution1v1";
+import { resolveRoundLocal, type PlayerMove } from "@/lib/resolution1v1";
 
 function safeNumEq(v: unknown, target: number): boolean {
   if (v === undefined || v === null) return false;
@@ -473,6 +473,51 @@ export function useMatchStakes1v1(matchId: string | null, _refreshKey?: number):
       loaded: true,
     };
   }, [matchId, matchAbilities]);
+}
+
+/**
+ * Returns both players' fully-decoded moves for a round, but only once both
+ * have revealed (`reveal_count === 2`); otherwise null. Pure `useMemo` over the
+ * already-subscribed RoundMoves1v1 / RoundTraps1v1 stores — no effects, no new
+ * subscription. Feeds `resolveRoundLocal` so the match page can show the round
+ * outcome the instant reveal #2 indexes, ~30-45s before the chain resolve.
+ */
+export function useRevealedMoves1v1(
+  matchId: string | null,
+  round: number,
+): { moveA: PlayerMove; moveB: PlayerMove } | null {
+  const roundMoves = useModels(ModelsMapping.RoundMoves1v1);
+  const roundTraps = useModels(ModelsMapping.RoundTraps1v1);
+
+  return useMemo(() => {
+    if (!matchId || round < 1) return null;
+    const idBig = BigInt(matchId);
+    const rm = flatModels<RoundMoves1v1Model>(roundMoves).find(
+      (r) => safeBigIntEq(r.match_id, idBig) && safeNumEq(r.round, round),
+    );
+    if (!rm || safeNum(rm.reveal_count) < 2) return null;
+    const rt = flatModels<RoundTraps1v1>(roundTraps).find(
+      (r) => safeBigIntEq(r.match_id, idBig) && safeNumEq(r.round, round),
+    );
+    // Generated model structs have no string index signature; read fields
+    // through a Record view so template-literal keys type-check.
+    const rmRec = rm as unknown as Record<string, unknown>;
+    const rtRec = rt as unknown as Record<string, unknown> | undefined;
+    const traps = (side: "a" | "b"): [number, number, number] =>
+      rtRec
+        ? [safeNum(rtRec[`${side}_trap0`]), safeNum(rtRec[`${side}_trap1`]), safeNum(rtRec[`${side}_trap2`])]
+        : [0, 0, 0];
+    const move = (s: "a" | "b"): PlayerMove => ({
+      attack: [safeNum(rmRec[`${s}_p0`]), safeNum(rmRec[`${s}_p1`]), safeNum(rmRec[`${s}_p2`])],
+      defense: [safeNum(rmRec[`${s}_g0`]), safeNum(rmRec[`${s}_g1`]), safeNum(rmRec[`${s}_g2`])],
+      repair: safeNum(rmRec[`${s}_repair`]),
+      nodeContest: [safeNum(rmRec[`${s}_nc0`]), safeNum(rmRec[`${s}_nc1`]), safeNum(rmRec[`${s}_nc2`])],
+      traps: traps(s),
+      abilityId: safeNum(rmRec[`${s}_ability_id`]),
+      abilityTarget: safeNum(rmRec[`${s}_ability_target`]),
+    });
+    return { moveA: move("a"), moveB: move("b") };
+  }, [matchId, round, roundMoves, roundTraps]);
 }
 
 export function useRoundModifiers1v1(matchId: string | null, round: number): [number, number, number] {

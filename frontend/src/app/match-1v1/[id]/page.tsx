@@ -1,7 +1,7 @@
 // frontend/src/app/match-1v1/[id]/page.tsx
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useAccount } from "@/app/providers";
@@ -12,9 +12,11 @@ import {
   useCommitmentStatus1v1,
   useRoundModifiers1v1,
   useMatchAbilities1v1,
+  useRevealedMoves1v1,
   MODIFIER_NAMES,
 } from "@/lib/gameState1v1";
 import type { RoundResult1v1, NodeOwner } from "@/lib/gameState1v1";
+import { resolveRoundLocal } from "@/lib/resolution1v1";
 import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, clearCommitData1v1 } from "@/lib/crypto";
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
@@ -68,6 +70,65 @@ export default function Match1v1Page() {
 
   const modifiers = useRoundModifiers1v1(matchId, state?.round ?? 1);
 
+  // --- Optimistic round outcome ---
+  // The moment both reveals index (phase === "resolving"), mirror the Cairo
+  // round math locally so the result shows ~30-45s before the chain resolve.
+  const revealedMoves = useRevealedMoves1v1(matchId, state?.round ?? 0);
+  const optimisticOutcome = useMemo(() => {
+    if (!revealedMoves || !state || state.phase !== "resolving") return null;
+    return resolveRoundLocal({
+      moveA: revealedMoves.moveA,
+      moveB: revealedMoves.moveB,
+      nodeOwners: state.nodes,
+      modifiers: modifiers ?? [0, 0, 0],
+      vaultAHp: state.vaultAHp,
+      vaultBHp: state.vaultBHp,
+      round: state.round,
+    });
+  }, [revealedMoves, state, modifiers]);
+
+  // Map the optimistic outcome into the exact shape the chain result path feeds
+  // BattleAnimation + heldHp. `heldHp` follows the existing convention
+  // (finalHP + gate damage) so the animation counts down to the optimistic
+  // final; top HP bars read the final directly (below).
+  const optimisticView = useMemo(() => {
+    if (!optimisticOutcome || !revealedMoves || !state) return null;
+    const o = optimisticOutcome;
+    const result: RoundResult1v1 = {
+      round: state.round,
+      aAttack: revealedMoves.moveA.attack,
+      aDefense: revealedMoves.moveA.defense,
+      bAttack: revealedMoves.moveB.attack,
+      bDefense: revealedMoves.moveB.defense,
+      damageToA: o.totalDamageToA,
+      damageToB: o.totalDamageToB,
+      modifiers: [o.gates[0].modifier, o.gates[1].modifier, o.gates[2].modifier],
+      gateBreakdown: o.gates.map((g) => ({
+        gate: g.gate,
+        modifier: g.modifier,
+        attackA: g.attackA,
+        defenseA: g.defenseA,
+        attackB: g.attackB,
+        defenseB: g.defenseB,
+        dmgToA: g.dmgToA,
+        dmgToB: g.dmgToB,
+      })),
+      aTraps: revealedMoves.moveA.traps,
+      bTraps: revealedMoves.moveB.traps,
+      trapDmgToA: o.trapDamageToA,
+      trapDmgToB: o.trapDamageToB,
+      aAbilityId: revealedMoves.moveA.abilityId,
+      aAbilityTarget: revealedMoves.moveA.abilityTarget,
+      bAbilityId: revealedMoves.moveB.abilityId,
+      bAbilityTarget: revealedMoves.moveB.abilityTarget,
+    };
+    return {
+      result,
+      heldHp: { a: o.vaultAHpAfter + o.totalDamageToA, b: o.vaultBHpAfter + o.totalDamageToB },
+      newNodes: o.nodeOwnersAfter,
+    };
+  }, [optimisticOutcome, revealedMoves, state]);
+
   // Ability selection state
   const [selectedAbility, setSelectedAbility] = useState(0);
   const [selectedTarget, setSelectedTarget] = useState(0);
@@ -112,6 +173,17 @@ export default function Match1v1Page() {
   const [heldHp, setHeldHp] = useState<{ a: number; b: number } | null>(null);
   const [prevNodes, setPrevNodes] = useState<[NodeOwner, NodeOwner, NodeOwner]>(["neutral", "neutral", "neutral"]);
   const prevRoundRef = useRef<number>(0);
+  // The round whose optimistic animation has finished playing — hides the
+  // optimistic overlay while we keep the confirming pill up until reconcile.
+  const [dismissedOptimisticRound, setDismissedOptimisticRound] = useState(0);
+  // Last optimistic outcome shown, captured for reconcile against the chain
+  // resolve (ref, not state — set from a ref-only effect so no setState-in-effect).
+  const shownOptimisticRef = useRef<{
+    round: number;
+    vaultAHpAfter: number;
+    vaultBHpAfter: number;
+    nodeOwnersAfter: [NodeOwner, NodeOwner, NodeOwner];
+  } | null>(null);
 
   // --- Polling fallback for stale gRPC subscription state ---
   // After a user's own commit/reveal tx, we poll Torii SQL for a short window
@@ -256,13 +328,40 @@ export default function Match1v1Page() {
     }
   }, [state?.round, setAllocations, setAutoRevealStatus, setAutoRevealError, setRevealRetry, setSubmitting, setConfirming, setError]);
 
-  // Detect round transitions and capture pre-resolution HP for the overlay
+  // Detect round transitions and capture pre-resolution HP for the overlay.
+  // Also reconciles the optimistic outcome against the chain resolve: if we
+  // already animated this round optimistically, we skip the replay and just
+  // compare (chain is authoritative — bars are chain-derived once resolving
+  // clears). Otherwise fall back to the original chain-driven animation.
   useEffect(() => {
     if (!state || !history.length) return;
     const currentRound = state.round;
     if (prevRoundRef.current > 0 && currentRound > prevRoundRef.current) {
-      const justResolved = history.find((r) => r.round === prevRoundRef.current);
-      if (justResolved) {
+      const resolvedRound = prevRoundRef.current;
+      const justResolved = history.find((r) => r.round === resolvedRound);
+      const shown = shownOptimisticRef.current;
+      const optimisticAlreadyShown = shown?.round === resolvedRound;
+      if (optimisticAlreadyShown && shown) {
+        // Reconcile local vs chain; chain wins on any mismatch.
+        const nodesMatch = shown.nodeOwnersAfter.every((n, i) => n === state.nodes[i]);
+        if (
+          shown.vaultAHpAfter !== state.vaultAHp ||
+          shown.vaultBHpAfter !== state.vaultBHp ||
+          !nodesMatch
+        ) {
+          console.error("[optimistic-resolve] mismatch", {
+            round: resolvedRound,
+            local: {
+              vaultAHpAfter: shown.vaultAHpAfter,
+              vaultBHpAfter: shown.vaultBHpAfter,
+              nodeOwnersAfter: shown.nodeOwnersAfter,
+            },
+            chain: { vaultAHp: state.vaultAHp, vaultBHp: state.vaultBHp, nodes: state.nodes },
+          });
+        }
+        // Optimistic animation already played — don't replay. Chain-derived
+        // HP bars (heldHp stays null) snap to the authoritative values.
+      } else if (justResolved) {
         setHeldHp({
           a: state.vaultAHp + justResolved.damageToA,
           b: state.vaultBHp + justResolved.damageToB,
@@ -275,6 +374,19 @@ export default function Match1v1Page() {
       prevRoundRef.current = currentRound;
     }
   }, [state?.round, history, state, isPlayerA]);
+
+  // Capture the optimistic outcome for later reconcile. Ref-only write (no
+  // setState) so this effect doesn't run afoul of react-hooks/set-state-in-effect.
+  useEffect(() => {
+    if (optimisticOutcome && state) {
+      shownOptimisticRef.current = {
+        round: state.round,
+        vaultAHpAfter: optimisticOutcome.vaultAHpAfter,
+        vaultBHpAfter: optimisticOutcome.vaultBHpAfter,
+        nodeOwnersAfter: optimisticOutcome.nodeOwnersAfter,
+      };
+    }
+  }, [optimisticOutcome, state]);
 
   // One-shot mount log — if this never appears in console after reload, the
   // page is serving a stale bundle and a hard refresh is needed.
@@ -496,6 +608,13 @@ export default function Match1v1Page() {
     setHeldHp(null);
   }, []);
 
+  // Optimistic animation finished — hide the overlay but keep the confirming
+  // pill and final HP bars until the chain resolve reconciles. setState here is
+  // in a callback (gsap oncomplete), not an effect body.
+  const handleOptimisticComplete = useCallback(() => {
+    setDismissedOptimisticRound(state?.round ?? 0);
+  }, [state?.round]);
+
   // Commit handler
   const handleCommit = useCallback(async () => {
     if (!account || !state || commitLock.current) return;
@@ -604,8 +723,11 @@ export default function Match1v1Page() {
     );
   }
 
-  const yourVault = heldHp ? (isPlayerA ? heldHp.a : heldHp.b) : (isPlayerA ? state.vaultAHp : state.vaultBHp);
-  const enemyVault = heldHp ? (isPlayerA ? heldHp.b : heldHp.a) : (isPlayerA ? state.vaultBHp : state.vaultAHp);
+  // During optimistic resolving (heldHp not yet set by the chain path), show the
+  // optimistic final HP; CSS width transition animates the bars down to it.
+  const displayHp = heldHp ?? (optimisticOutcome ? { a: optimisticOutcome.vaultAHpAfter, b: optimisticOutcome.vaultBHpAfter } : null);
+  const yourVault = displayHp ? (isPlayerA ? displayHp.a : displayHp.b) : (isPlayerA ? state.vaultAHp : state.vaultBHp);
+  const enemyVault = displayHp ? (isPlayerA ? displayHp.b : displayHp.a) : (isPlayerA ? state.vaultBHp : state.vaultAHp);
   const yourPct = Math.max(0, Math.min(100, (yourVault / 50) * 100));
   const enemyPct = Math.max(0, Math.min(100, (enemyVault / 50) * 100));
   const hpBarColor = (pct: number) => (pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500");
@@ -625,7 +747,11 @@ export default function Match1v1Page() {
   } else if (effectiveCommitted && revealed && effectiveRevealCount < 2) {
     phaseText = "Waiting for opponent to reveal...";
   } else if (state.phase === "resolving") {
-    phaseText = autoResolveError ? "Resolve failed — retry below" : "Resolving round...";
+    phaseText = autoResolveError
+      ? "Resolve failed — retry below"
+      : optimisticOutcome
+        ? "Confirming outcome on-chain..."
+        : "Resolving round...";
   }
 
   const toggleRound = (round: number) => {
@@ -761,7 +887,7 @@ export default function Match1v1Page() {
               modifiers={modifiers}
               opponentAllocations={opponentAllocations}
             >
-              {pendingResult && heldHp && (
+              {pendingResult && heldHp ? (
                 <BattleAnimation
                   result={pendingResult}
                   prevNodes={prevNodes}
@@ -770,8 +896,22 @@ export default function Match1v1Page() {
                   heldHp={heldHp}
                   onComplete={handleResolutionComplete}
                 />
-              )}
+              ) : optimisticView && dismissedOptimisticRound !== state.round ? (
+                <BattleAnimation
+                  result={optimisticView.result}
+                  prevNodes={prevNodes}
+                  newNodes={optimisticView.newNodes}
+                  isPlayerA={isPlayerA}
+                  heldHp={optimisticView.heldHp}
+                  onComplete={handleOptimisticComplete}
+                />
+              ) : null}
             </BattlefieldView>
+            {optimisticOutcome && state.phase === "resolving" && (
+              <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-[10px] tracking-wider uppercase text-[#c8a44e] bg-[#1a1714]/90 border border-[#c8a44e]/40 rounded-full px-3 py-1 animate-pulse">
+                confirming on-chain…
+              </div>
+            )}
           </div>
 
           {/* War Dispatch Log */}
