@@ -37,6 +37,7 @@ import { CIRCUITS } from "@/lib/forge/circuits";
 import { toriiSql, sqlInt, sqlU64, toNum } from "@/lib/toriiSql";
 import { ABILITIES } from "@/lib/craftingContracts";
 import { BattleAnimation } from "@/components/BattleAnimation";
+import { ModifierCards } from "@/components/ModifierCards";
 
 export default function Match1v1Page() {
   const params = useParams();
@@ -672,7 +673,9 @@ export default function Match1v1Page() {
   const handleCommit = useCallback(async () => {
     if (!account || !state || commitLock.current) return;
     const trapCost = (allocations[10] + allocations[11] + allocations[12]) * 2;
-    const total = allocations.slice(0, 10).reduce((a, b) => a + b, 0) + trapCost;
+    // Repair (index 6) costs 2 budget per HP — count it twice, matching the
+    // form's spendOf and the contract's reveal-time budget check.
+    const total = allocations.slice(0, 10).reduce((a, b) => a + b, 0) + (allocations[6] || 0) + trapCost;
     if (total !== budget) return;
 
     commitLock.current = true;
@@ -1010,6 +1013,10 @@ export default function Match1v1Page() {
               </div>
             )}
           </div>
+
+          {/* Gate modifier cards — this round's modifiers, paired by accent
+              color with the glowing bands on the 3D gates. */}
+          <ModifierCards modifiers={modifiers} />
 
           {/* War Dispatch Log */}
           <div className="border border-[#3d3428] rounded-lg bg-[#1a1714]">

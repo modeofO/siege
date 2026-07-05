@@ -3,7 +3,6 @@
 import { createRef, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { Text } from "@react-three/drei";
 import type { NodeOwner } from "@/lib/gameState1v1";
 import { PALETTE } from "./layout";
 
@@ -202,12 +201,14 @@ export function CitadelPiece({ side, hp, position, hpRef, wear = 0 }: CitadelPie
 // Gate
 // ---------------------------------------------------------------------------
 
-// Reuse the 2D view's modifier labels — glyph is the initial letter.
-const MODIFIER_GLYPH: Record<number, string> = {
-  1: "N", // Narrow Pass
-  2: "M", // Mirror
-  3: "D", // Deadlock
-  4: "R", // Reflection
+// Accent colors per gate modifier — kept in sync with ModifierCards.tsx (the
+// DOM cards below the battlefield carry names/descriptions; the gate glows
+// the matching color so players can pair card to gate spatially).
+export const MODIFIER_ACCENT: Record<number, string> = {
+  1: "#daa520", // Narrow Pass
+  2: "#c8a44e", // Mirror Gate
+  3: "#ff3344", // Deadlock
+  4: "#ff8800", // Reflection
 };
 
 export interface GatePieceProps {
@@ -219,13 +220,13 @@ export interface GatePieceProps {
 
 /**
  * A gate: two stone pillars carrying a lintel with a rounded arch keystone.
- * `scorch` (0–1) darkens the stone toward charcoal. When `modifier` is 1–4 a
- * small holo glyph (drei <Text>, PALETTE.holo) floats above showing the
- * modifier's initial letter.
+ * `scorch` (0–1) darkens the stone toward charcoal. When `modifier` is 1–4
+ * the lintel carries a glowing accent band in the modifier's color — the
+ * matching ModifierCards entry (DOM, below the battlefield) explains it.
  */
 export function GatePiece({ modifier, scorch, position }: GatePieceProps) {
   const stone = useMemo(() => scorchedStone(STONE, scorch), [scorch]);
-  const glyph = MODIFIER_GLYPH[modifier];
+  const accent = MODIFIER_ACCENT[modifier];
 
   return (
     <group position={position}>
@@ -249,22 +250,31 @@ export function GatePiece({ modifier, scorch, position }: GatePieceProps) {
         <meshStandardMaterial color={stone} roughness={0.85} />
       </mesh>
 
-      {/* Holographic modifier glyph */}
-      {glyph ? (
-        <Text
-          position={[0, 1.05, 0]}
-          fontSize={0.34}
-          color={PALETTE.holo}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.006}
-          outlineColor="#0a2a30"
-          material-toneMapped={false}
-          material-transparent
-          material-opacity={0.92}
-        >
-          {glyph}
-        </Text>
+      {/* Modifier accent: glowing band across the lintel face + tinted
+          keystone. Color pairs with the DOM modifier card for this gate. */}
+      {accent ? (
+        <>
+          <mesh position={[0, 0.62, 0.105]}>
+            <boxGeometry args={[0.98, 0.06, 0.012]} />
+            <meshStandardMaterial
+              color={accent}
+              emissive={accent}
+              emissiveIntensity={1.4}
+              toneMapped={false}
+            />
+          </mesh>
+          <mesh position={[0, 0.69, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[0.19, 0.19, 0.06, 16, 1, false, 0, Math.PI]} />
+            <meshStandardMaterial
+              color={accent}
+              emissive={accent}
+              emissiveIntensity={0.9}
+              transparent
+              opacity={0.85}
+              toneMapped={false}
+            />
+          </mesh>
+        </>
       ) : null}
     </group>
   );

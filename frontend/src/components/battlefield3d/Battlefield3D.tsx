@@ -98,7 +98,10 @@ export default function Battlefield3D({
         // we mount a FRESH canvas element with a fresh context. Retries are
         // capped to avoid a remount loop on hardware that keeps evicting.
         key={canvasEpoch}
-        shadows
+        // "percentage" = PCFShadowMap. The boolean default selects
+        // PCFSoftShadowMap, which three r185 deprecated (it aliases to PCF
+        // anyway) and logs a console warning on every renderer init.
+        shadows="percentage"
         dpr={[1, 2]}
         className="absolute inset-0"
         camera={{ fov: 45, position: [0, 6.5, 5.2] }}
