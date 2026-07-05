@@ -12,6 +12,10 @@ interface Method {
   name: string;
   entrypoint: string;
   description?: string;
+  // Cartridge requires spender + amount on ERC-20 approve session policies
+  // (bare approve entries are deprecated and will be rejected).
+  spender?: string;
+  amount?: string;
 }
 
 interface ContractPolicy {
@@ -108,7 +112,15 @@ export function buildPolicies(
   if (resourceTokens) {
     for (const addr of Object.values(resourceTokens)) {
       policies.contracts[addr] = {
-        methods: [m("approve", "Approve crafting contract to spend resource tokens")],
+        methods: [
+          {
+            ...m("approve", "Approve crafting contract to spend resource tokens"),
+            // Crafting is the only approve spender; amounts are raw integers
+            // (no decimals), so this cap is far above any craft cost.
+            spender: contracts.crafting1v1,
+            amount: "0xffffffff",
+          },
+        ],
       };
     }
   }
