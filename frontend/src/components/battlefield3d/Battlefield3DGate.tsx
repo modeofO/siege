@@ -19,26 +19,35 @@ function webglAvailable(): boolean {
 // NEXT_PUBLIC_BATTLE_3D=0 force-disables (dev escape hatch); default on.
 const FLAG_ON = process.env.NEXT_PUBLIC_BATTLE_3D !== "0";
 
-export function Battlefield3DGate(props: Battlefield3DProps & { children?: ReactNode }) {
+// `fallbackOnly` renders ONLY in the 2D fallback path (as BattlefieldView's
+// children). In the 3D path the scene plays the resolution itself, so this slot
+// — the 2D BattleAnimation overlay — is dropped. Anything that must appear in
+// BOTH paths (e.g. the "confirming on-chain…" pill) stays a sibling of the gate
+// in the caller, not a child here. This keeps the 2D fallback DOM byte-identical
+// to the pre-integration page.
+export function Battlefield3DGate(
+  props: Battlefield3DProps & { fallbackOnly?: ReactNode },
+) {
+  const { fallbackOnly, ...rest } = props;
   const use3d = useMemo(() => FLAG_ON && webglAvailable(), []);
 
   if (!use3d) {
     return (
       <BattlefieldView
-        allocations={props.allocations}
-        isPlayerA={props.isPlayerA}
-        committed={props.committed}
-        modifiers={props.modifiers}
-        opponentAllocations={props.opponentAllocations}
+        allocations={rest.allocations}
+        isPlayerA={rest.isPlayerA}
+        committed={rest.committed}
+        modifiers={rest.modifiers}
+        opponentAllocations={rest.opponentAllocations}
       >
-        {props.children}
+        {fallbackOnly}
       </BattlefieldView>
     );
   }
 
   return (
     <Suspense fallback={<div className="h-full min-h-[320px] animate-pulse bg-[#1a1714] rounded-lg" />}>
-      <Battlefield3D {...props} />
+      <Battlefield3D {...rest} />
     </Suspense>
   );
 }

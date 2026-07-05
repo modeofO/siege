@@ -21,7 +21,7 @@ import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt
 import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
-import { BattlefieldView } from "@/components/BattlefieldView";
+import { Battlefield3DGate } from "@/components/battlefield3d/Battlefield3DGate";
 import { MatchStakesHeader } from "@/components/MatchStakesHeader";
 import { MatchEndActions } from "@/components/MatchEndActions";
 import { HoldStatusStrip } from "@/components/HoldStatusStrip";
@@ -771,6 +771,11 @@ export default function Match1v1Page() {
       : [...lastRound.aAttack, ...lastRound.aDefense, 0, 0, 0, 0, ...lastRound.aTraps]
     : null;
 
+  // Whether the opponent has committed this round, derived from the total commit
+  // count: both committed (>=2), or exactly one commit that isn't ours.
+  const opponentCommitted =
+    effectiveCommitCount >= 2 || (effectiveCommitCount >= 1 && !effectiveCommitted);
+
   return (
     <div className="space-y-2 max-w-7xl mx-auto">
       {/* ===== 1. HEADER BANNER ===== */}
@@ -880,33 +885,41 @@ export default function Match1v1Page() {
         {/* Left: Animated Battlefield + War Log */}
         <div className="flex flex-col gap-2">
           <div className="relative">
-            <BattlefieldView
+            <Battlefield3DGate
               allocations={allocations}
               isPlayerA={isPlayerA}
               committed={effectiveCommitted}
+              opponentCommitted={opponentCommitted}
               modifiers={modifiers}
               opponentAllocations={opponentAllocations}
-            >
-              {pendingResult && heldHp ? (
-                <BattleAnimation
-                  result={pendingResult}
-                  prevNodes={prevNodes}
-                  newNodes={state.nodes}
-                  isPlayerA={isPlayerA}
-                  heldHp={heldHp}
-                  onComplete={handleResolutionComplete}
-                />
-              ) : optimisticView && dismissedOptimisticRound !== state.round ? (
-                <BattleAnimation
-                  result={optimisticView.result}
-                  prevNodes={prevNodes}
-                  newNodes={optimisticView.newNodes}
-                  isPlayerA={isPlayerA}
-                  heldHp={optimisticView.heldHp}
-                  onComplete={handleOptimisticComplete}
-                />
-              ) : null}
-            </BattlefieldView>
+              nodes={state.nodes}
+              vaultAHp={state.vaultAHp}
+              vaultBHp={state.vaultBHp}
+              history={history}
+              outcome={optimisticOutcome ?? null}
+              onResolutionComplete={handleOptimisticComplete}
+              fallbackOnly={
+                pendingResult && heldHp ? (
+                  <BattleAnimation
+                    result={pendingResult}
+                    prevNodes={prevNodes}
+                    newNodes={state.nodes}
+                    isPlayerA={isPlayerA}
+                    heldHp={heldHp}
+                    onComplete={handleResolutionComplete}
+                  />
+                ) : optimisticView && dismissedOptimisticRound !== state.round ? (
+                  <BattleAnimation
+                    result={optimisticView.result}
+                    prevNodes={prevNodes}
+                    newNodes={optimisticView.newNodes}
+                    isPlayerA={isPlayerA}
+                    heldHp={optimisticView.heldHp}
+                    onComplete={handleOptimisticComplete}
+                  />
+                ) : null
+              }
+            />
             {optimisticOutcome && state.phase === "resolving" && (
               <div className="absolute top-2 left-1/2 -translate-x-1/2 z-30 pointer-events-none text-[10px] tracking-wider uppercase text-[#c8a44e] bg-[#1a1714]/90 border border-[#c8a44e]/40 rounded-full px-3 py-1 animate-pulse">
                 confirming on-chain…
