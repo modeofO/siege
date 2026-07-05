@@ -834,16 +834,15 @@ export default function Match1v1Page() {
   const myTeam: "teamA" | "teamB" = isPlayerA ? "teamA" : "teamB";
   const projectedBudget = computeBudget(state.nodes, myTeam, state.round + 1);
   // "Load Into Orders" is only offered while we can still edit this round's
-  // commit. It copies the SAVED sketch (a 10-slot array) into the 13-slot
-  // allocation form, padding the three trap slots to 0 — the pre-draft UI has no
-  // trap inputs, and the form's own budget guard rejects any overspend, so we
-  // don't attempt to re-validate here.
+  // commit. It copies the drawer's LIVE draft (a 10-slot array) into the 13-slot
+  // allocation form, padding/zeroing the three trap slots — the pre-draft UI has
+  // no trap inputs, and the form's own budget guard rejects any overspend, so we
+  // don't re-validate here. The drawer persists the draft before calling this.
   const onLoadIntoOrders =
     state.phase === "committing" && !effectiveCommitted
-      ? () => {
+      ? (alloc: number[]) => {
           const next = new Array(13).fill(0);
-          const src = preDraft ?? [];
-          for (let i = 0; i < 13; i++) next[i] = src[i] || 0;
+          for (let i = 0; i < 13; i++) next[i] = alloc[i] || 0;
           setAllocations(next);
         }
       : null;

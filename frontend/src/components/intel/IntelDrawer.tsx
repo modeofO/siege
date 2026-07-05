@@ -17,7 +17,9 @@ interface IntelDrawerProps {
   projectedBudget: number;
   preDraft: number[] | null;
   onSavePreDraft: (allocations: number[]) => void;
-  onLoadIntoOrders: (() => void) | null; // null when not in commit phase (button disabled)
+  // Receives the drawer's LIVE draft so unsaved slider edits load too. null when
+  // not in commit phase (button disabled).
+  onLoadIntoOrders: ((allocations: number[]) => void) | null;
 }
 
 // Display order matches AllocationForm1v1's GATE_ORDER: East / Under. / West
@@ -281,6 +283,7 @@ export function IntelDrawer({
               <section className="border-t border-[#3d3428] pt-3">
                 <SectionLabel>Tendencies</SectionLabel>
                 <div className="space-y-1">
+                  <StatRow label="Win rate" value={`${Math.round(profile.winRate * 100)}%`} />
                   <StatRow label="Trap rate" value={`${Math.round(profile.trapRate * 100)}%`} />
                   <StatRow
                     label="Repair when low"
@@ -434,7 +437,13 @@ export function IntelDrawer({
                   Save Sketch
                 </button>
                 <button
-                  onClick={() => onLoadIntoOrders?.()}
+                  onClick={() => {
+                    if (!onLoadIntoOrders) return;
+                    // Persist the live draft, then load it — loading also saves so
+                    // the sketch and the orders form never diverge.
+                    onSavePreDraft(draft);
+                    onLoadIntoOrders(draft);
+                  }}
                   disabled={!onLoadIntoOrders}
                   title={onLoadIntoOrders ? undefined : "Available during the commit phase"}
                   className={`flex-1 py-1.5 text-[11px] rounded border font-serif tracking-wider uppercase transition-colors ${
