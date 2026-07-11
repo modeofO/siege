@@ -31,7 +31,7 @@ pub mod resolution_1v1 {
     use siege_dojo::models::events::{RoundResolved, MatchFinished};
     use siege_dojo::models::resource_config::ResourceConfig;
     use siege_dojo::tokens::resource_token::{IResourceTokenDispatcher, IResourceTokenDispatcherTrait};
-    use super::{IVrfProviderResDispatcher, IVrfProviderResDispatcherTrait, Source};
+    use super::{IVrfProviderResSafeDispatcher, IVrfProviderResSafeDispatcherTrait, Source};
 
     const VRF_PROVIDER_ADDRESS: felt252 =
         0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f;
@@ -81,6 +81,9 @@ pub mod resolution_1v1 {
 
     #[abi(embed_v0)]
     impl Resolution1v1Impl of super::IResolution1v1<ContractState> {
+        // safe_dispatcher: next-round VRF is called via the SafeDispatcher so a
+        // revert falls back to Normal modifiers instead of stranding the match.
+        #[feature("safe_dispatcher")]
         fn resolve_round(ref self: ContractState, match_id: u64) {
             let mut world = self.world_default();
             let mut state: MatchState1v1 = world.read_model(match_id);
@@ -521,9 +524,16 @@ pub mod resolution_1v1 {
                 } else {
                     VRF_PROVIDER_ADDRESS.try_into().unwrap()
                 };
-                let vrf = IVrfProviderResDispatcher { contract_address: vrf_addr };
-                let random_value = vrf.consume_random(Source::Nonce(get_contract_address()));
-                let (g0, g1, g2) = random_to_modifiers(random_value);
+                // Next-round modifiers must never be able to strand a match: if
+                // the VRF call reverts (e.g. the nested-call seed quirk in
+                // force_timeout -> resolve_round, issue #44, or a provider
+                // outage), fall back to all-Normal gates instead of bubbling the
+                // revert up and locking the match (and any escrowed stakes).
+                let vrf = IVrfProviderResSafeDispatcher { contract_address: vrf_addr };
+                let (g0, g1, g2) = match vrf.consume_random(Source::Nonce(get_contract_address())) {
+                    Result::Ok(random_value) => random_to_modifiers(random_value),
+                    Result::Err(_) => (MOD_NORMAL, MOD_NORMAL, MOD_NORMAL),
+                };
                 world.write_model(@RoundModifiers1v1 {
                     match_id,
                     round: round + 1,

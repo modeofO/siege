@@ -355,15 +355,12 @@ pub mod world_system {
                 i += 1;
             };
 
-            // Mint 3 starter abilities (IDs 1, 2, 3)
-            let rc: ResourceConfig = world.read_model(0_u8);
-            if rc.ability_token.is_non_zero() {
-                let ability = IAbilityTokenDispatcher { contract_address: rc.ability_token };
-                ability.mint(caller, 1_u256, 1_u256);
-                ability.mint(caller, 2_u256, 1_u256);
-                ability.mint(caller, 3_u256, 1_u256);
-            }
-
+            // Checks-effects-interactions: persist the kingdom with
+            // registered = true BEFORE minting starter abilities. mint uses
+            // mint_with_acceptance_check, which calls on_erc1155_received on the
+            // caller; a contract-account caller could otherwise re-enter
+            // register_player while registered is still false and recursively
+            // claim more homes and mint more abilities.
             world.write_model(@PlayerKingdom {
                 player: caller,
                 home_0: h0,
@@ -377,6 +374,15 @@ pub mod world_system {
                 total_wins: 0,
                 faction_reinforcement_enabled: false,
             });
+
+            // Mint 3 starter abilities (IDs 1, 2, 3)
+            let rc: ResourceConfig = world.read_model(0_u8);
+            if rc.ability_token.is_non_zero() {
+                let ability = IAbilityTokenDispatcher { contract_address: rc.ability_token };
+                ability.mint(caller, 1_u256, 1_u256);
+                ability.mint(caller, 2_u256, 1_u256);
+                ability.mint(caller, 3_u256, 1_u256);
+            }
         }
 
         fn set_ability_token(ref self: ContractState, ability_token: ContractAddress) {
@@ -397,6 +403,7 @@ pub mod world_system {
         ) -> u64 {
             let mut world = self.world_default();
             let caller = get_caller_address();
+            assert(opponent != caller, 'Cannot self-match');
             let kingdom: PlayerKingdom = world.read_model(caller);
             assert(kingdom.registered, 'Not registered');
 
@@ -621,6 +628,12 @@ pub mod world_system {
             assert(stakes.staked, 'Not a staked match');
             assert(!stakes.settled, 'Already settled');
             stakes.settled = true;
+            // Checks-effects-interactions: persist the settled flag BEFORE any
+            // external ERC-1155 transfer. safe_transfer_from invokes the
+            // recipient's on_erc1155_received hook, so a contract-account winner
+            // could otherwise re-enter settle_match while settled is still false
+            // and drain other matches' escrow from the shared token balance.
+            world.write_model(@stakes);
 
             let rc: ResourceConfig = world.read_model(0_u8);
             let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
@@ -819,8 +832,9 @@ pub mod world_system {
             // players collect resources through the hourly claim_drip instead.
             // It scanned the whole map and minted per parcel, dominating the
             // transaction's gas and pushing it past paymaster sponsorship limits.
-
-            world.write_model(@stakes);
+            //
+            // stakes (with settled = true) was already persisted above, before
+            // the escrow transfers, to close the reentrancy window.
         }
 
         fn claim_parcel(ref self: ContractState, match_id: u64, parcel_id: u32, parcel_type: u8) {
@@ -1063,7 +1077,12 @@ pub mod world_system {
             assert(kingdom.tier >= 1, 'Strategos tier required');
 
             let existing: FactionMember = world.read_model(caller);
-            assert(existing.faction_id == 0, 'Already in a faction');
+            // A dissolved faction counts as no membership — a member stranded by
+            // a leader's dissolve can still form a new faction.
+            if existing.faction_id != 0 {
+                let existing_faction: Faction = world.read_model(existing.faction_id);
+                assert(existing_faction.dissolved, 'Already in a faction');
+            }
 
             // Burn formation cost: 30 Iron + 30 Stone + 20 Wood
             let rc: ResourceConfig = world.read_model(0_u8);
@@ -1135,7 +1154,12 @@ pub mod world_system {
             assert(!invite.used, 'Invite already used');
 
             let mut caller_member: FactionMember = world.read_model(caller);
-            assert(caller_member.faction_id == 0, 'Already in a faction');
+            // A dissolved faction counts as no membership — a member stranded by
+            // a leader's dissolve can accept an invite elsewhere.
+            if caller_member.faction_id != 0 {
+                let current_faction: Faction = world.read_model(caller_member.faction_id);
+                assert(current_faction.dissolved, 'Already in a faction');
+            }
 
             let now = get_block_timestamp();
             if caller_member.last_leave_time > 0 {
@@ -1164,7 +1188,17 @@ pub mod world_system {
             assert(member.faction_id != 0, 'Not in a faction');
 
             let mut faction: Faction = world.read_model(member.faction_id);
-            assert(!faction.dissolved, 'Already dissolved');
+
+            // Leaving an already-dissolved faction just clears the stale
+            // membership — don't touch the faction (it's dead) or decrement its
+            // count again. This lets members stranded by a leader's dissolve
+            // exit and rejoin/create elsewhere.
+            if faction.dissolved {
+                member.faction_id = 0;
+                member.last_leave_time = get_block_timestamp();
+                world.write_model(@member);
+                return;
+            }
 
             if caller == faction.leader {
                 faction.dissolved = true;

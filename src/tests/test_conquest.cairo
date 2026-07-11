@@ -70,6 +70,7 @@ mod tests {
     use siege_dojo::models::world_config::{WorldConfig, m_WorldConfig};
     use siege_dojo::models::match_stakes_1v1::m_MatchStakes1v1;
     use siege_dojo::models::preset_defense::{PresetDefense, m_PresetDefense};
+    use siege_dojo::models::conquest_cooldown::m_ConquestCooldown;
     use siege_dojo::models::match_state_1v1::m_MatchState1v1;
     use siege_dojo::models::match_abilities_1v1::m_MatchAbilities1v1;
     use siege_dojo::models::node_state::m_NodeState;
@@ -81,6 +82,7 @@ mod tests {
     use siege_dojo::models::resource_config::{ResourceConfig, m_ResourceConfig};
     use siege_dojo::models::events::{
         e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished,
+        e_ConquestResolved,
     };
     use siege_dojo::tokens::ability_token::{
         AbilityToken, IAbilityTokenDispatcher, IAbilityTokenDispatcherTrait,
@@ -188,6 +190,7 @@ mod tests {
                 TestResource::Model(m_WorldConfig::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchStakes1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_PresetDefense::TEST_CLASS_HASH),
+                TestResource::Model(m_ConquestCooldown::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchState1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchAbilities1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_NodeState::TEST_CLASS_HASH),
@@ -206,6 +209,7 @@ mod tests {
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
                 TestResource::Event(e_RoundResolved::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchFinished::TEST_CLASS_HASH),
+                TestResource::Event(e_ConquestResolved::TEST_CLASS_HASH),
                 TestResource::Contract(world_system::TEST_CLASS_HASH),
                 TestResource::Contract(conquest::TEST_CLASS_HASH),
                 TestResource::Contract(actions_1v1::TEST_CLASS_HASH),

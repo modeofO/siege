@@ -44,3 +44,17 @@ pub struct MatchCreated1v1 {
     pub player_a: ContractAddress,
     pub player_b: ContractAddress,
 }
+
+#[dojo::event]
+#[derive(Drop, Serde)]
+pub struct ConquestResolved {
+    #[key]
+    pub attacker: ContractAddress,
+    pub target_parcel: u32,
+    pub defender: ContractAddress,
+    pub attacker_won: bool,
+    // The ability the attacker committed (0 = none). If non-zero it was
+    // consumed by this attack — abilities are single-use in conquest.
+    pub ability_id: u8,
+    pub ability_consumed: bool,
+}

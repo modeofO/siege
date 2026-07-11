@@ -149,6 +149,8 @@ const MAX_VAULT_HP = 50;
 const MAX_ROUNDS = 10;
 const DEFENDER_PRESET_BUDGET = 12;
 const CONQUEST_ATTACK_BUDGET = 10;
+// Mirrors CONQUEST_COOLDOWN in src/systems/conquest.cairo — keep in sync.
+const CONQUEST_COOLDOWN_SECONDS = 3600;
 
 const min3 = (n: number) => (n > 3 ? 3 : n);
 
@@ -308,30 +310,6 @@ async function pollReceipt(rpcUrl: string, txHash: string): Promise<void> {
 }
 
 async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
-  process.stderr.write(`[exec-debug] signer.address: ${signer.address}\n`);
-  const signerAny = signer as any;
-  try {
-    const keys = Object.getOwnPropertyNames(Object.getPrototypeOf(signerAny) ?? {}).concat(Object.keys(signerAny));
-    process.stderr.write(`[exec-debug] signer keys: ${keys.join(', ')}\n`);
-  } catch {}
-  if (signerAny.controller) {
-    const ctrl = signerAny.controller;
-    try {
-      const ckeys = Object.getOwnPropertyNames(Object.getPrototypeOf(ctrl) ?? {}).concat(Object.keys(ctrl));
-      process.stderr.write(`[exec-debug] controller keys: ${ckeys.join(', ')}\n`);
-    } catch {}
-    try {
-      const addr = typeof ctrl.address === 'function' ? ctrl.address() : ctrl.address;
-      process.stderr.write(`[exec-debug] controller.address: ${addr}\n`);
-    } catch (e: any) { process.stderr.write(`[exec-debug] controller.address error: ${e.message}\n`); }
-    try {
-      const cAddr = typeof ctrl.cartridgeAccount === 'function' ? ctrl.cartridgeAccount() : ctrl.cartridgeAccount;
-      process.stderr.write(`[exec-debug] controller.cartridgeAccount: ${JSON.stringify(cAddr)}\n`);
-    } catch {}
-    try {
-      process.stderr.write(`[exec-debug] controller.constructor.name: ${ctrl.constructor?.name}\n`);
-    } catch {}
-  }
   const controller = (signer as unknown as { controller?: {
     executeFromOutside: (calls: Array<{ contractAddress: string; entrypoint: string; calldata: string[] }>) => Promise<{ transaction_hash: string }>;
   } }).controller;
@@ -343,40 +321,7 @@ async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
     contractAddress: addAddressPadding(c.contractAddress),
     calldata: CallData.toHex(c.calldata),
   }));
-  // Intercept fetch to capture what address the WASM targets
-  const origFetch = globalThis.fetch;
-  const fetchLog: string[] = [];
-  globalThis.fetch = async (input: any, init?: any) => {
-    const url = typeof input === 'string' ? input : input?.url ?? String(input);
-    let bodyStr = '';
-    if (init?.body) {
-      bodyStr = typeof init.body === 'string' ? init.body : JSON.stringify(init.body);
-    } else if (typeof input === 'object' && input !== null) {
-      try { bodyStr = await input.clone?.().text?.() ?? ''; } catch {}
-    }
-    // Also check for Request objects
-    if (!bodyStr && input instanceof Request) {
-      try { bodyStr = await input.clone().text(); } catch {}
-    }
-    const snippet = bodyStr.length > 2000 ? bodyStr.slice(0, 2000) : bodyStr;
-    // Look for any hex strings that could be addresses (shorter pattern)
-    const hexMatches = bodyStr.match(/0x[0-9a-fA-F]{10,}/g);
-    fetchLog.push(`url=${url} bodyLen=${bodyStr.length} hexes=${JSON.stringify([...new Set(hexMatches ?? [])].slice(0, 8))} snippet=${snippet.slice(0, 500)}`);
-    return origFetch(input, init);
-  };
-  let res: { transaction_hash: string };
-  try {
-    res = await controller.executeFromOutside(normalized);
-  } catch (e: any) {
-    globalThis.fetch = origFetch;
-    const debugInfo = {
-      signerAddress: signer.address,
-      fetchLog,
-    };
-    e.message = `${e.message} [DEBUG: ${JSON.stringify(debugInfo)}]`;
-    throw e;
-  }
-  globalThis.fetch = origFetch;
+  const res = await controller.executeFromOutside(normalized);
   if (rpcUrlForReceipts) await pollReceipt(rpcUrlForReceipts, res.transaction_hash);
   return res.transaction_hash;
 }
@@ -1417,7 +1362,19 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           String(ability_target),
         ]),
       ]);
-      return { tx_hash: tx, target_parcel, total_allocated: total, budget: CONQUEST_ATTACK_BUDGET };
+      const ability_consumed = ability_id > 0;
+      return {
+        tx_hash: tx,
+        target_parcel,
+        total_allocated: total,
+        budget: CONQUEST_ATTACK_BUDGET,
+        ability_id,
+        ability_consumed,
+        // Player-facing notifications for the two conquest side effects.
+        notice: ability_consumed
+          ? `Ability ${ability_id} was CONSUMED by this attack — abilities are single-use in conquest and are not returned, win or lose. Conquest is also rate-limited: you cannot attack again for ${CONQUEST_COOLDOWN_SECONDS} seconds.`
+          : `No ability used. Conquest is rate-limited: you cannot attack again for ${CONQUEST_COOLDOWN_SECONDS} seconds.`,
+      };
     },
   );
 
