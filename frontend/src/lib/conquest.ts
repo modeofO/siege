@@ -83,6 +83,15 @@ export async function setPresetDefense(
   return result.transaction_hash;
 }
 
+export interface ConquestSubmitResult {
+  txHash: string;
+  // A non-zero abilityId is CONSUMED by the attack (single-use in conquest —
+  // not returned win or lose). Surface this to the player when the attack UI
+  // is wired up. There is currently no conquest-attack component consuming
+  // this helper, so this is the notification plumbing for that future UI.
+  abilityConsumed: boolean;
+}
+
 export async function initiateConquest(
   account: AccountInterface,
   targetParcelId: number,
@@ -94,7 +103,7 @@ export async function initiateConquest(
   g2: number,
   abilityId: number,
   abilityTarget: number,
-): Promise<string> {
+): Promise<ConquestSubmitResult> {
   const result = await resilientExecute(account, {
     contractAddress: CONQUEST_ADDRESS,
     entrypoint: "initiate_conquest",
@@ -110,8 +119,10 @@ export async function initiateConquest(
       abilityTarget.toString(),
     ],
   });
-  return result.transaction_hash;
+  return { txHash: result.transaction_hash, abilityConsumed: abilityId > 0 };
 }
 
 export const DEFENDER_BUDGET = 12;
 export const ATTACKER_BUDGET = 10;
+// Mirrors CONQUEST_COOLDOWN in src/systems/conquest.cairo — keep in sync.
+export const CONQUEST_COOLDOWN_SECONDS = 3600;

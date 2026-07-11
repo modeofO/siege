@@ -2,3 +2,4 @@ node_modules/
 dist/
 .cartridge/
 .cartridge-bak-*/
+.env

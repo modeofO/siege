@@ -37,13 +37,16 @@ pub fn ability_tier_from_token(token_id: u8) -> u8 {
 #[dojo::contract]
 pub mod conquest {
     use core::num::traits::Zero;
-    use starknet::{ContractAddress, get_caller_address, get_contract_address};
+    use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
     use dojo::model::ModelStorage;
+    use dojo::event::EventStorage;
     use siege_dojo::models::parcel::Parcel;
     use siege_dojo::models::player_kingdom::PlayerKingdom;
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::preset_defense::PresetDefense;
     use siege_dojo::models::faction_member::FactionMember;
+    use siege_dojo::models::conquest_cooldown::ConquestCooldown;
+    use siege_dojo::models::events::ConquestResolved;
     use siege_dojo::utils::hex;
     use super::{IERC1155Dispatcher, IERC1155DispatcherTrait};
     use super::{ability_type_from_token, ability_tier_from_token};
@@ -64,6 +67,10 @@ pub mod conquest {
     const ATTACKER_BUDGET: u8 = 10;
     const DEFENDER_HP: u8 = 15;
     const ATTACKER_HP: u8 = 10;
+    // Minimum seconds between an attacker's conquest attempts. Without it a
+    // home-only attacker (who forfeits nothing on a loss) can spam attacks to
+    // re-roll VRF preset selection and farm territory/tier for free. Tunable.
+    const CONQUEST_COOLDOWN: u64 = 3600;
 
     #[generate_trait]
     impl InternalImpl of InternalTrait {
@@ -161,7 +168,24 @@ pub mod conquest {
             let atk_total = p0 + p1 + p2 + g0 + g1 + g2;
             assert(atk_total <= ATTACKER_BUDGET, 'Budget exceeds 10');
 
-            // Validate ability (0 = none, 1-10 = valid) and verify ownership
+            // Rate limit: refuse another attack until the cooldown elapses.
+            // Written before any token movement so a blocked call is cheap.
+            let now = get_block_timestamp();
+            let mut cooldown: ConquestCooldown = world.read_model(attacker);
+            if cooldown.last_attack_time != 0 {
+                assert(
+                    now >= cooldown.last_attack_time + CONQUEST_COOLDOWN,
+                    'Conquest on cooldown',
+                );
+            }
+            cooldown.last_attack_time = now;
+            world.write_model(@cooldown);
+
+            // Validate ability (0 = none, 1-10 = valid) and verify ownership.
+            // The ability is CONSUMED by the attack: it is escrowed permanently
+            // into this contract (the only address that implements the ERC-1155
+            // receiver, so it's a de-facto burn) and never returned, win or
+            // lose. Abilities are single-use in conquest.
             if ability_id > 0 {
                 assert(ability_id <= 10, 'Invalid ability ID');
                 assert(ability_target <= 2, 'Invalid ability target');
@@ -420,6 +444,17 @@ pub mod conquest {
                 }
                 // If !has_non_home: last stand — no parcel loss for attacker
             }
+
+            // Surface the outcome (and whether an ability was consumed) so the
+            // frontend and MCP can notify the player.
+            world.emit_event(@ConquestResolved {
+                attacker,
+                target_parcel,
+                defender,
+                attacker_won: attacker_wins,
+                ability_id,
+                ability_consumed: ability_id > 0,
+            });
         }
     }
 }

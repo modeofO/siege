@@ -23,6 +23,7 @@ pub mod models {
     pub mod faction_member;
     pub mod faction_invite;
     pub mod player_cosmetics;
+    pub mod conquest_cooldown;
 }
 
 pub mod tokens;

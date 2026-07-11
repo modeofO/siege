@@ -8,10 +8,31 @@
  * instead of corrupting the JSON-RPC stream.
  */
 
+import { chmodSync, existsSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import SessionProvider from "@cartridge/controller/session/node";
 import { shortString, type WalletAccount } from "starknet";
 import type { ResourceTokenAddresses, SiegeContracts } from "./config.js";
 import { buildPolicies } from "./policies.js";
+
+/**
+ * Restrict the session directory to the current user. The persisted
+ * session.json holds the session private key in cleartext; without this it is
+ * created world-readable (0644) and any local user could sign as the agent.
+ * Best-effort — a chmod failure must not block a working session.
+ */
+function hardenSessionPerms(basePath: string): void {
+  try {
+    if (!existsSync(basePath)) return;
+    chmodSync(basePath, 0o700);
+    for (const name of readdirSync(basePath)) {
+      const entry = join(basePath, name);
+      if (statSync(entry).isFile()) chmodSync(entry, 0o600);
+    }
+  } catch {
+    // non-fatal: perms are defense-in-depth, not required for correctness
+  }
+}
 
 interface SessionConfig {
   rpcUrl: string;
@@ -82,13 +103,19 @@ export async function getAccount(
     const p = getProvider(cfg);
 
     const first = await p.connect();
-    if (first) return first;
+    if (first) {
+      hardenSessionPerms(cfg.basePath);
+      return first;
+    }
 
     const deadline = Date.now() + POLL_TIMEOUT_MS;
     while (Date.now() < deadline) {
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
       const retry = await p.connect();
-      if (retry) return retry;
+      if (retry) {
+        hardenSessionPerms(cfg.basePath);
+        return retry;
+      }
     }
 
     throw new Error(

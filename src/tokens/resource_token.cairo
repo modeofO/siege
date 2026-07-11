@@ -68,6 +68,15 @@ pub mod ResourceToken {
             self.erc20.mint(to, amount);
         }
 
+        // NOTE: an authorized operator can burn tokens from ANY `from` address,
+        // not just the caller. This is required — game contracts (crafting,
+        // upgrades, faction costs) burn the player's tokens while the contract,
+        // not the player, is the on-chain caller. The invariant that keeps this
+        // safe is external: every operator must only ever pass the transaction
+        // signer as `from`. A tx-origin assert here would break the paymaster /
+        // outside-execution path (where account_contract_address can be a
+        // forwarder), so the operator allowlist is the trust boundary — only
+        // grant the operator role to audited first-party contracts.
         fn burn(ref self: ContractState, from: ContractAddress, amount: u256) {
             let caller = get_caller_address();
             assert(is_resource_operator(@self, caller), 'Not resource operator');
