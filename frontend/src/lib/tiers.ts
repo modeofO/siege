@@ -27,3 +27,20 @@ export const UPGRADE_COSTS: (UpgradeCost | null)[] = [
 export function tierName(tier: number): TierName {
   return TIER_NAMES[tier] ?? "Polis";
 }
+
+// Number of defense presets a tier unlocks. Mirrors tier_preset_count in
+// src/systems/world_system.cairo — keep in sync.
+export function tierPresetCount(tier: number): number {
+  switch (tier) {
+    case 0:
+      return 1;
+    case 1:
+      return 2;
+    case 2:
+      return 3;
+    case 3:
+      return 4;
+    default:
+      return 1;
+  }
+}

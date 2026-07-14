@@ -14,6 +14,11 @@ function contractAddress(tag: string, envName: string, fallback = ""): string {
   return process.env[envName] || fromManifest || fallback;
 }
 
+// Cartridge VRF provider — a fixed network address, not a Dojo contract. Lives
+// here (an address-only module) rather than contracts1v1.ts so sessionPolicies
+// can read it without pulling the controllerSession import cycle.
+export const VRF_PROVIDER_ADDRESS = "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
+
 export const ACTIONS_1V1_ADDRESS = contractAddress(
   "siege_dojo-actions_1v1",
   "NEXT_PUBLIC_ACTIONS_1V1_ADDRESS",
