@@ -4,12 +4,15 @@ import {
   COMMIT_REVEAL_1V1_ADDRESS,
   RESOLUTION_1V1_ADDRESS,
   WORLD_SYSTEM_ADDRESS,
+  VRF_PROVIDER_ADDRESS,
 } from "@/lib/contractAddresses";
 import { resilientExecute } from "@/lib/controllerSession";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
-export const VRF_PROVIDER_ADDRESS = "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
+// Re-exported for back-compat — the canonical definition now lives in
+// contractAddresses.ts to avoid a sessionPolicies/controllerSession import cycle.
+export { VRF_PROVIDER_ADDRESS };
 
 export const CONTRACTS_1V1 = {
   ACTIONS: ACTIONS_1V1_ADDRESS,

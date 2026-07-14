@@ -14,6 +14,12 @@ interface HexGridProps {
   playerAddress: string | null;
   homeParcelIds: number[]; // [home0, home1, home2]
   cosmeticsMap?: Record<string, PlayerCosmeticsData>;
+  // Controlled selection: when `onSelectParcel` is provided the grid is
+  // controlled by the parent (world page); otherwise it keeps internal state
+  // (dev pages). `attackableParcelIds` marks raidable borders with a red ring.
+  selectedParcel?: ParcelData | null;
+  onSelectParcel?: (parcel: ParcelData | null) => void;
+  attackableParcelIds?: Set<number>;
 }
 
 function normalizeAddr(a: string): string {
@@ -68,9 +74,25 @@ function getBannerStyle(banner: string | null): BannerStyle | null {
   return BANNER_STYLES[banner] ?? null;
 }
 
-export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }: HexGridProps) {
+export function HexGrid({
+  parcels,
+  playerAddress,
+  homeParcelIds,
+  cosmeticsMap,
+  selectedParcel: controlledSelected,
+  onSelectParcel,
+  attackableParcelIds,
+}: HexGridProps) {
   const [hoveredParcel, setHoveredParcel] = useState<ParcelData | null>(null);
-  const [selectedParcel, setSelectedParcel] = useState<ParcelData | null>(null);
+  const [internalSelected, setInternalSelected] = useState<ParcelData | null>(null);
+
+  const selectedParcel = onSelectParcel ? controlledSelected ?? null : internalSelected;
+
+  const selectParcel = (parcel: ParcelData) => {
+    const next = selectedParcel?.parcelId === parcel.parcelId ? null : parcel;
+    if (onSelectParcel) onSelectParcel(next);
+    else setInternalSelected(next);
+  };
 
   if (parcels.length === 0) return null;
 
@@ -146,7 +168,7 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
               key={parcel.parcelId}
               onMouseEnter={() => setHoveredParcel(parcel)}
               onMouseLeave={() => setHoveredParcel(null)}
-              onClick={() => setSelectedParcel(selectedParcel?.parcelId === parcel.parcelId ? null : parcel)}
+              onClick={() => selectParcel(parcel)}
               className="cursor-pointer"
               filter={owned ? "url(#glow-gold)" : undefined}
             >
@@ -158,6 +180,18 @@ export function HexGrid({ parcels, playerAddress, homeParcelIds, cosmeticsMap }:
                 stroke={getStroke(parcel)}
                 strokeWidth={getStrokeWidth(parcel)}
               />
+
+              {/* Attackable border — pulsing red target ring */}
+              {attackableParcelIds?.has(parcel.parcelId) && (
+                <polygon
+                  points={hexPoints(x, y, HEX_SIZE + 1.5)}
+                  fill="none"
+                  stroke="#c44332"
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  className="animate-pulse pointer-events-none"
+                />
+              )}
 
               {/* Parcel skin overlay — ward projection */}
               {skinCircuit && (() => {
