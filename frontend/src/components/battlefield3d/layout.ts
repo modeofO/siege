@@ -20,21 +20,31 @@ type Vec3 = [number, number, number];
 
 // Left→right gate x follows the 2D layout order East/Underground/West = data
 // indices 0/2/1, so gate 0 is leftmost, gate 2 center, gate 1 rightmost.
-const GATE_X: Record<0 | 1 | 2, number> = { 0: -2.5, 2: 0, 1: 2.5 };
+export const GATE_X: Record<0 | 1 | 2, number> = { 0: -2.5, 2: 0, 1: 2.5 };
 
 /** World position of a gate on the map plane (table surface y = 0). */
 export function gatePosition(gate: 0 | 1 | 2): Vec3 {
   return [GATE_X[gate], 0, 0];
 }
 
-/** Node marker `i` sits directly behind its gate so the pairing reads visually. */
+// Nodes form a vertical column on the right side of the paper, centered on the
+// midline — gates and nodes are separate objectives and must not look attached.
+export const NODE_POS: readonly Vec3[] = [
+  [3.7, 0, -1.15],
+  [3.7, 0, 0],
+  [3.7, 0, 1.15],
+];
+
+/** Node marker `i` in the right-hand objective column. */
 export function nodePosition(node: 0 | 1 | 2): Vec3 {
-  return [GATE_X[node], 0, -0.8];
+  return [...NODE_POS[node]];
 }
 
-/** Player citadel is on the +Z side, enemy on the −Z side. */
+/** Player citadel is on the +Z side, enemy on the −Z side. Pulled inward from
+ * the original ±2.4 so the curtain-wall ring (half-extent 0.8) stays on the
+ * 10×6 paper: 2.15 + 0.8 = 2.95 < 3. */
 export function citadelPosition(side: "player" | "enemy"): Vec3 {
-  return [0, 0, side === "player" ? 2.4 : -2.4];
+  return [0, 0, side === "player" ? 2.15 : -2.15];
 }
 
 const RANK_SIZE = 4;
