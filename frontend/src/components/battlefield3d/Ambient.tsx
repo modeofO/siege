@@ -203,17 +203,20 @@ function Embers({ modifiers, color }: { modifiers: [number, number, number]; col
   const points = useRef<THREE.Points>(null);
   const glow = getSharedTextures().glow;
 
-  // Ember sources: the candle plus each modifier-accented gate.
+  // Ember sources: the candle plus each modifier-accented gate. Scalar deps so
+  // a fresh-but-equal modifiers array from a store poll can't reset the
+  // particle buffers mid-flight.
+  const [mod0, mod1, mod2] = modifiers;
   const sources = useMemo(() => {
     const out: Array<[number, number, number]> = [[CANDLE_POS[0], 0.2, CANDLE_POS[2]]];
-    ([0, 1, 2] as const).forEach((g) => {
-      if (MODIFIER_ACCENT[modifiers[g]]) {
-        const [gx, , gz] = gatePosition(g);
+    ([mod0, mod1, mod2] as const).forEach((mod, g) => {
+      if (MODIFIER_ACCENT[mod]) {
+        const [gx, , gz] = gatePosition(g as 0 | 1 | 2);
         out.push([gx, 0.5, gz]);
       }
     });
     return out;
-  }, [modifiers]);
+  }, [mod0, mod1, mod2]);
 
   const { positions, velocities } = useMemo(() => {
     const positions = new Float32Array(EMBER_COUNT * 3);

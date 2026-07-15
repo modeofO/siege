@@ -29,18 +29,26 @@ function RoomEnv({ intensity }: { intensity: number }) {
   const scene = useThree((s) => s.scene);
   useEffect(() => {
     const pmrem = new THREE.PMREMGenerator(gl);
-    const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+    const envScene = new RoomEnvironment();
+    const envTex = pmrem.fromScene(envScene, 0.04).texture;
+    // Free the temporary room geometry/materials once baked into the PMREM.
+    envScene.dispose();
     // The three.js scene graph is imperative by design; this effect is the
     // standard r3f escape hatch for scene-level properties.
     // eslint-disable-next-line react-hooks/immutability
     scene.environment = envTex;
-    scene.environmentIntensity = intensity;
     return () => {
       scene.environment = null;
       envTex.dispose();
       pmrem.dispose();
     };
-  }, [gl, scene, intensity]);
+  }, [gl, scene]);
+
+  // Intensity is a plain scalar — variant toggles must not trigger a rebake.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
+    scene.environmentIntensity = intensity;
+  }, [scene, intensity]);
   return null;
 }
 
