@@ -5,6 +5,7 @@ import type { AccountInterface } from "starknet";
 import type { ParcelData } from "@/lib/worldState";
 import {
   approveConquestAbilityOperator,
+  isConquestAbilityOperatorApproved,
   initiateConquest,
   fetchConquestOutcome,
   useConquestCooldown,
@@ -77,7 +78,15 @@ export function ConquestModal({ account, attacker, target, myOwnedParcels, abili
     setPhase("submitting");
     try {
       if (abilityId > 0) {
-        await approveConquestAbilityOperator(account);
+        // Skip the approval tx when conquest is already an operator. If the
+        // read itself fails, fall back to sending the approval (prior behavior).
+        let approved = false;
+        try {
+          approved = await isConquestAbilityOperatorApproved(account, attacker);
+        } catch {
+          approved = false;
+        }
+        if (!approved) await approveConquestAbilityOperator(account);
       }
       await initiateConquest(
         account,

@@ -65,6 +65,16 @@ export function PresetDefensePanel({ account, address, tier, refresh }: PresetDe
 
   const nextTierName = tier < TIER_NAMES.length - 1 ? tierName(tier + 1) : null;
 
+  // The contract marks slots 0..preset_count-1 as saved, so saving only a later
+  // slot leaves earlier all-zero slots that VRF can still pick (a free win for
+  // the attacker). Flag any saved-but-empty slot so the player fills it.
+  const presetCount = data?.presetCount ?? 0;
+  const isUndefendedSlot = (index: number, slot: PresetSlot | undefined): boolean =>
+    index < presetCount && !!slot && slotTotal(slot) === 0;
+  const hasUndefendedSlot = Array.from({ length: presetCount }).some((_, i) =>
+    isUndefendedSlot(i, data?.slots[i]),
+  );
+
   return (
     <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
       <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Standing Defenses</div>
@@ -72,6 +82,11 @@ export function PresetDefensePanel({ account, address, tier, refresh }: PresetDe
         When you are attacked, fate picks one of your presets at random. Set at least one — a Hold with no defense
         cannot be defended.
       </div>
+      {hasUndefendedSlot && (
+        <div className="text-[11px] text-[#c44332] leading-relaxed">
+          Fate may pick an empty preset — fill every unlocked slot.
+        </div>
+      )}
 
       <div className="space-y-2">
         {Array.from({ length: allowedSlots }, (_, index) => {
@@ -133,9 +148,13 @@ export function PresetDefensePanel({ account, address, tier, refresh }: PresetDe
                   <span className="text-[11px] text-[#7a7060] italic">Not set</span>
                 )}
               </div>
-              <span className="text-[9px] tracking-wider uppercase text-[#daa520]">
-                {saved ? `Edit · ${slotTotal(slot!)}/${DEFENDER_BUDGET}` : "Set"}
-              </span>
+              {isUndefendedSlot(index, slot) ? (
+                <span className="text-[9px] tracking-wider uppercase text-[#c44332]">UNDEFENDED</span>
+              ) : (
+                <span className="text-[9px] tracking-wider uppercase text-[#daa520]">
+                  {saved ? `Edit · ${slotTotal(slot!)}/${DEFENDER_BUDGET}` : "Set"}
+                </span>
+              )}
             </button>
           );
         })}
