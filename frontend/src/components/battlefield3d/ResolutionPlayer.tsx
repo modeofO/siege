@@ -247,10 +247,12 @@ export default function ResolutionPlayer({
 
   return (
     <group>
-      {/* HP counters float above each citadel, facing the +Z camera. */}
+      {/* HP counters float beside each citadel's right flank (+x reads as
+          screen-right from the fixed +Z camera), clear of the keep towers and
+          curtain walls that occlude a centered counter. */}
       <Text
         ref={playerText}
-        position={[pcx, 1.75, pcz]}
+        position={[pcx + 1.35, 1.1, pcz]}
         fontSize={0.4}
         color={PALETTE.playerGold}
         anchorX="center"
@@ -263,7 +265,7 @@ export default function ResolutionPlayer({
       </Text>
       <Text
         ref={enemyText}
-        position={[ecx, 1.75, ecz]}
+        position={[ecx + 1.35, 1.1, ecz]}
         fontSize={0.4}
         color={PALETTE.enemyCrimson}
         anchorX="center"
