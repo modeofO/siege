@@ -67,6 +67,11 @@ pub mod conquest {
     const ATTACKER_BUDGET: u8 = 10;
     const DEFENDER_HP: u8 = 15;
     const ATTACKER_HP: u8 = 10;
+    // Per-gate value of the fallback garrison a defender fights with when they
+    // have no presets and no ally reinforcement. sum 12 == DEFENDER_BUDGET;
+    // fixed and publicly known — not setting presets means every attacker knows
+    // your defense.
+    const DEFAULT_DEF_ALLOC: u8 = 2;
     // Minimum seconds between an attacker's conquest attempts. Without it a
     // home-only attacker (who forfeits nothing on a loss) can spam attacks to
     // re-roll VRF preset selection and farm territory/tier for free. Tunable.
@@ -279,10 +284,10 @@ pub mod conquest {
 
             // Get defender's preset defense and select via VRF
             let defense: PresetDefense = world.read_model(defender);
-            assert(defense.preset_count + ally_count > 0, 'No defense set');
 
-            // VRF selects preset index (0, 1, or 2)
-            // Read VRF from ResourceConfig (same pattern as actions_1v1)
+            // Consume VRF unconditionally — the multicall always submits
+            // request_random, so consuming it must not become conditional.
+            // Read VRF from ResourceConfig (same pattern as actions_1v1).
             let rc: siege_dojo::models::resource_config::ResourceConfig = world.read_model(0_u8);
             let vrf_addr = if rc.vrf_provider.is_non_zero() {
                 rc.vrf_provider
@@ -293,27 +298,38 @@ pub mod conquest {
             let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
             let random_value: u256 = vrf.consume_random(Source::Nonce(starknet::get_contract_address())).into();
             let total_pool: u8 = defense.preset_count + ally_count;
-            let preset_idx: u8 = (random_value % total_pool.into()).try_into().unwrap();
 
-            // Read selected preset — defender slots first, then ally slots
-            let (def_p0, def_p1, def_p2, def_g0, def_g1, def_g2) = if preset_idx < defense.preset_count {
-                if preset_idx == 0 {
-                    (defense.p0_p0, defense.p0_p1, defense.p0_p2, defense.p0_g0, defense.p0_g1, defense.p0_g2)
-                } else if preset_idx == 1 {
-                    (defense.p1_p0, defense.p1_p1, defense.p1_p2, defense.p1_g0, defense.p1_g1, defense.p1_g2)
-                } else if preset_idx == 2 {
-                    (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
-                } else {
-                    (defense.p3_p0, defense.p3_p1, defense.p3_p2, defense.p3_g0, defense.p3_g1, defense.p3_g2)
-                }
+            // Select the defending allocation. A turtling defender with no presets
+            // and no ally reinforcement (total_pool == 0) is always attackable and
+            // fights with the fixed, publicly known default garrison. The modulo is
+            // skipped in that case — dividing by zero would panic.
+            let (def_p0, def_p1, def_p2, def_g0, def_g1, def_g2) = if total_pool == 0 {
+                (
+                    DEFAULT_DEF_ALLOC, DEFAULT_DEF_ALLOC, DEFAULT_DEF_ALLOC,
+                    DEFAULT_DEF_ALLOC, DEFAULT_DEF_ALLOC, DEFAULT_DEF_ALLOC,
+                )
             } else {
-                let ally_idx = preset_idx - defense.preset_count;
-                if ally_idx == 0 {
-                    (ally_p0_1, ally_p1_1, ally_p2_1, ally_g0_1, ally_g1_1, ally_g2_1)
-                } else if ally_idx == 1 {
-                    (ally_p0_2, ally_p1_2, ally_p2_2, ally_g0_2, ally_g1_2, ally_g2_2)
+                let preset_idx: u8 = (random_value % total_pool.into()).try_into().unwrap();
+                // Read selected preset — defender slots first, then ally slots
+                if preset_idx < defense.preset_count {
+                    if preset_idx == 0 {
+                        (defense.p0_p0, defense.p0_p1, defense.p0_p2, defense.p0_g0, defense.p0_g1, defense.p0_g2)
+                    } else if preset_idx == 1 {
+                        (defense.p1_p0, defense.p1_p1, defense.p1_p2, defense.p1_g0, defense.p1_g1, defense.p1_g2)
+                    } else if preset_idx == 2 {
+                        (defense.p2_p0, defense.p2_p1, defense.p2_p2, defense.p2_g0, defense.p2_g1, defense.p2_g2)
+                    } else {
+                        (defense.p3_p0, defense.p3_p1, defense.p3_p2, defense.p3_g0, defense.p3_g1, defense.p3_g2)
+                    }
                 } else {
-                    (ally_p0_3, ally_p1_3, ally_p2_3, ally_g0_3, ally_g1_3, ally_g2_3)
+                    let ally_idx = preset_idx - defense.preset_count;
+                    if ally_idx == 0 {
+                        (ally_p0_1, ally_p1_1, ally_p2_1, ally_g0_1, ally_g1_1, ally_g2_1)
+                    } else if ally_idx == 1 {
+                        (ally_p0_2, ally_p1_2, ally_p2_2, ally_g0_2, ally_g1_2, ally_g2_2)
+                    } else {
+                        (ally_p0_3, ally_p1_3, ally_p2_3, ally_g0_3, ally_g1_3, ally_g2_3)
+                    }
                 }
             };
 

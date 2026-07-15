@@ -117,54 +117,10 @@ describe("getAttackability", () => {
     expect(getAttackability(target, myParcels, 7, { "0xb": 3 })).toEqual({ attackable: true });
   });
 
-  // --- Defense (No defense set) pre-check, mirroring conquest.cairo:280-282 ---
-  const target = parcel({ parcelId: 6, col: 1, row: 0, owner: ENEMY });
-
-  it("blocks an undefended target with no preset and no faction", () => {
-    const defense = {
-      info: { "0xb": { presetCount: 0, reinforcementOn: false } },
-      allParcels: [myParcels[0], target],
-    };
-    expect(getAttackability(target, myParcels, 0, {}, defense)).toEqual({
-      attackable: false,
-      reason: "No defense set — cannot be attacked",
-    });
-  });
-
-  it("allows an undefended target reinforced by an adjacent same-faction ally", () => {
-    // ENEMY (faction 3) has no preset but opted into reinforcement; ALLY is a
-    // different player in faction 3 owning a parcel adjacent to the target.
-    const allyParcel = parcel({ parcelId: 7, col: 2, row: 0, owner: ALLY });
-    const defense = {
-      info: { "0xb": { presetCount: 0, reinforcementOn: true } },
-      allParcels: [myParcels[0], target, allyParcel],
-    };
-    expect(getAttackability(target, myParcels, 0, { "0xb": 3, "0xc": 3 }, defense)).toEqual({
-      attackable: true,
-    });
-  });
-
-  it("blocks when the only same-faction ally parcel is not adjacent to the target", () => {
-    const allyParcel = parcel({ parcelId: 7, col: 5, row: 5, owner: ALLY });
-    const defense = {
-      info: { "0xb": { presetCount: 0, reinforcementOn: true } },
-      allParcels: [myParcels[0], target, allyParcel],
-    };
-    expect(getAttackability(target, myParcels, 0, { "0xb": 3, "0xc": 3 }, defense)).toEqual({
-      attackable: false,
-      reason: "No defense set — cannot be attacked",
-    });
-  });
-
-  it("allows a target with a saved preset", () => {
-    const defense = {
-      info: { "0xb": { presetCount: 1, reinforcementOn: false } },
-      allParcels: [myParcels[0], target],
-    };
-    expect(getAttackability(target, myParcels, 0, {}, defense)).toEqual({ attackable: true });
-  });
-
-  it("is unchanged when the defense param is omitted", () => {
+  it("allows an adjacent enemy regardless of whether they set a defense", () => {
+    // A defender who never set a preset is still attackable — the contract
+    // gives them a fixed default garrison rather than blocking the attack.
+    const target = parcel({ parcelId: 6, col: 1, row: 0, owner: ENEMY });
     expect(getAttackability(target, myParcels, 0, {})).toEqual({ attackable: true });
   });
 });

@@ -17,7 +17,6 @@ import {
   getAttackability,
   useConquestCooldown,
   useOwnerFactionIds,
-  useDefenderDefenseInfo,
   sameAddress,
 } from "@/lib/conquest";
 import { usePlayerFaction } from "@/lib/factions";
@@ -239,7 +238,6 @@ export default function WorldPage() {
   const { member } = usePlayerFaction(address ?? null);
   const myFactionId = member?.factionId ?? 0;
   const ownerFactionIds = useOwnerFactionIds(ownerAddresses);
-  const defenderInfo = useDefenderDefenseInfo(ownerAddresses);
   const conquestCooldown = useConquestCooldown(address ?? null);
 
   const myOwnedParcels = useMemo(
@@ -247,21 +245,16 @@ export default function WorldPage() {
     [parcels, address],
   );
 
-  const defenseParam = useMemo(
-    () => ({ info: defenderInfo, allParcels: parcels }),
-    [defenderInfo, parcels],
-  );
-
   const attackableParcelIds = useMemo(() => {
     const ids = new Set<number>();
     if (!address) return ids;
     for (const p of parcels) {
-      if (getAttackability(p, myOwnedParcels, myFactionId, ownerFactionIds, defenseParam).attackable) {
+      if (getAttackability(p, myOwnedParcels, myFactionId, ownerFactionIds).attackable) {
         ids.add(p.parcelId);
       }
     }
     return ids;
-  }, [parcels, address, myOwnedParcels, myFactionId, ownerFactionIds, defenseParam]);
+  }, [parcels, address, myOwnedParcels, myFactionId, ownerFactionIds]);
 
   const claimDrip = useCallback(async () => {
     if (!account) return;
@@ -365,7 +358,7 @@ export default function WorldPage() {
         <SelectionBar
           parcel={selectedParcel}
           isOwn={sameAddress(selectedParcel.owner, address)}
-          attackability={getAttackability(selectedParcel, myOwnedParcels, myFactionId, ownerFactionIds, defenseParam)}
+          attackability={getAttackability(selectedParcel, myOwnedParcels, myFactionId, ownerFactionIds)}
           cooldownRemaining={conquestCooldown.remainingSeconds}
           onOpenWarCouncil={() => setWarCouncilOpen(true)}
         />
