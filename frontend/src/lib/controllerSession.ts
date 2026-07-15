@@ -40,18 +40,40 @@ function getControllerProvider(account: AccountInterface): ControllerProviderWit
   return walletProvider;
 }
 
+function errorMessage(e: unknown): string {
+  return e instanceof Error
+    ? e.message
+    : e && typeof e === "object" && "message" in e
+      ? String((e as { message: unknown }).message)
+      : "";
+}
+
 function isPaymasterInfraError(e: unknown): boolean {
-  const msg =
-    e instanceof Error
-      ? e.message
-      : e && typeof e === "object" && "message" in e
-        ? String((e as { message: unknown }).message)
-        : "";
+  const msg = errorMessage(e);
   return (
     msg.includes("AVNU sponsorship failed") ||
     msg.includes("self-funded") ||
     msg.toLowerCase().includes("paymaster")
   );
+}
+
+// A sponsorship-provider outage (AVNU bridge down or its circuit breaker open)
+// fails every fee source the same way — retrying with CREDITS or opening the
+// manual Controller window only feeds the breaker more failures and keeps it
+// open longer. Fail fast with a clear message instead.
+export function isSponsorshipOutage(e: unknown): boolean {
+  const msg = errorMessage(e).toLowerCase();
+  return msg.includes("circuit breaker") || msg.includes("service not available");
+}
+
+export class SponsorshipUnavailableError extends Error {
+  constructor() {
+    super(
+      "Fee sponsorship is temporarily unavailable (the provider is cooling down). " +
+        "Wait a minute or two and try again — rapid retries keep it offline longer. No transaction was submitted.",
+    );
+    this.name = "SponsorshipUnavailableError";
+  }
 }
 
 function throwSessionError(reply: ExecuteReply): never {
@@ -134,11 +156,19 @@ export async function resilientExecute(
   try {
     return await executeWithSession(controller, callArray, FeeSource.PAYMASTER);
   } catch (e) {
+    if (isSponsorshipOutage(e)) {
+      console.warn("[siege] Sponsorship provider outage, failing fast:", e);
+      throw new SponsorshipUnavailableError();
+    }
     if (!isPaymasterInfraError(e)) throw e;
     console.warn("[siege] Paymaster unavailable, retrying with CREDITS:", e);
     try {
       return await executeWithSession(controller, callArray, FeeSource.CREDITS);
     } catch (e2) {
+      if (isSponsorshipOutage(e2)) {
+        console.warn("[siege] Sponsorship provider outage, failing fast:", e2);
+        throw new SponsorshipUnavailableError();
+      }
       if (!isPaymasterInfraError(e2)) throw e2;
       console.warn("[siege] Session fee sources exhausted, opening manual Controller window:", e2);
       return manualExecute(controller, account, callArray, details);
