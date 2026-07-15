@@ -98,7 +98,7 @@ export default function DevBattlefieldPage() {
   );
 
   return (
-    <div style={{ width: "100vw", height: "100vh", background: "#0d0b0a" }}>
+    <div style={{ width: "100%", height: "100vh", background: "#0d0b0a" }}>
       <div style={{ position: "absolute", zIndex: 10, top: 8, left: 8 }}>
         <button
           id="play-round"

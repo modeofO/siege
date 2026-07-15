@@ -32,17 +32,17 @@ describe("gatePosition", () => {
 });
 
 describe("nodePosition", () => {
-  it("sits directly behind its gate at z = -0.8", () => {
-    expect(nodePosition(0)).toEqual([-2.5, 0, -0.8]);
-    expect(nodePosition(2)).toEqual([0, 0, -0.8]);
-    expect(nodePosition(1)).toEqual([2.5, 0, -0.8]);
+  it("forms a vertical column at x = 3.7 on the right side of the paper", () => {
+    expect(nodePosition(0)).toEqual([3.7, 0, -1.15]);
+    expect(nodePosition(1)).toEqual([3.7, 0, 0]);
+    expect(nodePosition(2)).toEqual([3.7, 0, 1.15]);
   });
 });
 
 describe("citadelPosition", () => {
-  it("places player at +Z and enemy at -Z", () => {
-    expect(citadelPosition("player")).toEqual([0, 0, 2.4]);
-    expect(citadelPosition("enemy")).toEqual([0, 0, -2.4]);
+  it("places player at +Z and enemy at -Z, inside the paper with the wall ring", () => {
+    expect(citadelPosition("player")).toEqual([0, 0, 2.15]);
+    expect(citadelPosition("enemy")).toEqual([0, 0, -2.15]);
   });
 });
 

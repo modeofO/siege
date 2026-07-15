@@ -1,17 +1,205 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
-import { Canvas } from "@react-three/fiber";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as THREE from "three";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
 import { deriveAftermath } from "./aftermath";
-import { PALETTE, citadelPosition, gatePosition, nodePosition } from "./layout";
+import { citadelPosition, gatePosition, nodePosition } from "./layout";
+import { PALETTE } from "./layout";
+import { getSharedTextures, getPlainParchment, getHoloTexture } from "./textures";
+import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
+import { useBattlefieldVariant } from "@/lib/useBattlefieldVariant";
 import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
 import { TroopFormations } from "./TroopFormations";
 import Ambient from "./Ambient";
 import ResolutionPlayer from "./ResolutionPlayer";
 
 const GATES: Array<0 | 1 | 2> = [0, 1, 2];
+
+/** RoomEnvironment IBL for specular response — procedural, no HDR fetch. */
+function RoomEnv({ intensity }: { intensity: number }) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  useEffect(() => {
+    const pmrem = new THREE.PMREMGenerator(gl);
+    const envScene = new RoomEnvironment();
+    const envTex = pmrem.fromScene(envScene, 0.04).texture;
+    // Free the temporary room geometry/materials once baked into the PMREM.
+    envScene.dispose();
+    // The three.js scene graph is imperative by design; this effect is the
+    // standard r3f escape hatch for scene-level properties.
+    // eslint-disable-next-line react-hooks/immutability
+    scene.environment = envTex;
+    return () => {
+      scene.environment = null;
+      envTex.dispose();
+      pmrem.dispose();
+    };
+  }, [gl, scene]);
+
+  // Intensity is a plain scalar — variant toggles must not trigger a rebake.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/immutability
+    scene.environmentIntensity = intensity;
+  }, [scene, intensity]);
+  return null;
+}
+
+/** RenderPass → UnrealBloomPass → OutputPass. Emissives marked toneMapped:false
+ * clear the bloom threshold; the tone-mapped scene itself stays under it. */
+function PostFX({ variant }: { variant: BattlefieldVariant }) {
+  const gl = useThree((s) => s.gl);
+  const scene = useThree((s) => s.scene);
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
+  const [strength, radius, threshold] = VARIANT_TOKENS[variant].bloom;
+  const exposure = VARIANT_TOKENS[variant].exposure;
+
+  // Variant switches are rare user actions — rebuilding the composer keeps the
+  // bloom pass immutable from React's point of view.
+  const composer = useMemo(() => {
+    const c = new EffectComposer(gl);
+    c.addPass(new RenderPass(scene, camera));
+    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), strength, radius, threshold));
+    c.addPass(new OutputPass());
+    return c;
+    // Size changes are handled by the effect below — don't rebuild the composer.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gl, scene, camera, strength, radius, threshold]);
+
+  useEffect(() => {
+    composer.setPixelRatio(gl.getPixelRatio());
+    composer.setSize(size.width, size.height);
+  }, [composer, gl, size.width, size.height]);
+
+  useEffect(() => {
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
+
+  useEffect(() => () => composer.dispose(), [composer]);
+
+  // Positive priority takes over r3f's render loop: the composer draws instead.
+  useFrame(() => composer.render(), 1);
+  return null;
+}
+
+// Scrolling scanline shader for the holo overlay (variant 1b).
+const SCAN_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const SCAN_FRAG = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColor;
+  varying vec2 vUv;
+  void main() {
+    float scan = sin(vUv.y * 90.0 - uTime * 2.0) * 0.5 + 0.5;
+    float a = 0.05 * (0.35 + 0.65 * scan);
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
+/** Holo-only: additive teal map-grid plane + a scrolling scanline sheet. */
+function HoloOverlay() {
+  const holoMat = useRef<THREE.MeshBasicMaterial>(null);
+  const scanMat = useRef<THREE.ShaderMaterial>(null);
+  const holoTex = getHoloTexture();
+  const uniforms = useMemo(
+    () => ({ uTime: { value: 0 }, uColor: { value: new THREE.Color(PALETTE.holo) } }),
+    [],
+  );
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (holoMat.current) holoMat.current.opacity = 0.6 + 0.16 * Math.sin(t * 1.6);
+    if (scanMat.current) scanMat.current.uniforms.uTime.value = t;
+  });
+
+  return (
+    <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <planeGeometry args={[10, 6]} />
+        <meshBasicMaterial
+          ref={holoMat}
+          map={holoTex}
+          color={PALETTE.holo}
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <planeGeometry args={[10, 6]} />
+        <shaderMaterial
+          ref={scanMat}
+          uniforms={uniforms}
+          vertexShader={SCAN_VERT}
+          fragmentShader={SCAN_FRAG}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </>
+  );
+}
+
+/** Wooden table, dark border frame, and the parchment map (inked in warm;
+ * plain + holo grid overlay in holo). */
+function TableSurface({ variant }: { variant: BattlefieldVariant }) {
+  const { wood } = getSharedTextures();
+  const tokens = VARIANT_TOKENS[variant];
+  const parchment = tokens.parchmentInk ? getSharedTextures().parchment : getPlainParchment();
+  return (
+    <>
+      {/* Wooden table: a large box whose top sits flush at y = 0. */}
+      <mesh position={[0, -0.3, 0]} receiveShadow>
+        <boxGeometry args={[12, 0.6, 8]} />
+        <meshStandardMaterial
+          map={wood.map}
+          bumpMap={wood.bump}
+          bumpScale={0.5}
+          roughness={0.92}
+          metalness={0}
+        />
+      </mesh>
+
+      {/* Dark border frame peeking out under the parchment. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} receiveShadow>
+        <planeGeometry args={[10.4, 6.4]} />
+        <meshStandardMaterial color="#241a10" roughness={0.85} />
+      </mesh>
+
+      {/* Parchment map plane (10 x 6). Warm: inked cartography in the texture.
+          Holo: plain tinted paper — the glowing grid overlay carries the map. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.011, 0]} receiveShadow>
+        <planeGeometry args={[10, 6]} />
+        <meshStandardMaterial
+          map={parchment.map}
+          bumpMap={parchment.bump}
+          bumpScale={0.25}
+          color={tokens.parchmentTint}
+          roughness={0.92}
+          metalness={0}
+        />
+      </mesh>
+
+      {variant === "holo" ? <HoloOverlay /> : null}
+    </>
+  );
+}
 
 // Remap a node owner into the viewer's perspective so teamA always reads as the
 // player (gold) and teamB as the enemy (crimson), whichever slot the viewer is.
@@ -80,6 +268,11 @@ export default function Battlefield3D({
   const [canvasEpoch, setCanvasEpoch] = useState(0);
   const recoveryCount = useRef(0);
 
+  // Player-chosen art direction (persisted): warm Candlelit Keep (default) or
+  // the Arcane Holo Table. Same geometry — palette, lighting, and overlays swap.
+  const [variant, setVariant] = useBattlefieldVariant();
+  const tokens = VARIANT_TOKENS[variant];
+
   // Enemy cloak state: reveal true formations once opponentAllocations arrive;
   // otherwise show 3 shrouded ghost pawns while they're committed-but-secret;
   // render nothing before they commit.
@@ -87,7 +280,10 @@ export default function Battlefield3D({
   const enemyCloaked = !enemyRevealed && opponentCommitted;
 
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg bg-[#1a1714]">
+    <div
+      className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg"
+      style={{ backgroundColor: tokens.fogColor }}
+    >
       <Canvas
         // Context-loss recovery: React can unmount+remount the Canvas while
         // reusing the same <canvas> element (StrictMode / Suspense effect
@@ -104,9 +300,9 @@ export default function Battlefield3D({
         shadows="percentage"
         dpr={[1, 2]}
         className="absolute inset-0"
-        camera={{ fov: 45, position: [0, 6.5, 5.2] }}
+        camera={{ fov: 45, position: [0, 6.9, 5.85] }}
         onCreated={({ camera, gl }) => {
-          camera.lookAt(0, 0, -0.2);
+          camera.lookAt(0, 0, -0.15);
           gl.domElement.addEventListener("webglcontextlost", (e) => {
             e.preventDefault();
             if (recoveryCount.current >= 4) return;
@@ -115,32 +311,22 @@ export default function Battlefield3D({
           });
         }}
       >
-        {/* Base fill so nothing reads pure black. */}
-        <ambientLight intensity={0.25} />
-        {/* Warm key light (candle) + dust, holo shimmer, vault smoke, banners.
-            The flickering candle point-light lives inside Ambient. */}
-        <Ambient playerHp={playerHp} enemyHp={enemyHp} />
+        {/* Atmosphere: fog swallowing the table edges, matching background,
+            and a hemisphere base so nothing reads pure black. */}
+        <color attach="background" args={[tokens.fogColor]} />
+        <fogExp2 attach="fog" args={[tokens.fogColor, tokens.fogDensity]} />
+        <hemisphereLight args={[tokens.hemiSky, tokens.hemiGround, tokens.hemiIntensity]} />
+        <RoomEnv intensity={tokens.envIntensity} />
+
+        {/* Candle key light + glow/godray, dust, embers, vault smoke, banners
+            all live inside Ambient. Embers also rise from modifier gates. */}
+        <Ambient playerHp={playerHp} enemyHp={enemyHp} modifiers={modifiers} variant={variant} />
         {/* Cool directional fill from the far side to model the shadows. */}
-        <directionalLight intensity={0.4} position={[-4, 5, -3]} />
+        <directionalLight color={tokens.fillColor} intensity={tokens.fillIntensity} position={[-4, 5, -3]} />
+        {/* Rim from behind the enemy keep so silhouettes catch an edge. */}
+        <directionalLight color={tokens.rimColor} intensity={tokens.rimIntensity} position={[0, 4, -5.5]} />
 
-        {/* Wooden table: a large box whose top sits flush at y = 0. */}
-        <mesh position={[0, -0.3, 0]} receiveShadow>
-          <boxGeometry args={[12, 0.6, 8]} />
-          <meshStandardMaterial color={PALETTE.wood} roughness={0.9} />
-        </mesh>
-
-        {/* Dark border frame: a slightly larger dark plane peeking out under
-            the parchment as a thin border. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.008, 0]} receiveShadow>
-          <planeGeometry args={[10.4, 6.4]} />
-          <meshStandardMaterial color="#241a10" roughness={0.85} />
-        </mesh>
-
-        {/* Parchment map plane (10 x 6) slightly above the table + frame. */}
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.01, 0]} receiveShadow>
-          <planeGeometry args={[10, 6]} />
-          <meshStandardMaterial color={PALETTE.parchment} roughness={0.8} />
-        </mesh>
+        <TableSurface variant={variant} />
 
         {/* Citadels: viewer's keep on +Z, enemy on −Z. Damage tiers follow the
             ticking display HP via the shared refs during playback. */}
@@ -150,6 +336,7 @@ export default function Battlefield3D({
           hpRef={playerHpRef}
           wear={aftermath.myVaultWear}
           position={citadelPosition("player")}
+          variant={variant}
         />
         <CitadelPiece
           side="enemy"
@@ -157,6 +344,7 @@ export default function Battlefield3D({
           hpRef={enemyHpRef}
           wear={aftermath.enemyVaultWear}
           position={citadelPosition("enemy")}
+          variant={variant}
         />
 
         {/* Gates left→right (data order 0/2/1) with their round modifiers. */}
@@ -215,10 +403,41 @@ export default function Battlefield3D({
           enemyLungeRef={enemyLungeRef}
           onResolutionComplete={onResolutionComplete}
         />
+
+        {/* Bloom over the whole scene — replaces r3f's default render. */}
+        <PostFX variant={variant} />
       </Canvas>
       {/* DOM overlay: badges etc. render on top of the canvas. The overlay itself
           is pass-through; its own children opt back into pointer events. */}
       <div className="pointer-events-none absolute inset-0">{children}</div>
+
+      {/* Art-direction toggle: warm Candlelit Keep ↔ Arcane Holo Table. */}
+      <div className="pointer-events-auto absolute top-2 right-2 flex gap-0.5 rounded border border-white/10 bg-black/50 p-0.5 font-mono text-[10px] uppercase tracking-widest backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() => setVariant("warm")}
+          aria-pressed={variant === "warm"}
+          className={
+            variant === "warm"
+              ? "rounded-sm bg-[#c8a44e] px-2 py-1 text-[#140d07]"
+              : "rounded-sm px-2 py-1 text-[#9a8a62] hover:text-[#e6c268]"
+          }
+        >
+          Candlelit
+        </button>
+        <button
+          type="button"
+          onClick={() => setVariant("holo")}
+          aria-pressed={variant === "holo"}
+          className={
+            variant === "holo"
+              ? "rounded-sm bg-[#59d8e6] px-2 py-1 text-[#04100f]"
+              : "rounded-sm px-2 py-1 text-[#5f8a90] hover:text-[#8fe0ea]"
+          }
+        >
+          Holo
+        </button>
+      </div>
     </div>
   );
 }

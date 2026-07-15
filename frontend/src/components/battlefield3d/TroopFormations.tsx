@@ -80,13 +80,13 @@ function capColor(g: Group, side: "player" | "enemy"): string {
 
 // Reusable pawn geometry dimensions (body + cap baked to stand on y = 0).
 function makeBodyGeometry(): THREE.CylinderGeometry {
-  const g = new THREE.CylinderGeometry(0.05, 0.06, 0.16, 10);
+  const g = new THREE.CylinderGeometry(0.05, 0.062, 0.16, 12);
   g.translate(0, 0.08, 0);
   return g;
 }
 function makeCapGeometry(): THREE.ConeGeometry {
-  const g = new THREE.ConeGeometry(0.075, 0.14, 10);
-  g.translate(0, 0.23, 0);
+  const g = new THREE.ConeGeometry(0.075, 0.15, 12);
+  g.translate(0, 0.235, 0);
   return g;
 }
 
@@ -103,12 +103,12 @@ function GhostPawns({ side }: { side: "player" | "enemy" }) {
       {slots.map((s, i) => (
         <group key={i} position={s}>
           <mesh position={[0, 0.08, 0]} castShadow>
-            <cylinderGeometry args={[0.05, 0.06, 0.16, 10]} />
-            <meshStandardMaterial color={PALETTE.pewter} roughness={0.6} transparent opacity={0.35} />
+            <cylinderGeometry args={[0.05, 0.062, 0.16, 12]} />
+            <meshStandardMaterial color={PALETTE.pewter} roughness={0.6} transparent opacity={0.32} />
           </mesh>
-          <mesh position={[0, 0.23, 0]} castShadow>
-            <coneGeometry args={[0.075, 0.14, 10]} />
-            <meshStandardMaterial color={PALETTE.pewter} roughness={0.5} transparent opacity={0.35} />
+          <mesh position={[0, 0.235, 0]} castShadow>
+            <coneGeometry args={[0.075, 0.15, 12]} />
+            <meshStandardMaterial color={PALETTE.pewter} roughness={0.5} transparent opacity={0.32} />
           </mesh>
         </group>
       ))}
@@ -276,19 +276,25 @@ function RealFormations({
         <meshStandardMaterial
           ref={bodyMat}
           color={PALETTE.pewter}
-          roughness={0.6}
-          metalness={0.2}
+          roughness={0.55}
+          metalness={0.35}
           emissive={PALETTE.playerGold}
           emissiveIntensity={0}
         />
       </instancedMesh>
       <instancedMesh ref={caps} args={[undefined, undefined, CAPACITY]} castShadow>
         <primitive object={capGeo} attach="geometry" />
-        <meshStandardMaterial roughness={0.5} metalness={0.25} />
+        <meshStandardMaterial roughness={0.45} metalness={0.4} />
       </instancedMesh>
 
       {side === "player" ? (
-        <Cylinder ref={sealRef} args={[0.3, 0.3, 0.04, 32]} position={[0, 0.03, 2.4]} visible={false} castShadow>
+        <Cylinder
+          ref={sealRef}
+          args={[0.3, 0.3, 0.04, 32]}
+          position={[0, 0.03, citadelPosition("player")[2]]}
+          visible={false}
+          castShadow
+        >
           <meshStandardMaterial color="#7a1f2b" roughness={0.7} metalness={0.1} />
         </Cylinder>
       ) : null}

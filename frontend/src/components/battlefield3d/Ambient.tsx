@@ -3,60 +3,16 @@
 import { useEffect, useMemo, useRef } from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { PALETTE, citadelPosition } from "./layout";
+import { PALETTE, citadelPosition, gatePosition } from "./layout";
+import { getSharedTextures } from "./textures";
+import { MODIFIER_ACCENT } from "./pieces";
+import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
 
-// The "always simmering" ambient layer for the war table. Everything here is
-// idle motion driven off the single frame clock (state.clock) with zero
+// The "always simmering" ambient layer for the candlelit war table. Everything
+// here is idle motion driven off the single frame clock (state.clock) with zero
 // per-frame allocation: scratch state lives in refs / useMemo'd typed arrays
 // that are mutated in place, and nothing here calls setState. Composed by
 // Battlefield3D. See the Shared Visual Language for coordinates and palette.
-
-// ---------------------------------------------------------------------------
-// Candle light flicker
-// ---------------------------------------------------------------------------
-
-// The warm key light (moved here from Battlefield3D, Task 2 parameters kept)
-// whose intensity flickers ±8% around this base via smoothed layered-sine
-// noise — a candle guttering, never a strobe.
-const CANDLE_BASE_INTENSITY = 2.2;
-
-/** Warm candle key light with a smoothed ±8% intensity flicker. */
-function CandleLight() {
-  const light = useRef<THREE.PointLight>(null);
-
-  useFrame((state) => {
-    const l = light.current;
-    if (!l) return;
-    // Three layered sines at incommensurate rates read as smooth flicker
-    // noise; amplitudes sum to 1 so the total stays in [-1, 1].
-    const t = state.clock.elapsedTime;
-    const n = Math.sin(t * 7.3) * 0.5 + Math.sin(t * 13.7) * 0.3 + Math.sin(t * 23.1) * 0.2;
-    l.intensity = CANDLE_BASE_INTENSITY * (1 + 0.08 * n);
-  });
-
-  return (
-    <pointLight
-      ref={light}
-      color={PALETTE.candle}
-      intensity={CANDLE_BASE_INTENSITY}
-      position={[3.5, 3, 2.5]}
-      castShadow
-      shadow-mapSize-width={1024}
-      shadow-mapSize-height={1024}
-      shadow-bias={-0.0005}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Dust motes
-// ---------------------------------------------------------------------------
-
-const DUST_COUNT = 120;
-// Drifting volume over the table.
-const DUST_X = [-4, 4] as const;
-const DUST_Y = [0.4, 3.2] as const;
-const DUST_Z = [-3, 3] as const;
 
 // Deterministic pseudo-random in [0, 1) from a seed (fract of sin), matching the
 // codebase's Math.sin hashing (see jitter() in pieces.tsx). Pure, so it is safe
@@ -65,6 +21,102 @@ function hash01(n: number): number {
   const s = Math.sin(n * 127.1 + 311.7) * 43758.5453;
   return s - Math.floor(s);
 }
+
+// ---------------------------------------------------------------------------
+// Candle: key light + emissive core + halo sprite + godray shaft
+// ---------------------------------------------------------------------------
+
+const CANDLE_POS: [number, number, number] = [3.5, 3, 2.5];
+
+/**
+ * The key light plus its visible flame: an emissive core sphere, an additive
+ * glow-sprite halo, and a faint tilted cone "light shaft" (godray). A
+ * layered-sine flicker (±9%) drives the light intensity, the core emissive,
+ * and the halo opacity together — a candle guttering, never a strobe.
+ */
+function Candle({ variant }: { variant: BattlefieldVariant }) {
+  const light = useRef<THREE.PointLight>(null);
+  const coreMat = useRef<THREE.MeshStandardMaterial>(null);
+  const haloMat = useRef<THREE.SpriteMaterial>(null);
+  const glow = getSharedTextures().glow;
+  const tokens = VARIANT_TOKENS[variant];
+
+  useFrame((state) => {
+    // Three layered sines at incommensurate rates read as smooth flicker
+    // noise; amplitudes sum to 1 so the total stays in [-1, 1].
+    const t = state.clock.elapsedTime;
+    const n = Math.sin(t * 7.3) * 0.5 + Math.sin(t * 13.7) * 0.3 + Math.sin(t * 23.1) * 0.2;
+    const f = 1 + 0.09 * n;
+    if (light.current) light.current.intensity = tokens.candleIntensity * f;
+    if (coreMat.current) coreMat.current.emissiveIntensity = 4 * f;
+    if (haloMat.current) haloMat.current.opacity = tokens.haloOpacity * (0.85 + 0.15 * n);
+  });
+
+  return (
+    <>
+      <pointLight
+        ref={light}
+        color={tokens.candleColor}
+        intensity={tokens.candleIntensity}
+        position={CANDLE_POS}
+        // The design's light rig was tuned with no physical falloff
+        // (PointLight decay 0); the default decay=2 makes it read flat.
+        decay={0}
+        castShadow
+        shadow-mapSize-width={1024}
+        shadow-mapSize-height={1024}
+        shadow-bias={-0.0006}
+        shadow-camera-near={0.5}
+        shadow-camera-far={22}
+      />
+      {/* Flame core — blooms via toneMapped:false */}
+      <mesh position={CANDLE_POS}>
+        <sphereGeometry args={[0.09, 16, 16]} />
+        <meshStandardMaterial
+          ref={coreMat}
+          color="#ffd9a0"
+          emissive={tokens.coreEmissive}
+          emissiveIntensity={4}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Halo sprite */}
+      <sprite position={CANDLE_POS} scale={[2.6, 2.6, 1]}>
+        <spriteMaterial
+          ref={haloMat}
+          map={glow}
+          color={tokens.haloColor}
+          transparent
+          opacity={tokens.haloOpacity}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+        />
+      </sprite>
+      {/* Faint downward light shaft (godray), tilted from the flame */}
+      <mesh position={[CANDLE_POS[0] - 0.4, 1.5, CANDLE_POS[2] - 0.3]} rotation={[0, 0, 0.16]}>
+        <coneGeometry args={[1.4, 3.2, 24, 1, true]} />
+        <meshBasicMaterial
+          color={tokens.shaftColor}
+          transparent
+          opacity={0.05}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          side={THREE.DoubleSide}
+        />
+      </mesh>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Dust motes
+// ---------------------------------------------------------------------------
+
+const DUST_COUNT = 130;
+// Drifting volume over the table.
+const DUST_X = [-4, 4] as const;
+const DUST_Y = [0.4, 3.4] as const;
+const DUST_Z = [-3, 3] as const;
 
 // Each mote's x/z lane is a stable function of its index, so recycling returns
 // it to the same lane it started in — no per-frame randomness needed.
@@ -75,8 +127,8 @@ function duLaneZ(i: number): number {
   return DUST_Z[0] + hash01(i * 3 + 2.7) * (DUST_Z[1] - DUST_Z[0]);
 }
 
-/** ~120 additive motes drifting slowly upward through the candle light. */
-function DustMotes() {
+/** ~130 additive motes drifting slowly upward through the candle light. */
+function DustMotes({ color }: { color: string }) {
   const points = useRef<THREE.Points>(null);
 
   // Positions + per-mote velocities are allocated once and mutated in place.
@@ -122,11 +174,11 @@ function DustMotes() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        color={PALETTE.candle}
-        size={0.02}
+        color={color}
+        size={0.025}
         sizeAttenuation
         transparent
-        opacity={0.35}
+        opacity={0.4}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
         toneMapped={false}
@@ -136,61 +188,90 @@ function DustMotes() {
 }
 
 // ---------------------------------------------------------------------------
-// Holo shimmer
+// Embers
 // ---------------------------------------------------------------------------
 
-const HOLO_VERT = /* glsl */ `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
+const EMBER_COUNT = 70;
+const EMBER_TOP_Y = 3.6;
 
-// ~10-line scanline: a faint scrolling horizontal band over the parchment.
-const HOLO_FRAG = /* glsl */ `
-  uniform float uTime;
-  uniform vec3 uColor;
-  uniform float uOpacity;
-  varying vec2 vUv;
-  void main() {
-    float scan = sin(vUv.y * 90.0 - uTime * 2.0) * 0.5 + 0.5;
-    float alpha = uOpacity * (0.35 + 0.65 * scan);
-    gl_FragColor = vec4(uColor, alpha);
-  }
-`;
+/**
+ * ~70 additive glow-sprite points rising from the candle and from any gate
+ * carrying a glowing modifier accent. Each ember belongs to a fixed source
+ * (round-robin) and respawns there when it drifts out the top.
+ */
+function Embers({ modifiers, color }: { modifiers: [number, number, number]; color: string }) {
+  const points = useRef<THREE.Points>(null);
+  const glow = getSharedTextures().glow;
 
-/** A shimmer plane 0.02u above the parchment with a slow-scrolling scanline. */
-function HoloShimmer() {
-  const material = useRef<THREE.ShaderMaterial>(null);
-  // Stable uniforms object; uTime.value is advanced each frame via the ref.
-  const uniforms = useMemo(
-    () => ({
-      uTime: { value: 0 },
-      uColor: { value: new THREE.Color(PALETTE.holo) },
-      uOpacity: { value: 0.05 },
-    }),
-    [],
-  );
+  // Ember sources: the candle plus each modifier-accented gate. Scalar deps so
+  // a fresh-but-equal modifiers array from a store poll can't reset the
+  // particle buffers mid-flight.
+  const [mod0, mod1, mod2] = modifiers;
+  const sources = useMemo(() => {
+    const out: Array<[number, number, number]> = [[CANDLE_POS[0], 0.2, CANDLE_POS[2]]];
+    ([mod0, mod1, mod2] as const).forEach((mod, g) => {
+      if (MODIFIER_ACCENT[mod]) {
+        const [gx, , gz] = gatePosition(g as 0 | 1 | 2);
+        out.push([gx, 0.5, gz]);
+      }
+    });
+    return out;
+  }, [mod0, mod1, mod2]);
 
-  useFrame((state) => {
-    const m = material.current;
-    if (m) m.uniforms.uTime.value = state.clock.elapsedTime;
+  const { positions, velocities } = useMemo(() => {
+    const positions = new Float32Array(EMBER_COUNT * 3);
+    const velocities = new Float32Array(EMBER_COUNT * 3);
+    for (let i = 0; i < EMBER_COUNT; i++) {
+      const s = sources[i % sources.length];
+      positions[i * 3] = s[0] + (hash01(i + 0.1) - 0.5) * 0.5;
+      positions[i * 3 + 1] = s[1] + hash01(i + 3.2) * 0.4;
+      positions[i * 3 + 2] = s[2] + (hash01(i + 5.5) - 0.5) * 0.5;
+      velocities[i * 3] = (hash01(i + 7) - 0.5) * 0.15;
+      velocities[i * 3 + 1] = 0.35 + hash01(i + 9) * 0.5;
+      velocities[i * 3 + 2] = (hash01(i + 11) - 0.5) * 0.15;
+    }
+    return { positions, velocities };
+  }, [sources]);
+
+  useFrame((state, delta) => {
+    const p = points.current;
+    if (!p) return;
+    const dt = Math.min(delta, 0.1);
+    const t = state.clock.elapsedTime;
+    const attr = p.geometry.attributes.position as THREE.BufferAttribute;
+    const arr = attr.array as Float32Array;
+    for (let i = 0; i < EMBER_COUNT; i++) {
+      const ix = i * 3;
+      arr[ix] += velocities[ix] * dt + Math.sin(t * 2 + i) * 0.12 * dt;
+      arr[ix + 1] += velocities[ix + 1] * dt;
+      arr[ix + 2] += velocities[ix + 2] * dt;
+      if (arr[ix + 1] > EMBER_TOP_Y) {
+        const s = sources[i % sources.length];
+        arr[ix] = s[0] + (hash01(i + 0.1) - 0.5) * 0.5;
+        arr[ix + 1] = s[1] + hash01(i + 3.2) * 0.4;
+        arr[ix + 2] = s[2] + (hash01(i + 5.5) - 0.5) * 0.5;
+      }
+    }
+    attr.needsUpdate = true;
   });
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
-      <planeGeometry args={[10, 6]} />
-      <shaderMaterial
-        ref={material}
-        uniforms={uniforms}
-        vertexShader={HOLO_VERT}
-        fragmentShader={HOLO_FRAG}
+    <points ref={points}>
+      <bufferGeometry>
+        <bufferAttribute attach="attributes-position" args={[positions, 3]} />
+      </bufferGeometry>
+      <pointsMaterial
+        map={glow}
+        color={color}
+        size={0.05}
+        sizeAttenuation
         transparent
+        opacity={0.9}
         depthWrite={false}
         blending={THREE.AdditiveBlending}
+        toneMapped={false}
       />
-    </mesh>
+    </points>
   );
 }
 
@@ -271,14 +352,22 @@ function SmokeColumn({ position, tier }: { position: [number, number, number]; t
 // Citadel banners
 // ---------------------------------------------------------------------------
 
-const BANNER_W = 0.55;
-const BANNER_H = 0.38;
-const BANNER_SEG_W = 8;
-const BANNER_SEG_H = 6;
-const MAST_H = 1.5;
+const BANNER_W = 0.58;
+const BANNER_H = 0.4;
+const BANNER_SEG_W = 12;
+const BANNER_SEG_H = 8;
+const MAST_H = 1.6;
 
 /** A cloth banner on a mast beside a citadel, waved by a sine-driven free edge. */
-function CitadelBanner({ position, color }: { position: [number, number, number]; color: string }) {
+function CitadelBanner({
+  position,
+  color,
+  emissiveIntensity,
+}: {
+  position: [number, number, number];
+  color: string;
+  emissiveIntensity: number;
+}) {
   const banner = useRef<THREE.Mesh>(null);
 
   // Cloth plane: translate so its left (mast) edge sits at local x = 0, then the
@@ -301,7 +390,7 @@ function CitadelBanner({ position, color }: { position: [number, number, number]
       // Displacement grows with distance from the fixed mast edge, so the free
       // edge flutters while the attached edge stays pinned.
       const t0 = x / BANNER_W;
-      const z = 0.07 * t0 * Math.sin(x * 7.0 - t * 4.0 + y * 3.0);
+      const z = 0.08 * t0 * Math.sin(x * 7.0 - t * 4.0 + y * 3.0);
       attr.setZ(i, z);
     }
     attr.needsUpdate = true;
@@ -315,8 +404,15 @@ function CitadelBanner({ position, color }: { position: [number, number, number]
         <meshStandardMaterial color="#4a3b2a" roughness={0.85} />
       </mesh>
       {/* Cloth banner hanging from near the top of the mast */}
-      <mesh ref={banner} geometry={geometry} position={[0.02, MAST_H - 0.35, 0]}>
-        <meshStandardMaterial color={color} roughness={0.7} metalness={0.05} side={THREE.DoubleSide} />
+      <mesh ref={banner} geometry={geometry} position={[0.02, MAST_H - 0.38, 0]} castShadow>
+        <meshStandardMaterial
+          color={color}
+          roughness={0.72}
+          metalness={0.04}
+          emissive={color}
+          emissiveIntensity={emissiveIntensity}
+          side={THREE.DoubleSide}
+        />
       </mesh>
     </group>
   );
@@ -331,9 +427,14 @@ export interface AmbientProps {
   // the −Z citadel's. Banners always fly regardless of HP.
   playerHp: number;
   enemyHp: number;
+  // Round modifiers per gate — glowing gates become ember sources.
+  modifiers: [number, number, number];
+  // Art direction: recolors the candle rig, dust, embers, banner glow.
+  variant?: BattlefieldVariant;
 }
 
-export default function Ambient({ playerHp, enemyHp }: AmbientProps) {
+export default function Ambient({ playerHp, enemyHp, modifiers, variant = "warm" }: AmbientProps) {
+  const tokens = VARIANT_TOKENS[variant];
   const playerTier = smokeTier(playerHp);
   const enemyTier = smokeTier(enemyHp);
   const [pcx, , pcz] = citadelPosition("player");
@@ -341,16 +442,17 @@ export default function Ambient({ playerHp, enemyHp }: AmbientProps) {
 
   return (
     <>
-      <CandleLight />
-      <DustMotes />
-      <HoloShimmer />
+      <Candle variant={variant} />
+      <DustMotes color={tokens.dustColor} />
+      {/* Keyed by the modifier set: source layout changes rebuild the buffer. */}
+      <Embers key={modifiers.join(",")} modifiers={modifiers} color={tokens.emberColor} />
 
       {playerTier !== "none" ? <SmokeColumn position={[pcx, 0, pcz]} tier={playerTier} /> : null}
       {enemyTier !== "none" ? <SmokeColumn position={[ecx, 0, ecz]} tier={enemyTier} /> : null}
 
       {/* Banners flank each citadel to the left, both facing the camera. */}
-      <CitadelBanner position={[pcx - 0.85, 0, pcz]} color={PALETTE.playerGold} />
-      <CitadelBanner position={[ecx - 0.85, 0, ecz]} color={PALETTE.enemyCrimson} />
+      <CitadelBanner position={[pcx - 0.9, 0, pcz]} color={PALETTE.playerGold} emissiveIntensity={tokens.bannerEmissive} />
+      <CitadelBanner position={[ecx - 0.9, 0, ecz]} color={PALETTE.enemyCrimson} emissiveIntensity={tokens.bannerEmissive} />
     </>
   );
 }
