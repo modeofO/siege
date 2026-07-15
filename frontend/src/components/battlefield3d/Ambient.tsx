@@ -6,6 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import { PALETTE, citadelPosition, gatePosition } from "./layout";
 import { getSharedTextures } from "./textures";
 import { MODIFIER_ACCENT } from "./pieces";
+import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
 
 // The "always simmering" ambient layer for the candlelit war table. Everything
 // here is idle motion driven off the single frame clock (state.clock) with zero
@@ -25,21 +26,20 @@ function hash01(n: number): number {
 // Candle: key light + emissive core + halo sprite + godray shaft
 // ---------------------------------------------------------------------------
 
-const CANDLE_BASE_INTENSITY = 3.4;
 const CANDLE_POS: [number, number, number] = [3.5, 3, 2.5];
-const HALO_BASE_OPACITY = 0.55;
 
 /**
- * The warm key light plus its visible flame: an emissive core sphere, an
- * additive glow-sprite halo, and a faint tilted cone "light shaft" (godray).
- * A layered-sine flicker (±9%) drives the light intensity, the core emissive,
+ * The key light plus its visible flame: an emissive core sphere, an additive
+ * glow-sprite halo, and a faint tilted cone "light shaft" (godray). A
+ * layered-sine flicker (±9%) drives the light intensity, the core emissive,
  * and the halo opacity together — a candle guttering, never a strobe.
  */
-function Candle() {
+function Candle({ variant }: { variant: BattlefieldVariant }) {
   const light = useRef<THREE.PointLight>(null);
   const coreMat = useRef<THREE.MeshStandardMaterial>(null);
   const haloMat = useRef<THREE.SpriteMaterial>(null);
   const glow = getSharedTextures().glow;
+  const tokens = VARIANT_TOKENS[variant];
 
   useFrame((state) => {
     // Three layered sines at incommensurate rates read as smooth flicker
@@ -47,20 +47,20 @@ function Candle() {
     const t = state.clock.elapsedTime;
     const n = Math.sin(t * 7.3) * 0.5 + Math.sin(t * 13.7) * 0.3 + Math.sin(t * 23.1) * 0.2;
     const f = 1 + 0.09 * n;
-    if (light.current) light.current.intensity = CANDLE_BASE_INTENSITY * f;
+    if (light.current) light.current.intensity = tokens.candleIntensity * f;
     if (coreMat.current) coreMat.current.emissiveIntensity = 4 * f;
-    if (haloMat.current) haloMat.current.opacity = HALO_BASE_OPACITY * (0.85 + 0.15 * n);
+    if (haloMat.current) haloMat.current.opacity = tokens.haloOpacity * (0.85 + 0.15 * n);
   });
 
   return (
     <>
       <pointLight
         ref={light}
-        color={PALETTE.candle}
-        intensity={CANDLE_BASE_INTENSITY}
+        color={tokens.candleColor}
+        intensity={tokens.candleIntensity}
         position={CANDLE_POS}
         // The design's light rig was tuned with no physical falloff
-        // (PointLight decay 0); the default decay=2 makes 3.4 read flat.
+        // (PointLight decay 0); the default decay=2 makes it read flat.
         decay={0}
         castShadow
         shadow-mapSize-width={1024}
@@ -75,7 +75,7 @@ function Candle() {
         <meshStandardMaterial
           ref={coreMat}
           color="#ffd9a0"
-          emissive="#ffbe6a"
+          emissive={tokens.coreEmissive}
           emissiveIntensity={4}
           toneMapped={false}
         />
@@ -85,9 +85,9 @@ function Candle() {
         <spriteMaterial
           ref={haloMat}
           map={glow}
-          color={PALETTE.candle}
+          color={tokens.haloColor}
           transparent
-          opacity={HALO_BASE_OPACITY}
+          opacity={tokens.haloOpacity}
           blending={THREE.AdditiveBlending}
           depthWrite={false}
         />
@@ -96,7 +96,7 @@ function Candle() {
       <mesh position={[CANDLE_POS[0] - 0.4, 1.5, CANDLE_POS[2] - 0.3]} rotation={[0, 0, 0.16]}>
         <coneGeometry args={[1.4, 3.2, 24, 1, true]} />
         <meshBasicMaterial
-          color={PALETTE.candle}
+          color={tokens.shaftColor}
           transparent
           opacity={0.05}
           blending={THREE.AdditiveBlending}
@@ -128,7 +128,7 @@ function duLaneZ(i: number): number {
 }
 
 /** ~130 additive motes drifting slowly upward through the candle light. */
-function DustMotes() {
+function DustMotes({ color }: { color: string }) {
   const points = useRef<THREE.Points>(null);
 
   // Positions + per-mote velocities are allocated once and mutated in place.
@@ -174,7 +174,7 @@ function DustMotes() {
         <bufferAttribute attach="attributes-position" args={[positions, 3]} />
       </bufferGeometry>
       <pointsMaterial
-        color={PALETTE.candle}
+        color={color}
         size={0.025}
         sizeAttenuation
         transparent
@@ -199,7 +199,7 @@ const EMBER_TOP_Y = 3.6;
  * carrying a glowing modifier accent. Each ember belongs to a fixed source
  * (round-robin) and respawns there when it drifts out the top.
  */
-function Embers({ modifiers }: { modifiers: [number, number, number] }) {
+function Embers({ modifiers, color }: { modifiers: [number, number, number]; color: string }) {
   const points = useRef<THREE.Points>(null);
   const glow = getSharedTextures().glow;
 
@@ -259,7 +259,7 @@ function Embers({ modifiers }: { modifiers: [number, number, number] }) {
       </bufferGeometry>
       <pointsMaterial
         map={glow}
-        color="#ff9a3c"
+        color={color}
         size={0.05}
         sizeAttenuation
         transparent
@@ -356,7 +356,15 @@ const BANNER_SEG_H = 8;
 const MAST_H = 1.6;
 
 /** A cloth banner on a mast beside a citadel, waved by a sine-driven free edge. */
-function CitadelBanner({ position, color }: { position: [number, number, number]; color: string }) {
+function CitadelBanner({
+  position,
+  color,
+  emissiveIntensity,
+}: {
+  position: [number, number, number];
+  color: string;
+  emissiveIntensity: number;
+}) {
   const banner = useRef<THREE.Mesh>(null);
 
   // Cloth plane: translate so its left (mast) edge sits at local x = 0, then the
@@ -399,7 +407,7 @@ function CitadelBanner({ position, color }: { position: [number, number, number]
           roughness={0.72}
           metalness={0.04}
           emissive={color}
-          emissiveIntensity={0.05}
+          emissiveIntensity={emissiveIntensity}
           side={THREE.DoubleSide}
         />
       </mesh>
@@ -418,9 +426,12 @@ export interface AmbientProps {
   enemyHp: number;
   // Round modifiers per gate — glowing gates become ember sources.
   modifiers: [number, number, number];
+  // Art direction: recolors the candle rig, dust, embers, banner glow.
+  variant?: BattlefieldVariant;
 }
 
-export default function Ambient({ playerHp, enemyHp, modifiers }: AmbientProps) {
+export default function Ambient({ playerHp, enemyHp, modifiers, variant = "warm" }: AmbientProps) {
+  const tokens = VARIANT_TOKENS[variant];
   const playerTier = smokeTier(playerHp);
   const enemyTier = smokeTier(enemyHp);
   const [pcx, , pcz] = citadelPosition("player");
@@ -428,17 +439,17 @@ export default function Ambient({ playerHp, enemyHp, modifiers }: AmbientProps) 
 
   return (
     <>
-      <Candle />
-      <DustMotes />
+      <Candle variant={variant} />
+      <DustMotes color={tokens.dustColor} />
       {/* Keyed by the modifier set: source layout changes rebuild the buffer. */}
-      <Embers key={modifiers.join(",")} modifiers={modifiers} />
+      <Embers key={modifiers.join(",")} modifiers={modifiers} color={tokens.emberColor} />
 
       {playerTier !== "none" ? <SmokeColumn position={[pcx, 0, pcz]} tier={playerTier} /> : null}
       {enemyTier !== "none" ? <SmokeColumn position={[ecx, 0, ecz]} tier={enemyTier} /> : null}
 
       {/* Banners flank each citadel to the left, both facing the camera. */}
-      <CitadelBanner position={[pcx - 0.9, 0, pcz]} color={PALETTE.playerGold} />
-      <CitadelBanner position={[ecx - 0.9, 0, ecz]} color={PALETTE.enemyCrimson} />
+      <CitadelBanner position={[pcx - 0.9, 0, pcz]} color={PALETTE.playerGold} emissiveIntensity={tokens.bannerEmissive} />
+      <CitadelBanner position={[ecx - 0.9, 0, ecz]} color={PALETTE.enemyCrimson} emissiveIntensity={tokens.bannerEmissive} />
     </>
   );
 }

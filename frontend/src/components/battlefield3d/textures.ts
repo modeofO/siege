@@ -487,6 +487,87 @@ export function makeParchment(ink: boolean): TexturePair {
 }
 
 // ---------------------------------------------------------------------------
+// Holo map overlay (variant 1b)
+// ---------------------------------------------------------------------------
+
+/**
+ * Teal holographic map: hex grid, straight supply routes, glowing rings at
+ * gates and nodes, border ticks. Drawn as an additive overlay plane above the
+ * (un-inked) paper in the holo variant. Linear data texture.
+ */
+export function makeHolo(): THREE.CanvasTexture {
+  const W = 1024;
+  const H = 614;
+  const c = mkCanvas(W, H);
+  const x = c.getContext("2d")!;
+  x.clearRect(0, 0, W, H);
+  const toPx = (wx: number, wz: number): [number, number] => [((wx / 10) + 0.5) * W, (0.5 - wz / 6) * H];
+  // Hex grid
+  x.strokeStyle = "rgba(89,216,230,0.16)";
+  x.lineWidth = 1;
+  const s = 34;
+  const hh = s * Math.sin(Math.PI / 3);
+  for (let row = 0; row * hh < H + s; row++) {
+    for (let col = -1; col * s * 1.5 < W + s; col++) {
+      const ox = col * s * 1.5;
+      const oy = row * 2 * hh + (col % 2 ? hh : 0);
+      x.beginPath();
+      for (let a = 0; a < 6; a++) {
+        const ang = (Math.PI / 3) * a;
+        const px = ox + s * Math.cos(ang);
+        const py = oy + s * Math.sin(ang);
+        if (a === 0) x.moveTo(px, py);
+        else x.lineTo(px, py);
+      }
+      x.closePath();
+      x.stroke();
+    }
+  }
+  // Straight routes citadel → gate
+  const [, , pcz] = citadelPosition("player");
+  const [, , ecz] = citadelPosition("enemy");
+  x.strokeStyle = "rgba(120,236,246,0.5)";
+  x.lineWidth = 1.6;
+  ([0, 1, 2] as const).forEach((g) => {
+    [pcz, ecz].forEach((fz) => {
+      const a = toPx(0, fz);
+      const b = toPx(GATE_X[g], 0);
+      x.beginPath();
+      x.moveTo(a[0], a[1]);
+      x.lineTo(b[0], b[1]);
+      x.stroke();
+    });
+  });
+  // Glowing rings at gates
+  ([0, 1, 2] as const).forEach((g) => {
+    const p = toPx(GATE_X[g], 0);
+    for (let r = 10; r < 30; r += 8) {
+      x.strokeStyle = `rgba(140,240,250,${0.4 - r / 120})`;
+      x.lineWidth = 1.4;
+      x.beginPath();
+      x.arc(p[0], p[1], r, 0, 7);
+      x.stroke();
+    }
+  });
+  // Glowing rings at nodes
+  NODE_POS.forEach((np) => {
+    const p = toPx(np[0], np[2]);
+    for (let r = 8; r < 26; r += 7) {
+      x.strokeStyle = `rgba(150,244,252,${0.45 - r / 100})`;
+      x.lineWidth = 1.4;
+      x.beginPath();
+      x.arc(p[0], p[1], r, 0, 7);
+      x.stroke();
+    }
+  });
+  // Border ticks
+  x.strokeStyle = "rgba(89,216,230,0.4)";
+  x.lineWidth = 2;
+  x.strokeRect(8, 8, W - 16, H - 16);
+  return bumpTex(c);
+}
+
+// ---------------------------------------------------------------------------
 // Glow sprite
 // ---------------------------------------------------------------------------
 
@@ -532,4 +613,20 @@ export function getSharedTextures(): SharedTextures {
     };
   }
   return shared;
+}
+
+// Holo-variant textures, painted only if the player ever switches to holo.
+let plainParchment: TexturePair | null = null;
+let holoOverlay: THREE.CanvasTexture | null = null;
+
+/** Un-inked paper for the holo variant (cartography comes from the overlay). */
+export function getPlainParchment(): TexturePair {
+  if (!plainParchment) plainParchment = makeParchment(false);
+  return plainParchment;
+}
+
+/** The teal holographic map-grid overlay texture. */
+export function getHoloTexture(): THREE.CanvasTexture {
+  if (!holoOverlay) holoOverlay = makeHolo();
+  return holoOverlay;
 }

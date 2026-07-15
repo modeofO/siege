@@ -12,18 +12,16 @@ import type { NodeOwner, RoundResult1v1 } from "@/lib/gameState1v1";
 import type { RoundOutcome } from "@/lib/resolution1v1";
 import { deriveAftermath } from "./aftermath";
 import { citadelPosition, gatePosition, nodePosition } from "./layout";
-import { getSharedTextures } from "./textures";
+import { PALETTE } from "./layout";
+import { getSharedTextures, getPlainParchment, getHoloTexture } from "./textures";
+import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
+import { useBattlefieldVariant } from "@/lib/useBattlefieldVariant";
 import { CitadelPiece, GatePiece, NodeMarker } from "./pieces";
 import { TroopFormations } from "./TroopFormations";
 import Ambient from "./Ambient";
 import ResolutionPlayer from "./ResolutionPlayer";
 
 const GATES: Array<0 | 1 | 2> = [0, 1, 2];
-
-// Candlelit-keep atmosphere (design 1a): scene background matches the fog so
-// the table dissolves into darkness at the edges.
-const FOG_COLOR = "#140d07";
-const FOG_DENSITY = 0.052;
 
 /** RoomEnvironment IBL for specular response — procedural, no HDR fetch. */
 function RoomEnv({ intensity }: { intensity: number }) {
@@ -47,27 +45,35 @@ function RoomEnv({ intensity }: { intensity: number }) {
 }
 
 /** RenderPass → UnrealBloomPass → OutputPass. Emissives marked toneMapped:false
- * clear the 0.84 threshold and bloom; the candlelit scene itself stays under it. */
-function PostFX() {
+ * clear the bloom threshold; the tone-mapped scene itself stays under it. */
+function PostFX({ variant }: { variant: BattlefieldVariant }) {
   const gl = useThree((s) => s.gl);
   const scene = useThree((s) => s.scene);
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
+  const [strength, radius, threshold] = VARIANT_TOKENS[variant].bloom;
+  const exposure = VARIANT_TOKENS[variant].exposure;
 
+  // Variant switches are rare user actions — rebuilding the composer keeps the
+  // bloom pass immutable from React's point of view.
   const composer = useMemo(() => {
     const c = new EffectComposer(gl);
     c.addPass(new RenderPass(scene, camera));
-    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), 0.7, 0.5, 0.84));
+    c.addPass(new UnrealBloomPass(new THREE.Vector2(size.width, size.height), strength, radius, threshold));
     c.addPass(new OutputPass());
     return c;
     // Size changes are handled by the effect below — don't rebuild the composer.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gl, scene, camera]);
+  }, [gl, scene, camera, strength, radius, threshold]);
 
   useEffect(() => {
     composer.setPixelRatio(gl.getPixelRatio());
     composer.setSize(size.width, size.height);
   }, [composer, gl, size.width, size.height]);
+
+  useEffect(() => {
+    gl.toneMappingExposure = exposure;
+  }, [gl, exposure]);
 
   useEffect(() => () => composer.dispose(), [composer]);
 
@@ -76,9 +82,78 @@ function PostFX() {
   return null;
 }
 
-/** Wooden table, dark border frame, and the inked parchment map. */
-function TableSurface() {
-  const { wood, parchment } = getSharedTextures();
+// Scrolling scanline shader for the holo overlay (variant 1b).
+const SCAN_VERT = /* glsl */ `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const SCAN_FRAG = /* glsl */ `
+  uniform float uTime;
+  uniform vec3 uColor;
+  varying vec2 vUv;
+  void main() {
+    float scan = sin(vUv.y * 90.0 - uTime * 2.0) * 0.5 + 0.5;
+    float a = 0.05 * (0.35 + 0.65 * scan);
+    gl_FragColor = vec4(uColor, a);
+  }
+`;
+
+/** Holo-only: additive teal map-grid plane + a scrolling scanline sheet. */
+function HoloOverlay() {
+  const holoMat = useRef<THREE.MeshBasicMaterial>(null);
+  const scanMat = useRef<THREE.ShaderMaterial>(null);
+  const holoTex = getHoloTexture();
+  const uniforms = useMemo(
+    () => ({ uTime: { value: 0 }, uColor: { value: new THREE.Color(PALETTE.holo) } }),
+    [],
+  );
+
+  useFrame((state) => {
+    const t = state.clock.elapsedTime;
+    if (holoMat.current) holoMat.current.opacity = 0.6 + 0.16 * Math.sin(t * 1.6);
+    if (scanMat.current) scanMat.current.uniforms.uTime.value = t;
+  });
+
+  return (
+    <>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.02, 0]}>
+        <planeGeometry args={[10, 6]} />
+        <meshBasicMaterial
+          ref={holoMat}
+          map={holoTex}
+          color={PALETTE.holo}
+          transparent
+          opacity={0.6}
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          toneMapped={false}
+        />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.03, 0]}>
+        <planeGeometry args={[10, 6]} />
+        <shaderMaterial
+          ref={scanMat}
+          uniforms={uniforms}
+          vertexShader={SCAN_VERT}
+          fragmentShader={SCAN_FRAG}
+          transparent
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+    </>
+  );
+}
+
+/** Wooden table, dark border frame, and the parchment map (inked in warm;
+ * plain + holo grid overlay in holo). */
+function TableSurface({ variant }: { variant: BattlefieldVariant }) {
+  const { wood } = getSharedTextures();
+  const tokens = VARIANT_TOKENS[variant];
+  const parchment = tokens.parchmentInk ? getSharedTextures().parchment : getPlainParchment();
   return (
     <>
       {/* Wooden table: a large box whose top sits flush at y = 0. */}
@@ -99,18 +174,21 @@ function TableSurface() {
         <meshStandardMaterial color="#241a10" roughness={0.85} />
       </mesh>
 
-      {/* Inked parchment map plane (10 x 6): terrain, supply routes, glyph
-          rings, compass rose — all painted into the canvas texture. */}
+      {/* Parchment map plane (10 x 6). Warm: inked cartography in the texture.
+          Holo: plain tinted paper — the glowing grid overlay carries the map. */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.011, 0]} receiveShadow>
         <planeGeometry args={[10, 6]} />
         <meshStandardMaterial
           map={parchment.map}
           bumpMap={parchment.bump}
           bumpScale={0.25}
+          color={tokens.parchmentTint}
           roughness={0.92}
           metalness={0}
         />
       </mesh>
+
+      {variant === "holo" ? <HoloOverlay /> : null}
     </>
   );
 }
@@ -182,6 +260,11 @@ export default function Battlefield3D({
   const [canvasEpoch, setCanvasEpoch] = useState(0);
   const recoveryCount = useRef(0);
 
+  // Player-chosen art direction (persisted): warm Candlelit Keep (default) or
+  // the Arcane Holo Table. Same geometry — palette, lighting, and overlays swap.
+  const [variant, setVariant] = useBattlefieldVariant();
+  const tokens = VARIANT_TOKENS[variant];
+
   // Enemy cloak state: reveal true formations once opponentAllocations arrive;
   // otherwise show 3 shrouded ghost pawns while they're committed-but-secret;
   // render nothing before they commit.
@@ -189,7 +272,10 @@ export default function Battlefield3D({
   const enemyCloaked = !enemyRevealed && opponentCommitted;
 
   return (
-    <div className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg bg-[#140d07]">
+    <div
+      className="relative h-full min-h-[320px] w-full overflow-hidden rounded-lg"
+      style={{ backgroundColor: tokens.fogColor }}
+    >
       <Canvas
         // Context-loss recovery: React can unmount+remount the Canvas while
         // reusing the same <canvas> element (StrictMode / Suspense effect
@@ -209,7 +295,6 @@ export default function Battlefield3D({
         camera={{ fov: 45, position: [0, 6.9, 5.85] }}
         onCreated={({ camera, gl }) => {
           camera.lookAt(0, 0, -0.15);
-          gl.toneMappingExposure = 1.02;
           gl.domElement.addEventListener("webglcontextlost", (e) => {
             e.preventDefault();
             if (recoveryCount.current >= 4) return;
@@ -218,22 +303,22 @@ export default function Battlefield3D({
           });
         }}
       >
-        {/* Candlelit atmosphere: warm fog swallowing the table edges, matching
-            background, and a hemisphere base so nothing reads pure black. */}
-        <color attach="background" args={[FOG_COLOR]} />
-        <fogExp2 attach="fog" args={[FOG_COLOR, FOG_DENSITY]} />
-        <hemisphereLight args={["#4a3820", "#140d06", 0.55]} />
-        <RoomEnv intensity={0.35} />
+        {/* Atmosphere: fog swallowing the table edges, matching background,
+            and a hemisphere base so nothing reads pure black. */}
+        <color attach="background" args={[tokens.fogColor]} />
+        <fogExp2 attach="fog" args={[tokens.fogColor, tokens.fogDensity]} />
+        <hemisphereLight args={[tokens.hemiSky, tokens.hemiGround, tokens.hemiIntensity]} />
+        <RoomEnv intensity={tokens.envIntensity} />
 
         {/* Candle key light + glow/godray, dust, embers, vault smoke, banners
             all live inside Ambient. Embers also rise from modifier gates. */}
-        <Ambient playerHp={playerHp} enemyHp={enemyHp} modifiers={modifiers} />
+        <Ambient playerHp={playerHp} enemyHp={enemyHp} modifiers={modifiers} variant={variant} />
         {/* Cool directional fill from the far side to model the shadows. */}
-        <directionalLight color="#6b8cae" intensity={0.38} position={[-4, 5, -3]} />
-        {/* Warm rim from behind the enemy keep so silhouettes catch an edge. */}
-        <directionalLight color="#ffab55" intensity={0.5} position={[0, 4, -5.5]} />
+        <directionalLight color={tokens.fillColor} intensity={tokens.fillIntensity} position={[-4, 5, -3]} />
+        {/* Rim from behind the enemy keep so silhouettes catch an edge. */}
+        <directionalLight color={tokens.rimColor} intensity={tokens.rimIntensity} position={[0, 4, -5.5]} />
 
-        <TableSurface />
+        <TableSurface variant={variant} />
 
         {/* Citadels: viewer's keep on +Z, enemy on −Z. Damage tiers follow the
             ticking display HP via the shared refs during playback. */}
@@ -243,6 +328,7 @@ export default function Battlefield3D({
           hpRef={playerHpRef}
           wear={aftermath.myVaultWear}
           position={citadelPosition("player")}
+          variant={variant}
         />
         <CitadelPiece
           side="enemy"
@@ -250,6 +336,7 @@ export default function Battlefield3D({
           hpRef={enemyHpRef}
           wear={aftermath.enemyVaultWear}
           position={citadelPosition("enemy")}
+          variant={variant}
         />
 
         {/* Gates left→right (data order 0/2/1) with their round modifiers. */}
@@ -310,11 +397,39 @@ export default function Battlefield3D({
         />
 
         {/* Bloom over the whole scene — replaces r3f's default render. */}
-        <PostFX />
+        <PostFX variant={variant} />
       </Canvas>
       {/* DOM overlay: badges etc. render on top of the canvas. The overlay itself
           is pass-through; its own children opt back into pointer events. */}
       <div className="pointer-events-none absolute inset-0">{children}</div>
+
+      {/* Art-direction toggle: warm Candlelit Keep ↔ Arcane Holo Table. */}
+      <div className="pointer-events-auto absolute top-2 right-2 flex gap-0.5 rounded border border-white/10 bg-black/50 p-0.5 font-mono text-[10px] uppercase tracking-widest backdrop-blur-sm">
+        <button
+          type="button"
+          onClick={() => setVariant("warm")}
+          aria-pressed={variant === "warm"}
+          className={
+            variant === "warm"
+              ? "rounded-sm bg-[#c8a44e] px-2 py-1 text-[#140d07]"
+              : "rounded-sm px-2 py-1 text-[#9a8a62] hover:text-[#e6c268]"
+          }
+        >
+          Candlelit
+        </button>
+        <button
+          type="button"
+          onClick={() => setVariant("holo")}
+          aria-pressed={variant === "holo"}
+          className={
+            variant === "holo"
+              ? "rounded-sm bg-[#59d8e6] px-2 py-1 text-[#04100f]"
+              : "rounded-sm px-2 py-1 text-[#5f8a90] hover:text-[#8fe0ea]"
+          }
+        >
+          Holo
+        </button>
+      </div>
     </div>
   );
 }

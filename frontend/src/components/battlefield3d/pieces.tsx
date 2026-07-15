@@ -6,6 +6,7 @@ import { useFrame } from "@react-three/fiber";
 import type { NodeOwner } from "@/lib/gameState1v1";
 import { PALETTE } from "./layout";
 import { getSharedTextures } from "./textures";
+import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
 
 // Procedural "carved miniature" pieces for the candlelit war table (design 1a).
 // No external assets — geometry is three.js primitives, surfaces use the shared
@@ -80,6 +81,8 @@ export interface CitadelPieceProps {
   // tier which tracks the current vault. Applied by multiplying into the tier's
   // absolute color set so the two darkening sources never fight.
   wear?: number;
+  // Art direction: only the window-slit emissive differs between variants.
+  variant?: BattlefieldVariant;
 }
 
 /** Apply one tier's damage visuals in place: merlon tilt + stone darkening. */
@@ -183,9 +186,10 @@ function keepMerlons(): Array<[number, number]> {
  * Tier visuals are applied imperatively (shared materials + merlon rotation)
  * so the optional `hpRef` ticker can drive them mid-playback without re-rendering.
  */
-export function CitadelPiece({ side, hp, position, hpRef, wear = 0 }: CitadelPieceProps) {
+export function CitadelPiece({ side, hp, position, hpRef, wear = 0, variant = "warm" }: CitadelPieceProps) {
   const trim = side === "player" ? PALETTE.playerGold : PALETTE.enemyCrimson;
   const { body: bodyMat, base: baseMat } = useStoneMaterials(side === "player" ? 0 : 1);
+  const tokens = VARIANT_TOKENS[variant];
 
   const trimMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: trim, roughness: 0.5, metalness: 0.45 }),
@@ -196,11 +200,11 @@ export function CitadelPiece({ side, hp, position, hpRef, wear = 0 }: CitadelPie
     () =>
       new THREE.MeshStandardMaterial({
         color: "#1a1206",
-        emissive: "#ffb257",
-        emissiveIntensity: 2.4,
+        emissive: tokens.windowEmissive,
+        emissiveIntensity: tokens.windowIntensity,
         toneMapped: false,
       }),
-    [],
+    [tokens],
   );
   const gatehouseMat = useMemo(
     () => new THREE.MeshStandardMaterial({ color: "#120c08", roughness: 1 }),
