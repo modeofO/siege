@@ -79,9 +79,15 @@ export function PresetDefensePanel({ account, address, tier, refresh }: PresetDe
     <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] p-4 space-y-3">
       <div className="text-xs tracking-wider text-[#7a7060] uppercase font-serif">Standing Defenses</div>
       <div className="text-[11px] text-[#7a7060] leading-relaxed">
-        When you are attacked, fate picks one of your presets at random. Set at least one — a Hold with no defense
-        cannot be defended.
+        When you are attacked, fate picks one of your presets at random. Set your own — a Hold with no presets defends
+        with a fixed default garrison that every attacker knows.
       </div>
+      {presetCount === 0 && (
+        <div className="text-[11px] text-[#daa520] leading-relaxed">
+          No presets set — your Hold defends with the default garrison (2/2/2 assault, 2/2/2 defense). Every attacker
+          knows it. Set your own.
+        </div>
+      )}
       {hasUndefendedSlot && (
         <div className="text-[11px] text-[#c44332] leading-relaxed">
           Fate may pick an empty preset — fill every unlocked slot.

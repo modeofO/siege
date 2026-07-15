@@ -62,7 +62,7 @@
     },
     {
       "address": "0x5d9d790df9b1003b144521d1bf9821a1c9dca7332a5a6c99f003af5b2ca4394",
-      "class_hash": "0x2b667b280d5b563b3a3bacd9f72c70ce787cb0a98180744e4a90a8e67fd2ba8",
+      "class_hash": "0x1d58a60259e2670a0b776eb413a6f49d77846ea9d8b9023d7e0d718f89e6647",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
       "selector": "0x2164fd7acc93a3de55c3bcb974b18eebe85614770b9c22881e53ffc80174a90",
@@ -88,7 +88,7 @@
     },
     {
       "address": "0x227d85f88211383106235553ee51e96dfa795ca4dcff86a734e63e9bb20f39e",
-      "class_hash": "0x1c0b0c2c64a4a81417e14d86660458175a890a765125a06780334ddcf8bde4e",
+      "class_hash": "0x5fd30922f513e03cc0fd896a9b51eaf7a9f277f1ecbed7ce76b81de545c664e",
       "init_calldata": [],
       "tag": "siege_dojo-resolution_1v1",
       "selector": "0x3243785fc5c17bf6bc5b9d485ddaa1275e126e753d2eddd05e69e17e98f85fd",
@@ -99,7 +99,7 @@
     },
     {
       "address": "0x1c35fca268af0253265c3ef881ec3f7d7d0afa94626a8a2ddc5bb133e8be401",
-      "class_hash": "0x20d8f473112be3d561d8f258b5df1d93303fe6d6541121bdca62e61ef22049c",
+      "class_hash": "0x547384ecd95e70d829c426c11b12a68211e195f94434acea5f62b9317625c76",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
@@ -165,6 +165,23 @@
       "class_hash": "0x752fca052df3d822c125f88c6300839c7fef856c0638ea5cc097aaff7085f38",
       "tag": "siege_dojo-Commitment",
       "selector": "0x42cf97a04459d0821fa8fe049abf2da4127be87669c7b017696d7a8cdd14e04"
+    },
+    {
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "last_attack_time",
+          "type": "core::integer::u64",
+          "key": false
+        }
+      ],
+      "class_hash": "0x63e5bdfd1faf7c79539c3eb2cb16a65bc0075b562793f5d3e33689eb867ceb7",
+      "tag": "siege_dojo-ConquestCooldown",
+      "selector": "0x2bbc89fa837fac52e87102d7d04ae1fc2895661ac0f830c84574757164eba66"
     },
     {
       "members": [
@@ -1222,6 +1239,43 @@
     }
   ],
   "events": [
+    {
+      "members": [
+        {
+          "name": "attacker",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "target_parcel",
+          "type": "core::integer::u32",
+          "key": false
+        },
+        {
+          "name": "defender",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": false
+        },
+        {
+          "name": "attacker_won",
+          "type": "core::bool",
+          "key": false
+        },
+        {
+          "name": "ability_id",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "ability_consumed",
+          "type": "core::bool",
+          "key": false
+        }
+      ],
+      "class_hash": "0x6af8f0a37cd6cebd97ee955062607951f60192884ddb18df240a805c8fd70cc",
+      "tag": "siege_dojo-ConquestResolved",
+      "selector": "0x67ce138892ed955f766731a8f152ceb27870df158f86e291fc3ff1e71740017"
+    },
     {
       "members": [
         {
@@ -3325,6 +3379,92 @@
     },
     {
       "type": "struct",
+      "name": "siege_dojo::models::conquest_cooldown::ConquestCooldown",
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "last_attack_time",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::conquest_cooldown::ConquestCooldownValue",
+      "members": [
+        {
+          "name": "last_attack_time",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::models::conquest_cooldown::m_ConquestCooldown::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::events::ConquestResolved",
+      "members": [
+        {
+          "name": "attacker",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "target_parcel",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "defender",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "attacker_won",
+          "type": "core::bool"
+        },
+        {
+          "name": "ability_id",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ability_consumed",
+          "type": "core::bool"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::events::ConquestResolvedValue",
+      "members": [
+        {
+          "name": "target_parcel",
+          "type": "core::integer::u32"
+        },
+        {
+          "name": "defender",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "attacker_won",
+          "type": "core::bool"
+        },
+        {
+          "name": "ability_id",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ability_consumed",
+          "type": "core::bool"
+        }
+      ]
+    },
+    {
+      "type": "struct",
       "name": "siege_dojo::models::events::MatchCreated1v1",
       "members": [
         {
@@ -3482,6 +3622,12 @@
           "type": "core::integer::u32"
         }
       ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::models::events::e_ConquestResolved::Event",
+      "kind": "enum",
+      "variants": []
     },
     {
       "type": "event",
