@@ -821,51 +821,74 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected: ('No defense set', 'ENTRYPOINT_FAILED'))]
-    fn test_conquest_reinforcement_empty_pool_panics() {
-        // Defender opts in AND is in a faction, but no faction ally owns a
-        // parcel adjacent to the target, and defender has no own presets.
-        // `defense.preset_count + ally_count == 0` → panic 'No defense set'.
+    fn test_conquest_no_presets_uses_default_defense() {
+        // A defender who never set a preset (and has no ally reinforcement) is
+        // no longer unattackable — they fight with the fixed default garrison
+        // 2/2/2 assault + 2/2/2 gate defense (sum 12). Here the default assault
+        // is strong enough to repel a naive attacker who brings no gate defense.
         let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
 
-        let mut kb: PlayerKingdom = world.read_model(player_b);
-        kb.faction_reinforcement_enabled = true;
-        world.write_model_test(@kb);
+        // Prove the cooldown is set from the real timestamp, not left at 0.
+        starknet::testing::set_block_timestamp(1000);
 
-        // Ally exists + is in the same faction, but owns no parcels.
-        let ally = deploy_user_salted(88);
-        world.write_model_test(@siege_dojo::models::faction::Faction {
-            faction_id: 3,
-            leader: ally,
-            name: 'Distant',
-            tag: 'DS',
-            member_count: 2,
-            created_at: 0,
-            dissolved: false,
-        });
-        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
-            player: ally,
-            faction_id: 3,
-            joined_at: 0,
-            last_leave_time: 0,
-        });
-        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
-            player: player_b,
-            faction_id: 3,
-            joined_at: 0,
-            last_leave_time: 0,
-        });
+        // Defender: no presets at all, no faction reinforcement.
 
-        // Target is parcel 9 (player_a has adjacency via parcel 8).
+        // Give B parcel 9 (col=4,row=1) as a non-home target; A's parcel 8 is adjacent.
         let mut tp: Parcel = world.read_model(9_u32);
         tp.owner = player_b;
         world.write_model_test(@tp);
-        let mut kb_mut: PlayerKingdom = world.read_model(player_b);
-        kb_mut.parcel_count += 1;
-        world.write_model_test(@kb_mut);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
 
-        // Defender has 0 presets, ally contributes nothing → panic.
+        // Attacker: p=(3,3,4) all attack, g=(0,0,0) no gate defense.
+        // Damage to defender: (3-2)+(3-2)+(4-2) = 1+1+2 = 4 → def_hp = 15-4 = 11
+        // Damage to attacker: default p 2/2/2 vs g 0/0/0 = 2+2+2 = 6 → atk_hp = 10-6 = 4
+        // 4 < 11 → defender wins, target unchanged.
         starknet::testing::set_contract_address(player_a);
-        conquest_sys.initiate_conquest(9, 1, 1, 1, 0, 0, 0, 0, 0);
+        conquest_sys.initiate_conquest(9, 3, 3, 4, 0, 0, 0, 0, 0);
+
+        let target: Parcel = world.read_model(9_u32);
+        assert(target.owner == player_b, 'default def should hold target');
+
+        let cooldown: siege_dojo::models::conquest_cooldown::ConquestCooldown =
+            world.read_model(player_a);
+        assert(cooldown.last_attack_time == 1000, 'cooldown should be set');
+    }
+
+    #[test]
+    fn test_conquest_ability_beats_default_defense() {
+        // The default garrison is predictable, so an attacker who prepares can
+        // still take a turtling defender's parcel. Siege Sword T2 (token 6)
+        // overrides one gate's attack to 10, and a matching gate defense soaks
+        // the default 2/2/2 assault.
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Give player_a a T2 Siege Sword (token ID 6).
+        let rc: ResourceConfig = world.read_model(0_u8);
+        let ability_token = IAbilityTokenDispatcher { contract_address: rc.ability_token };
+        let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+        starknet::testing::set_contract_address(world_sys_addr);
+        ability_token.mint(player_a, 6_u256, 1_u256);
+
+        // Defender: no presets, no reinforcement → default 2/2/2 // 2/2/2 garrison.
+
+        let mut tp: Parcel = world.read_model(9_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.parcel_count += 1;
+        world.write_model_test(@kb);
+
+        // Attacker: p=(0,0,0), g=(2,2,2) (total 6), Siege Sword T2 on gate 0.
+        // Siege Sword T2 → atk_p0 = 10.
+        // Damage to defender: (10-2)+0+0 = 8 → def_hp = 15-8 = 7
+        // Damage to attacker: default p 2/2/2 vs g 2/2/2 = 0 → atk_hp = 10
+        // 10 > 7 → attacker wins the target parcel.
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(9, 0, 0, 0, 2, 2, 2, 6, 0);
+
+        let target: Parcel = world.read_model(9_u32);
+        assert(target.owner == player_a, 'siege sword beats default');
     }
 }

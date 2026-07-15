@@ -1,27 +1,39 @@
 "use client";
 
 import type { SessionPolicies, Method } from "@cartridge/presets";
-import { CONTRACTS_1V1, VRF_PROVIDER_ADDRESS } from "@/lib/contracts1v1";
-import { CRAFTING_1V1_ADDRESS } from "@/lib/craftingContracts";
 import { RESOURCE_TOKENS } from "@/lib/useResourceBalances";
-import { WORLD_SYSTEM_ADDRESS, CONQUEST_ADDRESS } from "@/lib/contractAddresses";
+import {
+  ACTIONS_1V1_ADDRESS,
+  COMMIT_REVEAL_1V1_ADDRESS,
+  RESOLUTION_1V1_ADDRESS,
+  CRAFTING_1V1_ADDRESS,
+  WORLD_SYSTEM_ADDRESS,
+  CONQUEST_ADDRESS,
+  VRF_PROVIDER_ADDRESS,
+} from "@/lib/contractAddresses";
 import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
+
+// Import addresses only from address-only modules (contractAddresses,
+// abilityToken, useResourceBalances). Importing contracts1v1 or craftingContracts
+// here would form a cycle: those modules import controllerSession, which imports
+// this file — under a strict ESM loader that leaves the address exports
+// undefined when this module is first evaluated.
 
 // Session policies must cover every user-signed entrypoint. Existing sessions
 // keep their approved policy set until the player reconnects or updates it.
 export const SESSION_POLICIES: SessionPolicies = {
   contracts: {
-    [CONTRACTS_1V1.ACTIONS]: {
+    [ACTIONS_1V1_ADDRESS]: {
       methods: [{ name: "Create 1v1 Match", entrypoint: "create_match_1v1" }],
     },
-    [CONTRACTS_1V1.COMMIT_REVEAL]: {
+    [COMMIT_REVEAL_1V1_ADDRESS]: {
       methods: [
         { name: "Commit 1v1", entrypoint: "commit" },
         { name: "Reveal 1v1", entrypoint: "reveal" },
         { name: "Force Timeout", entrypoint: "force_timeout" },
       ],
     },
-    [CONTRACTS_1V1.RESOLUTION]: {
+    [RESOLUTION_1V1_ADDRESS]: {
       methods: [{ name: "Resolve Round", entrypoint: "resolve_round" }],
     },
     [VRF_PROVIDER_ADDRESS]: {

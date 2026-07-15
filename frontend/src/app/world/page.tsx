@@ -1,16 +1,25 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
-import { useWorldParcels, usePlayerKingdom } from "@/lib/worldState";
+import { useWorldParcels, usePlayerKingdom, type ParcelData } from "@/lib/worldState";
 import { HexGrid } from "@/components/HexGrid";
 import { RegisterKingdom } from "@/components/RegisterKingdom";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { FactionPanel } from "@/components/FactionPanel";
+import { PresetDefensePanel } from "@/components/conquest/PresetDefensePanel";
+import { ConquestModal } from "@/components/conquest/ConquestModal";
+import {
+  getAttackability,
+  useConquestCooldown,
+  useOwnerFactionIds,
+  sameAddress,
+} from "@/lib/conquest";
+import { usePlayerFaction } from "@/lib/factions";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/contractAddresses";
 import { resilientExecute } from "@/lib/controllerSession";
@@ -223,6 +232,30 @@ export default function WorldPage() {
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
   const { battles, loading: battlesLoading } = useActiveBattles(refreshKey);
 
+  // --- Conquest state ---
+  const [selectedParcel, setSelectedParcel] = useState<ParcelData | null>(null);
+  const [warCouncilOpen, setWarCouncilOpen] = useState(false);
+  const { member } = usePlayerFaction(address ?? null);
+  const myFactionId = member?.factionId ?? 0;
+  const ownerFactionIds = useOwnerFactionIds(ownerAddresses);
+  const conquestCooldown = useConquestCooldown(address ?? null);
+
+  const myOwnedParcels = useMemo(
+    () => (address ? parcels.filter((p) => sameAddress(p.owner, address)) : []),
+    [parcels, address],
+  );
+
+  const attackableParcelIds = useMemo(() => {
+    const ids = new Set<number>();
+    if (!address) return ids;
+    for (const p of parcels) {
+      if (getAttackability(p, myOwnedParcels, myFactionId, ownerFactionIds).attackable) {
+        ids.add(p.parcelId);
+      }
+    }
+    return ids;
+  }, [parcels, address, myOwnedParcels, myFactionId, ownerFactionIds]);
+
   const claimDrip = useCallback(async () => {
     if (!account) return;
     setClaiming(true);
@@ -309,12 +342,27 @@ export default function WorldPage() {
               playerAddress={address}
               homeParcelIds={kingdom.registered ? [kingdom.home0, kingdom.home1, kingdom.home2] : []}
               cosmeticsMap={cosmeticsMap}
+              selectedParcel={selectedParcel}
+              onSelectParcel={setSelectedParcel}
+              attackableParcelIds={kingdom.registered ? attackableParcelIds : undefined}
+              attackRingsDimmed={conquestCooldown.remainingSeconds > 0}
             />
           )}
         </div>
         <CloudDrift />
         <TorchOverlay />
       </div>
+
+      {/* Selection bar */}
+      {kingdom.registered && selectedParcel && (
+        <SelectionBar
+          parcel={selectedParcel}
+          isOwn={sameAddress(selectedParcel.owner, address)}
+          attackability={getAttackability(selectedParcel, myOwnedParcels, myFactionId, ownerFactionIds)}
+          cooldownRemaining={conquestCooldown.remainingSeconds}
+          onOpenWarCouncil={() => setWarCouncilOpen(true)}
+        />
+      )}
 
       {/* Hold summary */}
       {kingdom.registered && (
@@ -386,6 +434,11 @@ export default function WorldPage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Standing defenses */}
+      {kingdom.registered && (
+        <PresetDefensePanel account={account} address={address} tier={kingdom.tier} refresh={refresh} />
       )}
 
       {/* Battles */}
@@ -466,6 +519,85 @@ export default function WorldPage() {
 
       {/* Faction panel */}
       {kingdom.registered && <FactionPanel account={account} address={address} kingdom={kingdom} refresh={refresh} />}
+
+      {/* War Council modal */}
+      {warCouncilOpen && selectedParcel && (
+        <ConquestModal
+          account={account}
+          attacker={address}
+          target={selectedParcel}
+          myOwnedParcels={myOwnedParcels}
+          abilities={abilities}
+          onClose={() => {
+            setWarCouncilOpen(false);
+            refresh();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function formatCountdown(sec: number): string {
+  const s = Math.max(0, Math.floor(sec));
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r.toString().padStart(2, "0")}`;
+}
+
+interface SelectionBarProps {
+  parcel: ParcelData;
+  isOwn: boolean;
+  attackability: ReturnType<typeof getAttackability>;
+  cooldownRemaining: number;
+  onOpenWarCouncil: () => void;
+}
+
+function SelectionBar({ parcel, isOwn, attackability, cooldownRemaining, onOpenWarCouncil }: SelectionBarProps) {
+  const typeName = PARCEL_TYPE_NAMES[parcel.parcelType] ?? "Untyped";
+  const coords = `(${parcel.col}, ${parcel.row})`;
+
+  if (isOwn) {
+    return (
+      <div className="border border-[#daa520]/30 rounded-lg bg-[#1a1714] px-4 py-3 flex items-center justify-between">
+        <div className="text-[11px] text-[#d4cfc6]">
+          <span className="text-[#daa520] font-serif font-bold">{typeName}</span> {coords} — your holding
+        </div>
+        <span className="text-[10px] text-[#7a7060] tracking-wider uppercase">Yours</span>
+      </div>
+    );
+  }
+
+  if (!attackability.attackable) {
+    return (
+      <div className="border border-[#3d3428] rounded-lg bg-[#1a1714] px-4 py-3 flex items-center justify-between">
+        <div className="text-[11px] text-[#7a7060]">
+          <span className="text-[#d4cfc6] font-serif">{typeName}</span> {coords}
+        </div>
+        <span className="text-[10px] text-[#7a7060] tracking-wider uppercase">{attackability.reason}</span>
+      </div>
+    );
+  }
+
+  const onCooldown = cooldownRemaining > 0;
+
+  return (
+    <div className="border border-[#c44332]/40 rounded-lg bg-[#1a1714] px-4 py-3 flex items-center justify-between gap-4">
+      <div className="text-[11px] text-[#d4cfc6]">
+        <span className="text-[#c44332] font-serif font-bold">{typeName}</span> {coords} — raidable border
+      </div>
+      {onCooldown ? (
+        <span className="text-[10px] text-[#7a7060] tracking-wider uppercase shrink-0">
+          Next assault in {formatCountdown(cooldownRemaining)}
+        </span>
+      ) : (
+        <button
+          onClick={onOpenWarCouncil}
+          className="shrink-0 px-4 py-1.5 rounded text-[11px] font-bold tracking-wider font-serif border border-[#c44332] text-[#c44332] hover:bg-[#c44332]/15 transition-colors"
+        >
+          OPEN WAR COUNCIL
+        </button>
+      )}
     </div>
   );
 }

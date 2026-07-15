@@ -119,7 +119,7 @@ Registration claims three home parcels: the first maximizes distance to already-
 
 `claim_parcel` claims one unclaimed adjacent parcel after a settled staked-match win and assigns its parcel type.
 
-Conquest attacks adjacent non-home parcels in one transaction. Attacker budget is 10, defender preset budget is 12, attacker HP is 10, defender HP is 15, and ties go to the defender. Pillage window is 24 hours (`PILLAGE_WINDOW = 86400`).
+Conquest attacks adjacent non-home parcels in one transaction. Attacker budget is 10, defender preset budget is 12, attacker HP is 10, defender HP is 15, and ties go to the defender. Pillage window is 24 hours (`PILLAGE_WINDOW = 86400`). Defenders with no presets (and no ally reinforcement) defend with the fixed default 2/2/2 assault + 2/2/2 gate defense, so every Hold is always attackable.
 
 ## Tiers
 

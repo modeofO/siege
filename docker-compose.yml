@@ -31,3 +31,26 @@ services:
       - "8080:8080"
     depends_on:
       - katana
+
+  # Self-hosted Sepolia indexer (Cartridge stopped accepting new slot torii
+  # deployments). Point the frontend at http://localhost:8081 via
+  # NEXT_PUBLIC_TORII_URL. DB persists in the torii-sepolia-db volume.
+  torii-sepolia:
+    image: ghcr.io/dojoengine/dojo:v1.8.0
+    platform: linux/amd64
+    entrypoint: /opt/asdf/installs/torii/1.8.3/bin/torii
+    command: >-
+      --config /app/torii_sepolia.toml
+      --db-dir /data
+      --http.addr 0.0.0.0
+      --http.cors_origins "*"
+    volumes:
+      - .:/app
+      - torii-sepolia-db:/data
+    ports:
+      - "8081:8080"
+    profiles:
+      - sepolia
+
+volumes:
+  torii-sepolia-db:
