@@ -179,6 +179,22 @@ export async function approveConquestAbilityOperator(account: AccountInterface):
   return result.transaction_hash;
 }
 
+// Read AbilityToken.is_approved_for_all(owner, conquest) so the modal can skip a
+// redundant approval tx when conquest is already an operator. A non-zero felt
+// means approved. Callers should treat a throw as "unknown" and fall back to
+// sending the approval.
+export async function isConquestAbilityOperatorApproved(
+  account: AccountInterface,
+  owner: string,
+): Promise<boolean> {
+  const result = await account.callContract({
+    contractAddress: ABILITY_TOKEN_ADDRESS,
+    entrypoint: "is_approved_for_all",
+    calldata: [owner, CONQUEST_ADDRESS],
+  });
+  return result.length > 0 && BigInt(result[0]) !== BigInt(0);
+}
+
 export const DEFENDER_BUDGET = 12;
 export const ATTACKER_BUDGET = 10;
 // Mirrors CONQUEST_COOLDOWN in src/systems/conquest.cairo — keep in sync.
@@ -230,15 +246,26 @@ export interface Attackability {
   reason?: string;
 }
 
+// Per-defender info needed to reproduce the contract's 'No defense set' check:
+// their PresetDefense slot count and whether their kingdom opted into faction
+// reinforcement. Keyed by normalized owner address.
+export interface DefenderDefenseInfo {
+  presetCount: number;
+  reinforcementOn: boolean;
+}
+
 // Pure predicate mirroring the initiate_conquest asserts, for greying out the
 // map and the selection bar. The contract still enforces every rule; this is
 // UX only. `myParcels` are the caller's parcels; `ownerFactionIds` maps a
-// (normalized) owner address to its faction id (0 = none).
+// (normalized) owner address to its faction id (0 = none). When `defense` is
+// supplied, also reproduces the contract's 'No defense set' guard so undefended
+// targets are shown as unattackable.
 export function getAttackability(
   parcel: ParcelData,
   myParcels: ParcelData[],
   myFactionId: number,
   ownerFactionIds: Record<string, number>,
+  defense?: { info: Record<string, DefenderDefenseInfo>; allParcels: ParcelData[] },
 ): Attackability {
   const unclaimed =
     !parcel.owner ||
@@ -261,6 +288,31 @@ export function getAttackability(
 
   const adjacent = myParcels.some((p) => isNeighbor(p, parcel));
   if (!adjacent) return { attackable: false, reason: "Not adjacent to your holdings" };
+
+  // Contract (conquest.cairo): attack reverts 'No defense set' iff the defender
+  // has no preset AND no faction ally can reinforce. An ally is a DIFFERENT
+  // player in the SAME faction owning a parcel adjacent to the target, and only
+  // counts when the defender's kingdom enabled reinforcement and is in a faction.
+  if (defense) {
+    const defenderKey = normalizeAddr(parcel.owner);
+    const entry = defense.info[defenderKey] ?? { presetCount: 0, reinforcementOn: false };
+    if (entry.presetCount === 0) {
+      const defenderFactionId = ownerFactionIds[defenderKey] ?? 0;
+      const allyReinforces =
+        entry.reinforcementOn &&
+        defenderFactionId !== 0 &&
+        defense.allParcels.some(
+          (p) =>
+            p.owner &&
+            !sameAddress(p.owner, parcel.owner) &&
+            (ownerFactionIds[normalizeAddr(p.owner)] ?? 0) === defenderFactionId &&
+            isNeighbor(p, parcel),
+        );
+      if (!allyReinforces) {
+        return { attackable: false, reason: "No defense set — cannot be attacked" };
+      }
+    }
+  }
 
   return { attackable: true };
 }
@@ -299,6 +351,60 @@ export function useOwnerFactionIds(owners: string[]): Record<string, number> {
       if (!alive()) return;
       const next: Record<string, number> = {};
       for (const r of rows) next[normalizeAddr(r.player)] = toNum(r.faction_id);
+      setMap(next);
+    },
+    POLL_INTERVAL,
+    [key],
+    true,
+  );
+
+  return map;
+}
+
+// Torii SQL: map each owner address to its preset-defense count and kingdom
+// reinforcement flag, so getAttackability can reproduce the 'No defense set'
+// guard. On failure or missing rows an owner defaults to no defense, which the
+// contract enforces anyway.
+export function useDefenderDefenseInfo(
+  owners: string[],
+): Record<string, DefenderDefenseInfo> {
+  const [map, setMap] = useState<Record<string, DefenderDefenseInfo>>({});
+
+  // Stable, sorted key so the poll only re-subscribes when the owner set
+  // actually changes (parcels.map() produces a fresh array every render).
+  const normalized = Array.from(new Set(owners.map(normalizeAddr))).filter(
+    (a) => a !== "0x0",
+  );
+  normalized.sort();
+  const key = normalized.join(",");
+
+  usePoll(
+    async (alive) => {
+      if (normalized.length === 0) {
+        if (alive()) setMap({});
+        return;
+      }
+      const inList = normalized.map((a) => sqlAddr(a)).join(",");
+      const [presetRows, kingdomRows] = await Promise.all([
+        toriiSql<{ player: string; preset_count: number | string }>(
+          `SELECT player, preset_count FROM "siege_dojo-PresetDefense" WHERE player IN (${inList})`,
+        ),
+        toriiSql<{ player: string; faction_reinforcement_enabled: number | string }>(
+          `SELECT player, faction_reinforcement_enabled FROM "siege_dojo-PlayerKingdom" WHERE player IN (${inList})`,
+        ),
+      ]);
+      if (!alive()) return;
+      const next: Record<string, DefenderDefenseInfo> = {};
+      for (const a of normalized) next[a] = { presetCount: 0, reinforcementOn: false };
+      for (const r of presetRows) {
+        const k = normalizeAddr(r.player);
+        (next[k] ??= { presetCount: 0, reinforcementOn: false }).presetCount = toNum(r.preset_count);
+      }
+      for (const r of kingdomRows) {
+        const k = normalizeAddr(r.player);
+        (next[k] ??= { presetCount: 0, reinforcementOn: false }).reinforcementOn =
+          toNum(r.faction_reinforcement_enabled) !== 0;
+      }
       setMap(next);
     },
     POLL_INTERVAL,

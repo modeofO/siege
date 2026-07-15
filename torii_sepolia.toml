@@ -17,3 +17,7 @@ contracts = [
   "erc20:0x3d539cd317ecf470532a281922722826fadfa13eb5cc45f448ad714ef80cba1",
   "erc20:0x25372cc987ebff79ca4a781aadb02ef8853d43b496ee381f382c59f7deafb35",
 ]
+
+[events]
+# Keep every ConquestResolved emission queryable (attack/defense activity feed).
+historical = ["siege_dojo-ConquestResolved"]

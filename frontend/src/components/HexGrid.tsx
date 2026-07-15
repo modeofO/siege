@@ -20,6 +20,9 @@ interface HexGridProps {
   selectedParcel?: ParcelData | null;
   onSelectParcel?: (parcel: ParcelData | null) => void;
   attackableParcelIds?: Set<number>;
+  // While the attacker is on conquest cooldown the rings are still informative
+  // but not actionable — dim them and drop the pulse.
+  attackRingsDimmed?: boolean;
 }
 
 function normalizeAddr(a: string): string {
@@ -82,6 +85,7 @@ export function HexGrid({
   selectedParcel: controlledSelected,
   onSelectParcel,
   attackableParcelIds,
+  attackRingsDimmed,
 }: HexGridProps) {
   const [hoveredParcel, setHoveredParcel] = useState<ParcelData | null>(null);
   const [internalSelected, setInternalSelected] = useState<ParcelData | null>(null);
@@ -189,7 +193,8 @@ export function HexGrid({
                   stroke="#c44332"
                   strokeWidth={2}
                   strokeDasharray="4 3"
-                  className="animate-pulse pointer-events-none"
+                  strokeOpacity={attackRingsDimmed ? 0.35 : undefined}
+                  className={attackRingsDimmed ? "pointer-events-none" : "animate-pulse pointer-events-none"}
                 />
               )}
 
