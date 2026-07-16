@@ -48,7 +48,7 @@ import {
   type ServerCapabilities,
 } from "@modelcontextprotocol/sdk/types.js";
 import { readFileSync } from "node:fs";
-import type { WalletAccount } from "starknet";
+import type { AccountInterface } from "starknet";
 import { z } from "zod";
 
 import { loadConfig, type Config } from "./config.js";
@@ -73,7 +73,7 @@ async function main(): Promise<void> {
   const agentPrompt = readFileSync(config.agentPromptPath, "utf8");
 
   // ── mutable bootstrap state ──
-  let signer: WalletAccount | null = null;
+  let signer: AccountInterface | null = null;
   let agentAddress = "";
   let bootstrapDone = false;
   let bootstrapError: string | null = null;
@@ -87,7 +87,7 @@ async function main(): Promise<void> {
     config,
     state,
     watchMatch: (matchId) => watchMatch(state, matchId),
-    get signer(): WalletAccount | null {
+    get signer(): AccountInterface | null {
       return signer;
     },
     get agentAddress(): string {

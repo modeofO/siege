@@ -23,7 +23,7 @@ import type {
   ShapeOutput,
   ZodRawShapeCompat,
 } from "@modelcontextprotocol/sdk/server/zod-compat.js";
-import { addAddressPadding, CallData, shortString, type Call, type WalletAccount } from "starknet";
+import { addAddressPadding, CallData, shortString, type AccountInterface, type Call } from "starknet";
 import { z } from "zod";
 
 import type { Config } from "./config.js";
@@ -41,7 +41,7 @@ export interface ToolContext {
   state: StateClient;
   watchMatch: (matchId: number) => void;
   /** null until the Cartridge session is approved. Read tools work without it. */
-  signer: WalletAccount | null;
+  signer: AccountInterface | null;
   /** Address of the authenticated agent. Empty string until session is ready. */
   agentAddress: string;
 }
@@ -309,21 +309,28 @@ async function pollReceipt(rpcUrl: string, txHash: string): Promise<void> {
   // Timed out waiting for receipt — don't fail the call; tx may still land.
 }
 
-async function execute(signer: WalletAccount, calls: Call[]): Promise<string> {
-  const controller = (signer as unknown as { controller?: {
-    executeFromOutside: (calls: Array<{ contractAddress: string; entrypoint: string; calldata: string[] }>) => Promise<{ transaction_hash: string }>;
-  } }).controller;
-  if (!controller?.executeFromOutside) {
-    throw new Error("CartridgeSessionAccount unavailable on signer");
-  }
+async function execute(signer: AccountInterface, calls: Call[]): Promise<string> {
   const normalized = calls.map((c) => ({
     entrypoint: c.entrypoint,
     contractAddress: addAddressPadding(c.contractAddress),
     calldata: CallData.toHex(c.calldata),
   }));
-  const res = await controller.executeFromOutside(normalized);
-  if (rpcUrlForReceipts) await pollReceipt(rpcUrlForReceipts, res.transaction_hash);
-  return res.transaction_hash;
+  const controller = (signer as unknown as { controller?: {
+    executeFromOutside: (calls: Array<{ contractAddress: string; entrypoint: string; calldata: string[] }>) => Promise<{ transaction_hash: string }>;
+  } }).controller;
+  let txHash: string;
+  if (controller?.executeFromOutside) {
+    // Cartridge session signer — sponsored outside execution.
+    const res = await controller.executeFromOutside(normalized);
+    txHash = res.transaction_hash;
+  } else {
+    // Raw account signer (AGENT_ACCOUNT_ADDRESS mode) — direct invoke. Only
+    // viable on fee-less chains like the self-hosted katana.
+    const res = await signer.execute(normalized);
+    txHash = res.transaction_hash;
+  }
+  if (rpcUrlForReceipts) await pollReceipt(rpcUrlForReceipts, txHash);
+  return txHash;
 }
 
 function safeStringifyError(err: unknown): string {

@@ -1,0 +1,16 @@
+[world]
+name = "siege_dojo"
+seed = "siege_dojo_v9"
+
+[namespace]
+default = "siege_dojo"
+
+[env]
+# Self-hosted Railway katana (infra/katana). Deployer is katana dev account 0
+# — a public well-known dev key, test chain only, so it lives inline here.
+# Same env var names as the sepolia profile so init scripts work unchanged;
+# exporting DOJO_* overrides these. world_address filled after first migrate.
+rpc_url = "https://siege-katana-production.up.railway.app"
+account_address = "0x127fd5f1fe78a71f8bcd1fec63e3fe2f0486b6ecd5c86a0466c3a21fa5cfcec"
+private_key = "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912"
+world_address = "0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73"

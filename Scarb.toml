@@ -15,6 +15,7 @@ dojo = { git = "https://github.com/dojoengine/dojo.git", tag = "v1.8.0" }
 openzeppelin_token = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v3.0.0" }
 openzeppelin_introspection = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v3.0.0" }
 openzeppelin_interfaces = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v3.0.0" }
+openzeppelin_account = { git = "https://github.com/OpenZeppelin/cairo-contracts.git", tag = "v3.0.0" }
 
 [dev-dependencies]
 cairo_test = "2.13.1"
@@ -24,3 +25,5 @@ dojo_cairo_test = { git = "https://github.com/dojoengine/dojo.git", tag = "v1.8.
 allow-prebuilt-plugins = ["dojo_cairo_macros"]
 
 [profile.sepolia]
+
+[profile.katana]

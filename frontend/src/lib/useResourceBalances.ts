@@ -3,8 +3,10 @@
 import { useMemo } from "react";
 import { useTokens } from "@dojoengine/sdk/react";
 
-// ERC-20 token addresses (deployed on Sepolia).
-export const RESOURCE_TOKENS = {
+// ERC-20 resource token addresses, keyed by network. Sepolia set matches
+// scripts/init-sepolia-resource-config.sh; katana set is printed by
+// scripts/init-katana-world.ts (keep all three in sync when redeploying).
+const SEPOLIA_RESOURCE_TOKENS = {
   iron: "0x773f033bcbeb2e6362491d45680d7f7c788222c4a7deba580d7c89ab1251838",
   linen: "0x3602775d72b9fbb0cbc70fa27f15a8466779a5b5b224de5024378d6f7f0f91",
   stone: "0x555c070dcd35bfe65c12c1ba89c76136df3af1b9bb9e765fc0a3f711cddeb29",
@@ -12,6 +14,20 @@ export const RESOURCE_TOKENS = {
   ember: "0x3d539cd317ecf470532a281922722826fadfa13eb5cc45f448ad714ef80cba1",
   seeds: "0x25372cc987ebff79ca4a781aadb02ef8853d43b496ee381f382c59f7deafb35",
 } as const;
+
+const KATANA_RESOURCE_TOKENS = {
+  iron: "0x3ec5e18038345d363133443d25f742d063f34319ba923ac1c9d354054209095",
+  linen: "0x412a69d1b3ab113e6427ce92070c911995de6d31f7453940f82ea025b9d2bac",
+  stone: "0x39af623e54128504f833728cf09fbd98835d825be4eb3a553d9186cab0c39d3",
+  wood: "0x6f0245a8b9605beb8c68da8deda7382e8a794346eef1f49416e01f2d99cba34",
+  ember: "0x68d51f72cad08dd349467877a22ee2ae3a31f0c343a111087211777f4074099",
+  seeds: "0x6033ae1569611e683d42a3bcd73f7f5cf519ce5bce02e2e7b4235fecc559739",
+} as const;
+
+export const RESOURCE_TOKENS =
+  (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "katana"
+    ? KATANA_RESOURCE_TOKENS
+    : SEPOLIA_RESOURCE_TOKENS;
 
 export interface ResourceBalances {
   iron: number;

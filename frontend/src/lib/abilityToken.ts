@@ -4,7 +4,10 @@ import { byteArray, type RpcProvider } from "starknet";
 // Deployed ability token address — override via NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS
 export const ABILITY_TOKEN_ADDRESS =
   process.env.NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS ||
-  "0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05";
+  ((process.env.NEXT_PUBLIC_NETWORK || "devnet") === "katana"
+    ? // Katana deployment — scripts/init-katana-world.ts
+      "0x60159dd1eb29a2aef41134b6ac536f551769f6238100cd34fc9d50875f226e2"
+    : "0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05");
 
 export type AbilityInventory = {
   siege_sword: number;

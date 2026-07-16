@@ -32,6 +32,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "openzeppelin_account"
+version = "3.0.0"
+source = "git+https://github.com/OpenZeppelin/cairo-contracts.git?tag=v3.0.0#ddd3338e787a3fbf4a92b366640a57ee364390cb"
+dependencies = [
+ "openzeppelin_interfaces",
+ "openzeppelin_introspection",
+ "openzeppelin_utils",
+]
+
+[[package]]
 name = "openzeppelin_interfaces"
 version = "2.1.0"
 source = "git+https://github.com/OpenZeppelin/cairo-contracts.git?tag=v3.0.0#ddd3338e787a3fbf4a92b366640a57ee364390cb"
@@ -69,6 +79,7 @@ version = "1.0.0"
 dependencies = [
  "dojo",
  "dojo_cairo_test",
+ "openzeppelin_account",
  "openzeppelin_interfaces",
  "openzeppelin_introspection",
  "openzeppelin_token",

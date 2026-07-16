@@ -11,10 +11,18 @@ import { SESSION_POLICIES } from "@/lib/sessionPolicies";
 
 // ---------- Network mode ----------
 
-const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
+const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
+const IS_DEVNET = NETWORK === "devnet";
+const IS_KATANA = NETWORK === "katana";
 export function isDevMode() {
   return IS_DEVNET;
 }
+
+// Controller-mode chain parameters. "katana" = self-hosted Railway katana
+// (chain id short-string "SIEGE"); anything else non-devnet = public sepolia.
+const CONTROLLER_RPC_URL = IS_KATANA
+  ? process.env.NEXT_PUBLIC_RPC_URL || "https://siege-katana-production.up.railway.app"
+  : "https://api.cartridge.gg/x/starknet/sepolia";
 
 // ---------- Shared account interface ----------
 
@@ -96,19 +104,26 @@ function DevProvider({ children }: { children: React.ReactNode }) {
 
 // ---------- Sepolia mode (Cartridge Controller) ----------
 
-const sepoliaConnector = IS_DEVNET
+// Constructed browser-only: resolving a custom appchain (SIEGE) makes the
+// Controller fetch the chain id from the RPC, which crashes Next prerender
+// ("Cannot make synchronous HTTP call in Node.js environment").
+const sepoliaConnector = IS_DEVNET || typeof window === "undefined"
   ? null
   : new ControllerConnector({
       policies: SESSION_POLICIES,
-      chains: [{ rpcUrl: "https://api.cartridge.gg/x/starknet/sepolia" }],
-      defaultChainId: "0x" + sepolia.id.toString(16),
-      slot: "siege-dojo",
+      chains: [{ rpcUrl: CONTROLLER_RPC_URL }],
+      // "SIEGE" as a Cairo short string; keychain resolves the appchain by it.
+      defaultChainId: IS_KATANA ? "0x5349454745" : "0x" + sepolia.id.toString(16),
+      // No `slot`: the Cartridge-hosted torii for siege-dojo was discontinued
+      // (indexer moved to Railway). Passing a slot whose torii is gone makes
+      // the keychain bootstrap fail (RetrieveContracts 404 → "Transaction
+      // failed" on session approval). Keychain torii can't point at Railway.
       feeSource: FeeSource.PAYMASTER,
       propagateSessionErrors: true,
     });
 
 const sepoliaRpcProvider = jsonRpcProvider({
-  rpc: () => ({ nodeUrl: "https://api.cartridge.gg/x/starknet/sepolia" }),
+  rpc: () => ({ nodeUrl: CONTROLLER_RPC_URL }),
 });
 
 function CartridgeBridge({ children }: { children: React.ReactNode }) {
@@ -126,12 +141,26 @@ function CartridgeBridge({ children }: { children: React.ReactNode }) {
   );
 }
 
+// Self-hosted katana chain descriptor for starknet-react (id = "SIEGE").
+const siegeKatanaChain = {
+  ...sepolia,
+  id: BigInt("0x5349454745"),
+  network: "siege-katana",
+  name: "Siege Katana",
+  rpcUrls: {
+    default: { http: [CONTROLLER_RPC_URL] },
+    public: { http: [CONTROLLER_RPC_URL] },
+  },
+} as unknown as typeof sepolia;
+
+const controllerChain = IS_KATANA ? siegeKatanaChain : sepolia;
+
 function SepoliaProvider({ children }: { children: React.ReactNode }) {
   return (
     <StarknetConfig
       autoConnect
-      chains={[sepolia]}
-      defaultChainId={sepolia.id}
+      chains={[controllerChain]}
+      defaultChainId={controllerChain.id}
       provider={sepoliaRpcProvider}
       connectors={sepoliaConnector ? [sepoliaConnector] : []}
       explorer={cartridge}

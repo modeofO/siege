@@ -1,8 +1,11 @@
 import manifestDev from "../manifests/manifest_dev.json";
 import manifestSepolia from "../manifests/manifest_sepolia.json";
+import manifestKatana from "../manifests/manifest_katana.json";
 
-const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
-const manifest = IS_DEVNET ? manifestDev : manifestSepolia;
+const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
+const IS_DEVNET = NETWORK === "devnet";
+const IS_KATANA = NETWORK === "katana";
+const manifest = IS_DEVNET ? manifestDev : IS_KATANA ? manifestKatana : manifestSepolia;
 
 function manifestContract(tag: string): string | undefined {
   return manifest.contracts.find((contract) => contract.tag === tag)?.address;
@@ -14,10 +17,14 @@ function contractAddress(tag: string, envName: string, fallback = ""): string {
   return process.env[envName] || fromManifest || fallback;
 }
 
-// Cartridge VRF provider — a fixed network address, not a Dojo contract. Lives
-// here (an address-only module) rather than contracts1v1.ts so sessionPolicies
-// can read it without pulling the controllerSession import cycle.
-export const VRF_PROVIDER_ADDRESS = "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
+// VRF provider — a fixed network address, not a Dojo contract. Lives here (an
+// address-only module) rather than contracts1v1.ts so sessionPolicies can read
+// it without pulling the controllerSession import cycle. Sepolia uses the
+// Cartridge VRF service; the self-hosted katana uses DevVrfProvider
+// (pseudo-random, deployed by scripts/init-katana-world.ts).
+export const VRF_PROVIDER_ADDRESS = IS_KATANA
+  ? "0x3832c912886ed54ee500d913df5d7e10703d32d868a56cca1fb9f725c2c1121"
+  : "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
 
 export const ACTIONS_1V1_ADDRESS = contractAddress(
   "siege_dojo-actions_1v1",

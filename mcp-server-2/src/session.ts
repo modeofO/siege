@@ -11,7 +11,7 @@
 import { chmodSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import SessionProvider from "@cartridge/controller/session/node";
-import { shortString, type WalletAccount } from "starknet";
+import { Account, RpcProvider, shortString, type AccountInterface } from "starknet";
 import type { ResourceTokenAddresses, SiegeContracts } from "./config.js";
 import { buildPolicies } from "./policies.js";
 
@@ -82,7 +82,20 @@ function getProvider(cfg: SessionConfig): SessionProvider {
 export async function getAccount(
   cfg: SessionConfig,
   opts: ConnectOptions = {},
-): Promise<WalletAccount> {
+): Promise<AccountInterface> {
+  // Raw-key mode for self-hosted chains: Cartridge's createSession API cannot
+  // derive an RPC URL from a custom chain id ("SIEGE"), so headless sessions
+  // are impossible there. On a fee-less katana a plain prefunded account is
+  // equivalent — set AGENT_ACCOUNT_ADDRESS + AGENT_PRIVATE_KEY to use it.
+  const rawAddress = process.env.AGENT_ACCOUNT_ADDRESS;
+  const rawKey = process.env.AGENT_PRIVATE_KEY;
+  if (rawAddress && rawKey) {
+    return new Account({
+      provider: new RpcProvider({ nodeUrl: cfg.rpcUrl }),
+      address: rawAddress,
+      signer: rawKey,
+    });
+  }
   // Intercept the SDK's stdout chatter so the auth URL never reaches stdout
   // (which belongs to the MCP JSON-RPC stream). We restore the originals
   // when this function returns.

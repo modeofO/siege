@@ -140,14 +140,48 @@ Upgrade costs:
 - Hegemonia: 50 Iron, 50 Stone, 30 Wood, 20 Ember.
 - Basileia: 100 Iron, 100 Stone, 60 Wood, 40 Ember, 20 Seeds.
 
-## Sepolia
+## Self-hosted Katana (active network)
+
+Public sepolia is parked: Cartridge's sepolia AVNU sponsorship broke 2026-07-14
+(session approvals fail with "Transaction failed"), and slot deployments are
+discontinued entirely. The game now runs on a self-hosted katana appchain:
+
+- RPC: `https://siege-katana-production.up.railway.app` (Railway service
+  `siege-katana`, project `siege-katana`, source `infra/katana/`). Chain id
+  short-string `SIEGE` (`0x5349454745`). Flags: `--dev --dev.no-fee
+  --cartridge.paymaster` — fee-less, Controller classes at genesis, keychain
+  auto-deploys controller accounts. Deployer = katana dev account 0 (public dev
+  key, inline in `dojo_katana.toml`).
+- Torii: `https://siege-torii-katana-production.up.railway.app` (service
+  `siege-torii-katana`, source `infra/torii-katana/`).
+- World: same address as sepolia (same seed) — `manifest_katana.json`; system
+  addresses differ. Profile: `sozo -P katana` via the Docker builder.
+- Bootstrap after a fresh migrate: `bun x tsx scripts/init-katana-world.ts`
+  (declares/deploys AbilityToken + resource tokens + DevVrfProvider, grid init,
+  operator + config wiring; prints the address block).
+- VRF: `DevVrfProvider` (`src/tokens/dev_vrf_provider.cairo`) — pseudo-random,
+  dev chain only. The Cartridge VRF address in the sepolia docs does not exist
+  here.
+- Frontend/MCP switch on `NEXT_PUBLIC_NETWORK=katana` / `mcp-server-2/.env`.
+- MCP agent signing: Cartridge headless sessions cannot be created for a
+  custom chain id, so on katana the MCP signs with a raw account
+  (`AGENT_ACCOUNT_ADDRESS`/`AGENT_PRIVATE_KEY` env; unset = Cartridge session
+  flow for sepolia). The agent account is a `DevAgentAccount`
+  (`src/tokens/dev_agent_account.cairo`, deployed by
+  `scripts/deploy-agent-account.ts`) because katana's predeployed dev accounts
+  lack SRC5 and fail ERC-1155 acceptance checks (register_player starter
+  mints revert 'ERC1155: safe transfer failed').
+- Redeploy infra: `railway up ./infra/katana --path-as-root` (or
+  `./infra/torii-katana` with `--service siege-torii-katana`).
+
+## Sepolia (parked — sponsorship outage)
 
 Current config files point at:
 
 - Seed: `siege_dojo_v9`
 - World: `0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73`
 - RPC: `https://api.cartridge.gg/x/starknet/sepolia`
-- Torii: `https://api.cartridge.gg/x/siege-dojo/torii`
+- Torii: `https://siege-torii-production-d1a1.up.railway.app` (Railway; Cartridge slot torii discontinued — do not pass `slot: "siege-dojo"` to ControllerConnector, its dead torii breaks keychain session approval)
 - Torii start block: `10547399`
 
 Contract addresses should come from `manifest_sepolia.json`. Current important tags:
