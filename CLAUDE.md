@@ -310,7 +310,7 @@ https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8
 
 ## Frontend Notes
 
-The frontend supports `devnet` and `sepolia` modes through `src/app/providers.tsx`.
+The frontend supports `devnet`, `katana`, `sepolia`, and `mainnet` modes through `src/app/providers.tsx` (`NEXT_PUBLIC_NETWORK`).
 
 - Devnet uses local Katana accounts.
 - Sepolia uses Cartridge Controller and `SESSION_POLICIES`.
