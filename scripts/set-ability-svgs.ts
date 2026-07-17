@@ -10,7 +10,10 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const RPC = "https://api.cartridge.gg/x/starknet/sepolia";
+// RPC override: on mainnet Cartridge serves JSON-RPC 0.10.2, which starknet.js
+// cannot use for the execute/waitForTransaction path — pass RPC_URL=<v0.9 node>
+// (e.g. the Alchemy demo endpoint) for mainnet uploads.
+const RPC = process.env.RPC_URL ?? "https://api.cartridge.gg/x/starknet/sepolia";
 const ACCOUNT_ADDRESS = process.env.DOJO_ACCOUNT_ADDRESS!;
 const PRIVATE_KEY = process.env.DOJO_PRIVATE_KEY!;
 const ABILITY_TOKEN = process.env.ABILITY_TOKEN!;
