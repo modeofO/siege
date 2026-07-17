@@ -1,5 +1,6 @@
 node_modules/
 dist/
-.cartridge/
-.cartridge-bak-*/
+.cartridge*/
 .env
+# .env.mainnet is an intentionally-tracked, secret-free template (see Task 8);
+# .env itself (the active, possibly-raw-key config) stays ignored above.

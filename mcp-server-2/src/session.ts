@@ -8,7 +8,7 @@
  * instead of corrupting the JSON-RPC stream.
  */
 
-import { chmodSync, existsSync, readdirSync, statSync } from "node:fs";
+import { chmodSync, existsSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import SessionProvider from "@cartridge/controller/session/node";
 import { Account, RpcProvider, shortString, type AccountInterface } from "starknet";
@@ -107,6 +107,20 @@ export async function getAccount(
     const msg = args.map(String).join(" ");
     const urlMatch = msg.match(/https?:\/\/\S+/);
     if (urlMatch && opts.onAuthUrl) opts.onAuthUrl(urlMatch[0]);
+    // Also persist the full URL to a file. The tool-error copy is often
+    // truncated by the client (the policies query param is thousands of
+    // chars), and a partial URL approves a zero-policy session; reading it
+    // from disk guarantees the whole thing reaches `open`.
+    if (urlMatch) {
+      try {
+        const urlFile = join(cfg.basePath, "last-auth-url.txt");
+        writeFileSync(urlFile, urlMatch[0], { mode: 0o600 });
+        // `mode` only applies when the file is created; force 0600 on rewrite too.
+        chmodSync(urlFile, 0o600);
+      } catch {
+        /* best-effort */
+      }
+    }
     process.stderr.write(msg + "\n");
   };
   console.log = captureUrls;
