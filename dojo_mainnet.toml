@@ -1,0 +1,18 @@
+[world]
+name = "siege_dojo"
+seed = "siege_dojo_v9"
+
+[namespace]
+default = "siege_dojo"
+
+[env]
+# DEPLOY-TIME RPC OVERRIDE: Cartridge's mainnet RPC now serves JSON-RPC spec
+# 0.10.2, which sozo v1.8 cannot consume — sozo requires exactly spec 0.9.0.
+# This lava endpoint serves 0.9.0 on chain SN_MAIN (verified) and is used ONLY
+# for sozo migrate/auth from this profile. The runtime RPC for the frontend /
+# Cartridge Controller stays https://api.cartridge.gg/x/starknet/mainnet
+# (configured there, not here).
+rpc_url = "https://rpc.starknet.lava.build/rpc/v0_9"
+account_address = "$DOJO_ACCOUNT_ADDRESS"
+private_key = "$DOJO_PRIVATE_KEY"
+world_address = "0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73"

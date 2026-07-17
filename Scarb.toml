@@ -27,3 +27,5 @@ allow-prebuilt-plugins = ["dojo_cairo_macros"]
 [profile.sepolia]
 
 [profile.katana]
+
+[profile.mainnet]
