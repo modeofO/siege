@@ -106,12 +106,12 @@ function DevProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ---------- Sepolia mode (Cartridge Controller) ----------
+// ---------- Controller mode (sepolia & mainnet, Cartridge Controller) ----------
 
 // Constructed browser-only: resolving a custom appchain (SIEGE) makes the
 // Controller fetch the chain id from the RPC, which crashes Next prerender
 // ("Cannot make synchronous HTTP call in Node.js environment").
-const sepoliaConnector = IS_DEVNET || typeof window === "undefined"
+const controllerConnector = IS_DEVNET || typeof window === "undefined"
   ? null
   : new ControllerConnector({
       policies: SESSION_POLICIES,
@@ -126,7 +126,7 @@ const sepoliaConnector = IS_DEVNET || typeof window === "undefined"
       propagateSessionErrors: true,
     });
 
-const sepoliaRpcProvider = jsonRpcProvider({
+const controllerRpcProvider = jsonRpcProvider({
   rpc: () => ({ nodeUrl: CONTROLLER_RPC_URL }),
 });
 
@@ -159,14 +159,14 @@ const siegeKatanaChain = {
 
 const controllerChain = IS_KATANA ? siegeKatanaChain : IS_MAINNET ? mainnet : sepolia;
 
-function SepoliaProvider({ children }: { children: React.ReactNode }) {
+function ControllerProvider({ children }: { children: React.ReactNode }) {
   return (
     <StarknetConfig
       autoConnect
       chains={[controllerChain]}
       defaultChainId={controllerChain.id}
-      provider={sepoliaRpcProvider}
-      connectors={sepoliaConnector ? [sepoliaConnector] : []}
+      provider={controllerRpcProvider}
+      connectors={controllerConnector ? [controllerConnector] : []}
       explorer={cartridge}
     >
       <CartridgeBridge>{children}</CartridgeBridge>
@@ -177,6 +177,6 @@ function SepoliaProvider({ children }: { children: React.ReactNode }) {
 // ---------- Exported provider ----------
 
 export function StarknetProvider({ children }: { children: React.ReactNode }) {
-  const inner = IS_DEVNET ? <DevProvider>{children}</DevProvider> : <SepoliaProvider>{children}</SepoliaProvider>;
+  const inner = IS_DEVNET ? <DevProvider>{children}</DevProvider> : <ControllerProvider>{children}</ControllerProvider>;
   return <DojoProvider>{inner}</DojoProvider>;
 }
