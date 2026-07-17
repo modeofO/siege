@@ -208,6 +208,16 @@ operator + config wiring; prints the address block):
 bun x tsx scripts/init-mainnet-world.ts
 ```
 
+Then upload the ability SVGs (separate step — `init-mainnet-world.ts` does NOT
+do this; without it every ability renders as a "…" placeholder because the
+`uri` metadata `image` field is empty):
+
+```bash
+source deploy.mainnet.env
+RPC_URL="https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_9/demo" \
+  ABILITY_TOKEN=<mainnet AbilityToken> bun x tsx scripts/set-ability-svgs.ts
+```
+
 Frontend: `NEXT_PUBLIC_NETWORK=mainnet`, plus the required
 `NEXT_PUBLIC_TORII_URL=<torii domain>` (`toriiSql.ts` defaults to localhost
 otherwise). Vercel project root directory is `frontend/`; bun is auto-detected
