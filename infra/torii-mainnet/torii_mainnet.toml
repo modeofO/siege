@@ -1,0 +1,39 @@
+# RPC choice (validated 2026-07-17, torii 1.8.3 in ghcr.io/dojoengine/dojo:v1.8.0):
+# torii 1.8.3 hard-refuses JSON-RPC spec > 0.9. Cartridge mainnet
+# (https://api.cartridge.gg/x/starknet/mainnet) serves 0.10.2 and torii exits
+# immediately ("Provider spec version is not supported ... Got: 0.10.2"), so it
+# cannot be used here. Lava's v0_9 endpoint
+# (https://rpc.starknet.lava.build/rpc/v0_9) returns malformed JSON-RPC batch
+# responses ("invalid type: map, expected a sequence" on GetEvents) and torii
+# makes zero indexing progress. The Alchemy public v0_9 demo endpoint below was
+# the only candidate that indexed cleanly: it reached the world deploy block,
+# populated WorldConfig (total_parcels=32, initialized=1) and all 7 token
+# contract cursors within ~3 minutes with zero warnings/errors.
+# NOTE: this is Alchemy's shared public demo key and is throttled. If indexing
+# starts lagging under load, replace it with a dedicated Alchemy (or other
+# spec-0.9) mainnet key, and/or set index_pending = false below to cut the
+# per-second pending-block fetch load. Do NOT switch to the Cartridge URL until
+# a spec-0.9 Cartridge endpoint exists.
+rpc = "https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_9/demo"
+world_address = "0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73"
+world_block = 11948230
+
+[indexing]
+allowed_origins = ["*"]
+index_pending = true
+polling_interval = 1000
+contracts = [
+  # AbilityToken (ERC-1155) — mainnet deployment
+  "erc1155:0x583fb029535b4f18d267ea1462ffd7f3a785edcd873c4fd305f8d787e3ccbcc",
+  # Resource tokens (ERC-20): iron, linen, stone, wood, ember, seeds
+  "erc20:0x2be5138b0e987d3f84fe7850861a17b4a608a9f583c45c8d647486c304d8947",
+  "erc20:0x1df4ab0d418e43322f1134470a959d59da22cd7c5b03f9ba1ae375f271589c2",
+  "erc20:0x4a1acd44fc316535f126ec06d7a60a0de356f6e3530c0940bd8c952c9949401",
+  "erc20:0x5fdb13ea34654956ca7fdda8da6d5ee3fb741d1c14ffe944d59e4288a7976c",
+  "erc20:0x1b784f80e5b87cbb6138954cd2016de77f7e641fe55c51baaa1c23908d35376",
+  "erc20:0x4a6655dafd9505a9c96362475c6ad0f1744ba831c7503bf5b7d762f5f8613a7",
+]
+
+[events]
+# Keep every ConquestResolved emission queryable (attack/defense activity feed).
+historical = ["siege_dojo-ConquestResolved"]
