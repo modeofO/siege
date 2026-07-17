@@ -12,6 +12,10 @@ default = "siege_dojo"
 # for sozo migrate/auth from this profile. The runtime RPC for the frontend /
 # Cartridge Controller stays https://api.cartridge.gg/x/starknet/mainnet
 # (configured there, not here).
+#
+# Every mainnet sozo migrate/auth MUST pass --use-blake2s-casm-class-hash —
+# Starknet 0.14 mainnet computes CASM hashes with blake2s; without the flag
+# declares fail with a class-hash mismatch (same as sepolia).
 rpc_url = "https://rpc.starknet.lava.build/rpc/v0_9"
 account_address = "$DOJO_ACCOUNT_ADDRESS"
 private_key = "$DOJO_PRIVATE_KEY"
