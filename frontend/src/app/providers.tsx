@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useMemo } from "react";
 import { RpcProvider, Account, type AccountInterface } from "starknet";
-import { sepolia } from "@starknet-react/chains";
+import { sepolia, mainnet } from "@starknet-react/chains";
 import { StarknetConfig, jsonRpcProvider, cartridge, useAccount as useStarknetAccount } from "@starknet-react/core";
 import { ControllerConnector } from "@cartridge/connector";
 import { FeeSource } from "@cartridge/controller";
@@ -14,15 +14,19 @@ import { SESSION_POLICIES } from "@/lib/sessionPolicies";
 const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
 const IS_DEVNET = NETWORK === "devnet";
 const IS_KATANA = NETWORK === "katana";
+const IS_MAINNET = NETWORK === "mainnet";
 export function isDevMode() {
   return IS_DEVNET;
 }
 
 // Controller-mode chain parameters. "katana" = self-hosted Railway katana
-// (chain id short-string "SIEGE"); anything else non-devnet = public sepolia.
+// (chain id short-string "SIEGE"); "mainnet" = Starknet mainnet via Cartridge;
+// anything else non-devnet = public sepolia.
 const CONTROLLER_RPC_URL = IS_KATANA
   ? process.env.NEXT_PUBLIC_RPC_URL || "https://siege-katana-production.up.railway.app"
-  : "https://api.cartridge.gg/x/starknet/sepolia";
+  : IS_MAINNET
+    ? "https://api.cartridge.gg/x/starknet/mainnet"
+    : "https://api.cartridge.gg/x/starknet/sepolia";
 
 // ---------- Shared account interface ----------
 
@@ -113,7 +117,7 @@ const sepoliaConnector = IS_DEVNET || typeof window === "undefined"
       policies: SESSION_POLICIES,
       chains: [{ rpcUrl: CONTROLLER_RPC_URL }],
       // "SIEGE" as a Cairo short string; keychain resolves the appchain by it.
-      defaultChainId: IS_KATANA ? "0x5349454745" : "0x" + sepolia.id.toString(16),
+      defaultChainId: IS_KATANA ? "0x5349454745" : "0x" + (IS_MAINNET ? mainnet : sepolia).id.toString(16),
       // No `slot`: the Cartridge-hosted torii for siege-dojo was discontinued
       // (indexer moved to Railway). Passing a slot whose torii is gone makes
       // the keychain bootstrap fail (RetrieveContracts 404 → "Transaction
@@ -153,7 +157,7 @@ const siegeKatanaChain = {
   },
 } as unknown as typeof sepolia;
 
-const controllerChain = IS_KATANA ? siegeKatanaChain : sepolia;
+const controllerChain = IS_KATANA ? siegeKatanaChain : IS_MAINNET ? mainnet : sepolia;
 
 function SepoliaProvider({ children }: { children: React.ReactNode }) {
   return (

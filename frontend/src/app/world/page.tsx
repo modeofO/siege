@@ -28,7 +28,11 @@ import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import styles from "./parchment.module.css";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
+const RPC_URL =
+  process.env.NEXT_PUBLIC_RPC_URL ||
+  ((process.env.NEXT_PUBLIC_NETWORK || "devnet") === "mainnet"
+    ? "https://api.cartridge.gg/x/starknet/mainnet"
+    : "https://api.cartridge.gg/x/starknet/sepolia");
 
 const PARCEL_TYPE_NAMES: Record<number, string> = {
   0: "Forge",

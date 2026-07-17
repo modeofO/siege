@@ -1,11 +1,19 @@
 import manifestDev from "../manifests/manifest_dev.json";
 import manifestSepolia from "../manifests/manifest_sepolia.json";
 import manifestKatana from "../manifests/manifest_katana.json";
+import manifestMainnet from "../manifests/manifest_mainnet.json";
 
 const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
 const IS_DEVNET = NETWORK === "devnet";
 const IS_KATANA = NETWORK === "katana";
-const manifest = IS_DEVNET ? manifestDev : IS_KATANA ? manifestKatana : manifestSepolia;
+const IS_MAINNET = NETWORK === "mainnet";
+const manifest = IS_DEVNET
+  ? manifestDev
+  : IS_KATANA
+    ? manifestKatana
+    : IS_MAINNET
+      ? manifestMainnet
+      : manifestSepolia;
 
 function manifestContract(tag: string): string | undefined {
   return manifest.contracts.find((contract) => contract.tag === tag)?.address;

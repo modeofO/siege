@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { RpcProvider } from "starknet";
 import { fetchAbilityMetadata, type AbilityMetadata } from "@/lib/abilityToken";
 
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "https://api.cartridge.gg/x/starknet/sepolia";
+const RPC_URL =
+  process.env.NEXT_PUBLIC_RPC_URL ||
+  ((process.env.NEXT_PUBLIC_NETWORK || "devnet") === "mainnet"
+    ? "https://api.cartridge.gg/x/starknet/mainnet"
+    : "https://api.cartridge.gg/x/starknet/sepolia");
 
 let sharedProvider: RpcProvider | null = null;
 function getProvider(): RpcProvider {

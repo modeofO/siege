@@ -24,10 +24,22 @@ const KATANA_RESOURCE_TOKENS = {
   seeds: "0x6033ae1569611e683d42a3bcd73f7f5cf519ce5bce02e2e7b4235fecc559739",
 } as const;
 
+const MAINNET_RESOURCE_TOKENS = {
+  iron: "0x2be5138b0e987d3f84fe7850861a17b4a608a9f583c45c8d647486c304d8947",
+  linen: "0x1df4ab0d418e43322f1134470a959d59da22cd7c5b03f9ba1ae375f271589c2",
+  stone: "0x4a1acd44fc316535f126ec06d7a60a0de356f6e3530c0940bd8c952c9949401",
+  wood: "0x5fdb13ea34654956ca7fdda8da6d5ee3fb741d1c14ffe944d59e4288a7976c",
+  ember: "0x1b784f80e5b87cbb6138954cd2016de77f7e641fe55c51baaa1c23908d35376",
+  seeds: "0x4a6655dafd9505a9c96362475c6ad0f1744ba831c7503bf5b7d762f5f8613a7",
+} as const;
+
+const NET = process.env.NEXT_PUBLIC_NETWORK || "devnet";
 export const RESOURCE_TOKENS =
-  (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "katana"
+  NET === "katana"
     ? KATANA_RESOURCE_TOKENS
-    : SEPOLIA_RESOURCE_TOKENS;
+    : NET === "mainnet"
+      ? MAINNET_RESOURCE_TOKENS
+      : SEPOLIA_RESOURCE_TOKENS;
 
 export interface ResourceBalances {
   iron: number;

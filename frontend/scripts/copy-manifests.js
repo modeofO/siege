@@ -10,7 +10,7 @@ const path = require("node:path");
 
 const srcDir = path.resolve(__dirname, "..", "..");
 const dstDir = path.resolve(__dirname, "..", "src", "manifests");
-const names = ["manifest_dev.json", "manifest_sepolia.json"];
+const names = ["manifest_dev.json", "manifest_sepolia.json", "manifest_katana.json", "manifest_mainnet.json"];
 
 fs.mkdirSync(dstDir, { recursive: true });
 
