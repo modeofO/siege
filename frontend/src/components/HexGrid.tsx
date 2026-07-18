@@ -1,13 +1,21 @@
 // frontend/src/components/HexGrid.tsx
 "use client";
 
-import { useState } from "react";
+import { useMemo, useRef, useState, useEffect, useCallback } from "react";
 import type { ParcelData } from "@/lib/worldState";
 import type { PlayerCosmeticsData } from "@/lib/cosmetics";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import { projectToHex, traceToHexPoints, getWardTint } from "@/lib/forge/wardProjection";
 import { WardGlyph } from "@/components/forge/WardGlyph";
 import { HEX_SIZE, hexToPixel, hexPoints, PARCEL_TYPE_COLORS, PARCEL_TYPE_NAMES } from "@/lib/hexRender";
+import {
+  computeFitBox,
+  zoomAt,
+  pan,
+  clientToView,
+  boxToViewBox,
+  type Box,
+} from "@/lib/mapView";
 
 interface HexGridProps {
   parcels: ParcelData[];
@@ -92,21 +100,110 @@ export function HexGrid({
 
   const selectedParcel = onSelectParcel ? controlledSelected ?? null : internalSelected;
 
+  const fitBox = useMemo(() => {
+    const positions = parcels.map((p) => hexToPixel(p.col, p.row));
+    return computeFitBox(positions, HEX_SIZE * 2);
+  }, [parcels]);
+
+  const [view, setView] = useState<Box | null>(null);
+  const activeView = view ?? fitBox;
+
+  const svgRef = useRef<SVGSVGElement | null>(null);
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const draggedRef = useRef(false);
+  const fitRef = useRef(fitBox);
+  useEffect(() => {
+    fitRef.current = fitBox;
+  }, [fitBox]);
+
+  // React's root-level wheel listener is passive, so preventDefault via
+  // onWheel is ignored — attach a native non-passive listener instead.
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const rect = svg.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+      const factor = Math.exp(-e.deltaY * 0.002);
+      setView((v) => {
+        const cur = v ?? fitRef.current;
+        const anchor = clientToView(cur, rect, e.clientX, e.clientY);
+        return zoomAt(cur, fitRef.current, factor, anchor);
+      });
+    };
+    svg.addEventListener("wheel", onWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    // Deliberately no setPointerCapture here: capturing on every pointerdown
+    // makes Chromium retarget the subsequent click to the svg, so a plain tap
+    // on a parcel never reaches its <g onClick>. Capture is deferred to
+    // onPointerMove, once the gesture proves itself a real drag/pinch.
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointersRef.current.size === 1) draggedRef.current = false;
+  }, []);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    const prev = pointersRef.current.get(e.pointerId);
+    if (!prev) return;
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return;
+    const pointers = pointersRef.current;
+
+    if (pointers.size === 1) {
+      const dxPx = e.clientX - prev.x;
+      const dyPx = e.clientY - prev.y;
+      if (Math.abs(dxPx) + Math.abs(dyPx) > 4) {
+        draggedRef.current = true;
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }
+      }
+      setView((v) => {
+        const cur = v ?? fitRef.current;
+        const scale = Math.max(cur.w / rect.width, cur.h / rect.height);
+        return pan(cur, fitRef.current, -dxPx * scale, -dyPx * scale);
+      });
+    } else if (pointers.size === 2) {
+      draggedRef.current = true;
+      if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
+      const [a, b] = [...pointers.entries()].map(([id, p]) =>
+        id === e.pointerId ? { x: e.clientX, y: e.clientY } : p,
+      );
+      const [pa, pb] = [...pointers.values()];
+      const prevDist = Math.hypot(pa.x - pb.x, pa.y - pb.y);
+      const newDist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (prevDist > 0 && newDist > 0) {
+        const midX = (a.x + b.x) / 2;
+        const midY = (a.y + b.y) / 2;
+        setView((v) => {
+          const cur = v ?? fitRef.current;
+          const anchor = clientToView(cur, rect, midX, midY);
+          return zoomAt(cur, fitRef.current, newDist / prevDist, anchor);
+        });
+      }
+    }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  }, []);
+
+  const onPointerEnd = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
+    pointersRef.current.delete(e.pointerId);
+  }, []);
+
+  if (parcels.length === 0) return null;
+
   const selectParcel = (parcel: ParcelData) => {
+    if (draggedRef.current) return;
     const next = selectedParcel?.parcelId === parcel.parcelId ? null : parcel;
     if (onSelectParcel) onSelectParcel(next);
     else setInternalSelected(next);
   };
-
-  if (parcels.length === 0) return null;
-
-  const positions = parcels.map((p) => hexToPixel(p.col, p.row));
-  const padding = HEX_SIZE * 2;
-  const minX = Math.min(...positions.map((p) => p.x)) - padding;
-  const minY = Math.min(...positions.map((p) => p.y)) - padding;
-  const maxX = Math.max(...positions.map((p) => p.x)) + padding;
-  const maxY = Math.max(...positions.map((p) => p.y)) + padding;
-  const viewBox = `${minX} ${minY} ${maxX - minX} ${maxY - minY}`;
 
   const isOwned = (parcel: ParcelData) => playerAddress && parcel.owner.toLowerCase() === playerAddress.toLowerCase();
 
@@ -137,7 +234,16 @@ export function HexGrid({
 
   return (
     <div className="relative">
-      <svg viewBox={viewBox} className="w-full max-h-[60vh]" style={{ background: "transparent" }}>
+      <svg
+        ref={svgRef}
+        viewBox={boxToViewBox(activeView)}
+        className="w-full max-h-[60vh]"
+        style={{ background: "transparent", touchAction: "none" }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerEnd}
+        onPointerCancel={onPointerEnd}
+      >
         <defs>
           <filter id="glow-gold" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -304,6 +410,16 @@ export function HexGrid({
           );
         })}
       </svg>
+
+      {view && (
+        <button
+          type="button"
+          onClick={() => setView(null)}
+          className="absolute top-2 left-2 bg-[#1a1714] border border-[#3d3428] rounded px-2 py-1 text-xs text-[#d4cfc6] hover:border-[#daa520]"
+        >
+          ⌖ Fit
+        </button>
+      )}
 
       {/* Tooltip */}
       {hoveredParcel && (

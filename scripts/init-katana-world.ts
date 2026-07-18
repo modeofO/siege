@@ -28,8 +28,8 @@ const PRIVATE_KEY =
   process.env.DOJO_PRIVATE_KEY ??
   "0xc5b2fcab997346f3ea1c00b002ecf6f382c5f9c9659a3894eb783c5320f912";
 
-const GRID_W = 8;
-const GRID_H = 4;
+const GRID_W = 12;
+const GRID_H = 8;
 
 const TOKENS = [
   { name: "Iron", symbol: "IRON" },
