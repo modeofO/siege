@@ -58,8 +58,8 @@ const VRF_PROVIDER =
 // STRK fee token on mainnet — read the deployer balance before the first tx.
 const STRK_TOKEN = "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d";
 
-const GRID_W = 8;
-const GRID_H = 4;
+const GRID_W = 12;
+const GRID_H = 8;
 
 const TOKENS = [
   { name: "Iron", symbol: "IRON" },

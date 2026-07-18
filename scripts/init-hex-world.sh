@@ -24,8 +24,8 @@ set -euo pipefail
 export DOJO_ACCOUNT_ADDRESS DOJO_PRIVATE_KEY
 
 # Grid: 8 columns x 4 rows = 32 parcels, even-row offset. Edit GRID_W/GRID_H to resize.
-GRID_W=8
-GRID_H=4
+GRID_W=12
+GRID_H=8
 
 COLS=$(GRID_W=$GRID_W GRID_H=$GRID_H node -e 'const W=+process.env.GRID_W,H=+process.env.GRID_H,a=[];for(let r=0;r<H;r++)for(let c=0;c<W;c++)a.push(c);console.log(a.join(","))')
 ROWS=$(GRID_W=$GRID_W GRID_H=$GRID_H node -e 'const W=+process.env.GRID_W,H=+process.env.GRID_H,a=[];for(let r=0;r<H;r++)for(let c=0;c<W;c++)a.push(r);console.log(a.join(","))')
