@@ -99,12 +99,13 @@
     },
     {
       "address": "0x186b8b191ec895a79c3aa10e7deeb0f69b85d2cdbeb113a4643a3017c3723b0",
-      "class_hash": "0x547384ecd95e70d829c426c11b12a68211e195f94434acea5f62b9317625c76",
+      "class_hash": "0x61a54e4c257b40a2678cae7142c8a9f1a58a830b72e34f40469ef987877f6a",
       "init_calldata": [],
       "tag": "siege_dojo-world_system",
       "selector": "0x6e542af67a84c67ecf895e9ce49d5decd5f7062073b95143b14d09a507ed4ff",
       "systems": [
         "initialize_world",
+        "expand_world",
         "register_player",
         "set_ability_token",
         "create_staked_match",
@@ -5917,6 +5918,22 @@
             {
               "name": "rows",
               "type": "core::array::Array::<core::integer::u16>"
+            }
+          ],
+          "outputs": [],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "expand_world",
+          "inputs": [
+            {
+              "name": "new_cols",
+              "type": "core::integer::u16"
+            },
+            {
+              "name": "new_rows",
+              "type": "core::integer::u16"
             }
           ],
           "outputs": [],
