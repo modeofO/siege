@@ -34,7 +34,7 @@
   "contracts": [
     {
       "address": "0x47dfe0aaa197fb59299890a2acef546bb532d0a8796034aa8fafa00f0d54571",
-      "class_hash": "0x21c80f8fe475dbc1628f9d1977da33b012167ed84686f5f958541e35576c026",
+      "class_hash": "0x7e0f212c35de94252ad767ac18aceb33d8360cabecde577bae7e01730b43d83",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
       "selector": "0x26e0eeadcc0c8f020b1da157b4d0f038ca209cb1d1ed9b6b52248376703705",
@@ -62,7 +62,7 @@
     },
     {
       "address": "0x5e8997406aa1d0fb7a33a4b17e94ff8c5708ddaf4c8a7de812a31b2199e404f",
-      "class_hash": "0x1d58a60259e2670a0b776eb413a6f49d77846ea9d8b9023d7e0d718f89e6647",
+      "class_hash": "0x22383692ea99ae2a537717151f6f255f95da405eef66deb47b8648edd614f93",
       "init_calldata": [],
       "tag": "siege_dojo-conquest",
       "selector": "0x2164fd7acc93a3de55c3bcb974b18eebe85614770b9c22881e53ffc80174a90",
