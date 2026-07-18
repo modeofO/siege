@@ -31,7 +31,10 @@ export function clampView(view: Box, fit: Box): Box {
   return { x: cx - view.w / 2, y: cy - view.h / 2, w: view.w, h: view.h };
 }
 
-// factor > 1 zooms in. The world point under `anchor` stays put.
+// factor > 1 zooms in. The world point under `anchor` stays put — except
+// when the resulting view would leave the world extent: clampView then
+// re-centers and the anchor may drift. Bounds deliberately win over
+// anchor fixation (standard bounded-map behavior).
 export function zoomAt(view: Box, fit: Box, factor: number, anchor: { x: number; y: number }): Box {
   const w = Math.min(Math.max(view.w / factor, fit.w / MAX_SCALE), fit.w / MIN_SCALE);
   const ratio = w / view.w;

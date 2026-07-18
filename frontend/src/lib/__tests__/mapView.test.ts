@@ -47,6 +47,17 @@ describe("zoomAt", () => {
     for (let i = 0; i < 20; i += 1) v = zoomAt(v, FIT, 0.5, { x: 200, y: 100 });
     expect(v.w).toBeCloseTo(FIT.w * 2);
   });
+
+  it("bounds win over anchor fixation at the world edge (clamp engages)", () => {
+    // View centered exactly on the fit's right edge; zoom out with an
+    // off-center anchor. clampView re-centers — the anchor is allowed to
+    // drift, but the view must stay clamped and keep its dimensions.
+    const view: Box = { x: 350, y: 150, w: 100, h: 50 };
+    const v = zoomAt(view, FIT, 0.5, { x: 390, y: 175 });
+    expect(v).toEqual({ x: 300, y: 125, w: 200, h: 100 });
+    expect(v.x + v.w / 2).toBeLessThanOrEqual(FIT.x + FIT.w);
+    expect(v.y + v.h / 2).toBeLessThanOrEqual(FIT.y + FIT.h);
+  });
 });
 
 describe("pan / clampView", () => {
