@@ -30,6 +30,17 @@ interface ControllerProviderWithSession {
   openExecute?: (calls: Call[]) => Promise<{ status: boolean; transactionHash?: string } | undefined>;
 }
 
+// Thrown when a session cannot silently sign the calls even after re-approval.
+// The keychain requires interactive confirmation (e.g. ERC-20 `approve` spend
+// prompts) — resilientExecute catches this and opens the Controller window
+// rather than dead-ending. NOT a paymaster/infra failure.
+class ManualExecutionRequiredError extends Error {
+  constructor() {
+    super("Session cannot sign these calls without interaction; opening Controller window.");
+    this.name = "ManualExecutionRequiredError";
+  }
+}
+
 function toArray(calls: AllowArray<Call>): Call[] {
   return Array.isArray(calls) ? calls : [calls];
 }
@@ -112,9 +123,10 @@ async function executeWithSession(
     reply = await keychainExecute(controller, calls, feeSource);
     if (isSuccess(reply)) return reply as InvokeFunctionResponse;
     if (reply.code === ResponseCodes.USER_INTERACTION_REQUIRED) {
-      throw new Error(
-        "Controller session is not approved for the ranked match call set. Approve the updated Cartridge session and try again; no transaction was submitted.",
-      );
+      // Session still can't sign silently (e.g. ERC-20 approve needs an explicit
+      // spend confirmation). Signal resilientExecute to open the interactive
+      // Controller window instead of failing the action outright.
+      throw new ManualExecutionRequiredError();
     }
   }
 
@@ -156,6 +168,13 @@ export async function resilientExecute(
   try {
     return await executeWithSession(controller, callArray, FeeSource.PAYMASTER);
   } catch (e) {
+    // Session can't sign these calls without interaction (e.g. ERC-20 approve
+    // in the craft multicall) — open the Controller window so the user can
+    // confirm, rather than surfacing a dead-end "not approved" error.
+    if (e instanceof ManualExecutionRequiredError) {
+      console.warn("[siege] Session needs interaction, opening manual Controller window");
+      return manualExecute(controller, account, callArray, details);
+    }
     if (isSponsorshipOutage(e)) {
       console.warn("[siege] Sponsorship provider outage, failing fast:", e);
       throw new SponsorshipUnavailableError();
