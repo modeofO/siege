@@ -13,8 +13,10 @@ import { AbilityWagerPicker } from "@/components/AbilityWagerPicker";
 import { AbilityIcon } from "@/components/AbilityIcon";
 import { toriiSql, sqlU64 } from "@/lib/toriiSql";
 import Link from "next/link";
-
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "http://localhost:5050";
+// Canonical network-aware RPC (mainnet/katana/sepolia/devnet). The old local
+// `NEXT_PUBLIC_RPC_URL || "http://localhost:5050"` fallback fetched localhost on
+// Vercel and broke ability-balance loads.
+import { RPC_URL } from "@/lib/dojoConfig";
 
 export default function Join1v1Page() {
   const { account, address, status } = useAccount();

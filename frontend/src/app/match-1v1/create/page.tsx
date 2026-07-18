@@ -13,8 +13,10 @@ import { lookupUsernames } from "@cartridge/controller";
 import Link from "next/link";
 
 import { toriiSql } from "@/lib/toriiSql";
-
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL || "http://localhost:5050";
+// Canonical network-aware RPC (mainnet/katana/sepolia/devnet). The old local
+// `NEXT_PUBLIC_RPC_URL || "http://localhost:5050"` fallback fetched localhost on
+// Vercel and broke ability-balance loads.
+import { RPC_URL } from "@/lib/dojoConfig";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
