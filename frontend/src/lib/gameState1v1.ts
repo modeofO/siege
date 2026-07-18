@@ -231,15 +231,19 @@ export function useMatchState1v1(matchId: string | null) {
 export function useRoundStatus1v1(matchId: string | null, round: number, _refreshKey?: number) {
   const roundMoves = useModels(ModelsMapping.RoundMoves1v1);
   const result = useMemo(() => {
-    if (!matchId) return { commitCount: 0, revealCount: 0 };
+    const empty = { commitCount: 0, revealCount: 0, commitDeadline: 0, revealDeadline: 0 };
+    if (!matchId) return empty;
     const idBig = BigInt(matchId);
     const rm = flatModels<RoundMoves1v1Model>(roundMoves).find(
       (r) => safeBigIntEq(r.match_id, idBig) && safeNumEq(r.round, round),
     );
-    if (!rm) return { commitCount: 0, revealCount: 0 };
+    if (!rm) return empty;
     return {
       commitCount: safeNum(rm.commit_count),
       revealCount: safeNum(rm.reveal_count),
+      // Unix-second deadlines armed by the contract (0 = not yet armed).
+      commitDeadline: safeNum(rm.commit_deadline),
+      revealDeadline: safeNum(rm.reveal_deadline),
     };
   }, [matchId, round, roundMoves]);
   return result;

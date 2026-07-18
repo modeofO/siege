@@ -23,7 +23,7 @@ import { useOpponentIntel } from "@/lib/intel/queries";
 import { detectDeviation } from "@/lib/intel/bluff";
 import { savePreDraft, loadPreDraft } from "@/lib/intel/predraft";
 import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, clearCommitData1v1 } from "@/lib/crypto";
-import { commitMove1v1, revealMove1v1, resolveRound1v1, extractErrorMsg } from "@/lib/contracts1v1";
+import { commitMove1v1, revealMove1v1, resolveRound1v1, forceTimeout1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
 import { Battlefield3DGate, isBattle3DActive } from "@/components/battlefield3d/Battlefield3DGate";
@@ -213,6 +213,8 @@ export default function Match1v1Page() {
   const [autoResolveError, setAutoResolveError] = useState("");
   const [resolveRetryCount, setResolveRetryCount] = useState(0);
   const [error, setError] = useState("");
+  const [forceTimeoutSubmitting, setForceTimeoutSubmitting] = useState(false);
+  const [forceTimeoutError, setForceTimeoutError] = useState("");
   const [expandedRounds, setExpandedRounds] = useState<Set<number>>(new Set());
   const [pendingResult, setPendingResult] = useState<RoundResult1v1 | null>(null);
   const [heldHp, setHeldHp] = useState<{ a: number; b: number } | null>(null);
@@ -237,6 +239,19 @@ export default function Match1v1Page() {
   const [pollRevealCount, setPollRevealCount] = useState<number | null>(null);
   const [pollCommitted, setPollCommitted] = useState<boolean | null>(null);
   const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 1s-ticking wall clock (unix seconds) so the force-timeout action appears the
+  // moment a deadline elapses. setState lives in the interval callback, not the
+  // effect body, so it doesn't trip react-hooks/set-state-in-effect.
+  const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+  useEffect(() => {
+    const t = setInterval(() => setNowSec(Math.floor(Date.now() / 1000)), 1000);
+    return () => clearInterval(t);
+  }, []);
+  // When the current round became visible locally. Zero commits + no armed
+  // deadline is the normal state at every round open, so the abandon-timer
+  // offer waits out a grace period instead of flagging "stalled" instantly.
+  const roundSeenAtRef = useRef(Math.floor(Date.now() / 1000));
 
   // Effective values: max of subscription data and poll data
   const effectiveCommitCount = Math.max(roundStatus.commitCount, pollCommitCount ?? 0);
@@ -363,6 +378,8 @@ export default function Match1v1Page() {
     setSubmitting(false);
     setConfirming(false);
     setError("");
+    setForceTimeoutError("");
+    roundSeenAtRef.current = Math.floor(Date.now() / 1000);
     // Reset poll state on round change
     setPollCommitCount(null);
     setPollRevealCount(null);
@@ -731,6 +748,98 @@ export default function Match1v1Page() {
   useEffect(() => {
     if (effectiveCommitted && confirming) setConfirming(false);
   }, [effectiveCommitted, confirming, setConfirming]);
+
+  // --- Force timeout ---
+  // Deadlines are unix seconds on RoundMoves1v1. Derived purely from state +
+  // the ticking clock so the action surfaces the instant a deadline elapses,
+  // for participants only, while the match is still active.
+  const forceTimeout = useMemo(() => {
+    if (!state || !roleFound || state.phase === "finished") return null;
+    const cc = effectiveCommitCount;
+    const rc = effectiveRevealCount;
+    const cd = roundStatus.commitDeadline;
+    const rd = roundStatus.revealDeadline;
+
+    // Reveal-phase stall: both committed, someone hasn't revealed, reveal
+    // deadline elapsed. force_timeout resolves the round → consumes VRF.
+    if (cc >= 2 && rc < 2 && rd > 0 && nowSec >= rd) {
+      return {
+        withVrf: true,
+        actionable: true,
+        label: "Force timeout",
+        explain: "Opponent hasn't revealed — force timeout to resolve the round.",
+        secondsLeft: 0,
+      };
+    }
+    // Commit-phase stall: one player committed, commit deadline elapsed. No VRF.
+    if (cc >= 1 && cc < 2 && cd > 0 && nowSec >= cd) {
+      return {
+        withVrf: false,
+        actionable: true,
+        label: "Force timeout",
+        explain: "Opponent hasn't committed — force timeout to advance the round.",
+        secondsLeft: 0,
+      };
+    }
+    // Zero-commit abandon (two-step, no VRF): the first call arms a commit
+    // deadline; once it elapses a second call ends the match as a draw.
+    if (cc === 0) {
+      if (cd === 0) {
+        // Grace period: don't offer the abandon flow the moment a round opens.
+        if (nowSec - roundSeenAtRef.current < 60) return null;
+        return {
+          withVrf: false,
+          actionable: true,
+          label: "Start abandon timer",
+          explain:
+            "Neither player has committed. Start a 5-minute timer; once it elapses you can end the match as a draw and refund both stakes.",
+          secondsLeft: 0,
+        };
+      }
+      if (nowSec >= cd) {
+        return {
+          withVrf: false,
+          actionable: true,
+          label: "End match (draw)",
+          explain: "Abandon timer elapsed — end the match as a draw and refund both sides' stakes.",
+          secondsLeft: 0,
+        };
+      }
+      return {
+        withVrf: false,
+        actionable: false,
+        label: "",
+        explain: "",
+        secondsLeft: cd - nowSec,
+      };
+    }
+    return null;
+  }, [
+    state,
+    roleFound,
+    effectiveCommitCount,
+    effectiveRevealCount,
+    roundStatus.commitDeadline,
+    roundStatus.revealDeadline,
+    nowSec,
+  ]);
+
+  const handleForceTimeout = useCallback(
+    async (withVrf: boolean) => {
+      if (!account) return;
+      setForceTimeoutSubmitting(true);
+      setForceTimeoutError("");
+      try {
+        await forceTimeout1v1(account, matchId, withVrf);
+      } catch (e) {
+        setForceTimeoutError(extractErrorMsg(e));
+      } finally {
+        setForceTimeoutSubmitting(false);
+      }
+      void refresh();
+    },
+    [account, matchId, refresh],
+  );
 
   // Loading
   if (loading || !state) {
@@ -1270,6 +1379,35 @@ export default function Match1v1Page() {
           </div>
         </div>
       </div>
+
+      {forceTimeout && (
+        <div className="border border-[#ff8800]/40 rounded-lg bg-[#ff8800]/5 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-[10px] tracking-wider text-[#ff8800] uppercase font-serif font-bold">
+              Round stalled
+            </span>
+            <span className="text-xs text-[#d4cfc6]">
+              {forceTimeout.actionable
+                ? forceTimeout.explain
+                : `Abandon timer running — you can end the match in ${forceTimeout.secondsLeft}s.`}
+            </span>
+            {forceTimeoutError && (
+              <span className="text-[10px] text-[#ff3344] font-mono max-w-full truncate mt-0.5">
+                {forceTimeoutError}
+              </span>
+            )}
+          </div>
+          {forceTimeout.actionable && (
+            <button
+              onClick={() => handleForceTimeout(forceTimeout.withVrf)}
+              disabled={forceTimeoutSubmitting}
+              className="shrink-0 px-4 py-1.5 bg-[#ff8800]/10 border border-[#ff8800]/50 text-[#ff8800] text-xs tracking-wider uppercase rounded hover:bg-[#ff8800]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {forceTimeoutSubmitting ? "Submitting…" : forceTimeout.label}
+            </button>
+          )}
+        </div>
+      )}
 
       {error && !state.phase && (
         <div className="text-[#ff3344] text-sm border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">{error}</div>

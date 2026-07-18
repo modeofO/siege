@@ -194,6 +194,58 @@ export async function resolveRound1v1(account: AccountInterface, matchId: string
   }
 }
 
+// force_timeout ends a stalled round once its commit/reveal deadline elapses.
+// `withVrf` MUST match the phase: only a reveal-phase timeout resolves the round
+// (force_timeout → resolve_round consumes randomness for next-round modifiers).
+// Commit-phase and zero-commit timeouts consume no randomness, so an unconsumed
+// VRF request would make the paymaster wrapper revert — send force_timeout bare.
+export async function forceTimeout1v1(account: AccountInterface, matchId: string, withVrf: boolean) {
+  const forceTimeoutCall = {
+    contractAddress: CONTRACTS_1V1.COMMIT_REVEAL,
+    entrypoint: "force_timeout",
+    calldata: [matchId],
+  };
+
+  if (!withVrf) {
+    const tx = await resilientExecute(account, forceTimeoutCall, TX_OPTS);
+    await waitForReceiptOrThrow(account, tx.transaction_hash, "Force timeout");
+    return tx;
+  }
+
+  // Reveal-phase timeout. The VRF server keys the submitted seed to the contract
+  // called immediately after request_random, but the consumer (resolution_1v1)
+  // is reached only through the nested force_timeout → resolve_round call.
+  // Sandwich a harmless direct view call to resolution_1v1 so the seed keys to
+  // it; without it consume_random reverts 'not fulfilled' (issue #44).
+  let firstError: unknown;
+  try {
+    const tx = await resilientExecute(
+      account,
+      [
+        vrfRequestRandomCall(CONTRACTS_1V1.RESOLUTION),
+        { contractAddress: CONTRACTS_1V1.RESOLUTION, entrypoint: "dojo_name", calldata: [] },
+        forceTimeoutCall,
+      ],
+      TX_OPTS,
+    );
+    await waitForReceiptOrThrow(account, tx.transaction_hash, "Force timeout");
+    return tx;
+  } catch (e) {
+    firstError = e;
+    console.warn("[forceTimeout1v1] VRF-wrapped attempt failed, retrying without VRF:", extractErrorMsg(e));
+  }
+  // A match-ending resolve skips consume_random, so the unconsumed request
+  // reverts the wrap — fall back to a bare force_timeout.
+  try {
+    const tx = await resilientExecute(account, forceTimeoutCall, TX_OPTS);
+    await waitForReceiptOrThrow(account, tx.transaction_hash, "Force timeout");
+    return tx;
+  } catch (e2) {
+    console.error("[forceTimeout1v1] without-VRF also failed:", extractErrorMsg(e2));
+    throw firstError;
+  }
+}
+
 export const CONTRACTS_WORLD = {
   WORLD_SYSTEM: WORLD_SYSTEM_ADDRESS,
 };

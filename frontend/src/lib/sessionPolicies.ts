@@ -34,7 +34,13 @@ export const SESSION_POLICIES: SessionPolicies = {
       ],
     },
     [RESOLUTION_1V1_ADDRESS]: {
-      methods: [{ name: "Resolve Round", entrypoint: "resolve_round" }],
+      methods: [
+        { name: "Resolve Round", entrypoint: "resolve_round" },
+        // Harmless view call used in the force_timeout VRF sandwich to key the
+        // seed to resolution_1v1 (the nested consumer). Must be session-approved
+        // like any other call in the multicall, or signing fails.
+        { name: "Resolution Dojo Name", entrypoint: "dojo_name" },
+      ],
     },
     [VRF_PROVIDER_ADDRESS]: {
       methods: [{ name: "Request Random", entrypoint: "request_random" }],
