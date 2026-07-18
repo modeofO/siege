@@ -3,6 +3,7 @@ use starknet::ContractAddress;
 #[starknet::interface]
 pub trait IWorldSystem<T> {
     fn initialize_world(ref self: T, cols: Array<u16>, rows: Array<u16>);
+    fn expand_world(ref self: T, new_cols: u16, new_rows: u16);
     fn register_player(ref self: T, home_types: Array<u8>);
     fn set_ability_token(ref self: T, ability_token: ContractAddress);
     fn create_staked_match(ref self: T, opponent: ContractAddress, abilities: Array<u8>) -> u64;
@@ -211,6 +212,64 @@ pub mod world_system {
                 id: 0,
                 total_parcels: n,
                 next_parcel_id: n,
+                initialized: true,
+            });
+        }
+
+        fn expand_world(ref self: ContractState, new_cols: u16, new_rows: u16) {
+            let mut world = self.world_default();
+            assert(
+                world.dispatcher.is_owner(world.namespace_hash, get_caller_address()),
+                'Not world owner',
+            );
+            let config: WorldConfig = world.read_model(0_u8);
+            assert(config.initialized, 'World not initialized');
+
+            // The grid is always a full rectangle (init scripts and this
+            // entrypoint both maintain that), so current bounds are the max
+            // col/row over existing parcels plus one.
+            let mut cur_cols: u16 = 0;
+            let mut cur_rows: u16 = 0;
+            let mut i: u32 = 0;
+            while i < config.total_parcels {
+                let p: Parcel = world.read_model(i);
+                if p.col + 1 > cur_cols {
+                    cur_cols = p.col + 1;
+                }
+                if p.row + 1 > cur_rows {
+                    cur_rows = p.row + 1;
+                }
+                i += 1;
+            };
+
+            assert(new_cols >= cur_cols && new_rows >= cur_rows, 'Cannot shrink world');
+            assert(new_cols > cur_cols || new_rows > cur_rows, 'No growth');
+
+            let mut next_id: u32 = config.next_parcel_id;
+            let mut row: u16 = 0;
+            while row < new_rows {
+                let mut col: u16 = 0;
+                while col < new_cols {
+                    if col >= cur_cols || row >= cur_rows {
+                        world.write_model(@Parcel {
+                            parcel_id: next_id,
+                            col,
+                            row,
+                            parcel_type: 255,
+                            owner: 0.try_into().unwrap(),
+                            is_home: false,
+                        });
+                        next_id += 1;
+                    }
+                    col += 1;
+                };
+                row += 1;
+            };
+
+            world.write_model(@WorldConfig {
+                id: 0,
+                total_parcels: next_id,
+                next_parcel_id: next_id,
                 initialized: true,
             });
         }

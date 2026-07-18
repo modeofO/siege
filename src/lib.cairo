@@ -55,6 +55,7 @@ pub mod tests {
     pub mod test_ability_token;
     pub mod test_hex;
     pub mod test_world;
+    pub mod test_expand_world;
     pub mod test_staked_match;
     pub mod test_conquest;
     pub mod test_kingdom_tiers;
