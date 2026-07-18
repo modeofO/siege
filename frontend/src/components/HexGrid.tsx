@@ -137,7 +137,10 @@ export function HexGrid({
   }, []);
 
   const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+    // Deliberately no setPointerCapture here: capturing on every pointerdown
+    // makes Chromium retarget the subsequent click to the svg, so a plain tap
+    // on a parcel never reaches its <g onClick>. Capture is deferred to
+    // onPointerMove, once the gesture proves itself a real drag/pinch.
     pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
     if (pointersRef.current.size === 1) draggedRef.current = false;
   }, []);
@@ -154,7 +157,12 @@ export function HexGrid({
     if (pointers.size === 1) {
       const dxPx = e.clientX - prev.x;
       const dyPx = e.clientY - prev.y;
-      if (Math.abs(dxPx) + Math.abs(dyPx) > 4) draggedRef.current = true;
+      if (Math.abs(dxPx) + Math.abs(dyPx) > 4) {
+        draggedRef.current = true;
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        }
+      }
       setView((v) => {
         const cur = v ?? fitRef.current;
         const scale = Math.max(cur.w / rect.width, cur.h / rect.height);
@@ -162,6 +170,9 @@ export function HexGrid({
       });
     } else if (pointers.size === 2) {
       draggedRef.current = true;
+      if (!e.currentTarget.hasPointerCapture(e.pointerId)) {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      }
       const [a, b] = [...pointers.entries()].map(([id, p]) =>
         id === e.pointerId ? { x: e.clientX, y: e.clientY } : p,
       );
