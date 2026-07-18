@@ -103,7 +103,9 @@ export default function Create1v1Page() {
     selectedIds.length >= 1 &&
     selectedIds.length <= maxSlots;
 
-  const canCreate = !!account && !!address && !!opponentAddr && (mode === "practice" || stakedValid);
+  // create_match_1v1 reverts 'Not registered' for callers without a Hold
+  const canCreate =
+    !!account && !!address && !!opponentAddr && kingdom.registered && (mode === "practice" || stakedValid);
 
   const handleCreate = async () => {
     if (!account || !address || !opponentAddr) return;
@@ -227,6 +229,15 @@ export default function Create1v1Page() {
           <div className="text-xs text-[#ff3344]">Username not found</div>
         )}
       </div>
+
+      {address && !kingdom.registered && (
+        <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
+          Creating a match requires a Hold in the Marches.{" "}
+          <Link href="/world" className="underline">
+            Claim your Hold
+          </Link>
+        </div>
+      )}
 
       {/* Staked wager picker */}
       {mode === "staked" && (

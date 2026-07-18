@@ -46,9 +46,26 @@ mod tests {
     use siege_dojo::models::round_modifiers_1v1::m_RoundModifiers1v1;
     use siege_dojo::models::match_counter::{MatchCounter, m_MatchCounter};
     use siege_dojo::models::resource_config::{ResourceConfig, m_ResourceConfig};
+    use siege_dojo::models::player_kingdom::{PlayerKingdom, m_PlayerKingdom};
     use siege_dojo::models::events::{e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished};
 
     use super::MockVrfProvider;
+
+    /// create_match_1v1 requires the caller to hold a registered Hold
+    /// (spam guard, issue #31). Registers the current test caller.
+    fn register_caller(ref world: dojo::world::WorldStorage) {
+        world.write_model_test(@PlayerKingdom {
+            player: starknet::get_contract_address(),
+            home_0: 0, home_1: 0, home_2: 0,
+            parcel_count: 0,
+            registered: true,
+            free_craft_used: false,
+            last_drip_time: 0,
+            tier: 0,
+            total_wins: 0,
+            faction_reinforcement_enabled: false,
+        });
+    }
 
     fn deploy_mock_vrf() -> starknet::ContractAddress {
         let (addr, _) = starknet::syscalls::deploy_syscall(
@@ -71,6 +88,7 @@ mod tests {
                 TestResource::Model(m_RoundModifiers1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
                 TestResource::Model(m_ResourceConfig::TEST_CLASS_HASH),
+                TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveRevealed::TEST_CLASS_HASH),
@@ -105,7 +123,26 @@ mod tests {
         let mock_vrf_addr = deploy_mock_vrf();
         actions_sys.set_vrf_provider(mock_vrf_addr);
 
+        register_caller(ref world);
+
         (world, actions_sys)
+    }
+
+    #[test]
+    #[should_panic(expected: ('Not registered', 'ENTRYPOINT_FAILED'))]
+    fn test_create_match_1v1_requires_registered_caller() {
+        let ndef = namespace_def();
+        let mut world = spawn_test_world(world::TEST_CLASS_HASH, [ndef].span());
+        world.sync_perms_and_inits(contract_defs());
+        let (actions_addr, _) = world.dns(@"actions_1v1").unwrap();
+        let actions_sys = IActions1v1Dispatcher { contract_address: actions_addr };
+        let mock_vrf_addr = deploy_mock_vrf();
+        actions_sys.set_vrf_provider(mock_vrf_addr);
+
+        // Caller never registered a Hold — must revert.
+        actions_sys.create_match_1v1(
+            contract_address_const::<0x1>(), contract_address_const::<0x2>(),
+        );
     }
 
     #[test]

@@ -47,6 +47,7 @@ pub mod actions_1v1 {
     use siege_dojo::models::round_modifiers_1v1::RoundModifiers1v1;
     use siege_dojo::models::events::MatchCreated1v1;
     use siege_dojo::models::resource_config::ResourceConfig;
+    use siege_dojo::models::player_kingdom::PlayerKingdom;
     use dojo::event::EventStorage;
     use dojo::world::{IWorldDispatcherTrait, WorldStorageTrait};
     use super::{IVrfProviderDispatcher, IVrfProviderDispatcherTrait, Source};
@@ -135,6 +136,13 @@ pub mod actions_1v1 {
             player_b: ContractAddress,
         ) -> u64 {
             let mut world = self.world_default();
+
+            // Spam guard (issue #31): match creation is free, so gate it on
+            // having a registered Hold. Staked matches go through
+            // world_system → create_match_1v1_delegated, which has its own guard.
+            let caller = get_caller_address();
+            let kingdom: PlayerKingdom = world.read_model(caller);
+            assert(kingdom.registered, 'Not registered');
 
             let config: ResourceConfig = world.read_model(0_u8);
             let vrf_addr = if config.vrf_provider.is_non_zero() {

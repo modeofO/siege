@@ -56,7 +56,7 @@ docker compose run --rm builder sozo test
 
 ## Core Battle Rules
 
-1v1 state lives in `MatchState1v1`. Vault HP starts at 50. Matches end when a vault hits 0 or after round 10.
+1v1 state lives in `MatchState1v1`. Vault HP starts at 50. Matches end when a vault hits 0 or after round 10. `create_match_1v1` requires the caller to have a registered Hold (spam guard); staked matches go through `world_system.create_staked_match`, which guards separately.
 
 Each round:
 

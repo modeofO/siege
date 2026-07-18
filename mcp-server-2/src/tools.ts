@@ -1569,7 +1569,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_create_match",
     {
       description:
-        "Open a 1v1 match between two addresses. Submits a multicall: vRNG request_random + actions_1v1.create_match_1v1. After the tx lands, polls Torii for the assigned match_id (up to ~20s).",
+        "Open a 1v1 match between two addresses. The signing account must have a registered Hold (register via siege_register_player first) or the tx reverts 'Not registered'. Submits a multicall: vRNG request_random + actions_1v1.create_match_1v1. After the tx lands, polls Torii for the assigned match_id (up to ~20s).",
       inputSchema: {
         player_a: z.string().min(3),
         player_b: z.string().min(3),

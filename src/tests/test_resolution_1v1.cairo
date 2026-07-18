@@ -49,6 +49,7 @@ mod tests {
     use siege_dojo::models::round_traps_1v1::m_RoundTraps1v1;
     use siege_dojo::models::match_counter::{m_MatchCounter};
     use siege_dojo::models::resource_config::{ResourceConfig, m_ResourceConfig};
+    use siege_dojo::models::player_kingdom::{PlayerKingdom, m_PlayerKingdom};
     use siege_dojo::models::match_abilities_1v1::m_MatchAbilities1v1;
     use siege_dojo::models::events::{e_MatchCreated1v1, e_MoveCommitted, e_MoveRevealed, e_RoundResolved, e_MatchFinished};
 
@@ -64,6 +65,23 @@ mod tests {
         addr
     }
 
+
+    /// create_match_1v1 requires the caller to hold a registered Hold
+    /// (spam guard, issue #31). Registers the current test caller.
+    fn register_caller(ref world: dojo::world::WorldStorage) {
+        world.write_model_test(@PlayerKingdom {
+            player: starknet::get_contract_address(),
+            home_0: 0, home_1: 0, home_2: 0,
+            parcel_count: 0,
+            registered: true,
+            free_craft_used: false,
+            last_drip_time: 0,
+            tier: 0,
+            total_wins: 0,
+            faction_reinforcement_enabled: false,
+        });
+    }
+
     fn namespace_def() -> NamespaceDef {
         NamespaceDef {
             namespace: "siege_dojo",
@@ -76,6 +94,7 @@ mod tests {
                 TestResource::Model(m_RoundTraps1v1::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchCounter::TEST_CLASS_HASH),
                 TestResource::Model(m_ResourceConfig::TEST_CLASS_HASH),
+                TestResource::Model(m_PlayerKingdom::TEST_CLASS_HASH),
                 TestResource::Model(m_MatchAbilities1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MatchCreated1v1::TEST_CLASS_HASH),
                 TestResource::Event(e_MoveCommitted::TEST_CLASS_HASH),
@@ -134,6 +153,7 @@ mod tests {
         let addr1 = contract_address_const::<0x1>();
         let addr2 = contract_address_const::<0x2>();
 
+        register_caller(ref world);
         let match_id = actions_sys.create_match_1v1(addr1, addr2);
 
         let salt: felt252 = 99;
@@ -215,6 +235,7 @@ mod tests {
 
         let addr1 = contract_address_const::<0x1>();
         let addr2 = contract_address_const::<0x2>();
+        register_caller(ref world);
         let match_id = actions_sys.create_match_1v1(addr1, addr2);
 
         // Set vault B HP low
