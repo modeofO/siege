@@ -149,27 +149,11 @@ export async function revealMove1v1(
 }
 
 export async function resolveRound1v1(account: AccountInterface, matchId: string) {
-  // Try without VRF first — succeeds on the final round where the contract
-  // skips consume_random (match ends, no next-round modifiers needed).
+  // Try the VRF-wrapped multicall first. The contract consumes randomness for
+  // next-round gate modifiers via a SafeDispatcher, so an unwrapped resolve on
+  // a continuing round does NOT revert — it silently falls back to all-Normal
+  // modifiers. The wrap must therefore be the default, not the retry.
   let firstError: unknown;
-  try {
-    const tx = await resilientExecute(
-      account,
-      {
-        contractAddress: CONTRACTS_1V1.RESOLUTION,
-        entrypoint: "resolve_round",
-        calldata: [matchId],
-      },
-      TX_OPTS,
-    );
-    await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
-    return tx;
-  } catch (e) {
-    firstError = e;
-    console.warn("[resolveRound1v1] without-VRF attempt failed, retrying with VRF wrap:", extractErrorMsg(e));
-  }
-  // Fall back to VRF-wrapped multicall — needed on non-final rounds where
-  // the contract calls consume_random to generate next-round gate modifiers.
   try {
     const tx = await resilientExecute(
       account,
@@ -185,8 +169,27 @@ export async function resolveRound1v1(account: AccountInterface, matchId: string
     );
     await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
     return tx;
+  } catch (e) {
+    firstError = e;
+    console.warn("[resolveRound1v1] VRF-wrapped attempt failed, retrying without VRF:", extractErrorMsg(e));
+  }
+  // Fall back to a bare resolve — needed on match-ending rounds where the
+  // contract skips consume_random and the unconsumed request reverts the
+  // wrapped multicall.
+  try {
+    const tx = await resilientExecute(
+      account,
+      {
+        contractAddress: CONTRACTS_1V1.RESOLUTION,
+        entrypoint: "resolve_round",
+        calldata: [matchId],
+      },
+      TX_OPTS,
+    );
+    await waitForReceiptOrThrow(account, tx.transaction_hash, "Resolve round");
+    return tx;
   } catch (e2) {
-    console.error("[resolveRound1v1] with-VRF also failed:", extractErrorMsg(e2));
+    console.error("[resolveRound1v1] without-VRF also failed:", extractErrorMsg(e2));
     throw firstError;
   }
 }
