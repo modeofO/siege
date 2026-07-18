@@ -174,3 +174,4 @@ scripts/play-round.js
 .DS_Store
 docs/mcp/
 deploy*.env
+*.har

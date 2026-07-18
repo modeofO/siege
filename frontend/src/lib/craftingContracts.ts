@@ -2,7 +2,60 @@
 import type { AccountInterface, Call } from "starknet";
 import { CRAFTING_1V1_ADDRESS } from "./contractAddresses";
 import { resilientExecute } from "./controllerSession";
+import { waitForReceiptOrThrow } from "./contracts1v1";
 import { RESOURCE_TOKENS } from "./useResourceBalances";
+
+// Approve resources (if allowance is short) as a SEPARATE tx, then run the
+// craft call on its own. The Cartridge browser keychain silently DROPS the
+// craft_ability_batch call when it's multicalled together with the ERC-20
+// approves (it introspects the token contracts — supports_interface on the
+// resources, decimals on the ability token — those reverts make it submit only
+// the approves and never the craft). A lone craft call on the crafting contract
+// submits cleanly, exactly like register_player. Resources are 0-decimal raw
+// integers, so we approve a generous standing allowance once and future crafts
+// skip the approve entirely (single sessioned craft, no popup).
+const STANDING_ALLOWANCE = "0xffffffffffffffff"; // 2^64-1, dwarfs any craft cost
+
+async function approveThenCraft(
+  account: AccountInterface,
+  cost: AbilityCost,
+  quantity: number,
+  craftCall: Call,
+): Promise<string> {
+  const approvals: Call[] = [];
+  for (const [resource, amount] of Object.entries(cost)) {
+    if (amount <= 0) continue;
+    const tokenAddr = RESOURCE_TOKENS[resource as keyof typeof RESOURCE_TOKENS];
+    if (!tokenAddr) continue;
+    const needed = BigInt(amount * quantity);
+    let allowance = BigInt(0);
+    try {
+      const res = await account.callContract({
+        contractAddress: tokenAddr,
+        entrypoint: "allowance",
+        calldata: [account.address, CRAFTING_1V1_ADDRESS],
+      });
+      allowance = BigInt(res[0] ?? "0x0");
+    } catch {
+      // allowance read failed — approve to be safe
+    }
+    if (allowance < needed) {
+      approvals.push({
+        contractAddress: tokenAddr,
+        entrypoint: "approve",
+        calldata: [CRAFTING_1V1_ADDRESS, STANDING_ALLOWANCE, "0"],
+      });
+    }
+  }
+
+  if (approvals.length > 0) {
+    const approveTx = await resilientExecute(account, approvals);
+    await waitForReceiptOrThrow(account, approveTx.transaction_hash, "Approve resources");
+  }
+
+  const result = await resilientExecute(account, craftCall);
+  return result.transaction_hash;
+}
 
 export type AbilityId = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
 
@@ -130,55 +183,26 @@ export function maxAffordable(cost: AbilityCost, balances: Record<string, number
   return max === Infinity ? 0 : max;
 }
 
-// Approve required tokens then batch-craft T1 abilities in one multicall.
+// Approve resources (separate tx, only if short) then batch-craft T1 abilities.
 export async function craftAbility(account: AccountInterface, abilityId: number, cost: AbilityCost, quantity = 1): Promise<string> {
-  const calls: Call[] = [];
-
-  for (const [resource, amount] of Object.entries(cost)) {
-    const tokenAddr = RESOURCE_TOKENS[resource as keyof typeof RESOURCE_TOKENS];
-    if (!tokenAddr) continue;
-    calls.push({
-      contractAddress: tokenAddr,
-      entrypoint: "approve",
-      calldata: [CRAFTING_1V1_ADDRESS, (amount * quantity).toString(), "0"],
-    });
-  }
-
-  calls.push({
+  return approveThenCraft(account, cost, quantity, {
     contractAddress: CRAFTING_1V1_ADDRESS,
     entrypoint: "craft_ability_batch",
     calldata: [abilityId.toString(), quantity.toString()],
   });
-
-  const result = await resilientExecute(account, calls);
-  return result.transaction_hash;
 }
 
-// Approve required tokens then batch-craft T2 abilities (burns T1 + resources).
+// Approve resources (separate tx, only if short) then batch-craft T2 abilities
+// (burns T1 + resources).
 export async function craftAbilityTier2(
   account: AccountInterface,
   abilityTypeId: number,
   cost: AbilityCost,
   quantity = 1,
 ): Promise<string> {
-  const calls: Call[] = [];
-
-  for (const [resource, amount] of Object.entries(cost)) {
-    const tokenAddr = RESOURCE_TOKENS[resource as keyof typeof RESOURCE_TOKENS];
-    if (!tokenAddr) continue;
-    calls.push({
-      contractAddress: tokenAddr,
-      entrypoint: "approve",
-      calldata: [CRAFTING_1V1_ADDRESS, (amount * quantity).toString(), "0"],
-    });
-  }
-
-  calls.push({
+  return approveThenCraft(account, cost, quantity, {
     contractAddress: CRAFTING_1V1_ADDRESS,
     entrypoint: "craft_ability_tier2_batch",
     calldata: [abilityTypeId.toString(), quantity.toString()],
   });
-
-  const result = await resilientExecute(account, calls);
-  return result.transaction_hash;
 }
