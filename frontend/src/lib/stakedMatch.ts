@@ -45,8 +45,22 @@ function approveAbilityTokenForWorldSystem() {
 
 export async function createStakedMatch(account: AccountInterface, opponent: string, abilities: number[]) {
   // Approval must be separate — the Cartridge Paymaster VRF wrapping requires
-  // request_random as call[0] and the game call as call[1] with nothing between.
-  await resilientExecute(account, approveAbilityTokenForWorldSystem(), TX_OPTS);
+  // request_random as call[0] and the game call as call[1] with nothing between,
+  // so it can't be bundled atomically the way joinStakedMatch does.
+  //
+  // Only approve when needed, and WAIT FOR THE RECEIPT before the create call:
+  // resilientExecute resolves on submission, not inclusion, so firing create
+  // right after the approval races the sequencer — if create is mined first the
+  // escrow transfer reverts with "ERC1155: unauthorized operator".
+  const approved = await account.callContract({
+    contractAddress: ABILITY_TOKEN_ADDRESS,
+    entrypoint: "is_approved_for_all",
+    calldata: [account.address, CONTRACTS_WORLD.WORLD_SYSTEM],
+  });
+  if (BigInt(approved[0] ?? "0x0") === BigInt(0)) {
+    const approvalTx = await resilientExecute(account, approveAbilityTokenForWorldSystem(), TX_OPTS);
+    await waitForReceiptOrThrow(account, approvalTx.transaction_hash, "Approve ability operator");
+  }
 
   const tx = await resilientExecute(account,
     [
