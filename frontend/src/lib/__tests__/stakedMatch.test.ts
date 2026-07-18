@@ -4,22 +4,28 @@ import type { AccountInterface } from "starknet";
 import { CONTRACTS_WORLD, VRF_PROVIDER_ADDRESS } from "../contracts1v1";
 import { createStakedMatch } from "../stakedMatch";
 
-describe("createStakedMatch", () => {
-  it("approves separately, then sends the VRF request keyed to world_system", async () => {
-    const executes: unknown[] = [];
-    const account = {
-      execute: async (calls: unknown) => {
-        executes.push(calls);
-        return { transaction_hash: "0x1" };
-      },
-      waitForTransaction: async () => ({ execution_status: "SUCCEEDED" }),
-    } as unknown as AccountInterface;
+function mockAccount(approved: boolean, executes: unknown[]): AccountInterface {
+  return {
+    address: "0xplayer",
+    callContract: async () => [approved ? "0x1" : "0x0"],
+    execute: async (calls: unknown) => {
+      executes.push(calls);
+      return { transaction_hash: "0x1" };
+    },
+    waitForTransaction: async () => ({ execution_status: "SUCCEEDED", isSuccess: () => true }),
+    getTransactionReceipt: async () => ({ execution_status: "SUCCEEDED", isSuccess: () => true }),
+  } as unknown as AccountInterface;
+}
 
-    await createStakedMatch(account, "0xabc", [1, 2]);
+describe("createStakedMatch", () => {
+  it("when not yet approved: approves separately, waits, then sends the VRF request keyed to world_system", async () => {
+    const executes: unknown[] = [];
+    await createStakedMatch(mockAccount(false, executes), "0xabc", [1, 2]);
 
     // First execute: standalone operator approval — the Cartridge paymaster
     // VRF wrapping requires request_random as call[0] of the game multicall,
-    // so the approval cannot ride along.
+    // so the approval cannot ride along. It is awaited to receipt (below) to
+    // avoid racing the create call ("ERC1155: unauthorized operator").
     expect(executes).toHaveLength(2);
     const approval = executes[0] as { entrypoint: string; calldata: string[] };
     expect(approval.entrypoint).toBe("set_approval_for_all");
@@ -41,5 +47,16 @@ describe("createStakedMatch", () => {
       entrypoint: "create_staked_match",
       calldata: ["0xabc", "2", "1", "2"],
     });
+  });
+
+  it("when already approved: skips the approval tx and only sends VRF+create", async () => {
+    const executes: unknown[] = [];
+    await createStakedMatch(mockAccount(true, executes), "0xabc", [1, 2]);
+
+    // No standalone approval — operator already set, so only the game multicall runs.
+    expect(executes).toHaveLength(1);
+    const calls = executes[0] as Array<{ contractAddress: string; entrypoint: string; calldata: string[] }>;
+    expect(calls[0].entrypoint).toBe("request_random");
+    expect(calls[1].entrypoint).toBe("create_staked_match");
   });
 });
