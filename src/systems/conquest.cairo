@@ -241,6 +241,10 @@ pub mod conquest {
             let mut ally_p0_3: u8 = 0; let mut ally_p1_3: u8 = 0; let mut ally_p2_3: u8 = 0;
             let mut ally_g0_3: u8 = 0; let mut ally_g1_3: u8 = 0; let mut ally_g2_3: u8 = 0;
             let mut ally_count: u8 = 0;
+            let zero_addr: ContractAddress = Zero::zero();
+            let mut ally_owner_1: ContractAddress = zero_addr;
+            let mut ally_owner_2: ContractAddress = zero_addr;
+            let mut ally_owner_3: ContractAddress = zero_addr;
 
             let mut pi: u32 = 0;
             while pi < config.total_parcels {
@@ -251,27 +255,32 @@ pub mod conquest {
                         has_adjacent = true;
                     }
                 }
-                // Faction ally reinforcement.
-                // NOTE: entries are per-adjacent-parcel, not per-ally-player. An ally
-                // that owns multiple parcels bordering the target contributes their
-                // preset 0 once per adjacent parcel (up to the ally_count cap of 3).
-                // This is exercised by test_conquest_reinforcement_ally_contributes_to_pool.
-                // If per-ally dedup is desired in the future, track seen owners here.
+                // Faction ally reinforcement. Deduped per ally PLAYER (issue #29):
+                // an ally owning multiple parcels bordering the target still fills
+                // only one of the 3 ally slots, so clustered territory can't crowd
+                // the pool with copies of one preset.
                 if reinforcement_on && defender_faction_id != 0 && ally_count < 3 {
-                    if parcel_iter.owner.is_non_zero() && parcel_iter.owner != defender {
-                        let ally_member: FactionMember = world.read_model(parcel_iter.owner);
+                    let owner = parcel_iter.owner;
+                    let already_counted = owner == ally_owner_1
+                        || owner == ally_owner_2
+                        || owner == ally_owner_3;
+                    if owner.is_non_zero() && owner != defender && !already_counted {
+                        let ally_member: FactionMember = world.read_model(owner);
                         if ally_member.faction_id == defender_faction_id {
                             if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
-                                let ally_defense: siege_dojo::models::preset_defense::PresetDefense = world.read_model(parcel_iter.owner);
+                                let ally_defense: siege_dojo::models::preset_defense::PresetDefense = world.read_model(owner);
                                 if ally_count == 0 {
                                     ally_p0_1 = ally_defense.p0_p0; ally_p1_1 = ally_defense.p0_p1; ally_p2_1 = ally_defense.p0_p2;
                                     ally_g0_1 = ally_defense.p0_g0; ally_g1_1 = ally_defense.p0_g1; ally_g2_1 = ally_defense.p0_g2;
+                                    ally_owner_1 = owner;
                                 } else if ally_count == 1 {
                                     ally_p0_2 = ally_defense.p0_p0; ally_p1_2 = ally_defense.p0_p1; ally_p2_2 = ally_defense.p0_p2;
                                     ally_g0_2 = ally_defense.p0_g0; ally_g1_2 = ally_defense.p0_g1; ally_g2_2 = ally_defense.p0_g2;
+                                    ally_owner_2 = owner;
                                 } else {
                                     ally_p0_3 = ally_defense.p0_p0; ally_p1_3 = ally_defense.p0_p1; ally_p2_3 = ally_defense.p0_p2;
                                     ally_g0_3 = ally_defense.p0_g0; ally_g1_3 = ally_defense.p0_g1; ally_g2_3 = ally_defense.p0_g2;
+                                    ally_owner_3 = owner;
                                 }
                                 ally_count += 1;
                             }

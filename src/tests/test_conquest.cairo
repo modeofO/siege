@@ -25,6 +25,34 @@ pub mod MockVrfProvider {
     }
 }
 
+// Mock VRF provider returning 1 — used to select the second entry of the
+// defense pool, which is what exposes per-ally dedup in the reinforcement scan.
+#[starknet::contract]
+pub mod MockVrfProviderOne {
+    use starknet::ContractAddress;
+
+    #[derive(Drop, Copy, Clone, Serde)]
+    pub enum Source {
+        Nonce: ContractAddress,
+        Salt: felt252,
+    }
+
+    #[storage]
+    struct Storage {}
+
+    #[constructor]
+    fn constructor(ref self: ContractState) {}
+
+    #[abi(per_item)]
+    #[generate_trait]
+    impl External of ExternalTrait {
+        #[external(v0)]
+        fn consume_random(ref self: ContractState, source: Source) -> felt252 {
+            1
+        }
+    }
+}
+
 #[starknet::contract]
 pub mod MockAccount {
     const ISRC6_ID: felt252 = 0x2ceccef7f994940b3962a6c67e0ba4fcd37df7d131417c604f91e03caecc1cd;
@@ -90,7 +118,14 @@ mod tests {
     use siege_dojo::models::faction::{m_Faction, m_FactionCounter};
     use siege_dojo::models::faction_member::m_FactionMember;
     use siege_dojo::models::faction_invite::m_FactionInvite;
-    use super::{MockVrfProvider, MockAccount};
+    use super::{MockVrfProvider, MockVrfProviderOne, MockAccount};
+
+    fn deploy_mock_vrf_one() -> starknet::ContractAddress {
+        let (addr, _) = starknet::syscalls::deploy_syscall(
+            MockVrfProviderOne::TEST_CLASS_HASH.try_into().unwrap(), 0, array![].span(), false,
+        ).unwrap_syscall();
+        addr
+    }
 
     fn deploy_mock_vrf() -> starknet::ContractAddress {
         let (addr, _) = starknet::syscalls::deploy_syscall(
@@ -789,6 +824,88 @@ mod tests {
 
         let ka_after: PlayerKingdom = world.read_model(player_a);
         assert(ka_after.parcel_count < ka_before.parcel_count, 'attacker should lose parcel');
+    }
+
+    #[test]
+    fn test_conquest_reinforcement_dedups_ally_parcels() {
+        // One ally owning several parcels adjacent to the target must count
+        // once in the reinforcement pool, not once per parcel (issue #29).
+        // Pool with dedup:    [ally_weak, ally_strong]            → VRF 1 picks ally_strong
+        // Pool without dedup: [ally_weak, ally_weak, ally_strong] → VRF 1 picks ally_weak
+        let (mut world, conquest_sys, _, player_a, player_b) = conquest_setup();
+
+        // Defender opts in, no own presets.
+        let mut kb: PlayerKingdom = world.read_model(player_b);
+        kb.faction_reinforcement_enabled = true;
+        world.write_model_test(@kb);
+
+        // Faction 2: defender + two allies.
+        let ally_weak = deploy_user_salted(78);
+        let ally_strong = deploy_user_salted(79);
+        world.write_model_test(@siege_dojo::models::faction::Faction {
+            faction_id: 2, leader: ally_weak, name: 'Allied', tag: 'AL',
+            member_count: 3, created_at: 0, dissolved: false,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: player_b, faction_id: 2, joined_at: 0, last_leave_time: 0,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: ally_weak, faction_id: 2, joined_at: 0, last_leave_time: 0,
+        });
+        world.write_model_test(@siege_dojo::models::faction_member::FactionMember {
+            player: ally_strong, faction_id: 2, joined_at: 0, last_leave_time: 0,
+        });
+
+        // Target: parcel 7 at (2,1), owned by defender. Attacker home parcel 2
+        // at (2,0) provides attacker adjacency.
+        let mut tp: Parcel = world.read_model(7_u32);
+        tp.owner = player_b;
+        world.write_model_test(@tp);
+
+        // ally_weak owns TWO parcels adjacent to the target: 6 at (1,1) and
+        // 8 at (3,1) (reassigned from player_a — attacker adjacency still holds
+        // through home parcel 2). ally_weak never wrote a PresetDefense, so its
+        // contribution is all zeros.
+        let mut p6: Parcel = world.read_model(6_u32);
+        p6.owner = ally_weak;
+        world.write_model_test(@p6);
+        let mut p8: Parcel = world.read_model(8_u32);
+        p8.owner = ally_weak;
+        world.write_model_test(@p8);
+
+        // ally_strong owns parcel 12 at (2,2) — extend the grid by one row so
+        // the reinforcement scan reaches it. Parcels 10-14 other than 12 stay
+        // unwritten and read as unowned defaults.
+        let mut wc: WorldConfig = world.read_model(0_u8);
+        wc.total_parcels = 15;
+        world.write_model_test(@wc);
+        world.write_model_test(@Parcel {
+            parcel_id: 12, col: 2, row: 2, parcel_type: 255, owner: ally_strong, is_home: false,
+        });
+
+        // ally_strong preset 0: heavy counterattack 4/4/4.
+        world.write_model_test(@PresetDefense {
+            player: ally_strong,
+            p0_p0: 4, p0_p1: 4, p0_p2: 4, p0_g0: 0, p0_g1: 0, p0_g2: 0,
+            p1_p0: 0, p1_p1: 0, p1_p2: 0, p1_g0: 0, p1_g1: 0, p1_g2: 0,
+            p2_p0: 0, p2_p1: 0, p2_p2: 0, p2_g0: 0, p2_g1: 0, p2_g2: 0,
+            p3_p0: 0, p3_p1: 0, p3_p2: 0, p3_g0: 0, p3_g1: 0, p3_g2: 0,
+            preset_count: 1,
+        });
+
+        // VRF 1 → pool index 1 (defender has 0 presets of their own).
+        let mut rc: ResourceConfig = world.read_model(0_u8);
+        rc.vrf_provider = deploy_mock_vrf_one();
+        world.write_model_test(@rc);
+
+        // Attacker: 4/3/3 attack, no gates (budget 10).
+        //   vs ally_weak (zeros):  def_hp 15-10=5,  atk_hp 10 → attacker wins
+        //   vs ally_strong:        atk_hp 10-12→0,  def_hp 5  → defender holds
+        starknet::testing::set_contract_address(player_a);
+        conquest_sys.initiate_conquest(7, 4, 3, 3, 0, 0, 0, 0, 0);
+
+        let target: Parcel = world.read_model(7_u32);
+        assert(target.owner == player_b, 'dedup: strong ally defends');
     }
 
     #[test]
