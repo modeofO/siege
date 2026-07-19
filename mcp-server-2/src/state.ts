@@ -326,6 +326,7 @@ export class StateClient {
   }
 
   async queueStatus(player: string): Promise<QueueStatusData | null> {
+    if (!/^(0x)?[0-9a-fA-F]{1,64}$/.test(player)) throw new Error("invalid player address");
     const norm = "0x" + player.replace(/^0x/, "").toLowerCase().padStart(64, "0");
     const rows = await this.sql<Record<string, unknown>>(
       `SELECT state, queued_at, matched_match_id FROM "siege_dojo-QueueStatus" WHERE player = '${norm}' LIMIT 1`,
