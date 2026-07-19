@@ -1,11 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAccount } from "@/app/providers";
 import { AbilityIcon } from "./AbilityIcon";
 import { ClaimParcelMap } from "./ClaimParcelMap";
 import { useMatchEscrow, useClaimCandidates, settleMatch, claimParcel } from "@/lib/stakedMatch";
+import {
+  fetchMatchPot,
+  claimWinnings,
+  tokenSymbol,
+  formatTokenAmount,
+  type MatchPotRow,
+} from "@/lib/matchmaking";
 import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { tierName } from "@/lib/tiers";
@@ -66,6 +73,20 @@ export function MatchEndActions({
     parcels: worldParcels,
     loading: candidatesLoading,
   } = useClaimCandidates(didWin ? winnerAddr : null);
+
+  // Queue-made matches escrow an entry pot in the matchmaking contract.
+  const [pot, setPot] = useState<MatchPotRow | null>(null);
+  const [potClaiming, setPotClaiming] = useState(false);
+  const [potClaimed, setPotClaimed] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    fetchMatchPot(matchId).then((p) => {
+      if (!cancelled) setPot(p);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [matchId]);
 
   const [settling, setSettling] = useState(false);
   const [claiming, setClaiming] = useState<number | null>(null);
@@ -140,6 +161,42 @@ export function MatchEndActions({
             <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">⚔ Stakes ⚔</div>
             <StakeRow label={isPlayerA ? "Your wager" : "Opponent wager"} ids={escrow.a} />
             <StakeRow label={isPlayerA ? "Opponent wager" : "Your wager"} ids={escrow.b} />
+          </div>
+        )}
+
+        {pot && (pot.amountA > BigInt(0) || pot.amountB > BigInt(0)) && (
+          <div className="space-y-2">
+            <div className="text-[10px] tracking-wider text-[#c8a44e] uppercase font-serif">Entry Pot</div>
+            <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
+              {formatTokenAmount(pot.amountA, pot.tokenA)} {tokenSymbol(pot.tokenA)} +{" "}
+              {formatTokenAmount(pot.amountB, pot.tokenB)} {tokenSymbol(pot.tokenB)}
+              {isDraw
+                ? " — draw: both entries refunded in full."
+                : " — winner takes 65%, the rest funds the Marches."}
+            </div>
+            {pot.claimed || potClaimed ? (
+              <div className="text-[11px] text-[#c8a44e]">Pot paid out.</div>
+            ) : (
+              <button
+                onClick={async () => {
+                  if (!account) return;
+                  setPotClaiming(true);
+                  setTxError("");
+                  try {
+                    await claimWinnings(account, matchId);
+                    setPotClaimed(true);
+                  } catch (e) {
+                    setTxError(extractErrorMsg(e));
+                  } finally {
+                    setPotClaiming(false);
+                  }
+                }}
+                disabled={potClaiming || !account}
+                className="w-full py-2 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] rounded hover:bg-[#c8a44e]/20 transition-colors tracking-wider text-[11px] font-serif disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                {potClaiming ? "CLAIMING..." : isDraw ? "REFUND ENTRIES" : "PAY OUT POT"}
+              </button>
+            )}
           </div>
         )}
 

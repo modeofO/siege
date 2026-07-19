@@ -75,3 +75,15 @@ export const MATCHMAKING_ADDRESS = contractAddress(
   "siege_dojo-matchmaking",
   "NEXT_PUBLIC_MATCHMAKING_ADDRESS",
 );
+
+// Entry buy-in tokens for the paid matchmaking queue (mainnet). Lives here
+// (address-only module) so sessionPolicies can build approve policies without
+// pulling the controllerSession import cycle. The actual menu players see is
+// driven by on-chain EntryToken rows; this list only feeds session policies.
+export const ENTRY_TOKEN_ADDRESSES: string[] = IS_MAINNET
+  ? [
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
+      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
+      "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49", // LORDS
+    ]
+  : [];

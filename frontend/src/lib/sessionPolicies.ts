@@ -10,6 +10,7 @@ import {
   WORLD_SYSTEM_ADDRESS,
   CONQUEST_ADDRESS,
   MATCHMAKING_ADDRESS,
+  ENTRY_TOKEN_ADDRESSES,
   VRF_PROVIDER_ADDRESS,
 } from "@/lib/contractAddresses";
 import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
@@ -113,8 +114,27 @@ export const SESSION_POLICIES: SessionPolicies = {
             methods: [
               { name: "Find Match", entrypoint: "queue_for_match" },
               { name: "Leave Matchmaking Queue", entrypoint: "leave_queue" },
+              { name: "Claim Match Pot", entrypoint: "claim_winnings" },
             ],
           },
+          // Entry buy-in approvals, scoped to the matchmaking contract.
+          // Cartridge requires spender + amount on approve policies. The cap
+          // (2^96-1 ≈ 8e10 tokens at 18 decimals) is far above any buy-in.
+          ...Object.fromEntries(
+            ENTRY_TOKEN_ADDRESSES.map((addr) => [
+              addr,
+              {
+                methods: [
+                  {
+                    name: "Approve Entry",
+                    entrypoint: "approve",
+                    spender: MATCHMAKING_ADDRESS,
+                    amount: "0xffffffffffffffffffffffff",
+                  } as Method,
+                ],
+              },
+            ]),
+          ),
         }
       : {}),
 

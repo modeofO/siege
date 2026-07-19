@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
-import { createMatch1v1, extractErrorMsg } from "@/lib/contracts1v1";
+import { extractErrorMsg } from "@/lib/contracts1v1";
 import { createStakedMatch, useAbilityBalances } from "@/lib/stakedMatch";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
@@ -31,13 +31,15 @@ async function fetchMatchCounterValue(): Promise<number | null> {
   return typeof count === "string" && count.startsWith("0x") ? parseInt(count, 16) : Number(count);
 }
 
-type Mode = "practice" | "staked" | "find";
+// Practice mode removed 2026-07-19: free matches cost ~$1 of sponsorship
+// each. FIND (paid queue) is the default; STAKED keeps the manual flow.
+type Mode = "staked" | "find";
 
 export default function Create1v1Page() {
   const { account, address, status } = useAccount();
   const isConnected = status === "connected";
 
-  const [mode, setMode] = useState<Mode>("practice");
+  const [mode, setMode] = useState<Mode>(MATCHMAKING_ADDRESS ? "find" : "staked");
   const [opponentInput, setOpponentInput] = useState("");
   const [resolvedAddr, setResolvedAddr] = useState<string | null>(null);
   const [resolvedUsername, setResolvedUsername] = useState<string | null>(null);
@@ -105,9 +107,7 @@ export default function Create1v1Page() {
     selectedIds.length >= 1 &&
     selectedIds.length <= maxSlots;
 
-  // create_match_1v1 reverts 'Not registered' for callers without a Hold
-  const canCreate =
-    !!account && !!address && !!opponentAddr && kingdom.registered && (mode === "practice" || stakedValid);
+  const canCreate = !!account && !!address && !!opponentAddr && kingdom.registered && stakedValid;
 
   const handleCreate = async () => {
     if (!account || !address || !opponentAddr) return;
@@ -118,11 +118,7 @@ export default function Create1v1Page() {
     try {
       const counterBefore = (await fetchMatchCounterValue()) ?? 0;
 
-      if (mode === "staked") {
-        await createStakedMatch(account, opponentAddr, selectedIds);
-      } else {
-        await createMatch1v1(account, address, opponentAddr);
-      }
+      await createStakedMatch(account, opponentAddr, selectedIds);
 
       for (let i = 0; i < 12; i++) {
         await sleep(2000);
@@ -148,13 +144,9 @@ export default function Create1v1Page() {
   if (matchId) {
     return (
       <div className="max-w-lg mx-auto mt-20 text-center space-y-6">
-        <div className="text-2xl font-bold text-[#ffd700]">
-          {mode === "staked" ? "Staked Match Created" : "1v1 Match Created"}
-        </div>
+        <div className="text-2xl font-bold text-[#ffd700]">Staked Match Created</div>
         <div className="text-sm text-[#6a6a7a]">
-          {mode === "staked"
-            ? "Your wager is escrowed. Share the match ID — your opponent must match your wager to begin."
-            : "Share this match ID with your opponent:"}
+          Your wager is escrowed. Share the match ID — your opponent must match your wager to begin.
         </div>
         <div className="bg-[#12121a] border border-[#2a2a3a] rounded p-4 text-2xl font-bold">{matchId}</div>
         <Link
@@ -178,27 +170,7 @@ export default function Create1v1Page() {
       )}
 
       {/* Mode toggle */}
-      <div className={`grid ${MATCHMAKING_ADDRESS ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
-        <button
-          onClick={() => setMode("practice")}
-          className={`py-2 px-3 border rounded text-sm tracking-wider transition-colors ${
-            mode === "practice"
-              ? "border-[#ffd700] bg-[#ffd700]/10 text-[#ffd700]"
-              : "border-[#2a2a3a] text-[#6a6a7a] hover:border-[#4a4a5a]"
-          }`}
-        >
-          PRACTICE
-        </button>
-        <button
-          onClick={() => setMode("staked")}
-          className={`py-2 px-3 border rounded text-sm tracking-wider transition-colors ${
-            mode === "staked"
-              ? "border-[#c8a44e] bg-[#c8a44e]/10 text-[#c8a44e]"
-              : "border-[#2a2a3a] text-[#6a6a7a] hover:border-[#4a4a5a]"
-          }`}
-        >
-          STAKED
-        </button>
+      <div className={`grid ${MATCHMAKING_ADDRESS ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
         {MATCHMAKING_ADDRESS && (
           <button
             onClick={() => setMode("find")}
@@ -211,15 +183,23 @@ export default function Create1v1Page() {
             FIND
           </button>
         )}
+        <button
+          onClick={() => setMode("staked")}
+          className={`py-2 px-3 border rounded text-sm tracking-wider transition-colors ${
+            mode === "staked"
+              ? "border-[#c8a44e] bg-[#c8a44e]/10 text-[#c8a44e]"
+              : "border-[#2a2a3a] text-[#6a6a7a] hover:border-[#4a4a5a]"
+          }`}
+        >
+          STAKED
+        </button>
       </div>
       <div className="text-xs text-[#6a6a7a] leading-relaxed -mt-3">
-        {mode === "practice"
-          ? "Practice match. No abilities wagered, no parcels transferred. Reputation unchanged until the winner settles."
-          : mode === "find"
-            ? "Auto-match with the next player in the queue. Practice rules — nothing wagered."
-            : "Stake 1–" +
-              maxSlots +
-              " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}
+        {mode === "find"
+          ? "Auto-match with the next player in the queue. Entry buy-in charged only when a match is made; winner takes 65% of the pot."
+          : "Stake 1–" +
+            maxSlots +
+            " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}
       </div>
 
       {mode === "find" && <FindOpponent registered={kingdom.registered} />}
@@ -314,7 +294,7 @@ export default function Create1v1Page() {
             disabled={!canCreate || loading}
             className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            {loading ? "CREATING..." : mode === "staked" ? "CREATE STAKED MATCH" : "CREATE 1v1 MATCH"}
+            {loading ? "CREATING..." : "CREATE STAKED MATCH"}
           </button>
         </>
       )}
