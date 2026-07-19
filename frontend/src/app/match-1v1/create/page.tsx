@@ -9,6 +9,8 @@ import { createStakedMatch, useAbilityBalances } from "@/lib/stakedMatch";
 import { usePlayerKingdom } from "@/lib/worldState";
 import { TIER_INFO, tierName } from "@/lib/tiers";
 import { AbilityWagerPicker } from "@/components/AbilityWagerPicker";
+import { FindOpponent } from "@/components/FindOpponent";
+import { MATCHMAKING_ADDRESS } from "@/lib/contractAddresses";
 import { lookupUsernames } from "@cartridge/controller";
 import Link from "next/link";
 
@@ -29,7 +31,7 @@ async function fetchMatchCounterValue(): Promise<number | null> {
   return typeof count === "string" && count.startsWith("0x") ? parseInt(count, 16) : Number(count);
 }
 
-type Mode = "practice" | "staked";
+type Mode = "practice" | "staked" | "find";
 
 export default function Create1v1Page() {
   const { account, address, status } = useAccount();
@@ -176,7 +178,7 @@ export default function Create1v1Page() {
       )}
 
       {/* Mode toggle */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid ${MATCHMAKING_ADDRESS ? "grid-cols-3" : "grid-cols-2"} gap-2`}>
         <button
           onClick={() => setMode("practice")}
           className={`py-2 px-3 border rounded text-sm tracking-wider transition-colors ${
@@ -197,16 +199,33 @@ export default function Create1v1Page() {
         >
           STAKED
         </button>
+        {MATCHMAKING_ADDRESS && (
+          <button
+            onClick={() => setMode("find")}
+            className={`py-2 px-3 border rounded text-sm tracking-wider transition-colors ${
+              mode === "find"
+                ? "border-[#ffd700] bg-[#ffd700]/10 text-[#ffd700]"
+                : "border-[#2a2a3a] text-[#6a6a7a] hover:border-[#4a4a5a]"
+            }`}
+          >
+            FIND
+          </button>
+        )}
       </div>
       <div className="text-xs text-[#6a6a7a] leading-relaxed -mt-3">
         {mode === "practice"
           ? "Practice match. No abilities wagered, no parcels transferred. Reputation unchanged until the winner settles."
-          : "Stake 1–" +
-            maxSlots +
-            " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}
+          : mode === "find"
+            ? "Auto-match with the next player in the queue. Practice rules — nothing wagered."
+            : "Stake 1–" +
+              maxSlots +
+              " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}
       </div>
 
+      {mode === "find" && <FindOpponent registered={kingdom.registered} />}
+
       {/* Opponent */}
+      {mode !== "find" && (
       <div className="space-y-2">
         <label className="text-xs text-[#6a6a7a] tracking-wider uppercase">Opponent</label>
         <input
@@ -229,6 +248,7 @@ export default function Create1v1Page() {
           <div className="text-xs text-[#ff3344]">Username not found</div>
         )}
       </div>
+      )}
 
       {address && !kingdom.registered && (
         <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
@@ -281,19 +301,23 @@ export default function Create1v1Page() {
         </div>
       )}
 
-      <div className="text-xs text-[#6a6a7a] leading-relaxed">
-        You will be Player A. Your opponent joins as Player B using the match ID.
-      </div>
+      {mode !== "find" && (
+        <>
+          <div className="text-xs text-[#6a6a7a] leading-relaxed">
+            You will be Player A. Your opponent joins as Player B using the match ID.
+          </div>
 
-      {error && <div className="text-[#ff3344] text-sm break-all">{error}</div>}
+          {error && <div className="text-[#ff3344] text-sm break-all">{error}</div>}
 
-      <button
-        onClick={handleCreate}
-        disabled={!canCreate || loading}
-        className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
-      >
-        {loading ? "CREATING..." : mode === "staked" ? "CREATE STAKED MATCH" : "CREATE 1v1 MATCH"}
-      </button>
+          <button
+            onClick={handleCreate}
+            disabled={!canCreate || loading}
+            className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+          >
+            {loading ? "CREATING..." : mode === "staked" ? "CREATE STAKED MATCH" : "CREATE 1v1 MATCH"}
+          </button>
+        </>
+      )}
     </div>
   );
 }
