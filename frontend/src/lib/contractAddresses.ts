@@ -67,3 +67,11 @@ export const CRAFTING_1V1_ADDRESS = contractAddress(
   "NEXT_PUBLIC_CRAFTING_1V1_ADDRESS",
   "0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2",
 );
+
+// Matchmaking ships before its first migrate — the manifest has no
+// siege_dojo-matchmaking tag yet, so this resolves to "" and the frontend
+// hides the Find Opponent flow until a deploy adds it.
+export const MATCHMAKING_ADDRESS = contractAddress(
+  "siege_dojo-matchmaking",
+  "NEXT_PUBLIC_MATCHMAKING_ADDRESS",
+);

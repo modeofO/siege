@@ -9,6 +9,7 @@ import {
   CRAFTING_1V1_ADDRESS,
   WORLD_SYSTEM_ADDRESS,
   CONQUEST_ADDRESS,
+  MATCHMAKING_ADDRESS,
   VRF_PROVIDER_ADDRESS,
 } from "@/lib/contractAddresses";
 import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
@@ -103,6 +104,19 @@ export const SESSION_POLICIES: SessionPolicies = {
         { name: "Initiate Conquest", entrypoint: "initiate_conquest" },
       ],
     },
+
+    // Pre-migrate the manifest has no matchmaking address — an empty key
+    // would break the whole policy object, so add it conditionally.
+    ...(MATCHMAKING_ADDRESS
+      ? {
+          [MATCHMAKING_ADDRESS]: {
+            methods: [
+              { name: "Find Match", entrypoint: "queue_for_match" },
+              { name: "Leave Matchmaking Queue", entrypoint: "leave_queue" },
+            ],
+          },
+        }
+      : {}),
 
     [ABILITY_TOKEN_ADDRESS]: {
       methods: [{ name: "Approve Ability Operator", entrypoint: "set_approval_for_all" }],
