@@ -34,7 +34,7 @@
   "contracts": [
     {
       "address": "0x47dfe0aaa197fb59299890a2acef546bb532d0a8796034aa8fafa00f0d54571",
-      "class_hash": "0x7e0f212c35de94252ad767ac18aceb33d8360cabecde577bae7e01730b43d83",
+      "class_hash": "0x1daaff4a0b042973edb997b99ea1d810e7ca3e03c8e2e61cd3fcd1f63b513e1",
       "init_calldata": [],
       "tag": "siege_dojo-actions_1v1",
       "selector": "0x26e0eeadcc0c8f020b1da157b4d0f038ca209cb1d1ed9b6b52248376703705",
@@ -83,6 +83,18 @@
         "craft_ability_tier2",
         "craft_ability_batch",
         "craft_ability_tier2_batch",
+        "upgrade"
+      ]
+    },
+    {
+      "address": "0x44da6123cb69a66ff7f5d7756b269841b28becd5ac6951f94c2d397c5819fef",
+      "class_hash": "0x68c685c66a804590063b57de63efba02618321178086da75343da42fbef184d",
+      "init_calldata": [],
+      "tag": "siege_dojo-matchmaking",
+      "selector": "0x2e00e2530b02272b8731718900abdfdf06707490d0a6b9ab82b1278eb64725",
+      "systems": [
+        "queue_for_match",
+        "leave_queue",
         "upgrade"
       ]
     },
@@ -922,6 +934,55 @@
       "class_hash": "0x7af3b2c12887f75482cc4a188b49f5ef0cb5e6eb474ce30a5e381ad612fdd2a",
       "tag": "siege_dojo-PresetDefense",
       "selector": "0x6a078d48acad6faccf91a8ca75c932b0723fdc45e1c6c2d2b231c548575768c"
+    },
+    {
+      "members": [
+        {
+          "name": "queue_id",
+          "type": "core::integer::u8",
+          "key": true
+        },
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": false
+        },
+        {
+          "name": "queued_at",
+          "type": "core::integer::u64",
+          "key": false
+        }
+      ],
+      "class_hash": "0x5e2c2bfe2c84d67c07bfb73c8c594c979cf298fb0db677065441362b207dacf",
+      "tag": "siege_dojo-QueueSlot",
+      "selector": "0x4cecbf773707bf4388d1d49bbdb45301b9906ee5e80b1342e0c5abcab861b86"
+    },
+    {
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress",
+          "key": true
+        },
+        {
+          "name": "state",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "queued_at",
+          "type": "core::integer::u64",
+          "key": false
+        },
+        {
+          "name": "matched_match_id",
+          "type": "core::integer::u64",
+          "key": false
+        }
+      ],
+      "class_hash": "0x4f8fa17b77e6af0c545aeccbec84d36ecf4544d1b39ca98a29ee0ee40d07788",
+      "tag": "siege_dojo-QueueStatus",
+      "selector": "0x7f76ae3d2c6227299fec6374d02f9e3a0a7d6dff4780e8340c9ac6fd17e742b"
     },
     {
       "members": [
@@ -4006,6 +4067,90 @@
     },
     {
       "type": "struct",
+      "name": "siege_dojo::models::match_queue::QueueSlot",
+      "members": [
+        {
+          "name": "queue_id",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "queued_at",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::match_queue::QueueSlotValue",
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "queued_at",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::match_queue::QueueStatus",
+      "members": [
+        {
+          "name": "player",
+          "type": "core::starknet::contract_address::ContractAddress"
+        },
+        {
+          "name": "state",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "queued_at",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "matched_match_id",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "struct",
+      "name": "siege_dojo::models::match_queue::QueueStatusValue",
+      "members": [
+        {
+          "name": "state",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "queued_at",
+          "type": "core::integer::u64"
+        },
+        {
+          "name": "matched_match_id",
+          "type": "core::integer::u64"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::models::match_queue::m_QueueSlot::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::models::match_queue::m_QueueStatus::Event",
+      "kind": "enum",
+      "variants": []
+    },
+    {
+      "type": "struct",
       "name": "siege_dojo::models::match_record::MatchRecord",
       "members": [
         {
@@ -5854,6 +5999,47 @@
     {
       "type": "event",
       "name": "siege_dojo::systems::crafting_1v1::crafting_1v1::Event",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "UpgradeableEvent",
+          "type": "dojo::contract::components::upgradeable::upgradeable_cpt::Event",
+          "kind": "nested"
+        },
+        {
+          "name": "WorldProviderEvent",
+          "type": "dojo::contract::components::world_provider::world_provider_cpt::Event",
+          "kind": "nested"
+        }
+      ]
+    },
+    {
+      "type": "interface",
+      "name": "siege_dojo::systems::matchmaking::IMatchmaking",
+      "items": [
+        {
+          "type": "function",
+          "name": "queue_for_match",
+          "inputs": [],
+          "outputs": [
+            {
+              "type": "core::integer::u64"
+            }
+          ],
+          "state_mutability": "external"
+        },
+        {
+          "type": "function",
+          "name": "leave_queue",
+          "inputs": [],
+          "outputs": [],
+          "state_mutability": "external"
+        }
+      ]
+    },
+    {
+      "type": "event",
+      "name": "siege_dojo::systems::matchmaking::matchmaking::Event",
       "kind": "enum",
       "variants": [
         {

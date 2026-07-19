@@ -81,8 +81,7 @@ clients only poll Torii and re-queue after expiry), otherwise pair with the
 waiting player via `create_match_1v1_delegated` (waiting player = player_a).
 Clients always send the `[vrf request_random, queue_for_match]` multicall
 (the contract consumes unconditionally); `leave_queue` is always bare.
-Pairing is discovered by polling the `QueueStatus` model. Not yet
-migrated/deployed.
+Pairing is discovered by polling the `QueueStatus` model.
 
 Node contests resolve before gate damage: owning node `i` grants +1 defense at gate `i` the same round it is captured or held, plus +1 budget next round.
 
@@ -170,6 +169,7 @@ Contract addresses come from `manifest_mainnet.json`. Current important tags:
 - `siege_dojo-crafting_1v1`: `0x1f8085720ec1c5b153c273b522878365c2c19d55a22141c70e907e27df19ad3`
 - `siege_dojo-world_system`: `0x186b8b191ec895a79c3aa10e7deeb0f69b85d2cdbeb113a4643a3017c3723b0`
 - `siege_dojo-conquest`: `0x5e8997406aa1d0fb7a33a4b17e94ff8c5708ddaf4c8a7de812a31b2199e404f`
+- `siege_dojo-matchmaking`: `0x44da6123cb69a66ff7f5d7756b269841b28becd5ac6951f94c2d397c5819fef`
 - `AbilityToken` (ERC-1155): `0x583fb029535b4f18d267ea1462ffd7f3a785edcd873c4fd305f8d787e3ccbcc`
 - Cartridge VRF provider: `0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f` (same address as sepolia; verified live)
 
