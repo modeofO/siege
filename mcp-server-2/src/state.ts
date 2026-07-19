@@ -213,6 +213,22 @@ export interface QueueStatusData {
   matched_match_id: number;
 }
 
+export interface EntryTokenData {
+  token: string;
+  amount: string; // u256 as decimal string (base units)
+  enabled: boolean;
+}
+
+export interface MatchPotData {
+  player_a: string;
+  token_a: string;
+  amount_a: string;
+  player_b: string;
+  token_b: string;
+  amount_b: string;
+  claimed: boolean;
+}
+
 function assertSafeInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer`);
@@ -337,6 +353,37 @@ export class StateClient {
       state: toNum(row.state),
       queued_at: toNum(row.queued_at),
       matched_match_id: toNum(row.matched_match_id),
+    };
+  }
+
+  async entryTokens(): Promise<EntryTokenData[]> {
+    const rows = await this.sql<Record<string, unknown>>(
+      `SELECT token, amount, enabled FROM "siege_dojo-EntryToken"`,
+    );
+    return rows
+      .filter((r) => toBool(r.enabled))
+      .map((r) => ({
+        token: String(r.token),
+        amount: BigInt(String(r.amount ?? "0")).toString(),
+        enabled: true,
+      }));
+  }
+
+  async matchPot(matchId: number): Promise<MatchPotData | null> {
+    assertSafeInteger(matchId, "match_id");
+    const rows = await this.sql<Record<string, unknown>>(
+      `SELECT player_a, token_a, amount_a, player_b, token_b, amount_b, claimed FROM "siege_dojo-MatchPot" WHERE match_id = ${u64SqlKey(matchId)} LIMIT 1`,
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      player_a: String(row.player_a),
+      token_a: String(row.token_a),
+      amount_a: BigInt(String(row.amount_a ?? "0")).toString(),
+      player_b: String(row.player_b),
+      token_b: String(row.token_b),
+      amount_b: BigInt(String(row.amount_b ?? "0")).toString(),
+      claimed: toBool(row.claimed),
     };
   }
 

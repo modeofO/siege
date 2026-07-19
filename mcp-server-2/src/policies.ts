@@ -106,11 +106,33 @@ export function buildPolicies(
   if (contracts.matchmaking) {
     policies.contracts[contracts.matchmaking] = {
       methods: [
-        m("queue_for_match", "Join the matchmaking queue, poke the heartbeat, or get paired"),
+        m("queue_for_match", "Join the matchmaking queue (entry buy-in charged on pairing)"),
         m("leave_queue", "Leave the matchmaking queue"),
+        m("claim_winnings", "Pay out a finished queue match's entry pot"),
         ...DOJO_METHODS,
       ],
     };
+    // Entry buy-in approvals (STRK / ETH / LORDS), scoped to matchmaking.
+    // Cartridge requires spender + amount on approve policies; the cap is
+    // far above any sane buy-in.
+    const entryTokens = [
+      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+      "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+    ];
+    for (const addr of entryTokens) {
+      const existing = policies.contracts[addr]?.methods ?? [];
+      policies.contracts[addr] = {
+        methods: [
+          ...existing,
+          {
+            ...m("approve", "Approve matchmaking to pull the entry buy-in"),
+            spender: contracts.matchmaking,
+            amount: "0xffffffffffffffffffffffff",
+          },
+        ],
+      };
+    }
   }
 
   if (abilityTokenAddress) {

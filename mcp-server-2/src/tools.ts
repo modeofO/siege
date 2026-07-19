@@ -1606,20 +1606,75 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     return addr;
   };
 
+  // Mainnet entry buy-in tokens (symbol shorthand for the queue tool).
+  const ENTRY_TOKEN_SYMBOLS: Record<string, string> = {
+    strk: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+    eth: "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+    lords: "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+  };
+
+  const resolveEntryToken = (token: string): string => {
+    const bySymbol = ENTRY_TOKEN_SYMBOLS[token.toLowerCase()];
+    if (bySymbol) return bySymbol;
+    if (/^0x[0-9a-fA-F]+$/.test(token)) return token;
+    throw new Error(`Unknown entry token '${token}' — use strk, lords, eth, or a 0x address`);
+  };
+
+  // The buy-in is pulled by transfer_from in the PAIRING tx, so the
+  // matchmaking contract needs an allowance before queueing. Approve is a
+  // separate receipt-awaited tx: the VRF wrap requires request_random as
+  // call[0] with the game call immediately after.
+  const ensureEntryAllowance = async (
+    ctx: ToolContext,
+    mm: string,
+    token: string,
+    amount: bigint,
+  ): Promise<boolean> => {
+    if (amount === 0n) return false;
+    const res = await ctx.signer!.callContract({
+      contractAddress: token,
+      entrypoint: "allowance",
+      calldata: [ctx.agentAddress, mm],
+    });
+    const allowance = (BigInt(res[1] ?? "0x0") << 128n) + BigInt(res[0] ?? "0x0");
+    if (allowance >= amount) return false;
+    const low = "0x" + (amount & ((1n << 128n) - 1n)).toString(16);
+    const high = "0x" + (amount >> 128n).toString(16);
+    await execute(ctx.signer!, [call(token, "approve", [mm, low, high])]);
+    return true;
+  };
+
   register(
     "siege_queue_for_match",
     {
       description:
-        "Join the 1v1 matchmaking queue (practice rules, no stakes). Submits vRNG request_random + matchmaking.queue_for_match. If another player is already waiting, THIS tx creates the match and the result includes match_id. Otherwise you are enqueued for a fixed 10-minute window — poll siege_queue_status (free, no tx) until state=matched; do NOT re-call this tool as a heartbeat, each call is a sponsored tx. Re-call only after the window expires to re-queue. Requires a registered Hold.",
-      inputSchema: {},
+        "Join the 1v1 matchmaking queue. Entry buy-in (token param: strk|lords|eth or 0x address; amounts come from on-chain EntryToken config) is charged only when a match forms — winner later takes 65% of the pot via siege_claim_winnings. Approves the token if needed, then submits vRNG request_random + matchmaking.queue_for_match. If another player is already waiting, THIS tx creates the match and escrows both buy-ins; result includes match_id. Otherwise you are enqueued for a fixed 10-minute window — poll siege_queue_status (free, no tx) until state=matched; do NOT re-call this tool as a heartbeat, each call is a sponsored tx. Re-call only after the window expires to re-queue. Requires a registered Hold.",
+      inputSchema: {
+        token: z.string().default("strk").describe("Entry token: strk, lords, eth, or 0x address"),
+      },
       requiresSigner: true,
     },
-    async (_args, ctx) => {
+    async ({ token }, ctx) => {
       const mm = requireMatchmaking(ctx);
+      const tokenAddr = resolveEntryToken(token);
+
+      const entries = await ctx.state.entryTokens().catch(() => []);
+      const entry = entries.find(
+        (e) => BigInt(e.token) === BigInt(tokenAddr),
+      );
+      if (entries.length > 0 && !entry) {
+        throw new Error(
+          `Entry token ${token} is not enabled. Enabled: ${entries.map((e) => e.token).join(", ")}`,
+        );
+      }
+      const amount = BigInt(entry?.amount ?? "0");
+      const approved = await ensureEntryAllowance(ctx, mm, tokenAddr, amount);
+
       const tx = await execute(ctx.signer!, [
         vrfRequestRandom(ctx.config.vrfAddress, mm),
-        call(mm, "queue_for_match", []),
+        call(mm, "queue_for_match", [tokenAddr]),
       ]);
+      const buyIn = { token: tokenAddr, amount: amount.toString(), approval_tx_sent: approved };
       // Give Torii a moment, then report where we landed.
       if (ctx.agentAddress) {
         const deadline = Date.now() + 15000;
@@ -1627,14 +1682,21 @@ export function registerSiegeTools(reg: RegisterArgs): void {
           const status = await ctx.state.queueStatus(ctx.agentAddress).catch(() => null);
           if (status?.state === 2) {
             ctx.watchMatch(status.matched_match_id);
-            return { tx_hash: tx, result: "matched", match_id: status.matched_match_id };
+            return {
+              tx_hash: tx,
+              result: "matched",
+              match_id: status.matched_match_id,
+              buy_in: buyIn,
+              guidance: "Buy-ins are escrowed. After the match finishes, call siege_claim_winnings.",
+            };
           }
           if (status?.state === 1) {
             return {
               tx_hash: tx,
               result: "queued",
+              buy_in: buyIn,
               guidance:
-                "Poll siege_queue_status (free) for state=matched. Entry stays valid ~10 minutes; only re-call siege_queue_for_match after that to re-queue.",
+                "Nothing charged yet — the buy-in transfers only when a match forms. Poll siege_queue_status (free) for state=matched. Entry stays valid ~10 minutes; only re-call siege_queue_for_match after that to re-queue.",
             };
           }
           await new Promise((r) => setTimeout(r, 1500));
@@ -1643,8 +1705,29 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       return {
         tx_hash: tx,
         result: "submitted",
+        buy_in: buyIn,
         warning: "QueueStatus not yet indexed by Torii — poll siege_queue_status",
       };
+    },
+  );
+
+  register(
+    "siege_claim_winnings",
+    {
+      description:
+        "Pay out a finished queue-made match's entry pot (permissionless). Winner receives 65% of each side's buy-in; treasury the remainder; a draw refunds both players in full. Reverts if the match is not finished or the pot was already claimed.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative(),
+      },
+      requiresSigner: true,
+    },
+    async ({ match_id }, ctx) => {
+      const mm = requireMatchmaking(ctx);
+      const pot = await ctx.state.matchPot(match_id);
+      if (!pot) throw new Error(`No entry pot for match ${match_id} (not a queue-made match?)`);
+      if (pot.claimed) throw new Error(`Pot for match ${match_id} already claimed`);
+      const tx = await execute(ctx.signer!, [call(mm, "claim_winnings", [String(match_id)])]);
+      return { tx_hash: tx, pot };
     },
   );
 
