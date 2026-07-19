@@ -164,8 +164,18 @@ pub mod actions_1v1 {
         ) -> u64 {
             let mut world = self.world_default();
             let caller = get_caller_address();
-            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
-            assert(caller == world_sys_addr, 'Only world_system');
+            // Either contract may be absent from a given world (matchmaking on
+            // older deployments, world_system in lean test worlds) — dns
+            // returns Option, never unwrap it here.
+            let from_world_system = match world.dns(@"world_system") {
+                Option::Some((ws_addr, _)) => caller == ws_addr,
+                Option::None => false,
+            };
+            let from_matchmaking = match world.dns(@"matchmaking") {
+                Option::Some((mm_addr, _)) => caller == mm_addr,
+                Option::None => false,
+            };
+            assert(from_world_system || from_matchmaking, 'Unauthorized delegate');
 
             setup_match(ref world, player_a, player_b, random_value)
         }

@@ -24,6 +24,7 @@ pub mod models {
     pub mod faction_invite;
     pub mod player_cosmetics;
     pub mod conquest_cooldown;
+    pub mod match_queue;
 }
 
 pub mod tokens;
@@ -39,6 +40,7 @@ pub mod systems {
     pub mod crafting_1v1;
     pub mod world_system;
     pub mod conquest;
+    pub mod matchmaking;
 }
 
 #[cfg(test)]
@@ -63,4 +65,5 @@ pub mod tests {
     pub mod test_ability_tiers;
     pub mod test_pillaging;
     pub mod test_factions;
+    pub mod test_matchmaking;
 }
