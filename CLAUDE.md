@@ -75,12 +75,14 @@ salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, abilit
 Budget is `10 + owned_resource_nodes + max(0, round - 6)` (endgame escalation, rounds 7-10). Trap cost is 2 each. Repair costs 2 budget per HP and is uncapped during resolution.
 
 Matchmaking (unstaked only): `matchmaking.queue_for_match` is a single-slot
-queue — poke if already head, enqueue if the slot is empty/stale (120 s
-heartbeat window, clients re-poke every 60 s), otherwise pair with the waiting
-player via `create_match_1v1_delegated` (waiting player = player_a). Clients
-always send the `[vrf request_random, queue_for_match]` multicall (the
-contract consumes unconditionally); `leave_queue` is always bare. Pairing is
-discovered by polling the `QueueStatus` model. Not yet migrated/deployed.
+queue — re-queue if already head, enqueue if the slot is empty/stale (fixed
+600 s validity window, NO heartbeat — every poke is a sponsored tx, so
+clients only poll Torii and re-queue after expiry), otherwise pair with the
+waiting player via `create_match_1v1_delegated` (waiting player = player_a).
+Clients always send the `[vrf request_random, queue_for_match]` multicall
+(the contract consumes unconditionally); `leave_queue` is always bare.
+Pairing is discovered by polling the `QueueStatus` model. Not yet
+migrated/deployed.
 
 Node contests resolve before gate damage: owning node `i` grants +1 defense at gate `i` the same round it is captured or held, plus +1 budget next round.
 

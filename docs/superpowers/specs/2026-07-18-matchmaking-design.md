@@ -9,7 +9,7 @@ Implements GitHub issue #8 (queue-based auto-matching), scoped down per brainsto
 | Scope | Unstaked matches only. Staked keeps manual create/join flow. |
 | Match trigger | Match-on-join: `queue_for_match` pairs with waiting player in the same tx, else enqueues caller. No `auto_match` crank. |
 | Brackets | None in v1. FIFO pair-anyone. `PlayerReputation.bracket` untouched; bracket filtering is v2. |
-| Staleness | Heartbeat via poke. Entries older than `STALE_SECONDS = 120` are dead; frontend re-pokes every ~60s while searching. |
+| Staleness | Fixed validity window, no heartbeat (revised post-implementation for paymaster cost — every poke is a sponsored tx). Entries older than `STALE_SECONDS = 600` are dead; frontend shows "search expired" and offers re-queue. |
 | Placement | New `matchmaking` Dojo contract (approach A). Battle contracts untouched except one guard line. |
 
 Because there are no compatibility filters, the queue can never hold more than

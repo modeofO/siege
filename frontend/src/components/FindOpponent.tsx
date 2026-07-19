@@ -9,11 +9,11 @@ import {
   leaveQueue,
   fetchQueueStatus,
   QUEUE_MATCHED,
-  POKE_INTERVAL_MS,
+  SEARCH_EXPIRY_MS,
   POLL_INTERVAL_MS,
 } from "@/lib/matchmaking";
 
-type Phase = "idle" | "starting" | "searching" | "matched";
+type Phase = "idle" | "starting" | "searching" | "matched" | "expired";
 
 export function FindOpponent({ registered }: { registered: boolean }) {
   const { account, address } = useAccount();
@@ -31,7 +31,15 @@ export function FindOpponent({ registered }: { registered: boolean }) {
     searchingRef.current = true;
 
     const startedAt = Date.now();
-    const tick = setInterval(() => setElapsed(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    const tick = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startedAt) / 1000));
+      // Contract entry expires after its fixed window — no heartbeat txs.
+      // Surface that instead of searching forever on a dead entry.
+      if (Date.now() - startedAt >= SEARCH_EXPIRY_MS && searchingRef.current) {
+        searchingRef.current = false;
+        setPhase("expired");
+      }
+    }, 1000);
 
     const poll = setInterval(async () => {
       if (!searchingRef.current) return;
@@ -48,21 +56,10 @@ export function FindOpponent({ registered }: { registered: boolean }) {
       }
     }, POLL_INTERVAL_MS);
 
-    // Heartbeat: contract entries go stale after 120s; re-poke at 60s.
-    const poke = setInterval(async () => {
-      if (!searchingRef.current) return;
-      try {
-        await queueForMatch(account);
-      } catch (e) {
-        console.warn("[FindOpponent] poke failed:", extractErrorMsg(e));
-      }
-    }, POKE_INTERVAL_MS);
-
     return () => {
       searchingRef.current = false;
       clearInterval(tick);
       clearInterval(poll);
-      clearInterval(poke);
     };
   }, [phase, account, address, router]);
 
@@ -93,6 +90,23 @@ export function FindOpponent({ registered }: { registered: boolean }) {
     }
   };
 
+  if (phase === "expired") {
+    return (
+      <div className="space-y-4 text-center">
+        <div className="text-sm text-[#c8a44e] tracking-wider">SEARCH EXPIRED</div>
+        <div className="text-xs text-[#6a6a7a]">
+          No opponent found within 10 minutes. Queue up again when you&apos;re ready.
+        </div>
+        <button
+          onClick={handleFind}
+          className="px-6 py-2 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded text-sm hover:bg-[#ffd700]/20 transition-colors tracking-wider"
+        >
+          SEARCH AGAIN
+        </button>
+      </div>
+    );
+  }
+
   if (!registered) {
     return (
       <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5">
@@ -109,7 +123,7 @@ export function FindOpponent({ registered }: { registered: boolean }) {
         </div>
         <div className="text-xs text-[#6a6a7a]">
           {Math.floor(elapsed / 60)}:{String(elapsed % 60).padStart(2, "0")} — first player to queue up
-          gets matched with you instantly. Keep this page open.
+          gets matched with you instantly. Search expires after 10 minutes.
         </div>
         {phase === "searching" && (
           <button

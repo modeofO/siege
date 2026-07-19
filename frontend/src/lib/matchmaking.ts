@@ -22,9 +22,11 @@ export const QUEUE_IDLE = 0;
 export const QUEUE_QUEUED = 1;
 export const QUEUE_MATCHED = 2;
 
-// Contract heartbeat window is 120s; poke at half that so one dropped tx
-// doesn't stale us out.
-export const POKE_INTERVAL_MS = 60_000;
+// Contract queue entries live for a fixed 600s window (no heartbeat — every
+// poke would be a sponsored tx). Stop searching a touch early so the UI never
+// shows "searching" for an entry the contract already considers dead.
+export const QUEUE_WINDOW_MS = 600_000;
+export const SEARCH_EXPIRY_MS = QUEUE_WINDOW_MS - 15_000;
 export const POLL_INTERVAL_MS = 3_000;
 
 export interface QueueStatusRow {

@@ -1610,7 +1610,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_queue_for_match",
     {
       description:
-        "Join the 1v1 matchmaking queue (practice rules, no stakes). Submits vRNG request_random + matchmaking.queue_for_match. If another player is already waiting, THIS tx creates the match and the result includes match_id. Otherwise you are enqueued: re-call this tool every ~60 seconds as a heartbeat (entries go stale after 120s) and poll siege_queue_status until state=matched. Requires a registered Hold.",
+        "Join the 1v1 matchmaking queue (practice rules, no stakes). Submits vRNG request_random + matchmaking.queue_for_match. If another player is already waiting, THIS tx creates the match and the result includes match_id. Otherwise you are enqueued for a fixed 10-minute window — poll siege_queue_status (free, no tx) until state=matched; do NOT re-call this tool as a heartbeat, each call is a sponsored tx. Re-call only after the window expires to re-queue. Requires a registered Hold.",
       inputSchema: {},
       requiresSigner: true,
     },
@@ -1634,7 +1634,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
               tx_hash: tx,
               result: "queued",
               guidance:
-                "Re-call siege_queue_for_match every ~60s (heartbeat) and poll siege_queue_status for state=matched.",
+                "Poll siege_queue_status (free) for state=matched. Entry stays valid ~10 minutes; only re-call siege_queue_for_match after that to re-queue.",
             };
           }
           await new Promise((r) => setTimeout(r, 1500));

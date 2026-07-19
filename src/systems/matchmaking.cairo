@@ -25,10 +25,12 @@ pub mod matchmaking {
     const VRF_PROVIDER_ADDRESS: felt252 =
         0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f;
 
-    // A queue entry is dead this many seconds after its last poke. The
-    // frontend re-pokes every 60s while the search UI is open, so a fresh
-    // entry implies a live client.
-    pub const STALE_SECONDS: u64 = 120;
+    // Fixed validity window: a queue entry is dead this many seconds after
+    // it was created (or last refreshed by an explicit re-queue). There is no
+    // heartbeat — every poke would be a sponsored tx, and the paymaster bill
+    // adds up. A player who walks away can be matched for up to this window;
+    // the opponent recovers via the existing force_timeout zero-commit path.
+    pub const STALE_SECONDS: u64 = 600;
 
     pub const QUEUE_STATE_IDLE: u8 = 0;
     pub const QUEUE_STATE_QUEUED: u8 = 1;
@@ -80,7 +82,8 @@ pub mod matchmaking {
 
             let mut slot: QueueSlot = world.read_model(0_u8);
 
-            // Poke: caller is already the waiting head — refresh heartbeat.
+            // Re-queue: caller is already the waiting head — restart their
+            // validity window (e.g. clicked Find again after expiry).
             if slot.player == caller {
                 slot.queued_at = now;
                 world.write_model(@slot);
