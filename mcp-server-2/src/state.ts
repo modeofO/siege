@@ -207,6 +207,12 @@ export interface PlayerCosmeticsData {
   hold_decoration: string | null;
 }
 
+export interface QueueStatusData {
+  state: number; // 0 idle, 1 queued, 2 matched
+  queued_at: number;
+  matched_match_id: number;
+}
+
 function assertSafeInteger(value: number, label: string): void {
   if (!Number.isSafeInteger(value) || value < 0) {
     throw new Error(`${label} must be a non-negative safe integer`);
@@ -317,6 +323,20 @@ export class StateClient {
       await new Promise((r) => setTimeout(r, 1500));
     }
     return null;
+  }
+
+  async queueStatus(player: string): Promise<QueueStatusData | null> {
+    const norm = "0x" + player.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+    const rows = await this.sql<Record<string, unknown>>(
+      `SELECT state, queued_at, matched_match_id FROM "siege_dojo-QueueStatus" WHERE player = '${norm}' LIMIT 1`,
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      state: toNum(row.state),
+      queued_at: toNum(row.queued_at),
+      matched_match_id: toNum(row.matched_match_id),
+    };
   }
 
   async matchState(matchId: number): Promise<MatchStateData> {

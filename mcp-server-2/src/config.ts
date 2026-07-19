@@ -46,6 +46,8 @@ export interface SiegeContracts {
   crafting1v1: string;
   resolution1v1: string;
   worldSystem: string;
+  // null until the deployed manifest includes siege_dojo-matchmaking
+  matchmaking: string | null;
 }
 
 function required(name: string, value: string | undefined): string {
@@ -61,6 +63,13 @@ function findContract(manifest: DojoManifest, tag: string): string {
   const entry = manifest.contracts.find((c) => c.tag === tag);
   if (!entry) throw new Error(`Contract not found in manifest: ${tag}`);
   return entry.address;
+}
+
+// findContract throws on a missing tag — that would kill MCP startup on every
+// pre-migrate manifest, so contracts that may not be deployed yet resolve to
+// null instead and their tools error at call time.
+function findContractOptional(manifest: DojoManifest, tag: string): string | null {
+  return manifest.contracts.find((c) => c.tag === tag)?.address ?? null;
 }
 
 export function loadConfig(): Config {
@@ -83,6 +92,7 @@ export function loadConfig(): Config {
     crafting1v1: findContract(manifest, "siege_dojo-crafting_1v1"),
     resolution1v1: findContract(manifest, "siege_dojo-resolution_1v1"),
     worldSystem: findContract(manifest, "siege_dojo-world_system"),
+    matchmaking: findContractOptional(manifest, "siege_dojo-matchmaking"),
   };
 
   const resourceTokens: ResourceTokenAddresses = {

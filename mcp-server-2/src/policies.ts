@@ -103,6 +103,16 @@ export function buildPolicies(
     },
   };
 
+  if (contracts.matchmaking) {
+    policies.contracts[contracts.matchmaking] = {
+      methods: [
+        m("queue_for_match", "Join the matchmaking queue, poke the heartbeat, or get paired"),
+        m("leave_queue", "Leave the matchmaking queue"),
+        ...DOJO_METHODS,
+      ],
+    };
+  }
+
   if (abilityTokenAddress) {
     policies.contracts[abilityTokenAddress] = {
       methods: [m("set_approval_for_all", "Approve or revoke world_system as ability-token operator")],

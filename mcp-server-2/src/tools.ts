@@ -1596,6 +1596,91 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     },
   );
 
+  const requireMatchmaking = (ctx: ToolContext): string => {
+    const addr = ctx.config.contracts.matchmaking;
+    if (!addr) {
+      throw new Error(
+        "matchmaking contract not found in manifest — not deployed on this network yet",
+      );
+    }
+    return addr;
+  };
+
+  register(
+    "siege_queue_for_match",
+    {
+      description:
+        "Join the 1v1 matchmaking queue (practice rules, no stakes). Submits vRNG request_random + matchmaking.queue_for_match. If another player is already waiting, THIS tx creates the match and the result includes match_id. Otherwise you are enqueued: re-call this tool every ~60 seconds as a heartbeat (entries go stale after 120s) and poll siege_queue_status until state=matched. Requires a registered Hold.",
+      inputSchema: {},
+      requiresSigner: true,
+    },
+    async (_args, ctx) => {
+      const mm = requireMatchmaking(ctx);
+      const tx = await execute(ctx.signer!, [
+        vrfRequestRandom(ctx.config.vrfAddress, mm),
+        call(mm, "queue_for_match", []),
+      ]);
+      // Give Torii a moment, then report where we landed.
+      if (ctx.agentAddress) {
+        const deadline = Date.now() + 15000;
+        while (Date.now() < deadline) {
+          const status = await ctx.state.queueStatus(ctx.agentAddress).catch(() => null);
+          if (status?.state === 2) {
+            ctx.watchMatch(status.matched_match_id);
+            return { tx_hash: tx, result: "matched", match_id: status.matched_match_id };
+          }
+          if (status?.state === 1) {
+            return {
+              tx_hash: tx,
+              result: "queued",
+              guidance:
+                "Re-call siege_queue_for_match every ~60s (heartbeat) and poll siege_queue_status for state=matched.",
+            };
+          }
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+      return {
+        tx_hash: tx,
+        result: "submitted",
+        warning: "QueueStatus not yet indexed by Torii — poll siege_queue_status",
+      };
+    },
+  );
+
+  register(
+    "siege_leave_queue",
+    {
+      description: "Leave the 1v1 matchmaking queue. Safe to call when not queued.",
+      inputSchema: {},
+      requiresSigner: true,
+    },
+    async (_args, ctx) => {
+      const mm = requireMatchmaking(ctx);
+      const tx = await execute(ctx.signer!, [call(mm, "leave_queue", [])]);
+      return { tx_hash: tx };
+    },
+  );
+
+  register(
+    "siege_queue_status",
+    {
+      description:
+        "Read a player's matchmaking QueueStatus (state: 0 idle / 1 queued / 2 matched, matched_match_id). Defaults to the signing account.",
+      inputSchema: {
+        player: z.string().min(3).optional().describe("Address to check; defaults to the agent account"),
+      },
+    },
+    async ({ player }, ctx) => {
+      const addr = player ?? ctx.agentAddress;
+      if (!addr) throw new Error("No player address given and agent not yet authenticated");
+      const status = await ctx.state.queueStatus(addr);
+      if (!status) return { player: addr, state: "idle", note: "no QueueStatus row — never queued" };
+      const label = status.state === 2 ? "matched" : status.state === 1 ? "queued" : "idle";
+      return { player: addr, ...status, state: label };
+    },
+  );
+
   register(
     "siege_commit",
     {
