@@ -76,6 +76,18 @@ export class SponsorshipUnavailableError extends Error {
   }
 }
 
+// Gas price can tick up between the keychain's fee estimate and sequencer
+// acceptance, failing with "Resource bounds were not satisfied" even though
+// the shortfall is a fraction of a percent. A fresh attempt re-estimates at
+// the current price, so this is worth exactly one retry.
+export function isStaleFeeBounds(e: unknown): boolean {
+  const msg = errorMessage(e).toLowerCase();
+  return (
+    msg.includes("resource bounds were not satisfied") ||
+    msg.includes("lower than the actual gas price")
+  );
+}
+
 function throwSessionError(reply: ExecuteReply): never {
   const err = "error" in reply ? reply.error : undefined;
   if (err) throw err;
@@ -121,6 +133,20 @@ async function executeWithSession(
   throwSessionError(reply);
 }
 
+async function executeWithSessionRetryingBounds(
+  controller: ControllerProviderWithSession,
+  calls: Call[],
+  feeSource: FeeSource,
+): Promise<InvokeFunctionResponse> {
+  try {
+    return await executeWithSession(controller, calls, feeSource);
+  } catch (e) {
+    if (!isStaleFeeBounds(e)) throw e;
+    console.warn("[siege] Fee bounds went stale (gas price moved), retrying with fresh estimate:", e);
+    return executeWithSession(controller, calls, feeSource);
+  }
+}
+
 // With propagateSessionErrors:true, account.execute() rejects on session
 // failures without ever opening the Controller window. openExecute() is the
 // explicit interactive path: it opens the keychain UI, lets the user confirm
@@ -154,7 +180,7 @@ export async function resilientExecute(
 
   const callArray = toArray(calls);
   try {
-    return await executeWithSession(controller, callArray, FeeSource.PAYMASTER);
+    return await executeWithSessionRetryingBounds(controller, callArray, FeeSource.PAYMASTER);
   } catch (e) {
     if (isSponsorshipOutage(e)) {
       console.warn("[siege] Sponsorship provider outage, failing fast:", e);
@@ -163,7 +189,7 @@ export async function resilientExecute(
     if (!isPaymasterInfraError(e)) throw e;
     console.warn("[siege] Paymaster unavailable, retrying with CREDITS:", e);
     try {
-      return await executeWithSession(controller, callArray, FeeSource.CREDITS);
+      return await executeWithSessionRetryingBounds(controller, callArray, FeeSource.CREDITS);
     } catch (e2) {
       if (isSponsorshipOutage(e2)) {
         console.warn("[siege] Sponsorship provider outage, failing fast:", e2);
