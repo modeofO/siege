@@ -1,10 +1,10 @@
 // frontend/src/app/match-1v1/join/page.tsx
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, Suspense } from "react";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { joinStakedMatch, useAbilityBalances, useMatchEscrow } from "@/lib/stakedMatch";
 import { extractErrorMsg } from "@/lib/contracts1v1";
 import { usePlayerKingdom } from "@/lib/worldState";
@@ -18,27 +18,29 @@ import Link from "next/link";
 // Vercel and broke ability-balance loads.
 import { RPC_URL } from "@/lib/dojoConfig";
 
-export default function Join1v1Page() {
+function Join1v1PageInner() {
   const { account, address, status } = useAccount();
   const isConnected = status === "connected";
   const router = useRouter();
+  const searchParams = useSearchParams();
 
-  const [matchIdInput, setMatchIdInput] = useState("");
+  const [matchIdInput, setMatchIdInput] = useState(() => searchParams.get("id") ?? "");
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [alreadyInMatch, setAlreadyInMatch] = useState(false);
+  const [matchStatus, setMatchStatus] = useState<string | null>(null);
 
   const matchId = matchIdInput.trim() || null;
   const escrow = useMatchEscrow(matchId);
   const kingdom = usePlayerKingdom(address ?? null);
 
   useEffect(() => {
-    if (!matchId || !address) { setAlreadyInMatch(false); return; }
+    if (!matchId || !address) { setAlreadyInMatch(false); setMatchStatus(null); return; }
     let cancelled = false;
     (async () => {
-      const rows = await toriiSql<{ player_a: string; player_b: string }>(
-        `SELECT player_a, player_b FROM "siege_dojo-MatchState1v1" WHERE match_id = ${sqlU64(matchId)}`,
+      const rows = await toriiSql<{ player_a: string; player_b: string; status: string }>(
+        `SELECT player_a, player_b, status FROM "siege_dojo-MatchState1v1" WHERE match_id = ${sqlU64(matchId)}`,
       );
       if (cancelled) return;
       if (rows.length > 0) {
@@ -46,12 +48,22 @@ export default function Join1v1Page() {
         const isParticipant =
           BigInt(rows[0].player_a) === addrBig || BigInt(rows[0].player_b) === addrBig;
         setAlreadyInMatch(isParticipant);
+        setMatchStatus(String(rows[0].status));
       } else {
         setAlreadyInMatch(false);
+        setMatchStatus(null);
       }
     })();
     return () => { cancelled = true; };
   }, [matchId, address]);
+
+  // A Pending match is a staked challenge by construction (only
+  // create_staked_match makes Pending matches). Never treat it as practice —
+  // that's the Torii-lag race that let players "join" without staking and
+  // land on an unplayable board.
+  const isPendingStaked = matchStatus === "Pending";
+  const stakedFlow = escrow.isStaked || isPendingStaked;
+  const wagerIndexed = escrow.loaded && escrow.isStaked;
   // MatchStakes1v1 has 3 stake slots per side; world_system caps at 3 regardless of tier.
   const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
 
@@ -68,9 +80,14 @@ export default function Join1v1Page() {
     if (!matchId || !account) return;
     setError("");
 
-    // Practice match path — no on-chain join, just navigate.
-    if (!escrow.isStaked) {
+    // Non-staked (Active) match — no on-chain join, just navigate.
+    if (!stakedFlow) {
       router.push(`/match-1v1/${matchId}`);
+      return;
+    }
+
+    if (!wagerIndexed) {
+      setError("Challenger's wager is still indexing — wait a moment and try again.");
       return;
     }
 
@@ -99,7 +116,7 @@ export default function Join1v1Page() {
     !!matchId &&
     isConnected &&
     !loading &&
-    (!escrow.isStaked || (kingdom.registered && !balancesError && selectedIds.length >= 1));
+    (!stakedFlow || (wagerIndexed && kingdom.registered && !balancesError && selectedIds.length >= 1));
 
   return (
     <div className="max-w-lg mx-auto mt-12 space-y-6">
@@ -140,9 +157,15 @@ export default function Join1v1Page() {
       {/* Match info (once loaded) — only show join flow if NOT already in the match */}
       {!alreadyInMatch && (
         <>
-          {matchId && escrow.loaded && !escrow.exists && !escrow.timedOut && (
+          {matchId && escrow.loaded && !escrow.exists && !escrow.timedOut && !isPendingStaked && (
             <div className="text-[11px] text-[#7a7060] border border-[#3d3428] rounded p-3 bg-[#1a1714]">
-              No staked match with this ID. If it&apos;s a practice match, you can proceed — the join is implicit.
+              No stakes found for this ID — joining takes you straight to the match.
+            </div>
+          )}
+
+          {isPendingStaked && !wagerIndexed && (
+            <div className="text-[11px] text-[#c8a44e] border border-[#c8a44e]/40 rounded p-3 bg-[#1a1714]">
+              Staked challenge found — loading the challenger&apos;s wager from the indexer...
             </div>
           )}
 
@@ -205,10 +228,19 @@ export default function Join1v1Page() {
             disabled={!canJoin}
             className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
           >
-            {loading ? "JOINING..." : escrow.isStaked ? "MATCH WAGER & JOIN" : "JOIN MATCH"}
+            {loading ? "JOINING..." : stakedFlow ? "MATCH WAGER & JOIN" : "JOIN MATCH"}
           </button>
         </>
       )}
     </div>
+  );
+}
+
+// useSearchParams requires a Suspense boundary in the app router.
+export default function Join1v1Page() {
+  return (
+    <Suspense fallback={null}>
+      <Join1v1PageInner />
+    </Suspense>
   );
 }

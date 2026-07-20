@@ -3,6 +3,7 @@
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAccount } from "@/app/providers";
 import {
@@ -866,6 +867,38 @@ export default function Match1v1Page() {
             Player B: <span className="font-mono">{state.playerB}</span>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Staked match awaiting acceptance — the board is unplayable (commit
+  // asserts Active on-chain), so gate it with an explicit accept/wait screen.
+  if (state.phase === "pending") {
+    return (
+      <div className="max-w-lg mx-auto mt-20 text-center space-y-6">
+        <div className="text-2xl font-bold tracking-widest font-serif text-[#c8a44e]">STAKED CHALLENGE</div>
+        {isPlayerB ? (
+          <>
+            <div className="text-sm text-[#7a7060] leading-relaxed">
+              You&apos;ve been challenged. Match the wager to accept — the game activates the moment
+              your stake is escrowed.
+            </div>
+            <Link
+              href={`/match-1v1/join?id=${matchId}`}
+              className="inline-block px-8 py-3 bg-[#c8a44e]/10 border border-[#c8a44e]/40 text-[#c8a44e] rounded hover:bg-[#c8a44e]/20 transition-colors tracking-wider text-sm font-serif"
+            >
+              ACCEPT — STAKE YOUR WAGER
+            </Link>
+          </>
+        ) : isPlayerA ? (
+          <div className="text-sm text-[#7a7060] leading-relaxed">
+            Waiting for your opponent to accept the challenge and match your wager. Share match ID{" "}
+            <span className="font-mono text-[#c8a44e]">{matchId}</span>. You can cancel from the
+            create page while it&apos;s unaccepted (your stake is refunded).
+          </div>
+        ) : (
+          <div className="text-sm text-[#7a7060]">This staked match has not been accepted yet.</div>
+        )}
       </div>
     );
   }

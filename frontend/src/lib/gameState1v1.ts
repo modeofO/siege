@@ -60,7 +60,7 @@ export interface MatchState1v1 {
   playerA: string;
   playerB: string;
   round: number;
-  phase: "committing" | "revealing" | "resolving" | "finished";
+  phase: "pending" | "committing" | "revealing" | "resolving" | "finished";
   vaultAHp: number;
   vaultBHp: number;
   nodes: [NodeOwner, NodeOwner, NodeOwner];
@@ -173,6 +173,10 @@ export function useMatchState1v1(matchId: string | null) {
     let phase: MatchState1v1["phase"] = "committing";
     if (status === "Finished") {
       phase = "finished";
+    } else if (status === "Pending") {
+      // Staked match awaiting player B's join_staked_match. Without this the
+      // board renders as playable while every commit reverts on-chain.
+      phase = "pending";
     } else {
       const rm = flatModels<RoundMoves1v1Model>(roundMoves).find(
         (r) => safeBigIntEq(r.match_id, idBig) && safeNumEq(r.round, round),
