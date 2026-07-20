@@ -148,6 +148,9 @@ export async function ensureEntryAllowance(
   const allowance = (high << BigInt(128)) + low;
   if (allowance >= amount) return;
 
+  // Approve ~10 games worth so players sign one approve tx per ten queues,
+  // not one per queue. Stays under the session-policy cap (~20 games).
+  const grant = amount * BigInt(10);
   const tx = await resilientExecute(
     account,
     {
@@ -155,8 +158,8 @@ export async function ensureEntryAllowance(
       entrypoint: "approve",
       calldata: [
         MATCHMAKING_ADDRESS,
-        "0x" + (amount & ((BigInt(1) << BigInt(128)) - BigInt(1))).toString(16),
-        "0x" + (amount >> BigInt(128)).toString(16),
+        "0x" + (grant & ((BigInt(1) << BigInt(128)) - BigInt(1))).toString(16),
+        "0x" + (grant >> BigInt(128)).toString(16),
       ],
     },
     TX_OPTS,

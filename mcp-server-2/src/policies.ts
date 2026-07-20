@@ -113,14 +113,14 @@ export function buildPolicies(
       ],
     };
     // Entry buy-in approvals (STRK / ETH / LORDS), scoped to matchmaking.
-    // Cartridge requires spender + amount on approve policies; the cap is
-    // far above any sane buy-in.
-    const entryTokens = [
-      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
-      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
-      "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+    // Cartridge requires spender + amount on approve policies, and the amount
+    // is SHOWN at session approval — cap at ~20 games worth, not uint-max.
+    const entryTokens: Array<[string, string]> = [
+      ["0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", "0x1b1ae4d6e2ef500000"], // STRK 500
+      ["0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", "0x2386f26fc10000"], // ETH 0.01
+      ["0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49", "0x10f0cf064dd59200000"], // LORDS 5000
     ];
-    for (const addr of entryTokens) {
+    for (const [addr, cap] of entryTokens) {
       const existing = policies.contracts[addr]?.methods ?? [];
       policies.contracts[addr] = {
         methods: [
@@ -128,7 +128,7 @@ export function buildPolicies(
           {
             ...m("approve", "Approve matchmaking to pull the entry buy-in"),
             spender: contracts.matchmaking,
-            amount: "0xffffffffffffffffffffffff",
+            amount: cap,
           },
         ],
       };

@@ -10,7 +10,7 @@ import {
   WORLD_SYSTEM_ADDRESS,
   CONQUEST_ADDRESS,
   MATCHMAKING_ADDRESS,
-  ENTRY_TOKEN_ADDRESSES,
+  ENTRY_TOKEN_CAPS,
   VRF_PROVIDER_ADDRESS,
 } from "@/lib/contractAddresses";
 import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
@@ -118,18 +118,20 @@ export const SESSION_POLICIES: SessionPolicies = {
             ],
           },
           // Entry buy-in approvals, scoped to the matchmaking contract.
-          // Cartridge requires spender + amount on approve policies. The cap
-          // (2^96-1 ≈ 8e10 tokens at 18 decimals) is far above any buy-in.
+          // Cartridge requires spender + amount on approve policies, and the
+          // amount is SHOWN to the player at session approval — keep caps at
+          // roughly 20 games worth, not uint-max (a 2-million-token cap on
+          // the consent screen reads as a wallet drain).
           ...Object.fromEntries(
-            ENTRY_TOKEN_ADDRESSES.map((addr) => [
-              addr,
+            ENTRY_TOKEN_CAPS.map(({ address, cap }) => [
+              address,
               {
                 methods: [
                   {
                     name: "Approve Entry",
                     entrypoint: "approve",
                     spender: MATCHMAKING_ADDRESS,
-                    amount: "0xffffffffffffffffffffffff",
+                    amount: cap,
                   } as Method,
                 ],
               },

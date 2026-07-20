@@ -1638,8 +1638,11 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     });
     const allowance = (BigInt(res[1] ?? "0x0") << 128n) + BigInt(res[0] ?? "0x0");
     if (allowance >= amount) return false;
-    const low = "0x" + (amount & ((1n << 128n) - 1n)).toString(16);
-    const high = "0x" + (amount >> 128n).toString(16);
+    // Approve ~10 games worth — one approve tx per ten queues, under the
+    // session-policy cap (~20 games).
+    const grant = amount * 10n;
+    const low = "0x" + (grant & ((1n << 128n) - 1n)).toString(16);
+    const high = "0x" + (grant >> 128n).toString(16);
     await execute(ctx.signer!, [call(token, "approve", [mm, low, high])]);
     return true;
   };

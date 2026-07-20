@@ -80,10 +80,24 @@ export const MATCHMAKING_ADDRESS = contractAddress(
 // (address-only module) so sessionPolicies can build approve policies without
 // pulling the controllerSession import cycle. The actual menu players see is
 // driven by on-chain EntryToken rows; this list only feeds session policies.
-export const ENTRY_TOKEN_ADDRESSES: string[] = IS_MAINNET
+// Caps are the approve ceiling SHOWN on the Cartridge consent screen — sized
+// at roughly 20 games worth of buy-ins, deliberately not uint-max.
+export const ENTRY_TOKEN_CAPS: { address: string; cap: string }[] = IS_MAINNET
   ? [
-      "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d", // STRK
-      "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7", // ETH
-      "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49", // LORDS
+      {
+        // STRK — cap 500
+        address: "0x04718f5a0fc34cc1af16a1cdee98ffb20c31f5cd61d6ab07201858f4287c938d",
+        cap: "0x1b1ae4d6e2ef500000",
+      },
+      {
+        // ETH — cap 0.01
+        address: "0x049d36570d4e46f48e99674bd3fcc84644ddd6b96f7c741b1562b82f9e004dc7",
+        cap: "0x2386f26fc10000",
+      },
+      {
+        // LORDS — cap 5000
+        address: "0x0124aeb495b947201f5fac96fd1138e326ad86195b98df6dec9009158a533b49",
+        cap: "0x10f0cf064dd59200000",
+      },
     ]
   : [];
