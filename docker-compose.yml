@@ -14,6 +14,10 @@ services:
     platform: linux/amd64
     volumes:
       - .:/app
+      # Persist the scarb registry cache — without it every run re-clones
+      # dojo/openzeppelin from GitHub, which trips anonymous-clone rate
+      # limits on busy days ("failed to clone ... exit status: 128").
+      - scarb-cache:/root/.cache/scarb
     profiles:
       - tools
 
@@ -54,3 +58,4 @@ services:
 
 volumes:
   torii-sepolia-db:
+  scarb-cache:

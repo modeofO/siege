@@ -88,7 +88,7 @@
     },
     {
       "address": "0x44da6123cb69a66ff7f5d7756b269841b28becd5ac6951f94c2d397c5819fef",
-      "class_hash": "0x30fffcd3a39b0d99dcfb11ba39bab4b1179da15a69b5c5d73b12cf4a7e82522",
+      "class_hash": "0x8c267ae1b93b5ded57976917e11de248617574a992cb6663a40b6e91c9eda6",
       "init_calldata": [],
       "tag": "siege_dojo-matchmaking",
       "selector": "0x2e00e2530b02272b8731718900abdfdf06707490d0a6b9ab82b1278eb64725",
@@ -1055,9 +1055,24 @@
           "name": "amount",
           "type": "core::integer::u256",
           "key": false
+        },
+        {
+          "name": "ability_1",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "ability_2",
+          "type": "core::integer::u8",
+          "key": false
+        },
+        {
+          "name": "ability_3",
+          "type": "core::integer::u8",
+          "key": false
         }
       ],
-      "class_hash": "0xc8c44bd51460d3e01d6783d0b8212c37b8b829f5d1dca4cc00df2299a97532",
+      "class_hash": "0x349bab3e03a53e91425e3cbf3f7be0c277fe4de1499b87dab42cf3109bd7d88",
       "tag": "siege_dojo-QueueSlot",
       "selector": "0x4cecbf773707bf4388d1d49bbdb45301b9906ee5e80b1342e0c5abcab861b86"
     },
@@ -4328,6 +4343,18 @@
         {
           "name": "amount",
           "type": "core::integer::u256"
+        },
+        {
+          "name": "ability_1",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ability_2",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ability_3",
+          "type": "core::integer::u8"
         }
       ]
     },
@@ -4350,6 +4377,18 @@
         {
           "name": "amount",
           "type": "core::integer::u256"
+        },
+        {
+          "name": "ability_1",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ability_2",
+          "type": "core::integer::u8"
+        },
+        {
+          "name": "ability_3",
+          "type": "core::integer::u8"
         }
       ]
     },
@@ -6298,6 +6337,10 @@
             {
               "name": "token",
               "type": "core::starknet::contract_address::ContractAddress"
+            },
+            {
+              "name": "abilities",
+              "type": "core::array::Array::<core::integer::u8>"
             }
           ],
           "outputs": [
