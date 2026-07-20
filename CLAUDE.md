@@ -74,24 +74,28 @@ salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, abilit
 
 Budget is `10 + owned_resource_nodes + max(0, round - 6)` (endgame escalation, rounds 7-10). Trap cost is 2 each. Repair costs 2 budget per HP and is uncapped during resolution.
 
-Matchmaking (paid entry): `matchmaking.queue_for_match(token)` is a
-single-slot queue — re-queue if already head, enqueue if the slot is
-empty/stale (fixed 600 s validity window, NO heartbeat — every poke is a
-sponsored tx, so clients only poll Torii and re-queue after expiry),
-otherwise pair with the waiting player via `create_match_1v1_delegated`
-(waiting player = player_a). Entry buy-ins (owner-managed `EntryToken`
-allowlist: STRK/ETH/LORDS on mainnet; allowance+balance checked at queue
-time) are `transfer_from`-escrowed only in the pairing tx and recorded in
-`MatchPot`; permissionless `claim_winnings(match_id)` pays the winner
-`winner_bps` (6500) of each side's buy-in per-token and the treasury the
-rest — draws refund in full. Clients always send the
-`[vrf request_random, queue_for_match]` multicall (the contract consumes
-unconditionally); `leave_queue` and `claim_winnings` are always bare.
-Pairing is discovered by polling the `QueueStatus` model. Free practice
-matches were removed from the UI and paymaster (create_match_1v1 stays
-on-chain but unsponsored) — sponsorship cost. Approve-before-queue is a
-separate receipt-awaited tx (VRF wrap forbids calls between request_random
-and the game call).
+Matchmaking (paid + staked): `matchmaking.queue_for_match(token, abilities)`
+requires a 1-3 ability wager (tier-capped; ownership + matchmaking
+ERC-1155 operator approval checked at queue time) and runs three
+single-slot sub-queues keyed by wager size — players only pair with the
+same count, so stakes never trim. Entries have a fixed 600 s validity
+window, NO heartbeat (every poke is a sponsored tx); clients poll Torii
+and re-queue after expiry. Pairing (`create_match_1v1_delegated`, waiting
+player = player_a) escrows the entry buy-ins at matchmaking (`MatchPot`)
+and both ability wagers at world_system, writing `MatchStakes1v1` +
+`MatchAbilities1v1` — queue matches are full staked matches (settle_match,
+parcel release, reputation). Entry buy-ins come from the owner-managed
+`EntryToken` allowlist (STRK/ETH/LORDS mainnet; reprice via
+`scripts/init-entry-config.sh`); permissionless `claim_winnings(match_id)`
+pays the winner `winner_bps` (6500) of each side's buy-in per-token,
+treasury the rest, draws refund in full. Clients always send the
+`[vrf request_random, queue_for_match]` multicall (contract consumes
+unconditionally); `leave_queue`/`claim_winnings` are bare; ERC-20 and
+ERC-1155 approvals are separate receipt-awaited txs (VRF wrap forbids
+calls between request_random and the game call). Free practice matches
+are removed from UI and paymaster (create_match_1v1 on-chain but
+unsponsored). Session-policy approve caps are deliberately small
+(~20 games) because the consent screen displays them.
 
 Node contests resolve before gate damage: owning node `i` grants +1 defense at gate `i` the same round it is captured or held, plus +1 budget next round.
 
