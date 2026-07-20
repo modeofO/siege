@@ -8,13 +8,17 @@ use starknet::ContractAddress;
 #[derive(Drop, Serde)]
 pub struct QueueSlot {
     #[key]
-    pub queue_id: u8, // always 0 (singleton)
+    pub queue_id: u8, // wager size (1-3) — one sub-queue per ability count
     pub player: ContractAddress, // zero address = empty
     pub queued_at: u64,
     // Entry buy-in the waiting player committed to, locked at queue time so
     // an owner reprice mid-wait can never charge more than they approved.
     pub token: ContractAddress,
     pub amount: u256,
+    // Wagered ability ids (1-10); zero-padded past the wager size.
+    pub ability_1: u8,
+    pub ability_2: u8,
+    pub ability_3: u8,
 }
 
 // Owner-managed entry pricing. amount is in the token's base units;

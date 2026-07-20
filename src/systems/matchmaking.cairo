@@ -2,14 +2,17 @@ use starknet::ContractAddress;
 
 #[starknet::interface]
 pub trait IMatchmaking<T> {
+    // Queue for a staked auto-match, wagering 1-3 abilities. You only pair
+    // with a player wagering the SAME COUNT (three single-slot sub-queues).
     // Returns the created match_id when the caller was paired with the
     // waiting player, or 0 when the caller was enqueued (or re-queued).
     // `token` selects the entry buy-in token (must be an enabled EntryToken).
-    fn queue_for_match(ref self: T, token: ContractAddress) -> u64;
+    fn queue_for_match(ref self: T, token: ContractAddress, abilities: Array<u8>) -> u64;
     fn leave_queue(ref self: T);
-    // Permissionless payout of a finished queue-made match. Winner gets
-    // winner_bps of each side's buy-in (in that side's token), treasury the
-    // remainder; a draw refunds both players in full.
+    // Permissionless payout of a finished queue-made match's ENTRY pot.
+    // Winner gets winner_bps of each side's buy-in (in that side's token),
+    // treasury the remainder; a draw refunds both players in full. Ability
+    // stakes are escrowed at world_system and paid out by settle_match.
     fn claim_winnings(ref self: T, match_id: u64);
     fn set_entry_config(ref self: T, winner_bps: u16, treasury: ContractAddress);
     fn set_entry_token(ref self: T, token: ContractAddress, amount: u256, enabled: bool);
@@ -26,6 +29,23 @@ pub trait IERC20Entry<T> {
     fn balance_of(self: @T, account: ContractAddress) -> u256;
 }
 
+// ERC-1155 surface for ability wagers.
+#[starknet::interface]
+pub trait IERC1155Ability<T> {
+    fn safe_transfer_from(
+        ref self: T,
+        from: ContractAddress,
+        to: ContractAddress,
+        token_id: u256,
+        value: u256,
+        data: Span<felt252>,
+    );
+    fn balance_of(self: @T, account: ContractAddress, token_id: u256) -> u256;
+    fn is_approved_for_all(
+        self: @T, owner: ContractAddress, operator: ContractAddress,
+    ) -> bool;
+}
+
 #[dojo::contract]
 pub mod matchmaking {
     use core::num::traits::Zero;
@@ -35,6 +55,8 @@ pub mod matchmaking {
     use siege_dojo::models::match_queue::{
         QueueSlot, QueueStatus, EntryToken, EntryConfig, MatchPot,
     };
+    use siege_dojo::models::match_abilities_1v1::MatchAbilities1v1;
+    use siege_dojo::models::match_stakes_1v1::MatchStakes1v1;
     use siege_dojo::models::match_state::MatchStatus;
     use siege_dojo::models::match_state_1v1::MatchState1v1;
     use siege_dojo::models::player_kingdom::PlayerKingdom;
@@ -43,7 +65,11 @@ pub mod matchmaking {
         IActions1v1Dispatcher, IActions1v1DispatcherTrait,
         IVrfProviderDispatcher, IVrfProviderDispatcherTrait, Source,
     };
-    use super::{IERC20EntryDispatcher, IERC20EntryDispatcherTrait};
+    use siege_dojo::systems::world_system::tier_ability_slots;
+    use super::{
+        IERC20EntryDispatcher, IERC20EntryDispatcherTrait,
+        IERC1155AbilityDispatcher, IERC1155AbilityDispatcherTrait,
+    };
 
     const VRF_PROVIDER_ADDRESS: felt252 =
         0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f;
@@ -103,9 +129,31 @@ pub mod matchmaking {
         assert(ok, 'Payout transfer failed');
     }
 
+    // Escrow one side's wagered abilities at world_system (settle_match pays
+    // stakes out from there, so queue matches settle exactly like manual
+    // staked matches).
+    fn escrow_abilities(
+        erc1155: IERC1155AbilityDispatcher,
+        from: ContractAddress,
+        escrow: ContractAddress,
+        a1: u8, a2: u8, a3: u8,
+    ) {
+        let ids = array![a1, a2, a3];
+        let mut i: u32 = 0;
+        while i < 3 {
+            let id = *ids.at(i);
+            if id > 0 {
+                erc1155.safe_transfer_from(from, escrow, id.into(), 1_u256, array![].span());
+            }
+            i += 1;
+        };
+    }
+
     #[abi(embed_v0)]
     impl MatchmakingImpl of super::IMatchmaking<ContractState> {
-        fn queue_for_match(ref self: ContractState, token: ContractAddress) -> u64 {
+        fn queue_for_match(
+            ref self: ContractState, token: ContractAddress, abilities: Array<u8>,
+        ) -> u64 {
             let mut world = self.world_default();
             let caller = get_caller_address();
             let now = get_block_timestamp();
@@ -115,13 +163,33 @@ pub mod matchmaking {
             let kingdom: PlayerKingdom = world.read_model(caller);
             assert(kingdom.registered, 'Not registered');
 
+            // Wager: 1-3 abilities, capped by tier — mirrors join_staked_match.
+            let count = abilities.len();
+            assert(count >= 1 && count <= 3, 'Must stake 1-3 abilities');
+            let max_slots: u32 = tier_ability_slots(kingdom.tier).into();
+            assert(count <= max_slots, 'Too many abilities for tier');
+
+            let config: ResourceConfig = world.read_model(0_u8);
+
+            // Ability checks up front so a broke/unapproved head can't poison
+            // the slot: the pairing tx (sent by the OTHER player) is what
+            // actually moves the stakes.
+            let erc1155 = IERC1155AbilityDispatcher { contract_address: config.ability_token };
+            assert(erc1155.is_approved_for_all(caller, this), 'Approve ability operator');
+            let mut i: u32 = 0;
+            while i < count {
+                let id: u8 = *abilities.at(i);
+                assert(id >= 1 && id <= 10, 'Invalid ability ID');
+                assert(erc1155.balance_of(caller, id.into()) >= 1_u256, 'Ability not owned');
+                i += 1;
+            };
+            let w1: u8 = *abilities.at(0);
+            let w2: u8 = if count > 1 { *abilities.at(1) } else { 0 };
+            let w3: u8 = if count > 2 { *abilities.at(2) } else { 0 };
+
             // Entry pricing. Enabled with amount 0 = free entry.
             let entry: EntryToken = world.read_model(token);
             assert(entry.enabled, 'Entry token not enabled');
-
-            // Block unfundable entries up front so a broke head can't poison
-            // the slot: the pairing tx (paid by the OTHER player) is what
-            // actually pulls the funds.
             if entry.amount > 0 {
                 let erc20 = IERC20EntryDispatcher { contract_address: token };
                 assert(erc20.allowance(caller, this) >= entry.amount, 'Entry not funded');
@@ -133,7 +201,6 @@ pub mod matchmaking {
             // paymaster wrapper reverts on an unconsumed request — consuming
             // on every path (enqueue/re-queue/match) keeps the wrap valid.
             // The randomness is only used when a match is actually created.
-            let config: ResourceConfig = world.read_model(0_u8);
             let vrf_addr = if config.vrf_provider.is_non_zero() {
                 config.vrf_provider
             } else {
@@ -142,14 +209,39 @@ pub mod matchmaking {
             let vrf = IVrfProviderDispatcher { contract_address: vrf_addr };
             let random_value = vrf.consume_random(Source::Nonce(this));
 
-            let mut slot: QueueSlot = world.read_model(0_u8);
+            let count_key: u8 = count.try_into().unwrap();
 
-            // Re-queue: caller is already the waiting head — restart their
-            // validity window and refresh their token choice.
+            // Wager-size switch: clear the caller from any OTHER sub-queue so
+            // one player can never occupy two slots.
+            let mut k: u8 = 1;
+            while k <= 3 {
+                if k != count_key {
+                    let mut other: QueueSlot = world.read_model(k);
+                    if other.player == caller {
+                        other.player = Zero::zero();
+                        other.queued_at = 0;
+                        other.token = Zero::zero();
+                        other.amount = 0;
+                        other.ability_1 = 0;
+                        other.ability_2 = 0;
+                        other.ability_3 = 0;
+                        world.write_model(@other);
+                    }
+                }
+                k += 1;
+            };
+
+            let mut slot: QueueSlot = world.read_model(count_key);
+
+            // Re-queue: caller is already this sub-queue's head — restart the
+            // validity window and refresh token/wager choices.
             if slot.player == caller {
                 slot.queued_at = now;
                 slot.token = token;
                 slot.amount = entry.amount;
+                slot.ability_1 = w1;
+                slot.ability_2 = w2;
+                slot.ability_3 = w3;
                 world.write_model(@slot);
                 set_queued(ref world, caller, now);
                 return 0;
@@ -158,7 +250,7 @@ pub mod matchmaking {
             let head_empty = slot.player.is_zero();
             let head_stale = !head_empty && now > slot.queued_at + STALE_SECONDS;
 
-            // Enqueue: nobody (live) is waiting.
+            // Enqueue: nobody (live) is waiting at this wager size.
             if head_empty || head_stale {
                 if head_stale {
                     let mut old: QueueStatus = world.read_model(slot.player);
@@ -171,23 +263,62 @@ pub mod matchmaking {
                 slot.queued_at = now;
                 slot.token = token;
                 slot.amount = entry.amount;
+                slot.ability_1 = w1;
+                slot.ability_2 = w2;
+                slot.ability_3 = w3;
                 world.write_model(@slot);
                 set_queued(ref world, caller, now);
                 return 0;
             }
 
-            // Match: a live head is waiting. Waiting player becomes player_a.
-            // Escrow both buy-ins — the head's locked (token, amount) and the
-            // caller's current config amount. A head who revoked allowance
-            // since queueing makes this revert; their entry expires within
-            // STALE_SECONDS, so the block is bounded. Accepted for v1.
+            // Match: a live head waits at the same wager size. Head becomes
+            // player_a. Escrow entry buy-ins (matchmaking) and ability wagers
+            // (world_system — settle_match pays from there). A head who
+            // revoked allowance/approval since queueing makes this revert;
+            // their entry expires within STALE_SECONDS, so the block is
+            // bounded. Accepted for v1.
             let opponent = slot.player;
             collect_entry(this, opponent, slot.token, slot.amount);
             collect_entry(this, caller, token, entry.amount);
 
+            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+            escrow_abilities(erc1155, opponent, world_sys_addr, slot.ability_1, slot.ability_2, slot.ability_3);
+            escrow_abilities(erc1155, caller, world_sys_addr, w1, w2, w3);
+
             let (actions_addr, _) = world.dns(@"actions_1v1").unwrap();
             let actions = IActions1v1Dispatcher { contract_address: actions_addr };
             let match_id = actions.create_match_1v1_delegated(opponent, caller, random_value);
+
+            // Full staked-match wiring — settle_match and in-match ability
+            // activation treat queue matches exactly like manual staked ones.
+            world.write_model(@MatchStakes1v1 {
+                match_id,
+                a_stake_1: slot.ability_1,
+                a_stake_2: slot.ability_2,
+                a_stake_3: slot.ability_3,
+                b_stake_1: w1,
+                b_stake_2: w2,
+                b_stake_3: w3,
+                stake_count: count_key,
+                settled: false,
+                staked: true,
+                parcel_claimed: false,
+            });
+            world.write_model(@MatchAbilities1v1 {
+                match_id,
+                a_ability_1: slot.ability_1,
+                a_ability_2: slot.ability_2,
+                a_ability_3: slot.ability_3,
+                b_ability_1: w1,
+                b_ability_2: w2,
+                b_ability_3: w3,
+                a_used_1: false,
+                a_used_2: false,
+                a_used_3: false,
+                b_used_1: false,
+                b_used_2: false,
+                b_used_3: false,
+            });
 
             world.write_model(@MatchPot {
                 match_id,
@@ -204,6 +335,9 @@ pub mod matchmaking {
             slot.queued_at = 0;
             slot.token = Zero::zero();
             slot.amount = 0;
+            slot.ability_1 = 0;
+            slot.ability_2 = 0;
+            slot.ability_3 = 0;
             world.write_model(@slot);
 
             world.write_model(@QueueStatus {
@@ -226,14 +360,21 @@ pub mod matchmaking {
             let mut world = self.world_default();
             let caller = get_caller_address();
 
-            let mut slot: QueueSlot = world.read_model(0_u8);
-            if slot.player == caller {
-                slot.player = Zero::zero();
-                slot.queued_at = 0;
-                slot.token = Zero::zero();
-                slot.amount = 0;
-                world.write_model(@slot);
-            }
+            let mut k: u8 = 1;
+            while k <= 3 {
+                let mut slot: QueueSlot = world.read_model(k);
+                if slot.player == caller {
+                    slot.player = Zero::zero();
+                    slot.queued_at = 0;
+                    slot.token = Zero::zero();
+                    slot.amount = 0;
+                    slot.ability_1 = 0;
+                    slot.ability_2 = 0;
+                    slot.ability_3 = 0;
+                    world.write_model(@slot);
+                }
+                k += 1;
+            };
             // Only clear a queued status — a matched status keeps its
             // matched_match_id so a client that raced leave vs match still
             // finds its game.
