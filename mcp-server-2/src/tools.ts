@@ -1647,17 +1647,36 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     return true;
   };
 
+  // Matchmaking pulls wagered abilities in the pairing tx — it must be an
+  // approved ERC-1155 operator before queueing.
+  const ensureAbilityOperator = async (ctx: ToolContext, mm: string): Promise<void> => {
+    const abilityToken = ctx.config.abilityTokenAddress;
+    if (!abilityToken) throw new Error("ABILITY_TOKEN_ADDRESS not configured — cannot wager abilities");
+    const res = await ctx.signer!.callContract({
+      contractAddress: abilityToken,
+      entrypoint: "is_approved_for_all",
+      calldata: [ctx.agentAddress, mm],
+    });
+    if (BigInt(res[0] ?? "0x0") !== 0n) return;
+    await execute(ctx.signer!, [call(abilityToken, "set_approval_for_all", [mm, "1"])]);
+  };
+
   register(
     "siege_queue_for_match",
     {
       description:
-        "Join the 1v1 matchmaking queue. Entry buy-in (token param: strk|lords|eth or 0x address; amounts come from on-chain EntryToken config) is charged only when a match forms — winner later takes 65% of the pot via siege_claim_winnings. Approves the token if needed, then submits vRNG request_random + matchmaking.queue_for_match. If another player is already waiting, THIS tx creates the match and escrows both buy-ins; result includes match_id. Otherwise you are enqueued for a fixed 10-minute window — poll siege_queue_status (free, no tx) until state=matched; do NOT re-call this tool as a heartbeat, each call is a sponsored tx. Re-call only after the window expires to re-queue. Requires a registered Hold.",
+        "Join the 1v1 matchmaking queue with a wager of 1-3 owned abilities — you only pair with a player wagering the SAME COUNT. Entry buy-in (token param: strk|lords|eth or 0x address; amounts from on-chain EntryToken config) and the wagered abilities are charged/escrowed only when a match forms. Winner takes both sides' abilities (via siege_settle_match) plus 65% of the entry pot (via siege_claim_winnings). Handles ERC-20 allowance and ability-operator approval automatically. If another player is already waiting at your wager size, THIS tx creates the match; result includes match_id. Otherwise you are enqueued for a fixed 10-minute window — poll siege_queue_status (free, no tx) until state=matched; do NOT re-call this tool as a heartbeat, each call is a sponsored tx. Re-call only after the window expires to re-queue. Requires a registered Hold; wager size capped by tier.",
       inputSchema: {
         token: z.string().default("strk").describe("Entry token: strk, lords, eth, or 0x address"),
+        abilities: z
+          .array(z.number().int().min(1).max(10))
+          .min(1)
+          .max(3)
+          .describe("1-3 owned ability token ids to wager"),
       },
       requiresSigner: true,
     },
-    async ({ token }, ctx) => {
+    async ({ token, abilities }, ctx) => {
       const mm = requireMatchmaking(ctx);
       const tokenAddr = resolveEntryToken(token);
 
@@ -1671,11 +1690,16 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         );
       }
       const amount = BigInt(entry?.amount ?? "0");
+      await ensureAbilityOperator(ctx, mm);
       const approved = await ensureEntryAllowance(ctx, mm, tokenAddr, amount);
 
       const tx = await execute(ctx.signer!, [
         vrfRequestRandom(ctx.config.vrfAddress, mm),
-        call(mm, "queue_for_match", [tokenAddr]),
+        call(mm, "queue_for_match", [
+          tokenAddr,
+          String(abilities.length),
+          ...abilities.map(String),
+        ]),
       ]);
       const buyIn = { token: tokenAddr, amount: amount.toString(), approval_tx_sent: approved };
       // Give Torii a moment, then report where we landed.

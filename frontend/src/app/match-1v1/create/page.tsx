@@ -196,7 +196,7 @@ export default function Create1v1Page() {
       </div>
       <div className="text-xs text-[#6a6a7a] leading-relaxed -mt-3">
         {mode === "find"
-          ? "Auto-match with the next player in the queue. Entry buy-in charged only when a match is made; winner takes 65% of the pot."
+          ? "Auto-match with a player wagering the same number of abilities. Buy-in + wager charged only when a match is made; winner takes the abilities and 65% of the entry pot."
           : "Stake 1–" +
             maxSlots +
             " ability tokens. Winner takes both sides' escrow. Losing releases your furthest-from-home parcel."}

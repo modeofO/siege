@@ -1,15 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { extractErrorMsg } from "@/lib/contracts1v1";
+import { useAbilityBalances } from "@/lib/stakedMatch";
+import { usePlayerKingdom } from "@/lib/worldState";
+import { TIER_INFO, tierName } from "@/lib/tiers";
+import { AbilityWagerPicker } from "@/components/AbilityWagerPicker";
+import { RPC_URL } from "@/lib/dojoConfig";
 import {
   queueForMatch,
   leaveQueue,
   fetchQueueStatus,
   fetchEntryTokens,
   ensureEntryAllowance,
+  ensureAbilityOperator,
   tokenSymbol,
   formatTokenAmount,
   QUEUE_MATCHED,
@@ -28,6 +35,17 @@ export function FindOpponent({ registered }: { registered: boolean }) {
   const [elapsed, setElapsed] = useState(0);
   const [tokens, setTokens] = useState<EntryTokenRow[] | null>(null);
   const [selectedToken, setSelectedToken] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // Ability wager (1-3, tier-capped) — you pair only with same wager size.
+  const kingdom = usePlayerKingdom(address ?? null);
+  const maxSlots = Math.min(TIER_INFO[kingdom.tier]?.abilitySlots ?? 1, 3);
+  const rpcProvider = useMemo(() => new RpcProvider({ nodeUrl: RPC_URL }), []);
+  const {
+    balances,
+    loading: balancesLoading,
+    error: balancesError,
+  } = useAbilityBalances(registered ? rpcProvider : undefined, registered ? (address ?? null) : null);
   // Match ids are monotonic — anything newer than what we saw before
   // queueing is OUR pairing, so a stale matched row can't false-positive.
   const prevMatchedRef = useRef(0);
@@ -87,14 +105,19 @@ export function FindOpponent({ registered }: { registered: boolean }) {
 
   const handleFind = async () => {
     if (!account || !address || !selected) return;
+    if (selectedIds.length < 1 || selectedIds.length > maxSlots) {
+      setError(`Pick 1–${maxSlots} abilities to wager.`);
+      return;
+    }
     setError("");
     setPhase("starting");
     try {
       const before = await fetchQueueStatus(address);
       prevMatchedRef.current = before?.matchedMatchId ?? 0;
-      // Approval is a separate receipt-awaited tx (VRF wrap constraint).
+      // Approvals are separate receipt-awaited txs (VRF wrap constraint).
+      await ensureAbilityOperator(account);
       await ensureEntryAllowance(account, selected.token, selected.amount);
-      await queueForMatch(account, selected.token);
+      await queueForMatch(account, selected.token, selectedIds);
       setPhase("searching");
     } catch (e) {
       setError(extractErrorMsg(e));
@@ -166,8 +189,38 @@ export function FindOpponent({ registered }: { registered: boolean }) {
   return (
     <div className="space-y-4">
       <div className="text-xs text-[#6a6a7a] leading-relaxed">
-        Queue up and get paired with the next player looking for a match. The entry buy-in is
-        charged only when a match is made — the winner takes 65% of the pot.
+        Queue up and get paired with the next player wagering the same number of abilities. The
+        entry buy-in and your wager are charged only when a match is made — the winner takes both
+        sides&apos; abilities plus 65% of the entry pot.
+      </div>
+
+      {/* Ability wager */}
+      <div className="space-y-2">
+        <div className="flex items-baseline justify-between">
+          <label className="text-xs text-[#6a6a7a] tracking-wider uppercase">Your wager</label>
+          <span className="text-[10px] text-[#7a7060]">
+            {tierName(kingdom.tier)} · {selectedIds.length}/{maxSlots} slots
+          </span>
+        </div>
+        {balancesError ? (
+          <div className="text-xs text-[#ff3344] border border-[#ff3344]/30 rounded p-3 bg-[#ff3344]/5 break-all">
+            Could not load ability balances — check your RPC connection and refresh. ({balancesError})
+          </div>
+        ) : (
+          <>
+            <AbilityWagerPicker
+              balances={balances}
+              selected={selectedIds}
+              maxSlots={maxSlots}
+              onChange={setSelectedIds}
+              balancesLoading={balancesLoading}
+            />
+            <div className="text-[10px] text-[#7a7060]">
+              You&apos;ll only be matched against a player wagering {selectedIds.length || "the same number of"}{" "}
+              {selectedIds.length === 1 ? "ability" : "abilities"}.
+            </div>
+          </>
+        )}
       </div>
 
       {/* Entry token picker */}
@@ -202,7 +255,7 @@ export function FindOpponent({ registered }: { registered: boolean }) {
 
       <button
         onClick={handleFind}
-        disabled={!account || !selected || phase === "starting"}
+        disabled={!account || !selected || selectedIds.length < 1 || phase === "starting"}
         className="w-full py-3 bg-[#ffd700]/10 border border-[#ffd700]/40 text-[#ffd700] rounded hover:bg-[#ffd700]/20 transition-colors tracking-wider text-sm disabled:opacity-30 disabled:cursor-not-allowed"
       >
         {phase === "starting" ? "JOINING QUEUE..." : "FIND OPPONENT"}

@@ -1,5 +1,6 @@
 import type { AccountInterface, UniversalDetails } from "starknet";
 import { MATCHMAKING_ADDRESS } from "@/lib/contractAddresses";
+import { ABILITY_TOKEN_ADDRESS } from "@/lib/abilityToken";
 import { vrfRequestRandomCall, waitForReceiptOrThrow } from "@/lib/contracts1v1";
 import { resilientExecute } from "@/lib/controllerSession";
 import { toriiSql, sqlAddr, sqlU64, toNum } from "@/lib/toriiSql";
@@ -90,20 +91,47 @@ function toBool(v: unknown): boolean {
   return v === true || v === 1 || v === "1" || v === "true";
 }
 
-// Joins the queue (or re-queues), or — when someone is waiting — creates the
-// match and escrows both buy-ins in this tx. The contract consumes the VRF
-// request unconditionally, so the wrap is always valid.
-export async function queueForMatch(account: AccountInterface, token: string) {
+// Joins the queue (or re-queues) with a 1-3 ability wager, or — when someone
+// with the same wager size is waiting — creates the staked match and escrows
+// both sides' buy-ins and abilities in this tx. The contract consumes the
+// VRF request unconditionally, so the wrap is always valid.
+export async function queueForMatch(account: AccountInterface, token: string, abilities: number[]) {
   const tx = await resilientExecute(
     account,
     [
       vrfRequestRandomCall(MATCHMAKING_ADDRESS),
-      { contractAddress: MATCHMAKING_ADDRESS, entrypoint: "queue_for_match", calldata: [token] },
+      {
+        contractAddress: MATCHMAKING_ADDRESS,
+        entrypoint: "queue_for_match",
+        calldata: [token, String(abilities.length), ...abilities.map(String)],
+      },
     ],
     TX_OPTS,
   );
   await waitForReceiptOrThrow(account, tx.transaction_hash, "Queue for match");
   return tx;
+}
+
+// Matchmaking pulls the wagered abilities in the PAIRING tx, so it must be an
+// approved ERC-1155 operator before queueing. Separate receipt-awaited tx —
+// same VRF-wrap constraint as the ERC-20 approval.
+export async function ensureAbilityOperator(account: AccountInterface): Promise<void> {
+  const res = await account.callContract({
+    contractAddress: ABILITY_TOKEN_ADDRESS,
+    entrypoint: "is_approved_for_all",
+    calldata: [account.address, MATCHMAKING_ADDRESS],
+  });
+  if (BigInt(res[0] ?? "0x0") !== BigInt(0)) return;
+  const tx = await resilientExecute(
+    account,
+    {
+      contractAddress: ABILITY_TOKEN_ADDRESS,
+      entrypoint: "set_approval_for_all",
+      calldata: [MATCHMAKING_ADDRESS, "1"],
+    },
+    TX_OPTS,
+  );
+  await waitForReceiptOrThrow(account, tx.transaction_hash, "Approve ability operator");
 }
 
 // Bare call — leave_queue never consumes randomness, so a VRF wrap would
