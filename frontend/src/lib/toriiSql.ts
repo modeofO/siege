@@ -1,4 +1,7 @@
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
+// Must come from ./network, not process.env directly: this is the default read
+// path for world/parcel/match data, so reading the build's env pin would keep
+// polling the wrong indexer after a network switch.
+import { TORII_URL } from "./network";
 
 // --- Connection health tracking ---
 // toriiSql still returns [] on failure so callers stay simple, but failures

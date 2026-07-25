@@ -89,6 +89,37 @@ describe("envPin", () => {
   });
 });
 
+describe("endpoints follow the active network", () => {
+  // Regression: toriiSql.ts and AskToriiChat read NEXT_PUBLIC_TORII_URL
+  // directly, so the Torii SQL polling path — the default read path for world,
+  // parcel and match data — kept hitting the build's own indexer after a
+  // switch. The world rendered identically on both networks because it was the
+  // same indexer. Endpoints must derive from NETWORK, never from the raw env.
+  test("switching to katana moves Torii and RPC off the build's pins", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TORII_URL", "https://siege-torii-mainnet-production.up.railway.app");
+    vi.stubEnv("NEXT_PUBLIC_RPC_URL", "https://api.cartridge.gg/x/starknet/mainnet");
+    const net = await loadNetwork({ build: "mainnet", stored: "katana" });
+    expect(net.TORII_URL).toBe("https://siege-torii-katana-production.up.railway.app");
+    expect(net.RPC_URL).toBe("https://siege-katana-production.up.railway.app");
+    expect(net.CHAIN_ID).toBe("SIEGE");
+  });
+
+  test("switching to mainnet moves them off a katana build's pins", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TORII_URL", "https://siege-torii-katana-production.up.railway.app");
+    vi.stubEnv("NEXT_PUBLIC_RPC_URL", "https://siege-katana-production.up.railway.app");
+    const net = await loadNetwork({ build: "katana", stored: "mainnet" });
+    expect(net.TORII_URL).toBe("https://siege-torii-mainnet-production.up.railway.app");
+    expect(net.RPC_URL).toBe("https://api.cartridge.gg/x/starknet/mainnet");
+    expect(net.CHAIN_ID).toBe("SN_MAIN");
+  });
+
+  test("without an override the deployment's pins still win", async () => {
+    vi.stubEnv("NEXT_PUBLIC_TORII_URL", "https://custom-torii.example");
+    const net = await loadNetwork({ build: "mainnet", stored: null });
+    expect(net.TORII_URL).toBe("https://custom-torii.example");
+  });
+});
+
 describe("test-network classification", () => {
   test("katana counts as a test network", async () => {
     const net = await loadNetwork({ build: "katana", stored: null });

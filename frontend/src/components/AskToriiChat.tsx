@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+// Resolved per active network, not from the build's env pin — see ./lib/network.
+import { TORII_URL } from "@/lib/network";
 
 const ENDPOINT = "/api/asktorii";
 const STORAGE_KEY = "siege:rookery";
-const TORII_URL = process.env.NEXT_PUBLIC_TORII_URL || "http://localhost:8080";
 
 type Role = "you" | "chronicler" | "raven-lost";
 interface Message {

@@ -106,6 +106,47 @@ export function networkLabel(network: Network): string {
 /** Player-facing name for the active network. */
 export const NETWORK_LABEL = networkLabel(NETWORK);
 
+// ---------- Endpoints ----------
+//
+// These live here rather than in dojoConfig so that every consumer resolves the
+// same way. toriiSql.ts and AskToriiChat previously read NEXT_PUBLIC_TORII_URL
+// directly, which meant the Torii SQL polling path — the default read path for
+// world/parcel/match data — kept hitting the build's own indexer after a
+// network switch, while the RPC correctly moved. The world looked identical on
+// both networks because it was literally the same indexer.
+//
+// Deriving them needs only the network flags, so this module stays free of the
+// manifest imports that would drag @dojoengine/core into every leaf importer.
+
+// Hosted services run on Railway (Cartridge slot torii discontinued).
+export const TORII_URL =
+  envPin(process.env.NEXT_PUBLIC_TORII_URL) ||
+  (IS_DEVNET
+    ? "http://localhost:8080"
+    : IS_KATANA
+      ? "https://siege-torii-katana-production.up.railway.app"
+      : IS_MAINNET
+        ? "https://siege-torii-mainnet-production.up.railway.app"
+        : "https://siege-torii-production-d1a1.up.railway.app");
+
+export const RPC_URL =
+  envPin(process.env.NEXT_PUBLIC_RPC_URL) ||
+  (IS_DEVNET
+    ? "http://localhost:5050"
+    : IS_KATANA
+      ? "https://siege-katana-production.up.railway.app"
+      : IS_MAINNET
+        ? "https://api.cartridge.gg/x/starknet/mainnet"
+        : "https://api.cartridge.gg/x/starknet/sepolia");
+
+export const CHAIN_ID = IS_DEVNET
+  ? "KATANA"
+  : IS_KATANA
+    ? "SIEGE"
+    : IS_MAINNET
+      ? "SN_MAIN"
+      : "SN_SEPOLIA";
+
 // ---------- Switching ----------
 
 type Listener = () => void;

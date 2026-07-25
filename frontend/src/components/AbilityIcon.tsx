@@ -3,12 +3,10 @@
 import { useEffect, useState } from "react";
 import { RpcProvider } from "starknet";
 import { fetchAbilityMetadata, type AbilityMetadata } from "@/lib/abilityToken";
+// RPC follows the active network (see lib/network) — a local copy here would
+// keep using the build's endpoint after a switch, and had no katana branch.
+import { RPC_URL } from "@/lib/network";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ||
-  ((process.env.NEXT_PUBLIC_NETWORK || "devnet") === "mainnet"
-    ? "https://api.cartridge.gg/x/starknet/mainnet"
-    : "https://api.cartridge.gg/x/starknet/sepolia");
 
 let sharedProvider: RpcProvider | null = null;
 function getProvider(): RpcProvider {

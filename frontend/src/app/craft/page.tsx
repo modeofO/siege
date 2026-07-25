@@ -13,6 +13,9 @@ import { toriiSql, sqlHex, toNum } from "@/lib/toriiSql";
 import { LAST_MATCH_KEY } from "@/components/Navbar";
 import { useForgeState } from "@/lib/forge/forgeState";
 import type { ComponentKind } from "@/lib/forge/circuits";
+// RPC follows the active network (see lib/network) — a local copy here would
+// keep using the build's endpoint after a switch, and had no katana branch.
+import { RPC_URL } from "@/lib/network";
 import {
   COMPONENT_COSTS,
   CRAFTABLE_COMPONENTS,
@@ -21,11 +24,6 @@ import {
   maxAffordableComponent,
 } from "@/lib/forge/componentCosts";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_RPC_URL ||
-  ((process.env.NEXT_PUBLIC_NETWORK || "devnet") === "mainnet"
-    ? "https://api.cartridge.gg/x/starknet/mainnet"
-    : "https://api.cartridge.gg/x/starknet/sepolia");
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
