@@ -7,6 +7,7 @@ import { isDevMode } from "@/app/providers";
 import { useToriiHealth } from "@/lib/usePoll";
 import { AccountSelector } from "./AccountSelector";
 import { ConnectWallet } from "./ConnectWallet";
+import { NetworkSwitcher } from "./NetworkSwitcher";
 
 // Remember the match the player is currently in so pages like /craft can offer a way back.
 // Matches /match/<id> and /match-1v1/<id>, ignoring /create and /join subroutes.
@@ -49,6 +50,7 @@ export function Navbar() {
           </Link>
         </div>
         <div className="flex items-center gap-3">
+          <NetworkSwitcher />
           {!toriiHealthy && (
             <span
               className="text-[10px] tracking-wider text-[#b5523a] border border-[#b5523a]/40 rounded px-2 py-0.5"

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { BookLink } from "@/components/BookLink";
 import { CompassLink } from "@/components/CompassLink";
 import { AskToriiChat } from "@/components/AskToriiChat";
+import { TestNetworkBanner } from "@/components/TestNetworkBanner";
 
 const mono = Geist_Mono({ variable: "--font-mono", subsets: ["latin"] });
 const serif = Cinzel({ variable: "--font-serif", subsets: ["latin"], weight: ["400", "700"] });
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`${mono.variable} ${serif.variable} ${jetbrains.variable} font-mono antialiased bg-[#0d0b0a] text-[#d4cfc6] min-h-screen`}
       >
         <StarknetProvider>
+          <TestNetworkBanner />
           <Navbar />
           <main className="max-w-6xl mx-auto px-4 py-6">{children}</main>
           <CompassLink />
