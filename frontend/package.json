@@ -15,6 +15,7 @@
     "knip": "knip",
     "knip:fix": "knip --fix",
     "knip:prod": "knip --production",
+    "pretest": "node scripts/copy-manifests.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
