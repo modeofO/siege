@@ -2,6 +2,7 @@
 // via Torii's token index (pushed updates), not direct Starknet RPC calls.
 import { useMemo } from "react";
 import { useTokens } from "@dojoengine/sdk/react";
+import { IS_KATANA, IS_MAINNET } from "./network";
 
 // ERC-20 resource token addresses, keyed by network. Sepolia set matches
 // scripts/init-sepolia-resource-config.sh; katana set is printed by
@@ -33,13 +34,11 @@ const MAINNET_RESOURCE_TOKENS = {
   seeds: "0x4a6655dafd9505a9c96362475c6ad0f1744ba831c7503bf5b7d762f5f8613a7",
 } as const;
 
-const NET = process.env.NEXT_PUBLIC_NETWORK || "devnet";
-export const RESOURCE_TOKENS =
-  NET === "katana"
-    ? KATANA_RESOURCE_TOKENS
-    : NET === "mainnet"
-      ? MAINNET_RESOURCE_TOKENS
-      : SEPOLIA_RESOURCE_TOKENS;
+export const RESOURCE_TOKENS = IS_KATANA
+  ? KATANA_RESOURCE_TOKENS
+  : IS_MAINNET
+    ? MAINNET_RESOURCE_TOKENS
+    : SEPOLIA_RESOURCE_TOKENS;
 
 export interface ResourceBalances {
   iron: number;

@@ -1,14 +1,14 @@
 // abilityToken.ts — wrappers for reading ERC-1155 ability balances
 import { byteArray, type RpcProvider } from "starknet";
+import { envPin, IS_KATANA, IS_MAINNET } from "./network";
 
 // Deployed ability token address — override via NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS
-const ABILITY_TOKEN_NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
 export const ABILITY_TOKEN_ADDRESS =
-  process.env.NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS ||
-  (ABILITY_TOKEN_NETWORK === "katana"
+  envPin(process.env.NEXT_PUBLIC_ABILITY_TOKEN_ADDRESS) ||
+  (IS_KATANA
     ? // Katana deployment — scripts/init-katana-world.ts
       "0x60159dd1eb29a2aef41134b6ac536f551769f6238100cd34fc9d50875f226e2"
-    : ABILITY_TOKEN_NETWORK === "mainnet"
+    : IS_MAINNET
       ? // Mainnet deployment — Task 5
         "0x583fb029535b4f18d267ea1462ffd7f3a785edcd873c4fd305f8d787e3ccbcc"
       : "0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05");

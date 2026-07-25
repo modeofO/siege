@@ -3,10 +3,8 @@ import manifestSepolia from "../manifests/manifest_sepolia.json";
 import manifestKatana from "../manifests/manifest_katana.json";
 import manifestMainnet from "../manifests/manifest_mainnet.json";
 
-const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
-const IS_DEVNET = NETWORK === "devnet";
-const IS_KATANA = NETWORK === "katana";
-const IS_MAINNET = NETWORK === "mainnet";
+import { IS_DEVNET, IS_KATANA, IS_MAINNET } from "./network";
+
 const manifest = IS_DEVNET
   ? manifestDev
   : IS_KATANA

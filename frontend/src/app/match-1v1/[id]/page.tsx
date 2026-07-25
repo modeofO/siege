@@ -23,7 +23,7 @@ import { IntelDrawer } from "@/components/intel/IntelDrawer";
 import { useOpponentIntel } from "@/lib/intel/queries";
 import { detectDeviation } from "@/lib/intel/bluff";
 import { savePreDraft, loadPreDraft } from "@/lib/intel/predraft";
-import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, clearCommitData1v1 } from "@/lib/crypto";
+import { generateSalt, computeCommitment1v1, storeSalt1v1, storeMove1v1, getSalt1v1, getMove1v1, storeAbility1v1, getAbility1v1, clearCommitData1v1 } from "@/lib/crypto";
 import { commitMove1v1, revealMove1v1, resolveRound1v1, forceTimeout1v1, extractErrorMsg } from "@/lib/contracts1v1";
 import { useResourceBalances } from "@/lib/useResourceBalances";
 import { AllocationForm1v1 } from "@/components/AllocationForm1v1";
@@ -507,8 +507,7 @@ export default function Match1v1Page() {
     setAutoRevealStatus("pending");
     console.log(`[auto-reveal] starting reveal for match ${matchId} round ${state.round}`);
 
-    const abilityData = localStorage.getItem(`siege_1v1_ability_${matchId}_${state.round}`);
-    const parsedAbility = abilityData ? JSON.parse(abilityData) : { abilityId: 0, abilityTarget: 0 };
+    const parsedAbility = getAbility1v1(matchId, state.round);
 
     (async () => {
       try {
@@ -724,10 +723,10 @@ export default function Match1v1Page() {
       );
 
       await commitMove1v1(account, matchId, commitment);
-      localStorage.setItem(
-        `siege_1v1_ability_${matchId}_${state.round}`,
-        JSON.stringify({ abilityId: selectedAbility, abilityTarget: selectedTarget }),
-      );
+      storeAbility1v1(matchId, state.round, {
+        abilityId: selectedAbility,
+        abilityTarget: selectedTarget,
+      });
       // Tx submitted — now wait for Torii to reflect `committed`. Button
       // stays disabled with a "CONFIRMING ON-CHAIN..." label until the
       // useEffect below flips `confirming` off.

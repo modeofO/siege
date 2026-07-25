@@ -10,11 +10,11 @@ import { DojoProvider } from "@/lib/dojoSdk";
 import { SESSION_POLICIES } from "@/lib/sessionPolicies";
 
 // ---------- Network mode ----------
+// Network identity lives in @/lib/network — see that file for why it is a
+// build-time constant and must never become a runtime switch.
 
-const NETWORK = process.env.NEXT_PUBLIC_NETWORK || "devnet";
-const IS_DEVNET = NETWORK === "devnet";
-const IS_KATANA = NETWORK === "katana";
-const IS_MAINNET = NETWORK === "mainnet";
+import { envPin, IS_DEVNET, IS_KATANA, IS_MAINNET } from "@/lib/network";
+
 export function isDevMode() {
   return IS_DEVNET;
 }
@@ -23,7 +23,7 @@ export function isDevMode() {
 // (chain id short-string "SIEGE"); "mainnet" = Starknet mainnet via Cartridge;
 // anything else non-devnet = public sepolia.
 const CONTROLLER_RPC_URL = IS_KATANA
-  ? process.env.NEXT_PUBLIC_RPC_URL || "https://siege-katana-production.up.railway.app"
+  ? envPin(process.env.NEXT_PUBLIC_RPC_URL) || "https://siege-katana-production.up.railway.app"
   : IS_MAINNET
     ? "https://api.cartridge.gg/x/starknet/mainnet"
     : "https://api.cartridge.gg/x/starknet/sepolia";
