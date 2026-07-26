@@ -47,7 +47,12 @@ function Join1v1PageInner() {
         const addrBig = BigInt(address);
         const isParticipant =
           BigInt(rows[0].player_a) === addrBig || BigInt(rows[0].player_b) === addrBig;
-        setAlreadyInMatch(isParticipant);
+        // player_b is written at create_staked_match, so on a Pending match the
+        // challenged player is a participant who has NOT joined yet — they need
+        // the wager flow, not the rejoin shortcut.
+        const isUnacceptedChallengee =
+          String(rows[0].status) === "Pending" && BigInt(rows[0].player_b) === addrBig;
+        setAlreadyInMatch(isParticipant && !isUnacceptedChallengee);
         setMatchStatus(String(rows[0].status));
       } else {
         setAlreadyInMatch(false);
