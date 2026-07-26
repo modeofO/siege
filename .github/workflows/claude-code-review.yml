@@ -2,7 +2,11 @@ name: Claude Code Review
 
 on:
   pull_request:
-    types: [opened, synchronize, ready_for_review, reopened]
+    # `synchronize` is deliberately absent: with it, every push to an open PR
+    # triggers another full review, so a PR pushed to five times pays for five.
+    # This reviews when a PR arrives or is marked ready; ask for a fresh pass
+    # afterwards by commenting @claude, or run /code-review locally.
+    types: [opened, ready_for_review, reopened]
     # Optional: Only run on specific file changes
     # paths:
     #   - "src/**/*.ts"
