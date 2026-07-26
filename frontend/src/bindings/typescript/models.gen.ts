@@ -12,6 +12,12 @@ export interface Commitment {
   revealed: boolean;
 }
 
+// Type definition for `siege_dojo::models::conquest_cooldown::ConquestCooldown` struct
+export interface ConquestCooldown {
+  player: string;
+  last_attack_time: BigNumberish;
+}
+
 // Type definition for `siege_dojo::models::faction::Faction` struct
 export interface Faction {
   faction_id: BigNumberish;
@@ -69,6 +75,52 @@ export interface MatchCounter {
   count: BigNumberish;
 }
 
+// Type definition for `siege_dojo::models::match_queue::EntryConfig` struct
+export interface EntryConfig {
+  config_id: BigNumberish;
+  winner_bps: BigNumberish;
+  treasury: string;
+}
+
+// Type definition for `siege_dojo::models::match_queue::EntryToken` struct
+export interface EntryToken {
+  token: string;
+  amount: BigNumberish;
+  enabled: boolean;
+}
+
+// Type definition for `siege_dojo::models::match_queue::MatchPot` struct
+export interface MatchPot {
+  match_id: BigNumberish;
+  player_a: string;
+  token_a: string;
+  amount_a: BigNumberish;
+  player_b: string;
+  token_b: string;
+  amount_b: BigNumberish;
+  claimed: boolean;
+}
+
+// Type definition for `siege_dojo::models::match_queue::QueueSlot` struct
+export interface QueueSlot {
+  queue_id: BigNumberish;
+  player: string;
+  queued_at: BigNumberish;
+  token: string;
+  amount: BigNumberish;
+  ability_1: BigNumberish;
+  ability_2: BigNumberish;
+  ability_3: BigNumberish;
+}
+
+// Type definition for `siege_dojo::models::match_queue::QueueStatus` struct
+export interface QueueStatus {
+  player: string;
+  state: BigNumberish;
+  queued_at: BigNumberish;
+  matched_match_id: BigNumberish;
+}
+
 // Type definition for `siege_dojo::models::match_record::MatchRecord` struct
 export interface MatchRecord {
   player: string;
@@ -89,19 +141,8 @@ export interface MatchStakes1v1 {
   b_stake_3: BigNumberish;
   stake_count: BigNumberish;
   settled: boolean;
-}
-
-// Type definition for `siege_dojo::models::match_state::MatchState` struct
-export interface MatchState {
-  match_id: BigNumberish;
-  team_a_attacker: string;
-  team_a_defender: string;
-  team_b_attacker: string;
-  team_b_defender: string;
-  vault_a_hp: BigNumberish;
-  vault_b_hp: BigNumberish;
-  current_round: BigNumberish;
-  status: MatchStatusEnum;
+  staked: boolean;
+  parcel_claimed: boolean;
 }
 
 // Type definition for `siege_dojo::models::match_state_1v1::MatchState1v1` struct
@@ -151,6 +192,14 @@ export interface PillageEligibility {
   granted_at: BigNumberish;
   expires_at: BigNumberish;
   used: boolean;
+}
+
+// Type definition for `siege_dojo::models::player_cosmetics::PlayerCosmetics` struct
+export interface PlayerCosmetics {
+  player: string;
+  banner: BigNumberish;
+  parcel_skin: BigNumberish;
+  hold_decoration: BigNumberish;
 }
 
 // Type definition for `siege_dojo::models::player_kingdom::PlayerKingdom` struct
@@ -229,43 +278,6 @@ export interface RoundModifiers1v1 {
   gate_2: BigNumberish;
 }
 
-// Type definition for `siege_dojo::models::round_moves::RoundMoves` struct
-export interface RoundMoves {
-  match_id: BigNumberish;
-  round: BigNumberish;
-  commit_count: BigNumberish;
-  reveal_count: BigNumberish;
-  commit_deadline: BigNumberish;
-  reveal_deadline: BigNumberish;
-  ready: boolean;
-  atk_a_p0: BigNumberish;
-  atk_a_p1: BigNumberish;
-  atk_a_p2: BigNumberish;
-  atk_a_nc0: BigNumberish;
-  atk_a_nc1: BigNumberish;
-  atk_a_nc2: BigNumberish;
-  def_a_g0: BigNumberish;
-  def_a_g1: BigNumberish;
-  def_a_g2: BigNumberish;
-  def_a_repair: BigNumberish;
-  def_a_nc0: BigNumberish;
-  def_a_nc1: BigNumberish;
-  def_a_nc2: BigNumberish;
-  atk_b_p0: BigNumberish;
-  atk_b_p1: BigNumberish;
-  atk_b_p2: BigNumberish;
-  atk_b_nc0: BigNumberish;
-  atk_b_nc1: BigNumberish;
-  atk_b_nc2: BigNumberish;
-  def_b_g0: BigNumberish;
-  def_b_g1: BigNumberish;
-  def_b_g2: BigNumberish;
-  def_b_repair: BigNumberish;
-  def_b_nc0: BigNumberish;
-  def_b_nc1: BigNumberish;
-  def_b_nc2: BigNumberish;
-}
-
 // Type definition for `siege_dojo::models::round_moves_1v1::RoundMoves1v1` struct
 export interface RoundMoves1v1 {
   match_id: BigNumberish;
@@ -320,13 +332,14 @@ export interface WorldConfig {
   initialized: boolean;
 }
 
-// Type definition for `siege_dojo::models::events::MatchCreated` struct
-export interface MatchCreated {
-  match_id: BigNumberish;
-  team_a_attacker: string;
-  team_a_defender: string;
-  team_b_attacker: string;
-  team_b_defender: string;
+// Type definition for `siege_dojo::models::events::ConquestResolved` struct
+export interface ConquestResolved {
+  attacker: string;
+  target_parcel: BigNumberish;
+  defender: string;
+  attacker_won: boolean;
+  ability_id: BigNumberish;
+  ability_consumed: boolean;
 }
 
 // Type definition for `siege_dojo::models::events::MatchCreated1v1` struct
@@ -377,30 +390,35 @@ export type NodeOwnerEnum = CairoCustomEnum;
 export interface SchemaType extends ISchemaType {
   siege_dojo: {
     Commitment: Commitment;
+    ConquestCooldown: ConquestCooldown;
     Faction: Faction;
     FactionCounter: FactionCounter;
     FactionInvite: FactionInvite;
     FactionMember: FactionMember;
     MatchAbilities1v1: MatchAbilities1v1;
     MatchCounter: MatchCounter;
+    EntryConfig: EntryConfig;
+    EntryToken: EntryToken;
+    MatchPot: MatchPot;
+    QueueSlot: QueueSlot;
+    QueueStatus: QueueStatus;
     MatchRecord: MatchRecord;
     MatchStakes1v1: MatchStakes1v1;
-    MatchState: MatchState;
     MatchState1v1: MatchState1v1;
     NodeState: NodeState;
     Parcel: Parcel;
     Pillage: Pillage;
     PillageEligibility: PillageEligibility;
+    PlayerCosmetics: PlayerCosmetics;
     PlayerKingdom: PlayerKingdom;
     PlayerReputation: PlayerReputation;
     PresetDefense: PresetDefense;
     ResourceConfig: ResourceConfig;
     RoundModifiers1v1: RoundModifiers1v1;
-    RoundMoves: RoundMoves;
     RoundMoves1v1: RoundMoves1v1;
     RoundTraps1v1: RoundTraps1v1;
     WorldConfig: WorldConfig;
-    MatchCreated: MatchCreated;
+    ConquestResolved: ConquestResolved;
     MatchCreated1v1: MatchCreated1v1;
     MatchFinished: MatchFinished;
     MoveCommitted: MoveCommitted;
@@ -417,6 +435,10 @@ export const schema: SchemaType = {
       hash: 0,
       committed: false,
       revealed: false,
+    },
+    ConquestCooldown: {
+      player: "",
+      last_attack_time: 0,
     },
     Faction: {
       faction_id: 0,
@@ -463,6 +485,42 @@ export const schema: SchemaType = {
       id: 0,
       count: 0,
     },
+    EntryConfig: {
+      config_id: 0,
+      winner_bps: 0,
+      treasury: "",
+    },
+    EntryToken: {
+      token: "",
+      amount: 0,
+      enabled: false,
+    },
+    MatchPot: {
+      match_id: 0,
+      player_a: "",
+      token_a: "",
+      amount_a: 0,
+      player_b: "",
+      token_b: "",
+      amount_b: 0,
+      claimed: false,
+    },
+    QueueSlot: {
+      queue_id: 0,
+      player: "",
+      queued_at: 0,
+      token: "",
+      amount: 0,
+      ability_1: 0,
+      ability_2: 0,
+      ability_3: 0,
+    },
+    QueueStatus: {
+      player: "",
+      state: 0,
+      queued_at: 0,
+      matched_match_id: 0,
+    },
     MatchRecord: {
       player: "",
       opponent: "",
@@ -480,21 +538,8 @@ export const schema: SchemaType = {
       b_stake_3: 0,
       stake_count: 0,
       settled: false,
-    },
-    MatchState: {
-      match_id: 0,
-      team_a_attacker: "",
-      team_a_defender: "",
-      team_b_attacker: "",
-      team_b_defender: "",
-      vault_a_hp: 0,
-      vault_b_hp: 0,
-      current_round: 0,
-      status: new CairoCustomEnum({
-        Pending: "",
-        Active: undefined,
-        Finished: undefined,
-      }),
+      staked: false,
+      parcel_claimed: false,
     },
     MatchState1v1: {
       match_id: 0,
@@ -542,6 +587,12 @@ export const schema: SchemaType = {
       granted_at: 0,
       expires_at: 0,
       used: false,
+    },
+    PlayerCosmetics: {
+      player: "",
+      banner: 0,
+      parcel_skin: 0,
+      hold_decoration: 0,
     },
     PlayerKingdom: {
       player: "",
@@ -609,41 +660,6 @@ export const schema: SchemaType = {
       gate_1: 0,
       gate_2: 0,
     },
-    RoundMoves: {
-      match_id: 0,
-      round: 0,
-      commit_count: 0,
-      reveal_count: 0,
-      commit_deadline: 0,
-      reveal_deadline: 0,
-      ready: false,
-      atk_a_p0: 0,
-      atk_a_p1: 0,
-      atk_a_p2: 0,
-      atk_a_nc0: 0,
-      atk_a_nc1: 0,
-      atk_a_nc2: 0,
-      def_a_g0: 0,
-      def_a_g1: 0,
-      def_a_g2: 0,
-      def_a_repair: 0,
-      def_a_nc0: 0,
-      def_a_nc1: 0,
-      def_a_nc2: 0,
-      atk_b_p0: 0,
-      atk_b_p1: 0,
-      atk_b_p2: 0,
-      atk_b_nc0: 0,
-      atk_b_nc1: 0,
-      atk_b_nc2: 0,
-      def_b_g0: 0,
-      def_b_g1: 0,
-      def_b_g2: 0,
-      def_b_repair: 0,
-      def_b_nc0: 0,
-      def_b_nc1: 0,
-      def_b_nc2: 0,
-    },
     RoundMoves1v1: {
       match_id: 0,
       round: 0,
@@ -692,12 +708,13 @@ export const schema: SchemaType = {
       next_parcel_id: 0,
       initialized: false,
     },
-    MatchCreated: {
-      match_id: 0,
-      team_a_attacker: "",
-      team_a_defender: "",
-      team_b_attacker: "",
-      team_b_defender: "",
+    ConquestResolved: {
+      attacker: "",
+      target_parcel: 0,
+      defender: "",
+      attacker_won: false,
+      ability_id: 0,
+      ability_consumed: false,
     },
     MatchCreated1v1: {
       match_id: 0,
@@ -728,15 +745,20 @@ export const schema: SchemaType = {
 };
 export enum ModelsMapping {
   Commitment = "siege_dojo-Commitment",
+  ConquestCooldown = "siege_dojo-ConquestCooldown",
   Faction = "siege_dojo-Faction",
   FactionCounter = "siege_dojo-FactionCounter",
   FactionInvite = "siege_dojo-FactionInvite",
   FactionMember = "siege_dojo-FactionMember",
   MatchAbilities1v1 = "siege_dojo-MatchAbilities1v1",
   MatchCounter = "siege_dojo-MatchCounter",
+  EntryConfig = "siege_dojo-EntryConfig",
+  EntryToken = "siege_dojo-EntryToken",
+  MatchPot = "siege_dojo-MatchPot",
+  QueueSlot = "siege_dojo-QueueSlot",
+  QueueStatus = "siege_dojo-QueueStatus",
   MatchRecord = "siege_dojo-MatchRecord",
   MatchStakes1v1 = "siege_dojo-MatchStakes1v1",
-  MatchState = "siege_dojo-MatchState",
   MatchStatus = "siege_dojo-MatchStatus",
   MatchState1v1 = "siege_dojo-MatchState1v1",
   NodeOwner = "siege_dojo-NodeOwner",
@@ -744,16 +766,16 @@ export enum ModelsMapping {
   Parcel = "siege_dojo-Parcel",
   Pillage = "siege_dojo-Pillage",
   PillageEligibility = "siege_dojo-PillageEligibility",
+  PlayerCosmetics = "siege_dojo-PlayerCosmetics",
   PlayerKingdom = "siege_dojo-PlayerKingdom",
   PlayerReputation = "siege_dojo-PlayerReputation",
   PresetDefense = "siege_dojo-PresetDefense",
   ResourceConfig = "siege_dojo-ResourceConfig",
   RoundModifiers1v1 = "siege_dojo-RoundModifiers1v1",
-  RoundMoves = "siege_dojo-RoundMoves",
   RoundMoves1v1 = "siege_dojo-RoundMoves1v1",
   RoundTraps1v1 = "siege_dojo-RoundTraps1v1",
   WorldConfig = "siege_dojo-WorldConfig",
-  MatchCreated = "siege_dojo-MatchCreated",
+  ConquestResolved = "siege_dojo-ConquestResolved",
   MatchCreated1v1 = "siege_dojo-MatchCreated1v1",
   MatchFinished = "siege_dojo-MatchFinished",
   MoveCommitted = "siege_dojo-MoveCommitted",

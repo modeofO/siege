@@ -181,3 +181,10 @@ deploy*.env
 /.agents/
 /.claude/skills/controller-*
 /.claude/skills/slot-*
+
+# Local MCP server config — personal to each checkout, not shared
+.mcp.json
+
+# sozo --typescript codegen output. The checked-in copy lives at
+# frontend/src/bindings/typescript/; this is the staging dir it is copied from.
+/bindings/
