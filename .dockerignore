@@ -1,0 +1,14 @@
+# Build-context excludes for the repo-root context (Dockerfile.build, the
+# compose `builder` service). That Dockerfile COPYs nothing — the repo is
+# volume-mounted at runtime — so the context upload is pure overhead; without
+# this file every builder image build ships ~1.6G to the docker daemon.
+# The infra/torii-* images use their own directories as context and are
+# unaffected by this file.
+.git
+node_modules
+**/node_modules
+target
+**/target
+frontend/.next
+site/.next
+bindings

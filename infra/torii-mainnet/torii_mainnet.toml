@@ -1,14 +1,18 @@
-# RPC choice (validated 2026-07-17, torii 1.8.3 in ghcr.io/dojoengine/dojo:v1.8.0):
-# torii 1.8.3 hard-refuses JSON-RPC spec > 0.9. Cartridge mainnet
-# (https://api.cartridge.gg/x/starknet/mainnet) serves 0.10.2 and torii exits
-# immediately ("Provider spec version is not supported ... Got: 0.10.2"), so it
-# cannot be used here. Lava's v0_9 endpoint
+# RPC choice (validated 2026-07-17 on torii 1.8.3; still on Alchemy under
+# 1.8.16): torii <= 1.8.15 hard-refuses JSON-RPC spec > 0.9. Cartridge mainnet
+# (https://api.cartridge.gg/x/starknet/mainnet) serves 0.10.2 and those
+# versions exit immediately ("Provider spec version is not supported ... Got:
+# 0.10.2"). torii 1.8.16 (PR #429) downgrades that to a startup warning — it
+# will RUN against a 0.10 endpoint but still only implements 0.9 semantics
+# ("you may experience unexpected behaviours"), so switching to Cartridge is
+# now testable but not validated. Lava's v0_9 endpoint
 # (https://rpc.starknet.lava.build/rpc/v0_9) returns malformed JSON-RPC batch
 # responses ("invalid type: map, expected a sequence" on GetEvents) and torii
 # makes zero indexing progress. The Alchemy public v0_9 demo endpoint below was
 # the only candidate that indexed cleanly: it reached the world deploy block,
-# populated WorldConfig (total_parcels=32, initialized=1) and all 7 token
-# contract cursors within ~3 minutes with zero warnings/errors.
+# populated WorldConfig (total_parcels=32 at the time, initialized=1 — the grid
+# was later expanded to 96) and all 7 token contract cursors within ~3 minutes
+# with zero warnings/errors.
 # NOTE: this is Alchemy's shared public demo key and is throttled. If indexing
 # starts lagging under load, replace it with a dedicated Alchemy (or other
 # spec-0.9) mainnet key, and/or set index_pending = false below to cut the
@@ -16,11 +20,16 @@
 # a spec-0.9 Cartridge endpoint exists.
 rpc = "https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_9/demo"
 world_address = "0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73"
-world_block = 11948230
 
+# Key names verified against torii 1.8.3 with `--dump-config`; the published
+# Torii config docs use older names that this version silently ignores.
+# `world_block` belongs under [indexing] (top level is dropped), pending-block
+# indexing is `preconfirmed` (not `index_pending`), CORS is
+# [server].http_cors_origins (not [indexing].allowed_origins), and historical
+# models live under [sql] (not [events]).
 [indexing]
-allowed_origins = ["*"]
-index_pending = true
+world_block = 11948230
+preconfirmed = true
 polling_interval = 1000
 contracts = [
   # AbilityToken (ERC-1155) — mainnet deployment
@@ -34,6 +43,10 @@ contracts = [
   "erc20:0x4a6655dafd9505a9c96362475c6ad0f1744ba831c7503bf5b7d762f5f8613a7",
 ]
 
-[events]
+[server]
+# Also passed as --http.cors_origins in the Dockerfile, which takes precedence.
+http_cors_origins = ["*"]
+
+[sql]
 # Keep every ConquestResolved emission queryable (attack/defense activity feed).
 historical = ["siege_dojo-ConquestResolved"]

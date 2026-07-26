@@ -1,10 +1,15 @@
 rpc = "https://siege-katana-production.up.railway.app"
 world_address = "0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73"
-world_block = 0
 
+# Key names verified against torii 1.8.3 with `--dump-config`; the published
+# Torii config docs use older names that this version silently ignores.
+# `world_block` belongs under [indexing] (top level is dropped), pending-block
+# indexing is `preconfirmed` (not `index_pending`), CORS is
+# [server].http_cors_origins (not [indexing].allowed_origins), and historical
+# models live under [sql] (not [events]).
 [indexing]
-allowed_origins = ["*"]
-index_pending = true
+world_block = 0
+preconfirmed = true
 polling_interval = 1000
 contracts = [
   # AbilityToken (ERC-1155) — katana deployment, scripts/init-katana-world.ts
@@ -18,6 +23,10 @@ contracts = [
   "erc20:0x6033ae1569611e683d42a3bcd73f7f5cf519ce5bce02e2e7b4235fecc559739",
 ]
 
-[events]
+[server]
+# Also passed as --http.cors_origins in the Dockerfile, which takes precedence.
+http_cors_origins = ["*"]
+
+[sql]
 # Keep every ConquestResolved emission queryable (attack/defense activity feed).
 historical = ["siege_dojo-ConquestResolved"]
