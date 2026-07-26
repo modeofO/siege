@@ -54,6 +54,14 @@ const TOKENS = [
 // mainnet-style 1e18 amount. A tester registers a Hold, waits one drip, and can
 // queue; no operator has to fund anyone. Use scripts/fund-katana-tester.ts to
 // skip the wait.
+// Katana predeploys a Cartridge VRF provider at genesis (from
+// --cartridge.paymaster). ResourceConfig.vrf_provider MUST point at it rather
+// than the DevVrfProvider: transactions sent through the paymaster arrive as
+// outside-executions, and the paymaster appends assert_consumed against this
+// provider. Consuming from anything else reverts the whole call with
+// 'VrfProvider: not consumed'.
+const KATANA_CARTRIDGE_VRF = "0x015f542e25a4ce31481f986888c179b6e57412be340b8095f72f75a328fbb27b";
+
 const ENTRY_AMOUNT = 1n;
 const WINNER_BPS = 6500; // mirrors mainnet's split so settlement math is exercised
 
@@ -257,7 +265,8 @@ async function main() {
     [
       { contractAddress: actions1v1, entrypoint: "set_ability_token", calldata: CallData.compile([abilityToken]) },
       { contractAddress: actions1v1, entrypoint: "set_resource_config", calldata: CallData.compile(resourceAddresses) },
-      { contractAddress: actions1v1, entrypoint: "set_vrf_provider", calldata: CallData.compile([vrfProvider]) },
+      // Cartridge's predeployed provider, not vrfProvider — see KATANA_CARTRIDGE_VRF.
+      { contractAddress: actions1v1, entrypoint: "set_vrf_provider", calldata: CallData.compile([KATANA_CARTRIDGE_VRF]) },
     ],
     "wire ResourceConfig (ability token, resources, vrf)",
   );
@@ -305,7 +314,11 @@ async function main() {
 
   const addresses = {
     abilityToken,
-    vrfProvider,
+    // What ResourceConfig actually points at, and what clients must send
+    // request_random to. The DevVrfProvider below is still deployed but is NOT
+    // wired — the paymaster's assert_consumed forces Cartridge's provider.
+    vrfProvider: KATANA_CARTRIDGE_VRF,
+    unusedDevVrfProvider: vrfProvider,
     resources: Object.fromEntries(TOKENS.map((t, i) => [t.symbol, resourceAddresses[i]])),
   };
 

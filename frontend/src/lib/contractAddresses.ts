@@ -28,8 +28,15 @@ function contractAddress(tag: string, envName: string, fallback = ""): string {
 // it without pulling the controllerSession import cycle. Sepolia uses the
 // Cartridge VRF service; the self-hosted katana uses DevVrfProvider
 // (pseudo-random, deployed by scripts/init-katana-world.ts).
+// Katana predeploys its own Cartridge VRF provider at genesis (a consequence of
+// --cartridge.paymaster), at a different address than mainnet/sepolia. It must
+// be the one used: when a transaction goes through the paymaster as an
+// outside-execution, the paymaster appends assert_consumed against THAT
+// provider. Requesting randomness from any other contract — e.g. the
+// DevVrfProvider this used to point at — leaves the paymaster's request
+// unconsumed and the whole call reverts with 'VrfProvider: not consumed'.
 export const VRF_PROVIDER_ADDRESS = IS_KATANA
-  ? "0x3832c912886ed54ee500d913df5d7e10703d32d868a56cca1fb9f725c2c1121"
+  ? "0x015f542e25a4ce31481f986888c179b6e57412be340b8095f72f75a328fbb27b"
   : "0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f";
 
 export const ACTIONS_1V1_ADDRESS = contractAddress(
