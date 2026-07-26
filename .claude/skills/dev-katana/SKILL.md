@@ -40,7 +40,7 @@ wires operator + config, and prints the address block.
   defaults to the **mainnet** Cartridge address. Repointing the MCP at katana
   without also setting that variable to the address above reproduces the same
   `consume_random` mismatch.
-- **MCP signing**: Cartridge headless sessions cannot be created for a custom chain id, so on katana the MCP signs with a raw account (`AGENT_ACCOUNT_ADDRESS` / `AGENT_PRIVATE_KEY` env). Leaving those unset selects the Cartridge session flow used on sepolia/mainnet.
+- **MCP signing**: the Cartridge headless session flow WORKS on katana (verified 2026-07-26, controller 0.13.12) — the node SessionProvider passes `rpc_url` in the keychain auth URL, so the keychain resolves the SIEGE appchain exactly like the frontend's `chains: [{rpcUrl}]`, and writes land as outside-executions via katana's built-in paymaster (tx sender = dev account 0). Use `mcp-server-2/.env.katana-session` to sign as the user's real Controller. Raw-key mode (`AGENT_ACCOUNT_ADDRESS` / `AGENT_PRIVATE_KEY` env) remains as a browser-free fallback that signs as a separate DevAgentAccount; leaving those unset selects the session flow.
 - **Agent account**: must be a `DevAgentAccount` (`src/tokens/dev_agent_account.cairo`, deployed by `scripts/deploy-agent-account.ts`). Katana's predeployed dev accounts lack SRC5 and fail ERC-1155 acceptance checks — `register_player` starter mints revert with `'ERC1155: safe transfer failed'`.
 - **UDC**: uses the legacy deployer.
 - **ControllerConnector** is browser-only.

@@ -83,10 +83,11 @@ export async function getAccount(
   cfg: SessionConfig,
   opts: ConnectOptions = {},
 ): Promise<AccountInterface> {
-  // Raw-key mode for self-hosted chains: Cartridge's createSession API cannot
-  // derive an RPC URL from a custom chain id ("SIEGE"), so headless sessions
-  // are impossible there. On a fee-less katana a plain prefunded account is
-  // equivalent — set AGENT_ACCOUNT_ADDRESS + AGENT_PRIVATE_KEY to use it.
+  // Raw-key mode: signs as a plain prefunded account (katana DevAgentAccount)
+  // with no browser approval. Optional even on self-hosted chains — the
+  // session flow below also works for custom chain ids (verified on katana
+  // 2026-07-26): the keychain resolves the appchain from the rpc_url embedded
+  // in the auth URL, same as the frontend's chains: [{ rpcUrl }].
   const rawAddress = process.env.AGENT_ACCOUNT_ADDRESS;
   const rawKey = process.env.AGENT_PRIVATE_KEY;
   if (rawAddress && rawKey) {

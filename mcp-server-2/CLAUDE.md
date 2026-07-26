@@ -24,11 +24,15 @@ finishes emits its final channel event and is auto-released;
 traffic. Channel events carry `you` (`a`/`b`/`spectator`) so the agent knows
 whether to act; `siege_whoami` reports the watch set and poller liveness.
 
-Switch networks by copying `.env.mainnet` over `.env`. On mainnet, signing uses the
-Cartridge session flow — the absence of `AGENT_*` vars selects session signing.
-`SESSION_DIR` is `.cartridge-mainnet`. On katana, set `AGENT_ACCOUNT_ADDRESS` /
-`AGENT_PRIVATE_KEY` instead (headless Cartridge sessions can't be created for a
-custom chain id).
+Switch networks by copying `.env.mainnet` (or `.env.katana-session`) over `.env`
+and reconnecting the server. The absence of `AGENT_*` vars selects the Cartridge
+session flow; `SESSION_DIR` keeps per-network approvals separate
+(`.cartridge-mainnet` / `.cartridge-katana`). The session flow works on katana
+too (verified 2026-07-26): the keychain resolves the custom SIEGE chain from the
+`rpc_url` in the auth URL, and writes are sponsored by katana's built-in
+paymaster. Setting `AGENT_ACCOUNT_ADDRESS` / `AGENT_PRIVATE_KEY` instead selects
+raw-key signing as a DevAgentAccount (katana only — no browser approval, but a
+different address than the user's Controller).
 
 ## Cartridge session auth
 
