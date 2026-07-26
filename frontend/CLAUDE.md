@@ -20,14 +20,23 @@ hook is a pure `useModels` + `useMemo` selector over the global Dojo store those
 populate. A selector called on a page that has not opened the matching
 subscription silently returns empty data.
 
-Ranked/windowed views (top-N) cannot be subscriptions — a stream takes only a
-clause and cannot retract a row displaced from the window — so they poll a
-one-shot gRPC `RetrieveEntities` with a member clause + `order_by` + `limit`
-(`useActiveBattles`). Torii SQL remains for one-shot reads after a tx
+Ranked/windowed views (top-N) subscribe with a member clause and re-derive
+the window client-side: `useActiveBattles` selects over the
+`status Eq 'Active'` subscription (opened in `useWorldSubscription`), filters,
+sorts and slices in the selector, because a stream cannot retract a row
+displaced from the window. This needs torii >= 1.8.12/1.8.15 (deployed:
+1.8.16), where clause matching considers both old and new entity state so a
+match leaving the clause is still broadcast. Only do this for sets that stay
+small (concurrent active matches); for unbounded history (a leaderboard over
+all matches ever) poll a one-shot gRPC `RetrieveEntities` with member clause +
+`order_by` + `limit` instead. Torii SQL remains for one-shot reads after a tx
 (`fetchConquestOutcome`, the match page's post-tx poll). `usePoll` skips ticks
-while the tab is hidden and catches up on re-show. Any periodic Torii read
-must report into `reportToriiResult` — `useToriiHealth` is fed by both
-transports, and a page's only regular read may be its only liveness signal.
+while the tab is hidden and catches up on re-show.
+
+Known tradeoff: /world now makes zero periodic Torii reads, so
+`useToriiHealth` (fed only by SQL reads) cannot flip on that page — a dead
+subscription stream shows as quietly stale data, not as unhealthy. Accepted
+for architectural consistency; revisit if stuck pages are ever reported.
 
 Measured facts about torii query semantics the SDK docs do not tell you. Both
 deployments run torii 1.8.16 (verified 2026-07-26); the version-dependent one

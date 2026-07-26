@@ -27,11 +27,12 @@ export interface ParcelData {
  * How long to wait before treating an empty store as a genuinely empty world
  * rather than a subscription that has not delivered its first page yet. The
  * SQL poller could distinguish the two (a response arrived, it had no rows);
- * a store selector cannot, so `loading` needs a floor.
+ * a store selector cannot, so `loading` needs a floor. Exported for other
+ * store-backed panels with the same ambiguity (Live Battles).
  */
-const INITIAL_LOAD_GRACE_MS = 2500;
+export const INITIAL_LOAD_GRACE_MS = 2500;
 
-function useSettled(ms: number): boolean {
+export function useSettled(ms: number): boolean {
   const [settled, setSettled] = useState(false);
   // setState lives in the timeout callback, not the effect body — required by
   // react-hooks/set-state-in-effect (see frontend/CLAUDE.md).

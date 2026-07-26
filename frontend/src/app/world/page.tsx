@@ -5,7 +5,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
-import { useWorldParcels, usePlayerKingdom, type ParcelData } from "@/lib/worldState";
+import {
+  useWorldParcels,
+  usePlayerKingdom,
+  useSettled,
+  INITIAL_LOAD_GRACE_MS,
+  type ParcelData,
+} from "@/lib/worldState";
 import { useWorldSubscription } from "@/lib/worldSubscription";
 import { HexGrid } from "@/components/HexGrid";
 import { RegisterKingdom } from "@/components/RegisterKingdom";
@@ -24,15 +30,12 @@ import { usePlayerFaction } from "@/lib/factions";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/contractAddresses";
 import { resilientExecute } from "@/lib/controllerSession";
-import { useDojoSDK } from "@dojoengine/sdk/react";
-import { ToriiQueryBuilder, MemberClause } from "@dojoengine/sdk";
+import { useModels } from "@dojoengine/sdk/react";
 import {
   ModelsMapping,
-  type SchemaType,
   type MatchState1v1 as MatchState1v1Model,
 } from "@/bindings/typescript/models.gen";
-import { reportToriiResult } from "@/lib/toriiSql";
-import { safeNum } from "@/lib/modelUtils";
+import { safeNum, flatModels, enumVariant } from "@/lib/modelUtils";
 import { usePoll } from "@/lib/usePoll";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
@@ -191,60 +194,35 @@ interface ActiveBattle {
   vaultBHp: number;
 }
 
-// STILL POLLING, deliberately: top-N is a snapshot — a subscription stream
-// takes only a clause (no order_by/limit) and cannot retract row 21 when a
-// newer match displaces it, while subscribing to all of MatchState1v1 to sort
-// client-side would grow without bound as matches accumulate. But the
-// snapshot itself is gRPC (RetrieveEntities with a member clause + order_by +
-// limit), not SQL. Two measured gotchas encoded here: the order_by field must
-// be model-qualified (bare "match_id" errors with "Invalid cursor"), and a
-// unit-variant enum compares against its variant name as a plain string.
-// Via usePoll so it inherits the tab-visibility gate; reports into
-// useToriiHealth because it is the page's only periodic Torii read.
-function useActiveBattles(refreshKey: number): { battles: ActiveBattle[]; loading: boolean } {
-  const { sdk } = useDojoSDK();
-  const [battles, setBattles] = useState<ActiveBattle[]>([]);
-  const [loading, setLoading] = useState(true);
+// Pure selector over the member-clause subscription opened by
+// useWorldSubscription (status Eq 'Active') — zero steady-state traffic. The
+// store accumulates every MatchState1v1 row any subscription has touched
+// (finished battles stay after their exit-broadcast, and the match page's own
+// stream feeds the same store), so the panel's window is re-derived here:
+// filter Active, sort desc, slice 20. The stream cannot retract rows; the
+// selector is what maintains the top-N.
+function useActiveBattles(): { battles: ActiveBattle[]; loading: boolean } {
+  const matchStates = useModels(ModelsMapping.MatchState1v1);
+  const settled = useSettled(INITIAL_LOAD_GRACE_MS);
 
-  usePoll(
-    async (alive) => {
-      // Network read — the catch keeps a flaky Torii from surfacing as an
-      // unhandled rejection and routes the failure into the health tracker.
-      try {
-        const res = await sdk.getEntities({
-          query: new ToriiQueryBuilder<SchemaType>()
-            .withClause(MemberClause(ModelsMapping.MatchState1v1, "status", "Eq", "Active").build())
-            .addOrderBy(`${ModelsMapping.MatchState1v1}.match_id`, "Desc")
-            .withLimit(20)
-            .withEntityModels([ModelsMapping.MatchState1v1])
-            .includeHashedKeys(),
-        });
-        reportToriiResult(true);
-        if (!alive()) return;
-        setBattles(
-          res
-            .getItems()
-            .map((e) => e.models?.siege_dojo?.MatchState1v1)
-            .filter((m): m is MatchState1v1Model => !!m)
-            .map((m) => ({
-              matchId: safeNum(m.match_id),
-              playerA: String(m.player_a ?? ""),
-              playerB: String(m.player_b ?? ""),
-              round: safeNum(m.current_round),
-              vaultAHp: safeNum(m.vault_a_hp),
-              vaultBHp: safeNum(m.vault_b_hp),
-            })),
-        );
-        setLoading(false);
-      } catch (e) {
-        reportToriiResult(false, e instanceof Error ? e.message : String(e));
-      }
-    },
-    15_000,
-    [refreshKey],
+  const battles = useMemo<ActiveBattle[]>(
+    () =>
+      flatModels<MatchState1v1Model>(matchStates)
+        .filter((m) => enumVariant(m.status) === "Active")
+        .map((m) => ({
+          matchId: safeNum(m.match_id),
+          playerA: String(m.player_a ?? ""),
+          playerB: String(m.player_b ?? ""),
+          round: safeNum(m.current_round),
+          vaultAHp: safeNum(m.vault_a_hp),
+          vaultBHp: safeNum(m.vault_b_hp),
+        }))
+        .sort((a, b) => b.matchId - a.matchId)
+        .slice(0, 20),
+    [matchStates],
   );
 
-  return { battles, loading };
+  return { battles, loading: battles.length === 0 && !settled };
 }
 
 function truncAddr(addr: string): string {
@@ -269,7 +247,7 @@ export default function WorldPage() {
   const myCosmetics = usePlayerCosmetics(address ?? undefined);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
-  const { battles, loading: battlesLoading } = useActiveBattles(refreshKey);
+  const { battles, loading: battlesLoading } = useActiveBattles();
 
   // --- Conquest state ---
   const [selectedParcel, setSelectedParcel] = useState<ParcelData | null>(null);

@@ -36,6 +36,24 @@ export function toBigIntOrNull(v: string | null | undefined): bigint | null {
   }
 }
 
+type EnumLike = { activeVariant?: () => string; variant?: Record<string, unknown> };
+
+/**
+ * Variant name of a Cairo enum as it comes out of the SDK store: unit variants
+ * arrive as plain strings, data-carrying ones as CairoCustomEnum, and older
+ * SDK versions as a bare `variant` record.
+ */
+export function enumVariant(e: unknown): string {
+  if (!e) return "";
+  if (typeof e === "string") return e; // SDK returns enums as plain variant strings
+  const v = e as EnumLike;
+  if (typeof v.activeVariant === "function") return v.activeVariant();
+  if (v.variant && typeof v.variant === "object") {
+    return Object.keys(v.variant).find((k) => v.variant![k] !== undefined) || "";
+  }
+  return "";
+}
+
 /**
  * `useModels` claims to return `{ [entityId]: ModelData }` but actually returns
  * `Array<{ [entityId]: ModelData }>`. Normalize both shapes to a flat array of

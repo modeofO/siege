@@ -16,7 +16,7 @@ import {
 // The SDK's entity store occasionally contains placeholder / partial entries
 // (e.g., fresh subscription results before fields are hydrated). The shared
 // helpers guard every conversion so a render-time throw can't nuke the page.
-import { safeNum, safeBigIntEq, flatModels } from "@/lib/modelUtils";
+import { safeNum, safeBigIntEq, flatModels, enumVariant } from "@/lib/modelUtils";
 import { resolveRoundLocal, type PlayerMove } from "@/lib/resolution1v1";
 
 function safeNumEq(v: unknown, target: number): boolean {
@@ -40,18 +40,6 @@ export function toFeltHex(v: string | null | undefined): string | undefined {
   }
 }
 
-type EnumLike = { activeVariant?: () => string; variant?: Record<string, unknown> };
-
-function enumVariant(e: unknown): string {
-  if (!e) return "";
-  if (typeof e === "string") return e; // SDK returns enums as plain variant strings
-  const v = e as EnumLike;
-  if (typeof v.activeVariant === "function") return v.activeVariant();
-  if (v.variant && typeof v.variant === "object") {
-    return Object.keys(v.variant).find((k) => v.variant![k] !== undefined) || "";
-  }
-  return "";
-}
 
 export type NodeOwner = "neutral" | "teamA" | "teamB";
 

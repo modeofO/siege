@@ -2,7 +2,7 @@
 "use client";
 
 import { useEntityQuery } from "@dojoengine/sdk/react";
-import { ToriiQueryBuilder, KeysClause } from "@dojoengine/sdk";
+import { ToriiQueryBuilder, KeysClause, MemberClause } from "@dojoengine/sdk";
 import { ModelsMapping, type SchemaType } from "@/bindings/typescript/models.gen";
 
 /**
@@ -66,6 +66,23 @@ export function useWorldSubscription() {
       .withClause(KeysClause<SchemaType>([...WORLD_MODELS], [undefined], "VariableLen").build())
       .withEntityModels([...WORLD_MODELS])
       .withLimit(WORLD_ENTITY_LIMIT)
+      .includeHashedKeys(),
+  );
+
+  // Live Battles panel: a member-clause subscription instead of a poll.
+  // Requires torii >= 1.8.12/1.8.15 (deployed: 1.8.16) — those releases fixed
+  // clause matching against BOTH old and new entity state, so a match flipping
+  // Active -> Finished is still broadcast and leaves the panel. The seed fetch
+  // honors order_by+limit (top 20 by match_id desc; the field must be
+  // model-qualified); the stream then pushes every status change, and
+  // useActiveBattles re-derives the window client-side. Steady-state Torii
+  // traffic on /world is therefore zero.
+  useEntityQuery(
+    new ToriiQueryBuilder<SchemaType>()
+      .withClause(MemberClause(ModelsMapping.MatchState1v1, "status", "Eq", "Active").build())
+      .addOrderBy(`${ModelsMapping.MatchState1v1}.match_id`, "Desc")
+      .withLimit(20)
+      .withEntityModels([ModelsMapping.MatchState1v1])
       .includeHashedKeys(),
   );
 }

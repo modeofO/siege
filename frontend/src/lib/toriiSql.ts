@@ -6,9 +6,10 @@ import { TORII_URL } from "./network";
 // --- Connection health tracking ---
 // toriiSql still returns [] on failure so callers stay simple, but failures
 // are no longer silent: they update a shared health state (see useToriiHealth)
-// so the UI can distinguish "no data" from "Torii unreachable". The tracker is
-// shared with the gRPC read path (useActiveBattles) — any periodic Torii read
-// may be the page's only liveness signal, so all of them report here.
+// so the UI can distinguish "no data" from "Torii unreachable". Caveat: only
+// SQL reads feed this — /world is fully subscription-driven and makes no
+// periodic reads at all, so a dead gRPC stream there shows as stale data, not
+// as unhealthy. Health flips only on pages/actions that still hit SQL.
 
 const UNHEALTHY_AFTER = 2; // consecutive failures before flagging
 
@@ -16,7 +17,7 @@ let consecutiveFailures = 0;
 let healthy = true;
 const healthListeners = new Set<(healthy: boolean) => void>();
 
-export function reportToriiResult(ok: boolean, detail?: string) {
+function reportToriiResult(ok: boolean, detail?: string) {
   consecutiveFailures = ok ? 0 : consecutiveFailures + 1;
   const nowHealthy = consecutiveFailures < UNHEALTHY_AFTER;
   if (!ok && consecutiveFailures === UNHEALTHY_AFTER) {
