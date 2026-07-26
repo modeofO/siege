@@ -98,4 +98,23 @@ export const ENTRY_TOKEN_CAPS: { address: string; cap: string }[] = IS_MAINNET
         cap: "0x10f0cf064dd59200000",
       },
     ]
-  : [];
+  : IS_KATANA
+    ? // Practice-chain buy-ins are the six resource tokens (scripts/
+      // init-katana-world.ts enables them; addresses in katana-addresses.json).
+      // Leaving this empty meant the session carried queue_for_match but no
+      // approve policy, so queueing could never be covered and the keychain
+      // looped on USER_INTERACTION_REQUIRED.
+      //
+      // ResourceToken has 0 decimals and the buy-in is 1 whole token, so cap
+      // 100 = 100 games and shows on the consent screen as a plain "100".
+      (
+        [
+          "0x3ec5e18038345d363133443d25f742d063f34319ba923ac1c9d354054209095", // IRON
+          "0x412a69d1b3ab113e6427ce92070c911995de6d31f7453940f82ea025b9d2bac", // LINEN
+          "0x39af623e54128504f833728cf09fbd98835d825be4eb3a553d9186cab0c39d3", // STONE
+          "0x6f0245a8b9605beb8c68da8deda7382e8a794346eef1f49416e01f2d99cba34", // WOOD
+          "0x68d51f72cad08dd349467877a22ee2ae3a31f0c343a111087211777f4074099", // EMBER
+          "0x6033ae1569611e683d42a3bcd73f7f5cf519ce5bce02e2e7b4235fecc559739", // SEEDS
+        ] as const
+      ).map((address) => ({ address, cap: "0x64" }))
+    : [];
