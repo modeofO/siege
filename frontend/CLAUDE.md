@@ -20,10 +20,14 @@ hook is a pure `useModels` + `useMemo` selector over the global Dojo store those
 populate. A selector called on a page that has not opened the matching
 subscription silently returns empty data.
 
-Torii SQL remains correct for reads a subscription cannot express — `ORDER BY`
-/ `LIMIT` (`useActiveBattles`) and one-shot reads after a tx
+Ranked/windowed views (top-N) cannot be subscriptions — a stream takes only a
+clause and cannot retract a row displaced from the window — so they poll a
+one-shot gRPC `RetrieveEntities` with a member clause + `order_by` + `limit`
+(`useActiveBattles`). Torii SQL remains for one-shot reads after a tx
 (`fetchConquestOutcome`, the match page's post-tx poll). `usePoll` skips ticks
-while the tab is hidden and catches up on re-show.
+while the tab is hidden and catches up on re-show. Any periodic Torii read
+must report into `reportToriiResult` — `useToriiHealth` is fed by both
+transports, and a page's only regular read may be its only liveness signal.
 
 Measured facts about torii query semantics the SDK docs do not tell you. Both
 deployments run torii 1.8.16 (verified 2026-07-26); the version-dependent one
@@ -49,6 +53,10 @@ is marked:
   page.** It never follows `next_cursor`, so anything past the limit is dropped
   with no error. Measured on mainnet, the default returns 7 of 96 parcels.
   Always call `withLimit`. (SDK behavior — unchanged by the torii upgrade.)
+- **`addOrderBy` needs a model-qualified field.**
+  `"siege_dojo-MatchState1v1.match_id"` works; bare `"match_id"` errors with
+  `Invalid cursor: no column found`. Unit-variant enums compare with a plain
+  variant-name string (`MemberClause(..., "status", "Eq", "Active")`).
 - **Entity ids collide across models on small integer keys.** Parcel 5 and
   match 5 hash to the same entity id. Harmless for reads (`useModels` selects
   one model per entity), but keys alone cannot isolate a model — the models

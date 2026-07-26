@@ -24,7 +24,15 @@ import { usePlayerFaction } from "@/lib/factions";
 import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/contractAddresses";
 import { resilientExecute } from "@/lib/controllerSession";
-import { toriiSql, toNum } from "@/lib/toriiSql";
+import { useDojoSDK } from "@dojoengine/sdk/react";
+import { ToriiQueryBuilder, MemberClause } from "@dojoengine/sdk";
+import {
+  ModelsMapping,
+  type SchemaType,
+  type MatchState1v1 as MatchState1v1Model,
+} from "@/bindings/typescript/models.gen";
+import { reportToriiResult } from "@/lib/toriiSql";
+import { safeNum } from "@/lib/modelUtils";
 import { usePoll } from "@/lib/usePoll";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
@@ -181,35 +189,56 @@ interface ActiveBattle {
   round: number;
   vaultAHp: number;
   vaultBHp: number;
-  status: number;
 }
 
-// STILL POLLING, deliberately: ORDER BY + LIMIT have no subscription
-// equivalent, and subscribing to all of MatchState1v1 to sort client-side
-// would grow without bound as matches accumulate. Via usePoll so it inherits
-// the tab-visibility gate.
+// STILL POLLING, deliberately: top-N is a snapshot — a subscription stream
+// takes only a clause (no order_by/limit) and cannot retract row 21 when a
+// newer match displaces it, while subscribing to all of MatchState1v1 to sort
+// client-side would grow without bound as matches accumulate. But the
+// snapshot itself is gRPC (RetrieveEntities with a member clause + order_by +
+// limit), not SQL. Two measured gotchas encoded here: the order_by field must
+// be model-qualified (bare "match_id" errors with "Invalid cursor"), and a
+// unit-variant enum compares against its variant name as a plain string.
+// Via usePoll so it inherits the tab-visibility gate; reports into
+// useToriiHealth because it is the page's only periodic Torii read.
 function useActiveBattles(refreshKey: number): { battles: ActiveBattle[]; loading: boolean } {
+  const { sdk } = useDojoSDK();
   const [battles, setBattles] = useState<ActiveBattle[]>([]);
   const [loading, setLoading] = useState(true);
 
   usePoll(
     async (alive) => {
-      const rows = await toriiSql<Record<string, unknown>>(
-        `SELECT match_id, player_a, player_b, current_round, vault_a_hp, vault_b_hp, status FROM "siege_dojo-MatchState1v1" WHERE status = 'Active' ORDER BY match_id DESC LIMIT 20`
-      );
-      if (!alive()) return;
-      setBattles(
-        rows.map((r) => ({
-          matchId: toNum(r.match_id),
-          playerA: String(r.player_a ?? ""),
-          playerB: String(r.player_b ?? ""),
-          round: toNum(r.current_round),
-          vaultAHp: toNum(r.vault_a_hp),
-          vaultBHp: toNum(r.vault_b_hp),
-          status: toNum(r.status),
-        }))
-      );
-      setLoading(false);
+      // Network read — the catch keeps a flaky Torii from surfacing as an
+      // unhandled rejection and routes the failure into the health tracker.
+      try {
+        const res = await sdk.getEntities({
+          query: new ToriiQueryBuilder<SchemaType>()
+            .withClause(MemberClause(ModelsMapping.MatchState1v1, "status", "Eq", "Active").build())
+            .addOrderBy(`${ModelsMapping.MatchState1v1}.match_id`, "Desc")
+            .withLimit(20)
+            .withEntityModels([ModelsMapping.MatchState1v1])
+            .includeHashedKeys(),
+        });
+        reportToriiResult(true);
+        if (!alive()) return;
+        setBattles(
+          res
+            .getItems()
+            .map((e) => e.models?.siege_dojo?.MatchState1v1)
+            .filter((m): m is MatchState1v1Model => !!m)
+            .map((m) => ({
+              matchId: safeNum(m.match_id),
+              playerA: String(m.player_a ?? ""),
+              playerB: String(m.player_b ?? ""),
+              round: safeNum(m.current_round),
+              vaultAHp: safeNum(m.vault_a_hp),
+              vaultBHp: safeNum(m.vault_b_hp),
+            })),
+        );
+        setLoading(false);
+      } catch (e) {
+        reportToriiResult(false, e instanceof Error ? e.message : String(e));
+      }
     },
     15_000,
     [refreshKey],

@@ -6,7 +6,9 @@ import { TORII_URL } from "./network";
 // --- Connection health tracking ---
 // toriiSql still returns [] on failure so callers stay simple, but failures
 // are no longer silent: they update a shared health state (see useToriiHealth)
-// so the UI can distinguish "no data" from "Torii unreachable".
+// so the UI can distinguish "no data" from "Torii unreachable". The tracker is
+// shared with the gRPC read path (useActiveBattles) — any periodic Torii read
+// may be the page's only liveness signal, so all of them report here.
 
 const UNHEALTHY_AFTER = 2; // consecutive failures before flagging
 
@@ -14,7 +16,7 @@ let consecutiveFailures = 0;
 let healthy = true;
 const healthListeners = new Set<(healthy: boolean) => void>();
 
-function reportResult(ok: boolean, detail?: string) {
+export function reportToriiResult(ok: boolean, detail?: string) {
   consecutiveFailures = ok ? 0 : consecutiveFailures + 1;
   const nowHealthy = consecutiveFailures < UNHEALTHY_AFTER;
   if (!ok && consecutiveFailures === UNHEALTHY_AFTER) {
@@ -41,14 +43,14 @@ export async function toriiSql<T extends Record<string, unknown>>(sql: string): 
   try {
     const res = await fetch(`${TORII_URL}/sql?query=${encodeURIComponent(sql)}`);
     if (!res.ok) {
-      reportResult(false, `HTTP ${res.status}`);
+      reportToriiResult(false, `HTTP ${res.status}`);
       return [];
     }
     const data = (await res.json()) as T[];
-    reportResult(true);
+    reportToriiResult(true);
     return data;
   } catch (e) {
-    reportResult(false, e instanceof Error ? e.message : String(e));
+    reportToriiResult(false, e instanceof Error ? e.message : String(e));
     return [];
   }
 }
