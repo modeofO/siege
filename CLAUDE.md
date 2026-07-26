@@ -292,6 +292,12 @@ whose upstream version moved since the last report. The baseline lives in a
 commit and no `contents: write` are needed. Force a re-run of the analysis via
 workflow_dispatch with `force_analysis`.
 
+Stage 2 pins its model (`--model claude-opus-5` in `claude_args`) so verdict
+quality cannot drift with the CLI default. Tokens bill against the Claude
+subscription behind `CLAUDE_CODE_OAUTH_TOKEN`, not API credits. Both workflows
+run on GitHub-hosted `ubuntu-latest`; the repo is public, so runner minutes are
+free and every report, comment, and log is world-readable.
+
 Neither workflow opens bump PRs: the infra pins carry runbooks a bot would skip
 — a torii bump can need a reindex against a fresh `--db-dir`, a katana bump
 wipes dev-chain state, and the katana version is the binary *inside*

@@ -153,7 +153,13 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          claude_args: '--allowedTools "Read,Grep,Glob,WebFetch,Write"'
+          # Pinned deliberately: unpinned, this follows whatever the CLI default
+          # is at run time, so verdict quality could shift between runs with
+          # nothing in the diff to explain it. Reading a changelog and deciding
+          # whether this repo actually touches what moved is the hard part, so
+          # it gets the strong model — the delta gate keeps runs rare enough
+          # that subscription cost stays low.
+          claude_args: '--model claude-opus-5 --allowedTools "Read,Grep,Glob,WebFetch,Write"'
           prompt: |
             You are assessing upgrade blast radius for the Siege repo. Read CLAUDE.md
             and frontend/CLAUDE.md first for context on what this codebase does.
