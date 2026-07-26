@@ -1,9 +1,28 @@
 # MCP Notes
 
 `mcp-server-2/` is the active MCP implementation (`mcp-server/` is older and unused).
-It registers 44 tools and signs writes through a Cartridge session. It reads Dojo
+It registers 45 tools and signs writes through a Cartridge session. It reads Dojo
 contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses
 come from env/defaults.
+
+## Live updates (poll-driven, not streamed)
+
+All Torii reads are SQL. Live match notifications are driven by a watch-scoped
+poller (`live.ts`, 5 s tick): one `latestMatchActivity` probe per watched match
+per tick, full snapshot rebuild + diff (`notify.ts`) only when the probe moves,
+channel event + `resources/updated` only on a real delta. There is deliberately
+no gRPC subscription: Railway's edge kills idle streams at 300 s (measured
+2026-07-26), torii-client 1.8.2 had no reconnect, and the agent — which BLOCKS
+on channel events per agent-prompt.md — cannot perceive push latency but is
+stranded by a lost event. Polling guarantees delivery; a tick of latency is
+invisible against 300 s game clocks.
+
+Watch lifecycle invariant: the watch set only contains live matches the agent
+has touched. Reading a finished match never watches it; a watched match that
+finishes emits its final channel event and is auto-released;
+`siege_unwatch_match` is the explicit off switch. Empty watch set → zero Torii
+traffic. Channel events carry `you` (`a`/`b`/`spectator`) so the agent knows
+whether to act; `siege_whoami` reports the watch set and poller liveness.
 
 Switch networks by copying `.env.mainnet` over `.env`. On mainnet, signing uses the
 Cartridge session flow — the absence of `AGENT_*` vars selects session signing.

@@ -14,9 +14,6 @@ importers:
       '@cartridge/controller-wasm':
         specifier: 0.10.1
         version: 0.10.1
-      '@dojoengine/torii-client':
-        specifier: ^1.8.2
-        version: 1.8.2
       '@modelcontextprotocol/sdk':
         specifier: ^1.29.0
         version: 1.29.0(zod@3.25.76)
@@ -106,12 +103,6 @@ packages:
         optional: true
       '@x402/svm':
         optional: true
-
-  '@dojoengine/torii-client@1.8.2':
-    resolution: {integrity: sha512-A1aJFkBXgEcr5oObIMeiYsfkPd2VOFHdSARZ6D2IIc0BARz7rMa395yPbj5s4ZkTvhmdsovna/IJvSk0r4pFUA==}
-
-  '@dojoengine/torii-wasm@1.8.2':
-    resolution: {integrity: sha512-zPbZOGxX6uVU+7uHQ25c2LRGWFg4p/x0wi1YnRPWWXpMOmMBduXUAZlDhSaKBND7Ui3coEoCHSvoVs8S3mj1YQ==}
 
   '@emnapi/core@1.10.0':
     resolution: {integrity: sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==}
@@ -2705,12 +2696,6 @@ snapshots:
       - typescript
       - utf-8-validate
     optional: true
-
-  '@dojoengine/torii-client@1.8.2':
-    dependencies:
-      '@dojoengine/torii-wasm': 1.8.2
-
-  '@dojoengine/torii-wasm@1.8.2': {}
 
   '@emnapi/core@1.10.0':
     dependencies:

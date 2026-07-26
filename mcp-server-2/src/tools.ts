@@ -40,6 +40,10 @@ export interface ToolContext {
   config: Config;
   state: StateClient;
   watchMatch: (matchId: number) => void;
+  /** Explicit release from live notifications; true if the match was watched. */
+  unwatchMatch: (matchId: number) => boolean;
+  /** Watch set + poller liveness, for siege_whoami. */
+  liveStatus: () => { watched: number[]; last_tick_at: string | null; last_change_at: string | null };
   /** null until the Cartridge session is approved. Read tools work without it. */
   signer: AccountInterface | null;
   /** Address of the authenticated agent. Empty string until session is ready. */
@@ -513,11 +517,27 @@ export function registerSiegeTools(reg: RegisterArgs): void {
   register(
     "siege_whoami",
     {
-      description: "Return the authenticated agent's Starknet address.",
+      description:
+        "Return the authenticated agent's Starknet address, plus live-notification status: which matches are watched and when the poller last ticked/saw a change.",
       inputSchema: {},
       requiresSigner: true,
     },
-    async (_args, ctx) => ({ address: ctx.agentAddress }),
+    async (_args, ctx) => ({ address: ctx.agentAddress, live: ctx.liveStatus() }),
+  );
+
+  register(
+    "siege_unwatch_match",
+    {
+      description:
+        "Stop live notifications for a match (e.g. done spectating). Watching resumes automatically the next time you read an active match's state.",
+      inputSchema: {
+        match_id: z.number().int().nonnegative().describe("1v1 match id to stop watching"),
+      },
+    },
+    async ({ match_id }, ctx) => ({
+      unwatched: ctx.unwatchMatch(match_id),
+      still_watching: ctx.liveStatus().watched,
+    }),
   );
 
   // ----- reads -----

@@ -87,6 +87,11 @@ match's state changes. Tag attributes:
 
 - `match_id`, `phase` (`committing` / `revealing` / `resolving` / `finished`),
   `round`, `commits` (`0`–`2`), `reveals` (`0`–`2`), `hp_a`, `hp_b`, `status`.
+- `you` — your relationship to this match: `a` or `b` when you are that
+  player, `spectator` otherwise. **Only act (commit/reveal) on events where
+  you are a participant** — writes from a spectator revert with `'Not a match
+  participant'`. On a spectated match, just observe (you may still call
+  `siege_resolve_round` after both reveals; resolution is permissionless).
 - `budget_a` / `budget_b` — each side's budget for this round, escalation
   included.
 - `nodes` — node control as `a`/`b`/`-` per index, e.g. `a,-,b` means you hold
@@ -109,7 +114,16 @@ Use these to time your moves:
 - After your `siege_reveal`, wait for `<channel ... reveals="2">`, then call
   `siege_resolve_round`.
 - When `phase="finished"` or `status="Finished"`, the match is over — read the
-  final round details and stop.
+  final round details and stop. That final event is also the last one: the
+  server stops watching a finished match.
+- **Deadline safety net:** channel delivery is best-effort — never wait past
+  the clock. If the `deadline` from the last event passes without a new one,
+  call `siege_get_match_state` once and act on what it returns.
+
+Watching is automatic: reading an active match's state starts live
+notifications for it (finished matches are never watched). Use
+`siege_unwatch_match` when you are done spectating a match you are not
+playing; your own match releases itself when it finishes.
 
 If channels aren't enabled, fall back to polling `siege_get_match_state`
 between turns.

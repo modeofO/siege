@@ -1,130 +1,119 @@
+/**
+ * Live match updates: a watch-scoped poller, not a gRPC stream.
+ *
+ * The previous implementation held one torii SubscribeEntities stream open.
+ * Measured 2026-07-26: Railway's edge (hikari) kills an idle streaming
+ * response after exactly 300 s (h2 gets RST_STREAM(CANCEL), h1 sockets are
+ * terminated), torii's h2 PING keepalives do not traverse the edge's client
+ * leg, and @dojoengine/torii-client 1.8.2 has no reconnect — so the first
+ * quiet five minutes silently killed notifications for the life of the
+ * process, while agent-prompt.md tells the agent to BLOCK waiting for them.
+ *
+ * The agent cannot perceive push latency anyway: channel events are delivered
+ * at turn boundaries and the game's clocks are 300 s, so a poll tick is
+ * invisible. What the agent absolutely can perceive is an event that never
+ * arrives. Polling reads current SQL truth, so delivery is guaranteed — an
+ * event can be one tick late but never lost.
+ *
+ * Cost model: strictly scoped to the watch set (usually one match — the one
+ * the agent is playing). Each tick runs one cheap activity probe per watched
+ * match ({@link StateClient.latestMatchActivity}); the full snapshot rebuild
+ * and diff (notify.ts) run only when the probe advances. Empty watch set →
+ * zero traffic; notify.ts guarantees every watch terminates when its match
+ * finishes.
+ */
+
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 
-import type { Config } from "./config.js";
 import type { StateClient } from "./state.js";
-import {
-  createToriiClient,
-  subscribeEntities,
-  type Clause,
-  type Entity,
-  type Model,
-  type Subscription,
-  type ToriiClientInstance,
-  type Ty,
-} from "./torii.js";
 
-export const SIEGE_LIVE_MODELS = [
-  "siege_dojo-MatchState1v1",
-  "siege_dojo-RoundMoves1v1",
-  "siege_dojo-Commitment",
-  "siege_dojo-NodeState",
-  "siege_dojo-RoundModifiers1v1",
-  "siege_dojo-RoundTraps1v1",
-  "siege_dojo-MatchAbilities1v1",
-  "siege_dojo-MatchStakes1v1",
-] as const;
+export const POLL_INTERVAL_MS = 5_000;
 
-export interface LiveStateBridge {
-  client: ToriiClientInstance;
-  subscription: Subscription;
+export interface LivePoller {
+  stop: () => void;
 }
 
-interface StartLiveStateBridgeArgs {
+export interface LivePollerStatus {
+  watched: number[];
+  last_tick_at: string | null;
+  last_change_at: string | null;
+}
+
+interface StartLivePollerArgs {
   server: McpServer;
   state: StateClient;
-  config: Config;
-  isWatched: (matchId: number) => boolean;
-  /** Debounced — safe to call at gRPC push rate; errors are handled internally. */
+  getWatched: () => number[];
+  /** Debounced — safe to call every tick; errors are handled internally. */
   notifyMatchChanged: (server: McpServer, state: StateClient, matchId: number) => void;
   log: (message: string) => void;
+  intervalMs?: number;
 }
 
-export async function startLiveStateBridge({
+let lastTickAt: string | null = null;
+let lastChangeAt: string | null = null;
+const lastActivity = new Map<number, string | null>();
+
+/** Liveness surface for siege_whoami — proves the pipeline is alive. */
+export function livePollerStatus(getWatched: () => number[]): LivePollerStatus {
+  return { watched: getWatched(), last_tick_at: lastTickAt, last_change_at: lastChangeAt };
+}
+
+export function startLivePoller({
   server,
   state,
-  config,
-  isWatched,
+  getWatched,
   notifyMatchChanged,
   log,
-}: StartLiveStateBridgeArgs): Promise<LiveStateBridge> {
-  const worldAddress = config.manifest.world.address;
-  const client = await createToriiClient(config.toriiUrl, worldAddress);
-  const clause: Clause = {
-    Keys: {
-      keys: [],
-      pattern_matching: "VariableLen",
-      models: [...SIEGE_LIVE_MODELS],
-    },
+  intervalMs = POLL_INTERVAL_MS,
+}: StartLivePollerArgs): LivePoller {
+  let inFlight = false;
+
+  const tick = async (): Promise<void> => {
+    if (inFlight) return;
+    const watched = getWatched();
+
+    // Prune probe memory for matches that were unwatched between ticks so a
+    // later re-watch starts fresh.
+    for (const id of lastActivity.keys()) {
+      if (!watched.includes(id)) lastActivity.delete(id);
+    }
+    if (watched.length === 0) return;
+
+    inFlight = true;
+    lastTickAt = new Date().toISOString();
+    try {
+      for (const matchId of watched) {
+        // Network read — one failed probe skips a tick, never kills the loop.
+        try {
+          const activity = await state.latestMatchActivity(matchId);
+          const prev = lastActivity.get(matchId);
+          lastActivity.set(matchId, activity);
+          // First observation also notifies: it covers anything that happened
+          // between the watch seed and the first tick. notify.ts diffs, so a
+          // genuinely unchanged match emits nothing.
+          if (prev === undefined || prev !== activity) {
+            lastChangeAt = new Date().toISOString();
+            notifyMatchChanged(server, state, matchId);
+          }
+        } catch (err) {
+          log(`live poll probe failed for match ${matchId}: ${errorMessage(err)}`);
+        }
+      }
+    } finally {
+      inFlight = false;
+    }
   };
 
-  log(`Torii gRPC subscribing to models: ${SIEGE_LIVE_MODELS.join(", ")}`);
+  const timer = setInterval(() => void tick(), intervalMs);
+  // Don't hold the event loop open at shutdown.
+  timer.unref?.();
+  log(`live match poller started (${intervalMs} ms tick, watch-scoped)`);
 
-  let loggedPayloadShape = false;
-  const subscription = await subscribeEntities(
-    client,
-    worldAddress,
-    clause,
-    (entity) => {
-      for (const matchId of matchIdsFromEntity(entity)) {
-        if (!isWatched(matchId)) continue;
-        notifyMatchChanged(server, state, matchId);
-      }
-    },
-    (payload) => {
-      if (loggedPayloadShape || process.env.TORII_DEBUG_PAYLOADS !== "1") return;
-      loggedPayloadShape = true;
-      log(`Torii gRPC first entity payload shape: ${payloadShape(payload)}`);
-    },
-  );
-
-  log(`Torii gRPC subscription active for ${SIEGE_LIVE_MODELS.length} models`);
-  return { client, subscription };
+  return {
+    stop: () => clearInterval(timer),
+  };
 }
 
-function matchIdsFromEntity(entity: Entity): number[] {
-  const ids = new Set<number>();
-  for (const model of Object.values(entity.models ?? {})) {
-    const matchId = tyToSafeInteger((model as Model).match_id);
-    if (matchId !== null) ids.add(matchId);
-  }
-  return [...ids];
-}
-
-function tyToSafeInteger(value: Ty | unknown): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === "number") return Number.isSafeInteger(value) && value >= 0 ? value : null;
-  if (typeof value === "bigint") {
-    if (value < 0n || value > BigInt(Number.MAX_SAFE_INTEGER)) return null;
-    return Number(value);
-  }
-  if (typeof value === "string") {
-    const parsed = value.startsWith("0x") ? BigInt(value) : BigInt(value || "0");
-    return parsed <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(parsed) : null;
-  }
-  if (typeof value !== "object") return null;
-
-  if ("value" in value) {
-    return tyToSafeInteger((value as { value: unknown }).value);
-  }
-
-  for (const candidate of Object.values(value as Record<string, unknown>)) {
-    if (candidate === undefined) continue;
-    const parsed = tyToSafeInteger(candidate);
-    if (parsed !== null) return parsed;
-  }
-  return null;
-}
-
-
-function payloadShape(payload: unknown): string {
-  if (Array.isArray(payload)) return `array(${payload.length})`;
-  if (payload === null) return "null";
-  if (typeof payload !== "object") return typeof payload;
-
-  const record = payload as Record<string, unknown>;
-  const keys = Object.keys(record).slice(0, 8);
-  const data = record.data;
-  if (Array.isArray(data)) return `object{${keys.join(",")}} data=array(${data.length})`;
-  if (data && typeof data === "object") return `object{${keys.join(",")}} data=object{${Object.keys(data).slice(0, 8).join(",")}}`;
-  return `object{${keys.join(",")}}`;
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }

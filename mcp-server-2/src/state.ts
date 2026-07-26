@@ -387,6 +387,32 @@ export class StateClient {
     };
   }
 
+  /**
+   * Newest `internal_updated_at` across every table the match snapshot reads,
+   * or null if the match has no rows at all. One cheap query — the live poller
+   * probes this per tick and only rebuilds the full snapshot when it advances,
+   * so a quiet watched match costs one SQL round-trip per tick, not a fan-out.
+   */
+  async latestMatchActivity(matchId: number): Promise<string | null> {
+    assertSafeInteger(matchId, "match_id");
+    const key = u64SqlKey(matchId);
+    const tables = [
+      "siege_dojo-MatchState1v1",
+      "siege_dojo-Commitment",
+      "siege_dojo-NodeState",
+      "siege_dojo-RoundMoves1v1",
+      "siege_dojo-RoundModifiers1v1",
+      "siege_dojo-RoundTraps1v1",
+      "siege_dojo-MatchAbilities1v1",
+      "siege_dojo-MatchStakes1v1",
+    ];
+    const union = tables
+      .map((t) => `SELECT MAX(internal_updated_at) AS u FROM "${t}" WHERE match_id = ${key}`)
+      .join(" UNION ALL ");
+    const rows = await this.sql<{ u: string | null }>(`SELECT MAX(u) AS u FROM (${union})`);
+    return rows[0]?.u ?? null;
+  }
+
   async matchState(matchId: number): Promise<MatchStateData> {
     assertSafeInteger(matchId, "match_id");
     const rows = await this.sql<Record<string, unknown>>(

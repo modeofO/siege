@@ -24,7 +24,6 @@
   "dependencies": {
     "@cartridge/controller": "0.13.12",
     "@cartridge/controller-wasm": "0.10.1",
-    "@dojoengine/torii-client": "^1.8.2",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "starknet": "^8.9.2",
     "zod": "^3.25.76"

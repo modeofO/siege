@@ -54,11 +54,13 @@ import { z } from "zod";
 import { loadConfig } from "./config.js";
 import { getAccount } from "./session.js";
 import { StateClient } from "./state.js";
-import { startLiveStateBridge, type LiveStateBridge } from "./live.js";
+import { startLivePoller, livePollerStatus } from "./live.js";
 import { registerMatchResources } from "./match-resource.js";
 import {
   notifyMatchChanged,
+  setAgentAddress,
   subscribedMatchResourceUris,
+  unwatchMatch,
   watchMatch,
   watchedMatches,
 } from "./notify.js";
@@ -80,7 +82,6 @@ async function main(): Promise<void> {
   let bootstrapError: string | null = null;
   let bootstrapPhase = "starting";
   let authUrl: string | null = null;
-  const liveBridges: LiveStateBridge[] = [];
 
   // Live ToolContext: getters so tool handlers see the freshest signer/address
   // as bootstrap progresses, without us having to re-register tools later.
@@ -88,6 +89,8 @@ async function main(): Promise<void> {
     config,
     state,
     watchMatch: (matchId) => watchMatch(state, matchId),
+    unwatchMatch: (matchId) => unwatchMatch(matchId),
+    liveStatus: () => livePollerStatus(() => [...watchedMatches]),
     get signer(): AccountInterface | null {
       return signer;
     },
@@ -145,20 +148,13 @@ async function main(): Promise<void> {
   await server.connect(transport);
   log("stdio transport connected — tools advertised. Bootstrapping in background.");
 
-  void startLiveStateBridge({
+  startLivePoller({
     server,
     state,
-    config,
-    isWatched: (matchId) => watchedMatches.has(matchId),
+    getWatched: () => [...watchedMatches],
     notifyMatchChanged,
     log,
-  })
-    .then((bridge) => {
-      liveBridges.push(bridge);
-    })
-    .catch((err: unknown) => {
-      log(`Torii gRPC subscription unavailable; live match updates will not be pushed: ${errorMessage(err)}`);
-    });
+  });
 
   // ── background bootstrap ──
   void (async () => {
@@ -187,6 +183,7 @@ async function main(): Promise<void> {
 
       signer = account;
       agentAddress = account.address;
+      setAgentAddress(account.address);
       authUrl = null;
       bootstrapDone = true;
       bootstrapPhase = "ready";
@@ -247,10 +244,6 @@ function registerAgentResources(server: McpServer, agentPrompt: string): void {
       ],
     }),
   );
-}
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 main().catch((err) => {

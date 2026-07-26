@@ -2,13 +2,20 @@
  * Watched-match tracking and live update fan-out.
  *
  * Split out of index.ts so it can be exercised without importing the server
- * entry point — importing index.ts runs `main()`, which connects stdio,
- * subscribes to Torii and opens a real Cartridge session.
+ * entry point — importing index.ts runs `main()`, which connects stdio and
+ * opens a real Cartridge session.
  *
- * Flow: the Torii gRPC bridge calls {@link notifyMatchChanged} for every entity
- * push touching a watched match. That debounces, rebuilds the snapshot once the
- * writes settle, diffs it, and — only on a real change — emits both the standard
- * `notifications/resources/updated` and the Claude Code channel event.
+ * Flow: the live poller (live.ts) calls {@link notifyMatchChanged} whenever a
+ * watched match's activity probe advances. That debounces, rebuilds the
+ * snapshot once the writes settle, diffs it, and — only on a real change —
+ * emits both the standard `notifications/resources/updated` and the Claude
+ * Code channel event.
+ *
+ * Watch lifecycle invariant: the set only ever contains matches that are
+ * currently alive and that the agent has touched. Reads of finished matches
+ * never watch ({@link watchMatch} self-guards); a watched match that finishes
+ * emits its final event and is then removed ({@link flushMatchChanged});
+ * {@link unwatchMatch} is the explicit release for e.g. abandoned spectating.
  */
 
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -25,6 +32,15 @@ const log = (msg: string) => process.stderr.write(`[siege-mcp] ${msg}\n`);
 export const watchedMatches = new Set<number>();
 export const subscribedMatchResourceUris = new Set<string>();
 const matchResourceSnapshots = new Map<number, string>();
+
+// The agent's own account address, set by index.ts once the session resolves.
+// Used to stamp channel events with `you`: participant side or spectator —
+// so an event is self-describing instead of relying on conversation memory.
+let agentAddress = "";
+
+export function setAgentAddress(address: string): void {
+  agentAddress = address;
+}
 
 /**
  * Coalescing window for a burst of Torii entity updates belonging to the same
@@ -72,15 +88,51 @@ async function flushMatchChanged(server: McpServer, state: StateClient, matchId:
   await pushChannelEvent(server, snapshot).catch((err: unknown) => {
     log(`channel notification failed for match ${matchId}: ${errorMessage(err)}`);
   });
+
+  // Final event delivered — a finished match has nothing further to say, so
+  // release it. This is what guarantees every watch (and its poll) terminates.
+  if (snapshot.status === "Finished") {
+    unwatchMatch(matchId);
+    log(`match ${matchId} finished — unwatched after final event`);
+  }
 }
 
-/** Exposed so tools/resources can opt a match into live notifications. */
+/**
+ * Exposed so tools/resources can opt a match into live notifications.
+ * Self-guards against dead matches: reading a finished match for history is a
+ * read, not a commitment to poll it — the seed fetch checks status and backs
+ * out again, without emitting (a first observation never diffs as changed).
+ */
 export function watchMatch(state: StateClient, matchId: number): void {
   if (watchedMatches.has(matchId)) return;
   watchedMatches.add(matchId);
-  void updateMatchSnapshot(state, matchId).catch((err: unknown) => {
-    log(`failed to seed match ${matchId} snapshot: ${errorMessage(err)}`);
-  });
+  void updateMatchSnapshot(state, matchId)
+    .then(({ snapshot }) => {
+      if (snapshot.status === "Finished") {
+        unwatchMatch(matchId);
+        log(`match ${matchId} is finished — not watching`);
+      }
+    })
+    .catch((err: unknown) => {
+      log(`failed to seed match ${matchId} snapshot: ${errorMessage(err)}`);
+    });
+}
+
+/**
+ * Explicit release — the off switch for a match the agent no longer cares
+ * about (abandoned spectating, wrong id). Also the internal path for the two
+ * automatic releases above. Clears every per-match residue so a later
+ * re-watch starts from a clean seed.
+ */
+export function unwatchMatch(matchId: number): boolean {
+  const wasWatched = watchedMatches.delete(matchId);
+  matchResourceSnapshots.delete(matchId);
+  const pending = pendingNotifies.get(matchId);
+  if (pending) {
+    clearTimeout(pending);
+    pendingNotifies.delete(matchId);
+  }
+  return wasWatched;
 }
 
 async function updateMatchSnapshot(
@@ -116,6 +168,20 @@ function activeDeadline(snapshot: MatchResourceSnapshot): number | null {
   return null;
 }
 
+/** `a`/`b` when the agent is that participant, else `spectator`. */
+function youFor(snapshot: MatchResourceSnapshot): string {
+  const same = (x: string): boolean => {
+    try {
+      return agentAddress !== "" && BigInt(x) === BigInt(agentAddress);
+    } catch {
+      return false;
+    }
+  };
+  if (same(snapshot.player_a.address)) return "a";
+  if (same(snapshot.player_b.address)) return "b";
+  return "spectator";
+}
+
 async function pushChannelEvent(server: McpServer, snapshot: MatchResourceSnapshot): Promise<void> {
   const content =
     `match ${snapshot.match_id} round ${snapshot.current_round} ${snapshot.phase}: ` +
@@ -139,6 +205,9 @@ async function pushChannelEvent(server: McpServer, snapshot: MatchResourceSnapsh
       // learn what the push already knew.
       meta: {
         match_id: String(snapshot.match_id),
+        // Who the agent is to this event: act on "a"/"b", observe on
+        // "spectator" — commits/reveals from a non-participant revert.
+        you: youFor(snapshot),
         phase: snapshot.phase,
         round: String(snapshot.current_round),
         commits: String(snapshot.commits),

@@ -323,7 +323,7 @@ https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8
 
 ## MCP Server
 
-`mcp-server-2/` is the active MCP server. It registers 44 tools and can submit transactions through a Cartridge session after browser approval.
+`mcp-server-2/` is the active MCP server. It registers 45 tools and can submit transactions through a Cartridge session after browser approval.
 
 ```bash
 cd mcp-server-2
