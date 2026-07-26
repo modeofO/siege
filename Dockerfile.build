@@ -1,15 +1,24 @@
 FROM ubuntu:24.04
 
+# Defaults are the versions this repo is actually pinned to — `docker compose
+# run --rm builder ...` must keep reproducing the shipped toolchain with no
+# arguments. The ARGs exist so the cairo-canary workflow can rebuild at a
+# candidate scarb/sozo and run the contract suite against it before anything
+# is committed. scripts/check-versions.ts reads these two lines by regex; keep
+# the literal versions on them.
+ARG SCARB_VERSION=2.13.1
+ARG SOZO_VERSION=1.8.6
+
 RUN apt-get update -qq && apt-get install -y -qq \
     build-essential curl git pkg-config libssl-dev ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-# Install scarb 2.13.1 (matches dojo v1.8.0 core dependency)
-RUN curl -sSL https://docs.swmansion.com/scarb/install.sh | bash -s -- -v 2.13.1
+# Install scarb (default matches the dojo v1.8.0 core dependency)
+RUN curl -sSL https://docs.swmansion.com/scarb/install.sh | bash -s -- -v "${SCARB_VERSION}"
 ENV PATH="/root/.local/bin:${PATH}"
 
-# Install sozo 1.8.6 (latest, with updated Sierra->CASM compiler)
-RUN curl -sSL https://github.com/dojoengine/dojo/releases/download/sozo/v1.8.6/sozo_v1.8.6_linux_amd64.tar.gz | tar xz -C /usr/local/bin
+# Install sozo (ships the Sierra->CASM compiler used at migrate time)
+RUN curl -sSL "https://github.com/dojoengine/dojo/releases/download/sozo/v${SOZO_VERSION}/sozo_v${SOZO_VERSION}_linux_amd64.tar.gz" | tar xz -C /usr/local/bin
 
 # Install Rust (needed for scarb plugin compilation)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable

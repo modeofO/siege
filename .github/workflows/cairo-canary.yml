@@ -1,0 +1,230 @@
+# Does a candidate Cairo toolchain actually compile this world?
+#
+# Release notes for scarb / sozo / dojo / openzeppelin-cairo are sparse, and
+# their breakage shows up as compile errors rather than as documented API
+# changes. Reading changelogs is guesswork there; building is the answer. This
+# rebuilds Dockerfile.build at versions you name and runs the real contract
+# suite against it, committing nothing.
+#
+# Leave an input blank to keep whatever the repo is currently pinned to, so you
+# can move one component at a time and find out which one broke.
+#
+# Candidate versions come from the sticky issue that version-check.yml
+# maintains; results are posted back as a comment on it.
+name: Cairo canary
+
+on:
+  workflow_dispatch:
+    inputs:
+      scarb_version:
+        description: "scarb version to test (blank = keep Dockerfile.build's pin)"
+        type: string
+        default: ""
+      sozo_version:
+        description: "sozo version to test (blank = keep Dockerfile.build's pin)"
+        type: string
+        default: ""
+      cairo_version:
+        description: "cairo/starknet version for Scarb.toml (blank = keep)"
+        type: string
+        default: ""
+      dojo_tag:
+        description: "dojo git tag without the leading v, e.g. 1.8.1 (blank = keep)"
+        type: string
+        default: ""
+      oz_tag:
+        description: "openzeppelin cairo-contracts tag without the leading v (blank = keep)"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: cairo-canary
+  cancel-in-progress: true
+
+jobs:
+  canary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      # Every input is interpolated into sed expressions and docker build args.
+      # Only collaborators can dispatch this, but a version string has exactly
+      # one shape and rejecting anything else costs nothing.
+      - name: Validate inputs
+        env:
+          SCARB: ${{ inputs.scarb_version }}
+          SOZO: ${{ inputs.sozo_version }}
+          CAIRO: ${{ inputs.cairo_version }}
+          DOJO: ${{ inputs.dojo_tag }}
+          OZ: ${{ inputs.oz_tag }}
+        run: |
+          set -euo pipefail
+          for name in SCARB SOZO CAIRO DOJO OZ; do
+            value="${!name}"
+            [ -z "$value" ] && continue
+            if ! printf '%s' "$value" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$'; then
+              echo "::error::$name must be a bare semver like 1.8.7 (got: $value)"
+              exit 1
+            fi
+          done
+
+      - name: Apply candidate versions to Scarb.toml
+        id: patch
+        env:
+          CAIRO: ${{ inputs.cairo_version }}
+          DOJO: ${{ inputs.dojo_tag }}
+          OZ: ${{ inputs.oz_tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p .scarb-cache
+
+          # cairo-version, the starknet dependency and cairo_test all track the
+          # same compiler release and must move together.
+          if [ -n "$CAIRO" ]; then
+            sed -i "s/^cairo-version = \".*\"/cairo-version = \"$CAIRO\"/" Scarb.toml
+            sed -i "s/^starknet = \".*\"/starknet = \"$CAIRO\"/" Scarb.toml
+            sed -i "s/^cairo_test = \".*\"/cairo_test = \"$CAIRO\"/" Scarb.toml
+          fi
+          # dojo and dojo_cairo_test share a tag; so do the four openzeppelin crates.
+          if [ -n "$DOJO" ]; then
+            sed -i "s|dojo\.git\", tag = \"v[^\"]*\"|dojo.git\", tag = \"v$DOJO\"|g" Scarb.toml
+          fi
+          if [ -n "$OZ" ]; then
+            sed -i "s|cairo-contracts\.git\", tag = \"v[^\"]*\"|cairo-contracts.git\", tag = \"v$OZ\"|g" Scarb.toml
+          fi
+
+          if git diff --quiet Scarb.toml; then
+            echo "Scarb.toml unchanged"
+          else
+            git --no-pager diff Scarb.toml
+          fi
+
+          # A changed dependency set invalidates the committed lock.
+          if [ -n "$DOJO" ] || [ -n "$OZ" ] || [ -n "$CAIRO" ]; then
+            rm -f Scarb.lock
+            echo "Removed Scarb.lock so scarb re-resolves"
+          fi
+
+      - name: Cache the scarb registry
+        uses: actions/cache@v4
+        with:
+          path: .scarb-cache
+          key: scarb-canary-${{ inputs.scarb_version }}-${{ inputs.dojo_tag }}-${{ inputs.oz_tag }}-${{ hashFiles('Scarb.toml') }}
+          restore-keys: |
+            scarb-canary-
+
+      - name: Build the toolchain image
+        env:
+          SCARB: ${{ inputs.scarb_version }}
+          SOZO: ${{ inputs.sozo_version }}
+        run: |
+          set -euo pipefail
+          # Blank inputs must fall through to the Dockerfile's ARG defaults —
+          # passing --build-arg with an empty value would override them.
+          args=()
+          [ -n "$SCARB" ] && args+=(--build-arg "SCARB_VERSION=$SCARB")
+          [ -n "$SOZO" ] && args+=(--build-arg "SOZO_VERSION=$SOZO")
+          docker build -f Dockerfile.build -t siege-canary "${args[@]}" .
+
+          docker run --rm siege-canary sh -lc 'scarb --version && sozo --version' \
+            | tee toolchain.txt
+
+      - name: sozo build
+        id: build
+        run: |
+          set -o pipefail
+          docker run --rm \
+            -v "$PWD:/app" \
+            -v "$PWD/.scarb-cache:/root/.cache/scarb" \
+            siege-canary sozo build 2>&1 | tee build.log
+
+      - name: sozo test
+        id: test
+        # Run even when the build failed, so a single canary run reports both.
+        if: always() && steps.build.outcome != 'skipped'
+        run: |
+          set -o pipefail
+          docker run --rm \
+            -v "$PWD:/app" \
+            -v "$PWD/.scarb-cache:/root/.cache/scarb" \
+            siege-canary sozo test 2>&1 | tee test.log
+
+      # The container runs as root, so everything it wrote into the mounted
+      # workspace lands root-owned — including the scarb cache, which the
+      # actions/cache post-step then cannot read.
+      - name: Reclaim root-owned artifacts
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" .scarb-cache target 2>/dev/null || true
+
+      - name: Summarise
+        if: always()
+        env:
+          BUILD: ${{ steps.build.outcome }}
+          TEST: ${{ steps.test.outcome }}
+          SCARB: ${{ inputs.scarb_version }}
+          SOZO: ${{ inputs.sozo_version }}
+          CAIRO: ${{ inputs.cairo_version }}
+          DOJO: ${{ inputs.dojo_tag }}
+          OZ: ${{ inputs.oz_tag }}
+        run: |
+          set -euo pipefail
+          verdict="PASS"
+          [ "$BUILD" = "success" ] && [ "$TEST" = "success" ] || verdict="FAIL"
+
+          {
+            echo "## Cairo canary — $verdict"
+            echo
+            echo "| Input | Candidate |"
+            echo "| --- | --- |"
+            echo "| scarb | ${SCARB:-_repo pin_} |"
+            echo "| sozo | ${SOZO:-_repo pin_} |"
+            echo "| cairo-version | ${CAIRO:-_repo pin_} |"
+            echo "| dojo tag | ${DOJO:-_repo pin_} |"
+            echo "| openzeppelin tag | ${OZ:-_repo pin_} |"
+            echo
+            echo "\`sozo build\`: **$BUILD** · \`sozo test\`: **$TEST**"
+            echo
+            if [ -s toolchain.txt ]; then
+              echo "Resolved toolchain:"
+              echo '```'
+              cat toolchain.txt
+              echo '```'
+            fi
+            for log in build.log test.log; do
+              [ -s "$log" ] || continue
+              echo "<details><summary><code>$log</code> (last 60 lines)</summary>"
+              echo
+              echo '```'
+              tail -60 "$log"
+              echo '```'
+              echo
+              echo "</details>"
+              echo
+            done
+          } > canary.md
+
+          cat canary.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment on the version issue
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          number=$(gh issue list --repo "$REPO" --label "toolchain-versions" \
+            --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$number" ]; then
+            echo "No sticky version issue open — summary only."
+            exit 0
+          fi
+          printf '\n<sub>[workflow run](%s)</sub>\n' "$RUN_URL" >> canary.md
+          gh issue comment "$number" --repo "$REPO" --body-file canary.md

@@ -1,0 +1,216 @@
+# Weekly read-only audit of every version this repo pins — npm manifests, the
+# Cairo toolchain, the sozo/scarb binaries baked into Dockerfile.build, and the
+# container images the Railway services run.
+#
+# Two stages:
+#
+#   1. Deterministic, every run, no model tokens. scripts/check-versions.ts
+#      produces the report and rewrites ONE sticky issue in place, so there is
+#      never a backlog of stale duplicates.
+#
+#   2. Blast-radius analysis, gated. Semver size is not blast radius here —
+#      torii 1.8.3 -> 1.8.4 was a "patch" that changed KeysClause from
+#      vacuous-match to actually filtering. So an agent reads the release notes
+#      and greps THIS repo for the surface that moved. It only runs for majors
+#      and infra pins whose upstream version changed since the last report;
+#      without that gate the same six majors get re-analysed every Monday
+#      forever. The baseline lives in an HTML comment inside the issue body, so
+#      no commit and no contents:write are needed.
+#
+# It opens no PRs on purpose: the infra pins carry deploy runbooks (torii
+# reindexes, a katana bump wipes the dev chain) that an automated bump skips.
+# For the Cairo toolchain the honest check is a real compile — see
+# cairo-canary.yml.
+name: Version check
+
+on:
+  schedule:
+    # Mondays 09:00 UTC.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      force_analysis:
+        description: "Run the blast-radius agent even if nothing moved since the last report"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+  id-token: write
+
+concurrency:
+  group: version-check
+  cancel-in-progress: false
+
+env:
+  ISSUE_TITLE: "Toolchain & dependency versions"
+  ISSUE_LABEL: "toolchain-versions"
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # The sticky issue is both the output and the state store. Its body ends
+      # with a one-line `<!-- version-baseline:{...} -->` comment recording the
+      # upstream version each row was on last time.
+      - name: Locate sticky issue and recover baseline
+        id: baseline
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+
+          gh label create "$ISSUE_LABEL" \
+            --description "Automated dependency/toolchain version audit" \
+            --color "0e8a16" 2>/dev/null || true
+
+          number=$(gh issue list --repo "$REPO" --label "$ISSUE_LABEL" \
+            --state open --limit 1 --json number --jq '.[0].number // empty')
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+
+          echo '{}' > baseline.json
+          if [ -n "$number" ]; then
+            gh issue view "$number" --repo "$REPO" --json body --jq '.body' > issue-body.md
+            if grep -q '<!-- version-baseline:' issue-body.md; then
+              sed -n 's/^<!-- version-baseline:\(.*\) -->$/\1/p' issue-body.md \
+                | tail -1 > baseline.json
+            fi
+          fi
+          echo "baseline bytes: $(wc -c < baseline.json)"
+
+      - name: Build report
+        env:
+          # Lifts the anonymous api.github.com rate limit for the release lookups.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          bun x tsx scripts/check-versions.ts \
+            --markdown \
+            --baseline baseline.json \
+            --json-out versions.json > report.md
+
+      # Majors anywhere, plus any movement on an exactly-pinned infra
+      # component. Floating ("unpinned") and error rows are excluded — their
+      # latest churns constantly and would fire the agent every week.
+      - name: Select deltas worth analysing
+        id: deltas
+        run: |
+          set -euo pipefail
+          jq '[.rows[]
+                | select(.isNew == true)
+                | select(
+                    .severity == "major"
+                    or (.group == "pinned-infra"
+                        and (.severity == "major" or .severity == "minor" or .severity == "patch"))
+                  )]' versions.json > deltas.json
+
+          count=$(jq 'length' deltas.json)
+          echo "count=$count" >> "$GITHUB_OUTPUT"
+          echo "Deltas needing analysis: $count"
+
+          jq -r '.[] | "- \(.name) (`\(.group)`): `\(.current)` -> `\(.latest)` — release notes: \(.notesUrl // "n/a")"' \
+            deltas.json > deltas.md
+
+      - name: Upsert sticky issue
+        id: issue
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EXISTING: ${{ steps.baseline.outputs.number }}
+        run: |
+          set -euo pipefail
+          printf '\n<sub>[workflow run](%s)</sub>\n\n' "$RUN_URL" >> report.md
+          # Machine state for the next run's delta gate. One line, last in the body.
+          printf '<!-- version-baseline:%s -->\n' "$(jq -c '.baseline' versions.json)" >> report.md
+
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --repo "$REPO" --body-file report.md
+            number="$EXISTING"
+          else
+            url=$(gh issue create --repo "$REPO" --title "$ISSUE_TITLE" \
+              --label "$ISSUE_LABEL" --body-file report.md)
+            number="${url##*/}"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "Sticky issue #$number"
+
+      # ------------------------------------------------------------ stage 2
+
+      - name: Blast-radius analysis
+        if: steps.deltas.outputs.count != '0' || inputs.force_analysis
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: '--allowedTools "Read,Grep,Glob,WebFetch,Write"'
+          prompt: |
+            You are assessing upgrade blast radius for the Siege repo. Read CLAUDE.md
+            and frontend/CLAUDE.md first for context on what this codebase does.
+
+            `deltas.md` in the repo root lists dependency and toolchain upgrades that
+            became available since the last check. For EACH entry:
+
+            1. Fetch its release notes / changelog from the linked URL and read what
+               changed between the pinned version and the latest one.
+            2. Grep this repository for the APIs, config keys, CLI flags, or behaviours
+               that changed. Only code in this checkout counts — ignore anything under
+               `node_modules/`, `target/`, or `.claude/worktrees/`.
+            3. Decide a verdict:
+                  - `no-op` — nothing in this repo touches what changed.
+                  - `mechanical` — this repo is affected, but the fix is a rename or a
+                    signature tweak with no behavioural decision.
+                  - `needs-migration` — real behavioural change, a decision to make, or
+                    a deploy/runbook step required.
+
+            Be concrete and skeptical. Cite `file:line` for every claim that this repo
+            is affected. If the release notes are missing, sparse, or you cannot
+            confirm what changed, say so plainly and mark the verdict `unknown` rather
+            than guessing — a confident wrong verdict here is worse than no verdict.
+            Do not recommend performing the upgrades; this is assessment only.
+
+            Two things about this repo that matter for judging risk:
+            - Semver understates risk for dojo/torii. torii 1.8.3 -> 1.8.4 was a patch
+              release that changed gRPC KeysClause from matching everything to actually
+              filtering, which silently changes what the frontend reads.
+            - The Cairo toolchain (scarb, sozo, dojo, openzeppelin) has sparse release
+              notes and its breakage shows up as compile errors. For those, keep the
+              analysis short and say the cairo-canary workflow is the real check.
+
+            Write your findings to `blast-radius.md` in the repo root as GitHub-flavored
+            markdown. Structure it as one `###` section per entry, each starting with a
+            bolded verdict, then the evidence. Open with a one-line summary counting the
+            verdicts. No preamble, no closing pleasantries — this is posted verbatim as
+            an issue comment.
+
+      - name: Post analysis to the sticky issue
+        if: steps.deltas.outputs.count != '0' || inputs.force_analysis
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          NUMBER: ${{ steps.issue.outputs.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          if [ ! -s blast-radius.md ]; then
+            echo "Agent produced no blast-radius.md — nothing to post."
+            exit 0
+          fi
+          {
+            echo "## Blast-radius analysis"
+            echo
+            cat blast-radius.md
+            echo
+            printf '<sub>Automated assessment of newly available upgrades. [workflow run](%s)</sub>\n' "$RUN_URL"
+          } > comment.md
+          gh issue comment "$NUMBER" --repo "$REPO" --body-file comment.md

@@ -254,6 +254,62 @@ docker compose run --rm builder sozo test
 Frontend (`frontend/`), docs site (`site/`): standard `bun run lint` / `test` /
 `build`; see each package's `package.json`.
 
+## Version audit
+
+`scripts/check-versions.ts` compares every pinned version in the repo against
+upstream: the four npm manifests (`frontend/`, `mcp-server-2/`, `site/`,
+`scripts/` — `mcp-server/` is excluded as superseded), the Cairo toolchain in
+`Scarb.toml`, the scarb/sozo binaries curled in `Dockerfile.build`, and the
+container images and embedded binaries in `infra/*/Dockerfile`. It also reports
+cross-manifest drift, where the same package is on different versions in
+different packages.
+
+```bash
+bun x tsx scripts/check-versions.ts              # console
+bun x tsx scripts/check-versions.ts --markdown   # issue body
+bun x tsx scripts/check-versions.ts --json       # machine-readable
+bun x tsx scripts/check-versions.ts --strict     # exit 1 if anything is behind
+```
+
+Read-only and non-blocking by design. It reports bump **size**, not blast
+radius — semver understates risk here (torii 1.8.3 -> 1.8.4 was a "patch" that
+changed KeysClause from vacuous-match to actually filtering). Adding a new
+pinned version anywhere means adding it to the `PINNED` array; each entry reads
+its value out of the real file by regex, so the report cannot drift from what
+is deployed.
+
+`.github/workflows/version-check.yml` runs weekly in two stages:
+
+1. The script rewrites one sticky issue (label `toolchain-versions`) in place.
+2. A gated agent assesses blast radius — it reads the release notes and greps
+   this repo for the surface that changed, returning
+   `no-op` / `mechanical` / `needs-migration` per item with `file:line`
+   evidence, posted as an issue comment.
+
+The gate is what keeps stage 2 cheap: it fires only for majors and infra pins
+whose upstream version moved since the last report. The baseline lives in a
+`<!-- version-baseline:{…} -->` comment at the end of the issue body, so no
+commit and no `contents: write` are needed. Force a re-run of the analysis via
+workflow_dispatch with `force_analysis`.
+
+Neither workflow opens bump PRs: the infra pins carry runbooks a bot would skip
+— a torii bump can need a reindex against a fresh `--db-dir`, a katana bump
+wipes dev-chain state, and the katana version is the binary *inside*
+`ghcr.io/dojoengine/dojo`, which the image tag does not name.
+
+For the Cairo toolchain, changelogs are sparse and breakage surfaces as compile
+errors, so the real check is a build.
+`.github/workflows/cairo-canary.yml` (workflow_dispatch) rebuilds
+`Dockerfile.build` at candidate scarb/sozo versions, patches candidate
+cairo/dojo/openzeppelin versions into `Scarb.toml`, and runs `sozo build` +
+`sozo test` against them, committing nothing. Blank inputs keep the current
+pin, so components can be moved one at a time to isolate a break. Results are
+posted to the same sticky issue.
+
+`Dockerfile.build` takes `SCARB_VERSION` / `SOZO_VERSION` build args for this;
+their defaults are the repo's real pins, so `docker compose run --rm builder`
+still reproduces the shipped toolchain with no arguments.
+
 ## Torii gRPC
 
 Torii serves SQL and gRPC-web on the **same** base URL — there is no `/grpc`
