@@ -28,16 +28,16 @@ run() {
 }
 
 echo "== set_entry_config winner_bps=$WINNER_BPS treasury=$TREASURY"
-run set_entry_config -c "$WINNER_BPS,$TREASURY"
+run set_entry_config "$WINNER_BPS" "$TREASURY"
 
-# set_entry_token calldata: token, amount.low, amount.high, enabled
+# set_entry_token calldata: token, amount (u256), enabled
 echo "== enable STRK @ $STRK_AMOUNT"
-run set_entry_token -c "$STRK,$STRK_AMOUNT,0,1"
+run set_entry_token "$STRK" "u256:$STRK_AMOUNT" 1
 
 echo "== enable ETH @ $ETH_AMOUNT"
-run set_entry_token -c "$ETH,$ETH_AMOUNT,0,1"
+run set_entry_token "$ETH" "u256:$ETH_AMOUNT" 1
 
 echo "== enable LORDS @ $LORDS_AMOUNT"
-run set_entry_token -c "$LORDS,$LORDS_AMOUNT,0,1"
+run set_entry_token "$LORDS" "u256:$LORDS_AMOUNT" 1
 
 echo "Done."
