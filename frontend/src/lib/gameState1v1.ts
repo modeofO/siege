@@ -113,6 +113,25 @@ export function computeBudget(nodes: NodeOwner[], team: "teamA" | "teamB", round
   return 10 + nodes.filter((n) => n === team).length + escalation;
 }
 
+// Every model here is keyed by match_id. PlayerCosmetics is NOT in this list
+// deliberately: it is keyed by player address, so on torii >= 1.8.4 (where the
+// keys clause actually filters — see worldSubscription.ts) a match-id-keyed
+// clause would never match it. It gets its own wildcard query below.
+const MATCH_MODELS = [
+  ModelsMapping.MatchState1v1,
+  ModelsMapping.NodeState,
+  ModelsMapping.RoundMoves1v1,
+  ModelsMapping.RoundModifiers1v1,
+  ModelsMapping.RoundTraps1v1,
+  ModelsMapping.Commitment,
+  ModelsMapping.MatchAbilities1v1,
+] as const;
+
+// The key clause does not filter (see worldSubscription.ts), so this pulls
+// every match's rows and the page selects its own by match_id. Sized to clear
+// the whole-history row count with room to grow.
+const MATCH_ENTITY_LIMIT = 10_000;
+
 /**
  * Subscribes via gRPC to all match-scoped entities (MatchState1v1 + NodeState + RoundMoves1v1)
  * keyed by match_id, then synthesizes the unified MatchState1v1 view from the store.
@@ -124,24 +143,35 @@ export function computeBudget(nodes: NodeOwner[], team: "teamA" | "teamB", round
  */
 export function useMatchState1v1(matchId: string | null) {
   // Single match-scoped subscription. Every match-page hook below reads from
-  // the store this populates — no per-hook subscription.
+  // the store this populates — no per-hook subscription. PlayerCosmetics rides
+  // along because the match and spectate pages render both players' banners
+  // from the same store.
+  //
+  // withEntityModels + withLimit are both load-bearing; see the measured torii
+  // behaviour documented in worldSubscription.ts. Without the model list this
+  // query pulls every model in the world, and without the limit it silently
+  // truncates at 100 entities — which on a world with 360 could drop this
+  // match's own rows from the initial page.
   useEntityQuery(
     new ToriiQueryBuilder<SchemaType>()
       .withClause(
-        KeysClause<SchemaType>(
-          [
-            ModelsMapping.MatchState1v1,
-            ModelsMapping.NodeState,
-            ModelsMapping.RoundMoves1v1,
-            ModelsMapping.RoundModifiers1v1,
-            ModelsMapping.RoundTraps1v1,
-            ModelsMapping.Commitment,
-            ModelsMapping.MatchAbilities1v1,
-          ],
-          [toFeltHex(matchId)],
-          "VariableLen",
-        ).build(),
+        KeysClause<SchemaType>([...MATCH_MODELS], [toFeltHex(matchId)], "VariableLen").build(),
       )
+      .withEntityModels([...MATCH_MODELS])
+      .withLimit(MATCH_ENTITY_LIMIT)
+      .includeHashedKeys(),
+  );
+
+  // Cosmetics for the two players' banners. Separate query because the model
+  // is keyed by player address, not match_id (see MATCH_MODELS note). Wildcard
+  // key + model filter; the table is player-count sized.
+  useEntityQuery(
+    new ToriiQueryBuilder<SchemaType>()
+      .withClause(
+        KeysClause<SchemaType>([ModelsMapping.PlayerCosmetics], [undefined], "VariableLen").build(),
+      )
+      .withEntityModels([ModelsMapping.PlayerCosmetics])
+      .withLimit(MATCH_ENTITY_LIMIT)
       .includeHashedKeys(),
   );
 

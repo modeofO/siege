@@ -1,15 +1,21 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import type { AccountInterface, UniversalDetails } from "starknet";
+import { useModels } from "@dojoengine/sdk/react";
+import {
+  ModelsMapping,
+  type ConquestCooldown as ConquestCooldownModel,
+  type FactionMember as FactionMemberModel,
+  type PresetDefense as PresetDefenseModel,
+} from "@/bindings/typescript/models.gen";
 import { CONQUEST_ADDRESS } from "./contractAddresses";
 import { ABILITY_TOKEN_ADDRESS } from "./abilityToken";
 import { vrfRequestRandomCall, waitForReceiptOrThrow } from "./contracts1v1";
 import { resilientExecute } from "./controllerSession";
 import { toriiSql, toNum, sqlAddr, sqlInt } from "./toriiSql";
+import { safeBigIntEq, safeNum, flatModels, toBigIntOrNull } from "./modelUtils";
 import { isNeighbor } from "./hex";
 import type { ParcelData } from "./worldState";
-import { usePoll } from "./usePoll";
-
-const POLL_INTERVAL = 4000;
+import { useNowSeconds } from "./useNow";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
@@ -50,38 +56,37 @@ export interface PresetDefenseData {
   presetCount: number;
 }
 
+/**
+ * PresetDefense stores its four slots as flattened `p<slot>_<field>` columns
+ * rather than an array, so the slots have to be reassembled by name. Exported
+ * for tests: a typo in the key template would silently yield an all-zero
+ * garrison, which reads as a legitimate "no defenses set".
+ */
+export function presetSlotsFromModel(model: PresetDefenseModel): PresetSlot[] {
+  const row = model as unknown as Record<string, unknown>;
+  return [0, 1, 2, 3].map((i) => ({
+    p0: safeNum(row[`p${i}_p0`]),
+    p1: safeNum(row[`p${i}_p1`]),
+    p2: safeNum(row[`p${i}_p2`]),
+    g0: safeNum(row[`p${i}_g0`]),
+    g1: safeNum(row[`p${i}_g1`]),
+    g2: safeNum(row[`p${i}_g2`]),
+  }));
+}
+
+/** Reads the store populated by `useWorldSubscription` — see worldSubscription.ts. */
 export function usePresetDefense(playerAddress: string | null): PresetDefenseData | null {
-  const [data, setData] = useState<PresetDefenseData | null>(null);
+  const presets = useModels(ModelsMapping.PresetDefense);
 
-  usePoll(
-    async (alive) => {
-      if (!playerAddress) return;
-      const rows = await toriiSql<Record<string, number | string>>(
-        `SELECT p0_p0, p0_p1, p0_p2, p0_g0, p0_g1, p0_g2, p1_p0, p1_p1, p1_p2, p1_g0, p1_g1, p1_g2, p2_p0, p2_p1, p2_p2, p2_g0, p2_g1, p2_g2, p3_p0, p3_p1, p3_p2, p3_g0, p3_g1, p3_g2, preset_count FROM "siege_dojo-PresetDefense" WHERE player = ${sqlAddr(playerAddress)}`,
-      );
-      if (!alive()) return;
-
-      const node = rows[0];
-      if (!node) {
-        setData({ slots: [], presetCount: 0 });
-        return;
-      }
-
-      const slots: PresetSlot[] = [
-        { p0: toNum(node.p0_p0), p1: toNum(node.p0_p1), p2: toNum(node.p0_p2), g0: toNum(node.p0_g0), g1: toNum(node.p0_g1), g2: toNum(node.p0_g2) },
-        { p0: toNum(node.p1_p0), p1: toNum(node.p1_p1), p2: toNum(node.p1_p2), g0: toNum(node.p1_g0), g1: toNum(node.p1_g1), g2: toNum(node.p1_g2) },
-        { p0: toNum(node.p2_p0), p1: toNum(node.p2_p1), p2: toNum(node.p2_p2), g0: toNum(node.p2_g0), g1: toNum(node.p2_g1), g2: toNum(node.p2_g2) },
-        { p0: toNum(node.p3_p0), p1: toNum(node.p3_p1), p2: toNum(node.p3_p2), g0: toNum(node.p3_g0), g1: toNum(node.p3_g1), g2: toNum(node.p3_g2) },
-      ];
-
-      setData({ slots, presetCount: toNum(node.preset_count) });
-    },
-    POLL_INTERVAL,
-    [playerAddress],
-    !!playerAddress,
-  );
-
-  return data;
+  return useMemo(() => {
+    // The world subscription is wildcard-keyed (see worldSubscription.ts), so
+    // the store holds every player's row — match this player's explicitly.
+    const addr = toBigIntOrNull(playerAddress);
+    if (addr === null) return null;
+    const p = flatModels<PresetDefenseModel>(presets).find((x) => safeBigIntEq(x.player, addr));
+    if (!p) return { slots: [], presetCount: 0 };
+    return { slots: presetSlotsFromModel(p), presetCount: safeNum(p.preset_count) };
+  }, [presets, playerAddress]);
 }
 
 export async function setPresetDefense(
@@ -207,32 +212,23 @@ export interface ConquestCooldownData {
   remainingSeconds: number;
 }
 
-// Polls the attacker's ConquestCooldown and ticks every second so the countdown
-// stays live between Torii polls. remainingSeconds = max(0, last + 3600 - now).
+/**
+ * Reads the store populated by `useWorldSubscription` — see worldSubscription.ts.
+ * `lastAttackTime` only moves when this player attacks, but the derived
+ * countdown is wall-clock, so it needs its own 1s tick.
+ */
 export function useConquestCooldown(playerAddress: string | null): ConquestCooldownData {
-  const [lastAttackTime, setLastAttackTime] = useState(0);
-  const [now, setNow] = useState(() => Math.floor(Date.now() / 1000));
+  const cooldowns = useModels(ModelsMapping.ConquestCooldown);
+  const now = useNowSeconds(1000);
 
-  usePoll(
-    async (alive) => {
-      if (!playerAddress) return;
-      const rows = await toriiSql<{ last_attack_time: number | string }>(
-        `SELECT last_attack_time FROM "siege_dojo-ConquestCooldown" WHERE player = ${sqlAddr(playerAddress)}`,
-      );
-      if (!alive()) return;
-      setLastAttackTime(rows[0] ? toNum(rows[0].last_attack_time) : 0);
-    },
-    POLL_INTERVAL,
-    [playerAddress],
-    !!playerAddress,
-  );
-
-  // setState lives in the interval callback, not the effect body — safe under
-  // react-hooks/set-state-in-effect.
-  useEffect(() => {
-    const i = setInterval(() => setNow(Math.floor(Date.now() / 1000)), 1000);
-    return () => clearInterval(i);
-  }, []);
+  const lastAttackTime = useMemo(() => {
+    const addr = toBigIntOrNull(playerAddress);
+    if (addr === null) return 0;
+    const c = flatModels<ConquestCooldownModel>(cooldowns).find((x) =>
+      safeBigIntEq(x.player, addr),
+    );
+    return c ? safeNum(c.last_attack_time) : 0;
+  }, [cooldowns, playerAddress]);
 
   const remainingSeconds =
     lastAttackTime > 0 ? Math.max(0, lastAttackTime + CONQUEST_COOLDOWN_SECONDS - now) : 0;
@@ -291,40 +287,31 @@ function normalizeAddr(a: string): string {
   }
 }
 
-// Torii SQL: map each owner address to its faction id, so ally parcels can be
-// greyed out. On failure returns {} — the contract enforces the rule anyway.
+// Map each parcel owner to its faction id, so ally parcels can be greyed out.
+// The whole FactionMember model is in the store (see worldSubscription.ts), so
+// this no longer needs the owner list to build an IN clause — the argument is
+// kept only to scope the result to addresses actually on the map.
 export function useOwnerFactionIds(owners: string[]): Record<string, number> {
-  const [map, setMap] = useState<Record<string, number>>({});
+  const members = useModels(ModelsMapping.FactionMember);
 
-  // Stable, sorted key so the poll only re-subscribes when the owner set
-  // actually changes (parcels.map() produces a fresh array every render).
-  const normalized = Array.from(new Set(owners.map(normalizeAddr))).filter(
-    (a) => a !== "0x0",
-  );
-  normalized.sort();
-  const key = normalized.join(",");
+  // Stable, sorted key: parcels.map() produces a fresh array every render, so
+  // memoizing on the array identity would recompute constantly.
+  const key = useMemo(() => {
+    const normalized = Array.from(new Set(owners.map(normalizeAddr))).filter((a) => a !== "0x0");
+    normalized.sort();
+    return normalized.join(",");
+  }, [owners]);
 
-  usePoll(
-    async (alive) => {
-      if (normalized.length === 0) {
-        if (alive()) setMap({});
-        return;
-      }
-      const inList = normalized.map((a) => sqlAddr(a)).join(",");
-      const rows = await toriiSql<{ player: string; faction_id: number | string }>(
-        `SELECT player, faction_id FROM "siege_dojo-FactionMember" WHERE player IN (${inList})`,
-      );
-      if (!alive()) return;
-      const next: Record<string, number> = {};
-      for (const r of rows) next[normalizeAddr(r.player)] = toNum(r.faction_id);
-      setMap(next);
-    },
-    POLL_INTERVAL,
-    [key],
-    true,
-  );
-
-  return map;
+  return useMemo(() => {
+    if (!key) return {};
+    const wanted = new Set(key.split(","));
+    const next: Record<string, number> = {};
+    for (const m of flatModels<FactionMemberModel>(members)) {
+      const addr = normalizeAddr(m.player);
+      if (wanted.has(addr)) next[addr] = safeNum(m.faction_id);
+    }
+    return next;
+  }, [members, key]);
 }
 
 // ---------- Outcome polling ----------

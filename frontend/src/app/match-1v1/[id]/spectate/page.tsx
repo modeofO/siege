@@ -191,8 +191,8 @@ export default function SpectatorPage() {
   const modifiers = useRoundModifiers1v1(matchId, state?.round ?? 1);
   const matchStakes = useMatchStakes1v1(matchId, refreshKey);
 
-  const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined, refreshKey);
-  const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined, refreshKey);
+  const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined);
+  const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined);
 
   const [pendingResult, setPendingResult] = useState<RoundResult1v1 | null>(null);
   const [heldHp, setHeldHp] = useState<{ a: number; b: number } | null>(null);

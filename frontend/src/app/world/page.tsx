@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { RpcProvider } from "starknet";
 import { useAccount } from "@/app/providers";
 import { useWorldParcels, usePlayerKingdom, type ParcelData } from "@/lib/worldState";
+import { useWorldSubscription } from "@/lib/worldSubscription";
 import { HexGrid } from "@/components/HexGrid";
 import { RegisterKingdom } from "@/components/RegisterKingdom";
 import { fetchAllAbilityBalances } from "@/lib/abilityToken";
@@ -24,6 +25,7 @@ import { usePlayerCosmetics, useBulkPlayerCosmetics } from "@/lib/cosmetics";
 import { WORLD_SYSTEM_ADDRESS } from "@/lib/contractAddresses";
 import { resilientExecute } from "@/lib/controllerSession";
 import { toriiSql, toNum } from "@/lib/toriiSql";
+import { usePoll } from "@/lib/usePoll";
 import { ArcaneSeal } from "@/components/forge/ArcaneSeal";
 import { CIRCUITS } from "@/lib/forge/circuits";
 import styles from "./parchment.module.css";
@@ -182,17 +184,20 @@ interface ActiveBattle {
   status: number;
 }
 
+// STILL POLLING, deliberately: ORDER BY + LIMIT have no subscription
+// equivalent, and subscribing to all of MatchState1v1 to sort client-side
+// would grow without bound as matches accumulate. Via usePoll so it inherits
+// the tab-visibility gate.
 function useActiveBattles(refreshKey: number): { battles: ActiveBattle[]; loading: boolean } {
   const [battles, setBattles] = useState<ActiveBattle[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let cancelled = false;
-    const fetchBattles = async () => {
+  usePoll(
+    async (alive) => {
       const rows = await toriiSql<Record<string, unknown>>(
         `SELECT match_id, player_a, player_b, current_round, vault_a_hp, vault_b_hp, status FROM "siege_dojo-MatchState1v1" WHERE status = 'Active' ORDER BY match_id DESC LIMIT 20`
       );
-      if (cancelled) return;
+      if (!alive()) return;
       setBattles(
         rows.map((r) => ({
           matchId: toNum(r.match_id),
@@ -205,11 +210,10 @@ function useActiveBattles(refreshKey: number): { battles: ActiveBattle[]; loadin
         }))
       );
       setLoading(false);
-    };
-    void fetchBattles();
-    const interval = setInterval(fetchBattles, 15000);
-    return () => { cancelled = true; clearInterval(interval); };
-  }, [refreshKey]);
+    },
+    15_000,
+    [refreshKey],
+  );
 
   return { battles, loading };
 }
@@ -222,14 +226,18 @@ function truncAddr(addr: string): string {
 export default function WorldPage() {
   const { account, address } = useAccount();
   const [refreshKey, setRefreshKey] = useState(0);
-  const { parcels, loading } = useWorldParcels(refreshKey);
+  // Opens the world-scoped Torii subscriptions. Every store selector below
+  // (parcels, factions, preset defense) reads what this populates, so it must
+  // stay above them — see lib/worldSubscription.ts.
+  useWorldSubscription();
+  const { parcels, loading } = useWorldParcels();
   const kingdom = usePlayerKingdom(address || null, refreshKey);
   const [abilities, setAbilities] = useState<Record<number, number>>({});
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState("");
   const ownerAddresses = parcels.map((p) => p.owner).filter((o) => o && o !== "0x0");
-  const cosmeticsMap = useBulkPlayerCosmetics(ownerAddresses, refreshKey);
-  const myCosmetics = usePlayerCosmetics(address ?? undefined, refreshKey);
+  const cosmeticsMap = useBulkPlayerCosmetics(ownerAddresses);
+  const myCosmetics = usePlayerCosmetics(address ?? undefined);
 
   const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
   const { battles, loading: battlesLoading } = useActiveBattles(refreshKey);
@@ -277,22 +285,25 @@ export default function WorldPage() {
     }
   }, [account, refresh]);
 
-  // Fetch ability balances (all 10 token IDs — T1 1..5, T2 6..10)
-  useEffect(() => {
-    if (!address) return;
-    const fetchAb = async () => {
+  // Ability balances (all 10 token IDs — T1 1..5, T2 6..10). This is an RPC
+  // read, not Torii, so it has no subscription equivalent; via usePoll for the
+  // visibility gate. Balances only move on craft/settle, both of which call
+  // refresh(), so the interval is a slow backstop.
+  usePoll(
+    async (alive) => {
+      if (!address) return;
       try {
         const provider = new RpcProvider({ nodeUrl: RPC_URL });
         const balances = await fetchAllAbilityBalances(provider, address);
-        setAbilities(balances);
+        if (alive()) setAbilities(balances);
       } catch {
         // Ignore — ability token may not be deployed
       }
-    };
-    void fetchAb();
-    const i = setInterval(fetchAb, 8000);
-    return () => clearInterval(i);
-  }, [address, refreshKey]);
+    },
+    30_000,
+    [address, refreshKey],
+    !!address,
+  );
 
   // Get home parcel types for display
   const homeParcelTypes = kingdom.registered

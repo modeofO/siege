@@ -1,10 +1,15 @@
-import { useState, useMemo } from "react";
+import { useMemo } from "react";
 import { cairo } from "starknet";
 import type { AccountInterface, UniversalDetails } from "starknet";
+import { useModels } from "@dojoengine/sdk/react";
+import {
+  ModelsMapping,
+  type PlayerCosmetics as PlayerCosmeticsModel,
+} from "@/bindings/typescript/models.gen";
 import { WORLD_SYSTEM_ADDRESS } from "./contractAddresses";
 import { resilientExecute } from "./controllerSession";
-import { toriiSql, feltToStr, sqlAddr } from "./toriiSql";
-import { usePoll } from "./usePoll";
+import { feltToStr } from "./toriiSql";
+import { safeBigIntEq, flatModels, toBigIntOrNull } from "./modelUtils";
 import type { CircuitKey, CosmeticType } from "./forge/circuits";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
@@ -44,93 +49,49 @@ function feltToCircuitKey(felt: string | null): CircuitKey | null {
   return decoded ? (decoded as CircuitKey) : null;
 }
 
-export function usePlayerCosmetics(
-  playerAddress: string | undefined,
-  refreshKey?: number,
-): PlayerCosmeticsData {
-  const [data, setData] = useState<PlayerCosmeticsData>(EMPTY_COSMETICS);
-
-  usePoll(
-    async (alive) => {
-      if (!playerAddress) return;
-      const rows = await toriiSql<{
-        banner: string;
-        parcel_skin: string;
-        hold_decoration: string;
-      }>(
-        `SELECT banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player = ${sqlAddr(playerAddress)}`,
-      );
-      if (!alive()) return;
-
-      if (rows.length === 0) {
-        setData(EMPTY_COSMETICS);
-        return;
-      }
-
-      const row = rows[0];
-      setData({
-        banner: feltToCircuitKey(row.banner),
-        parcelSkin: feltToCircuitKey(row.parcel_skin),
-        holdDecoration: feltToCircuitKey(row.hold_decoration),
-      });
-    },
-    4000,
-    [playerAddress, refreshKey],
-    !!playerAddress,
-  );
-
-  return data;
+function toCosmeticsData(c: PlayerCosmeticsModel): PlayerCosmeticsData {
+  return {
+    banner: feltToCircuitKey(String(c.banner ?? "")),
+    parcelSkin: feltToCircuitKey(String(c.parcel_skin ?? "")),
+    holdDecoration: feltToCircuitKey(String(c.hold_decoration ?? "")),
+  };
 }
 
+/** Reads the store populated by `useWorldSubscription` — see worldSubscription.ts. */
+export function usePlayerCosmetics(playerAddress: string | undefined): PlayerCosmeticsData {
+  const cosmetics = useModels(ModelsMapping.PlayerCosmetics);
+
+  return useMemo(() => {
+    const addr = toBigIntOrNull(playerAddress);
+    if (addr === null) return EMPTY_COSMETICS;
+    const c = flatModels<PlayerCosmeticsModel>(cosmetics).find((x) => safeBigIntEq(x.player, addr));
+    return c ? toCosmeticsData(c) : EMPTY_COSMETICS;
+  }, [cosmetics, playerAddress]);
+}
+
+/** Reads the store populated by `useWorldSubscription` — see worldSubscription.ts. */
 export function useBulkPlayerCosmetics(
   playerAddresses: string[],
-  refreshKey?: number,
 ): Record<string, PlayerCosmeticsData> {
-  const [data, setData] = useState<Record<string, PlayerCosmeticsData>>({});
+  const cosmetics = useModels(ModelsMapping.PlayerCosmetics);
 
-  // Stable key so the poll restarts when the set of addresses actually
-  // changes, not just its length.
-  const addrsKey = useMemo(() => {
-    const normalized: string[] = [];
-    for (const a of playerAddresses) {
-      try {
-        normalized.push(sqlAddr(a));
-      } catch {
-        // skip malformed addresses
-      }
-    }
-    return normalized.sort().join(",");
-  }, [playerAddresses]);
-
-  usePoll(
-    async (alive) => {
-      if (!addrsKey) return;
-      const rows = await toriiSql<{
-        player: string;
-        banner: string;
-        parcel_skin: string;
-        hold_decoration: string;
-      }>(
-        `SELECT player, banner, parcel_skin, hold_decoration FROM "siege_dojo-PlayerCosmetics" WHERE player IN (${addrsKey})`,
-      );
-      if (!alive()) return;
-
-      const map: Record<string, PlayerCosmeticsData> = {};
-      for (const row of rows) {
-        map[normalizeAddr(row.player)] = {
-          banner: feltToCircuitKey(row.banner),
-          parcelSkin: feltToCircuitKey(row.parcel_skin),
-          holdDecoration: feltToCircuitKey(row.hold_decoration),
-        };
-      }
-      setData(map);
-    },
-    4000,
-    [addrsKey, refreshKey],
-    addrsKey.length > 0,
+  // Stable key: parcels.map() hands in a fresh array every render, so
+  // memoizing on its identity would recompute constantly.
+  const addrsKey = useMemo(
+    () => Array.from(new Set(playerAddresses.map(normalizeAddr))).sort().join(","),
+    [playerAddresses],
   );
 
-  return data;
+  return useMemo(() => {
+    if (!addrsKey) return {};
+    const wanted = new Set(addrsKey.split(","));
+    const map: Record<string, PlayerCosmeticsData> = {};
+    for (const c of flatModels<PlayerCosmeticsModel>(cosmetics)) {
+      const addr = normalizeAddr(c.player);
+      if (wanted.has(addr)) map[addr] = toCosmeticsData(c);
+    }
+    return map;
+  }, [cosmetics, addrsKey]);
 }
 
 const COSMETIC_TYPE_MAP: Record<CosmeticType, string> = {

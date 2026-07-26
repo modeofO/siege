@@ -1,19 +1,16 @@
 // frontend/src/lib/worldState.ts
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder, KeysClause } from "@dojoengine/sdk";
 import {
   ModelsMapping,
   type SchemaType,
+  type Parcel as ParcelModel,
   type PlayerKingdom as PlayerKingdomModel,
 } from "@/bindings/typescript/models.gen";
-import { toriiSql, toNum } from "./toriiSql";
 import { safeNum, flatModels } from "./modelUtils";
-import { usePoll } from "./usePoll";
-
-const POLL_INTERVAL = 4000;
 
 // --- Parcel data ---
 
@@ -26,41 +23,48 @@ export interface ParcelData {
   isHome: boolean;
 }
 
-export function useWorldParcels(refreshKey?: number) {
-  const [parcels, setParcels] = useState<ParcelData[]>([]);
-  const [loading, setLoading] = useState(true);
+/**
+ * How long to wait before treating an empty store as a genuinely empty world
+ * rather than a subscription that has not delivered its first page yet. The
+ * SQL poller could distinguish the two (a response arrived, it had no rows);
+ * a store selector cannot, so `loading` needs a floor.
+ */
+const INITIAL_LOAD_GRACE_MS = 2500;
 
-  usePoll(
-    async (alive) => {
-      const rows = await toriiSql<{
-        parcel_id: number;
-        col: number;
-        row: number;
-        parcel_type: number;
-        owner: string;
-        is_home: number;
-      }>('SELECT parcel_id, col, row, parcel_type, owner, is_home FROM "siege_dojo-Parcel"');
-      if (!alive()) return;
+function useSettled(ms: number): boolean {
+  const [settled, setSettled] = useState(false);
+  // setState lives in the timeout callback, not the effect body — required by
+  // react-hooks/set-state-in-effect (see frontend/CLAUDE.md).
+  useEffect(() => {
+    const t = setTimeout(() => setSettled(true), ms);
+    return () => clearTimeout(t);
+  }, [ms]);
+  return settled;
+}
 
-      if (rows.length > 0) {
-        setParcels(
-          rows.map((r) => ({
-            parcelId: toNum(r.parcel_id),
-            col: toNum(r.col),
-            row: toNum(r.row),
-            parcelType: toNum(r.parcel_type),
-            owner: r.owner || "0x0",
-            isHome: !!r.is_home,
-          })),
-        );
-      }
-      setLoading(false);
-    },
-    POLL_INTERVAL,
-    [refreshKey],
+/** Reads the store populated by `useWorldSubscription` — see worldSubscription.ts. */
+export function useWorldParcels() {
+  const parcelModels = useModels(ModelsMapping.Parcel);
+  const settled = useSettled(INITIAL_LOAD_GRACE_MS);
+
+  const parcels = useMemo<ParcelData[]>(
+    () =>
+      flatModels<ParcelModel>(parcelModels)
+        .map((p) => ({
+          parcelId: safeNum(p.parcel_id),
+          col: safeNum(p.col),
+          row: safeNum(p.row),
+          parcelType: safeNum(p.parcel_type),
+          owner: p.owner || "0x0",
+          isHome: !!p.is_home,
+        }))
+        // The store is keyed by entity id and has no inherent order; the SQL
+        // path returned insertion order. Sort so renders stay stable.
+        .sort((a, b) => a.parcelId - b.parcelId),
+    [parcelModels],
   );
 
-  return { parcels, loading };
+  return { parcels, loading: parcels.length === 0 && !settled };
 }
 
 // --- Player kingdom ---

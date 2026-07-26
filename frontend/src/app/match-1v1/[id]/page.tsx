@@ -145,8 +145,8 @@ export default function Match1v1Page() {
   // Stakes for the match header (#4) — both sides' wagered abilities.
   const matchStakes = useMatchStakes1v1(matchId, refreshKey);
 
-  const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined, refreshKey);
-  const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined, refreshKey);
+  const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined);
+  const cosmeticsB = usePlayerCosmetics(state?.playerB ?? undefined);
 
   // --- War Table Intel ---
   // Opponent address (null until roles resolve). The intel hook keeps stale data
