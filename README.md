@@ -323,7 +323,7 @@ https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8
 
 ## MCP Server
 
-`mcp-server-2/` is the active MCP server. It registers 39 tools and can submit transactions through a Cartridge session after browser approval.
+`mcp-server-2/` is the active MCP server. It registers 44 tools and can submit transactions through a Cartridge session after browser approval.
 
 ```bash
 cd mcp-server-2
@@ -331,21 +331,42 @@ pnpm install
 pnpm run build
 ```
 
-Required runtime env:
+Required runtime env: copy `mcp-server-2/.env.mainnet` to `.env` rather than
+setting these by hand — it carries the Torii URL, Cartridge RPC, manifest path,
+session dir, and all token addresses for the live network. See
+`mcp-server-2/README.md` for setup, session approval, and the channel contract.
+
+## Torii gRPC
+
+Torii serves SQL and gRPC-web on the same base URL — no `/grpc` path, no
+separate port:
+
+| Transport | Path |
+| --------- | ---- |
+| SQL reads | `{TORII_URL}/sql?query=…` |
+| gRPC-web  | `{TORII_URL}/world.World/<Method>` |
+
+Native gRPC is not exposed — torii binds it to `127.0.0.1:50051` by default and
+the Dockerfiles publish only HTTP 8080, which serves gRPC-web. So `grpcurl` and
+server reflection do not work here. To check what a deployment actually serves:
 
 ```bash
-TORII_URL=https://api.cartridge.gg/x/siege-dojo/torii
-RPC_URL=https://api.cartridge.gg/x/starknet/sepolia
-MANIFEST_PATH=../manifest_sepolia.json
-ABILITY_TOKEN_ADDRESS=0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05
+bun x tsx scripts/torii-conformance.ts              # mainnet
+bun x tsx scripts/torii-conformance.ts <toriiUrl>   # any deployment
 ```
+
+It reads the RPC list from `world.proto` upstream, probes each method over
+gRPC-web, and reports which are served. Useful when a subscription silently
+stops arriving, when checking whether a redeployed Torii is fully up, or when
+finding out which methods exist before writing a new read path. Exits 2 if the
+endpoint is unreachable.
 
 ## Documentation
 
 - `site/docs/pages/`: player-facing docs site.
 - `frontend/README.md`: frontend architecture and env.
 - `mcp-server-2/README.md`: MCP setup and tool list.
-- `skill/SKILL.md`: compact development guide for Codex/agent use.
+- `CLAUDE.md` (symlinked as `AGENTS.md`): working context for coding agents.
 - `docs/superpowers/`: historical specs and plans. Do not treat dated plans as current truth without checking code.
 
 ## License

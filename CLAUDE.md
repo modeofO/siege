@@ -1,6 +1,8 @@
-# CLAUDE.md
+# Siege — Agent Context
 
-This file gives Claude Code current working context for this repository. The source of truth is the code, manifests, and config in this checkout.
+This file gives coding agents current working context for this repository. The source of truth is the code, manifests, and config in this checkout.
+
+It is checked in as `CLAUDE.md`, with `AGENTS.md` as a symlink to it — edit either path, there is only one file.
 
 ## Current Product Shape
 
@@ -129,7 +131,14 @@ permissionless timeout.
 
 ## The Marches
 
-The Marches is an offset hex grid (`col`/`row` per parcel, `utils/hex.cairo` distance metric). The Sepolia v9 world is initialized by `scripts/init-hex-world.sh` as 8 columns x 4 rows = 32 parcels. There is no fold mechanic, no zones, and no sectors — older docs describing a tile graph with folds are obsolete.
+The Marches is an offset hex grid (`col`/`row` per parcel, `utils/hex.cairo` distance metric). There is no fold mechanic, no zones, and no sectors — older docs describing a tile graph with folds are obsolete.
+
+Grid size is per-world and can be grown after deploy with `expand_world`, so read `WorldConfig.total_parcels` rather than assuming:
+
+| World | Grid | Parcels |
+| ----- | ---- | ------- |
+| **mainnet (live)** | 12 cols x 8 rows | **96** (expanded 2026-07-18; deployed at 32) |
+| sepolia v9 | 8 cols x 4 rows | 32 (`scripts/init-hex-world.sh`) |
 
 Important models:
 
@@ -170,10 +179,14 @@ token addresses from `manifest_mainnet.json`**, never from a copy in docs.
 - Cartridge VRF provider: `0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f` (same address as sepolia; verified live).
 
 Torii: `https://siege-torii-mainnet-production.up.railway.app` (Railway service
-`siege-torii-mainnet` in project `siege-katana`, source `infra/torii-mainnet/`).
-Its RPC is the Alchemy public demo `v0_9` endpoint because torii 1.8.3 cannot
-consume Cartridge's spec 0.10.2 — swap to a dedicated Alchemy key if indexing
-lags. Redeploy: `railway up ./infra/torii-mainnet --path-as-root --service siege-torii-mainnet`.
+`siege-torii-mainnet` in project `siege-katana`, source `infra/torii-mainnet/`,
+image `ghcr.io/dojoengine/torii:v1.8.16` — torii ships its own image now; the
+`dojo:v1.8.X` bundle stopped at torii 1.8.3). Its RPC is the Alchemy public
+demo `v0_9` endpoint: torii <= 1.8.15 hard-refused Cartridge's spec 0.10.2, and
+1.8.16 merely downgrades that to a warning while still implementing only 0.9
+semantics, so Cartridge RPC is testable but unvalidated — swap to a dedicated
+Alchemy key if indexing lags. Redeploy: `railway up ./infra/torii-mainnet
+--path-as-root --service siege-torii-mainnet`.
 Torii dropping events is a real failure mode (it has stranded matches mid-resolve);
 a restart does NOT backfill — reindex by pointing `--db-dir` at a fresh path.
 
@@ -240,6 +253,55 @@ docker compose run --rm builder sozo test
 
 Frontend (`frontend/`), docs site (`site/`): standard `bun run lint` / `test` /
 `build`; see each package's `package.json`.
+
+## Torii gRPC
+
+Torii serves SQL and gRPC-web on the **same** base URL — there is no `/grpc`
+path and no separate port. `TORII_URL` feeds both:
+
+| Transport | Path |
+| --------- | ---- |
+| SQL reads | `{TORII_URL}/sql?query=…` |
+| gRPC-web  | `{TORII_URL}/world.World/<Method>` |
+
+Native gRPC is not reachable at all: torii's `--grpc.addr` defaults to
+`127.0.0.1` and `--grpc.port` to `50051`, neither of which the Dockerfiles set
+or expose — only the HTTP port 8080 is published, and that is what serves
+gRPC-web. So `grpcurl` and server reflection cannot work against these
+deployments regardless of the edge proxy. To see what a deployment serves:
+
+```bash
+bun x tsx scripts/torii-conformance.ts                        # mainnet
+bun x tsx scripts/torii-conformance.ts <toriiUrl>             # any deployment
+bun x tsx scripts/torii-conformance.ts <url> --proto ./world.proto   # offline
+```
+
+It reads the RPC list from `world.proto` in `dojoengine/torii`, probes each
+method with an empty gRPC-web frame, and classifies by response header:
+`grpc-status: 12` = not served, any other status = served (validated and
+rejected), no status header = served (status deferred to trailers). Exits 2 if
+the endpoint is unreachable, 0 otherwise.
+
+As of torii 1.8.16 (deployed 2026-07-26 on both networks), mainnet and katana
+serve all 38/38 declared methods — `Search` was `UNIMPLEMENTED` on 1.8.3 and
+is served since the FTS5 work in 1.8.7/1.8.8. Two methods worth knowing about
+that no client here calls: `ExecuteSql` (SQL over gRPC, an alternative to the
+HTTP endpoint) and `Worlds` (enumerate indexed worlds — Torii is multi-world
+since 1.8, hence `world_addresses` in `Query`).
+
+The 1.8.3 → 1.8.16 upgrade also changed query semantics the frontend depends
+on: the gRPC KeysClause was vacuous (matched everything) through 1.8.3 and
+filters correctly from 1.8.4 — details and the resulting rules live in
+`frontend/CLAUDE.md` under "Reads". `[sql] historical` is active on both
+deployments; katana was reindexed from genesis on upgrade (old 1.8.3 database
+parked at the volume root, `--db-dir` now `/data/torii-v1816`), mainnet was
+migrated in place so its historical rows start at the upgrade.
+
+Note that the published Torii gRPC docs are behind the 1.8.2 client: they show
+flat `limit`/`offset`, `entity_models`, and `dont_include_hashed_keys`, whereas
+the installed types declare `pagination` (cursor-based), `models`,
+`no_hashed_keys`, `world_addresses`, and `historical`. Trust
+`@dojoengine/torii-wasm`'s `dojo_wasm.d.ts` over the docs.
 
 ## Historical Docs
 
