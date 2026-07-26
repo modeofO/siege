@@ -17,6 +17,7 @@ import {
 // (e.g., fresh subscription results before fields are hydrated). The shared
 // helpers guard every conversion so a render-time throw can't nuke the page.
 import { safeNum, safeBigIntEq, flatModels, enumVariant } from "@/lib/modelUtils";
+import { useVisibilityReseed } from "@/lib/useReseed";
 import { resolveRoundLocal, type PlayerMove } from "@/lib/resolution1v1";
 
 function safeNumEq(v: unknown, target: number): boolean {
@@ -129,39 +130,49 @@ const MATCH_ENTITY_LIMIT = 10_000;
  * redundant); `refreshKey` bumps whenever the synthesized state changes, which dependent
  * hooks still use to invalidate their own polling until they're migrated too.
  */
+// withEntityModels + withLimit are both load-bearing; see the measured torii
+// behaviour documented in worldSubscription.ts. Without the model list this
+// query pulls every model in the world, and without the limit it silently
+// truncates at 100 entities — which on a world with 360 could drop this
+// match's own rows from the initial page.
+//
+// Keyed by match_id — safe because the route param is stable for the life of
+// the page instance. Do NOT key a query on a value that changes after mount
+// (e.g. wallet address): a changed query routes the SDK through its broken
+// updateEntitySubscription path (see playerKingdomQuery in worldState.ts).
+function matchQuery(matchId: string | null) {
+  return new ToriiQueryBuilder<SchemaType>()
+    .withClause(KeysClause<SchemaType>([...MATCH_MODELS], [toFeltHex(matchId)], "VariableLen").build())
+    .withEntityModels([...MATCH_MODELS])
+    .withLimit(MATCH_ENTITY_LIMIT)
+    .includeHashedKeys();
+}
+
+// Cosmetics for the two players' banners. Separate query because the model is
+// keyed by player address, not match_id (see MATCH_MODELS note). Wildcard key
+// + model filter; the table is player-count sized.
+function cosmeticsQuery() {
+  return new ToriiQueryBuilder<SchemaType>()
+    .withClause(
+      KeysClause<SchemaType>([ModelsMapping.PlayerCosmetics], [undefined], "VariableLen").build(),
+    )
+    .withEntityModels([ModelsMapping.PlayerCosmetics])
+    .withLimit(MATCH_ENTITY_LIMIT)
+    .includeHashedKeys();
+}
+
 export function useMatchState1v1(matchId: string | null) {
   // Single match-scoped subscription. Every match-page hook below reads from
-  // the store this populates — no per-hook subscription. PlayerCosmetics rides
-  // along because the match and spectate pages render both players' banners
-  // from the same store.
-  //
-  // withEntityModels + withLimit are both load-bearing; see the measured torii
-  // behaviour documented in worldSubscription.ts. Without the model list this
-  // query pulls every model in the world, and without the limit it silently
-  // truncates at 100 entities — which on a world with 360 could drop this
-  // match's own rows from the initial page.
-  useEntityQuery(
-    new ToriiQueryBuilder<SchemaType>()
-      .withClause(
-        KeysClause<SchemaType>([...MATCH_MODELS], [toFeltHex(matchId)], "VariableLen").build(),
-      )
-      .withEntityModels([...MATCH_MODELS])
-      .withLimit(MATCH_ENTITY_LIMIT)
-      .includeHashedKeys(),
-  );
-
-  // Cosmetics for the two players' banners. Separate query because the model
-  // is keyed by player address, not match_id (see MATCH_MODELS note). Wildcard
-  // key + model filter; the table is player-count sized.
-  useEntityQuery(
-    new ToriiQueryBuilder<SchemaType>()
-      .withClause(
-        KeysClause<SchemaType>([ModelsMapping.PlayerCosmetics], [undefined], "VariableLen").build(),
-      )
-      .withEntityModels([ModelsMapping.PlayerCosmetics])
-      .withLimit(MATCH_ENTITY_LIMIT)
-      .includeHashedKeys(),
-  );
+  // the store this populates — no per-hook subscription. PlayerCosmetics gets
+  // its own wildcard query (keyed by player, so it can't ride the match-id
+  // clause).
+  useEntityQuery(matchQuery(matchId));
+  useEntityQuery(cosmeticsQuery());
+  // Railway's edge kills idle streams at 300s (see useReseed.ts). A live match
+  // is rarely idle that long, but a spectator tab left in the background comes
+  // back stale without this.
+  const reseedQueries = useCallback(() => [matchQuery(matchId), cosmeticsQuery()], [matchId]);
+  useVisibilityReseed(reseedQueries);
 
   const matchStates = useModels(ModelsMapping.MatchState1v1);
   const nodeStates = useModels(ModelsMapping.NodeState);

@@ -4,6 +4,7 @@
 import { useEntityQuery } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder, KeysClause, MemberClause } from "@dojoengine/sdk";
 import { ModelsMapping, type SchemaType } from "@/bindings/typescript/models.gen";
+import { useVisibilityReseed } from "./useReseed";
 
 /**
  * Single world-scoped subscription, mirroring `useMatchState1v1`: one place
@@ -58,31 +59,43 @@ const WORLD_MODELS = [
   ModelsMapping.ConquestCooldown,
 ] as const;
 
-export function useWorldSubscription() {
-  useEntityQuery(
+function worldQuery() {
+  return (
     new ToriiQueryBuilder<SchemaType>()
       // Wildcard clause: per finding 2 a bound key would not narrow anything,
       // and per finding 3 it could not isolate a model even if it did.
       .withClause(KeysClause<SchemaType>([...WORLD_MODELS], [undefined], "VariableLen").build())
       .withEntityModels([...WORLD_MODELS])
       .withLimit(WORLD_ENTITY_LIMIT)
-      .includeHashedKeys(),
+      .includeHashedKeys()
   );
+}
 
-  // Live Battles panel: a member-clause subscription instead of a poll.
-  // Requires torii >= 1.8.12/1.8.15 (deployed: 1.8.16) — those releases fixed
-  // clause matching against BOTH old and new entity state, so a match flipping
-  // Active -> Finished is still broadcast and leaves the panel. The seed fetch
-  // honors order_by+limit (top 20 by match_id desc; the field must be
-  // model-qualified); the stream then pushes every status change, and
-  // useActiveBattles re-derives the window client-side. Steady-state Torii
-  // traffic on /world is therefore zero.
-  useEntityQuery(
-    new ToriiQueryBuilder<SchemaType>()
-      .withClause(MemberClause(ModelsMapping.MatchState1v1, "status", "Eq", "Active").build())
-      .addOrderBy(`${ModelsMapping.MatchState1v1}.match_id`, "Desc")
-      .withLimit(20)
-      .withEntityModels([ModelsMapping.MatchState1v1])
-      .includeHashedKeys(),
-  );
+// Live Battles panel: a member-clause subscription instead of a poll.
+// Requires torii >= 1.8.12/1.8.15 (deployed: 1.8.16) — those releases fixed
+// clause matching against BOTH old and new entity state, so a match flipping
+// Active -> Finished is still broadcast and leaves the panel. The seed fetch
+// honors order_by+limit (top 20 by match_id desc; the field must be
+// model-qualified); the stream then pushes every status change, and
+// useActiveBattles re-derives the window client-side. Steady-state Torii
+// traffic on /world is therefore zero.
+function battlesQuery() {
+  return new ToriiQueryBuilder<SchemaType>()
+    .withClause(MemberClause(ModelsMapping.MatchState1v1, "status", "Eq", "Active").build())
+    .addOrderBy(`${ModelsMapping.MatchState1v1}.match_id`, "Desc")
+    .withLimit(20)
+    .withEntityModels([ModelsMapping.MatchState1v1])
+    .includeHashedKeys();
+}
+
+function reseedQueries() {
+  return [worldQuery(), battlesQuery()];
+}
+
+export function useWorldSubscription() {
+  useEntityQuery(worldQuery());
+  useEntityQuery(battlesQuery());
+  // Railway's edge kills idle streams at 300s (see useReseed.ts); catch up
+  // whatever the dead windows missed the moment the user looks again.
+  useVisibilityReseed(reseedQueries);
 }

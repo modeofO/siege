@@ -11,6 +11,7 @@ import {
   type PlayerKingdom as PlayerKingdomModel,
 } from "@/bindings/typescript/models.gen";
 import { safeNum, flatModels } from "./modelUtils";
+import { useVisibilityReseed } from "./useReseed";
 
 // --- Parcel data ---
 
@@ -94,14 +95,31 @@ const EMPTY_KINGDOM: PlayerKingdomData = {
   factionReinforcementEnabled: false,
 };
 
+/**
+ * Static query — deliberately NOT keyed by the player address. Embedding the
+ * address made the query change when the wallet connected mid-session, which
+ * sent the SDK down its updateEntitySubscription path — broken in the shipped
+ * torii-wasm ("Error: expected instance of V", a failed wasm instanceof check
+ * on the stored subscription), after which the re-fetch for the new address
+ * never ran and kingdom data silently stayed empty. A query that never
+ * changes never takes that path. The selector filters by address instead;
+ * PlayerKingdom is player-count sized, so the wildcard stays cheap.
+ */
+export function playerKingdomQuery() {
+  return new ToriiQueryBuilder<SchemaType>()
+    .withClause(KeysClause<SchemaType>([ModelsMapping.PlayerKingdom], [undefined], "VariableLen").build())
+    .withEntityModels([ModelsMapping.PlayerKingdom])
+    .withLimit(10_000)
+    .includeHashedKeys();
+}
+
+function kingdomReseedQueries() {
+  return [playerKingdomQuery()];
+}
+
 export function usePlayerKingdom(playerAddress: string | null, _refreshKey?: number) {
-  useEntityQuery(
-    new ToriiQueryBuilder<SchemaType>()
-      .withClause(
-        KeysClause<SchemaType>([ModelsMapping.PlayerKingdom], [playerAddress ?? undefined], "VariableLen").build(),
-      )
-      .includeHashedKeys(),
-  );
+  useEntityQuery(playerKingdomQuery());
+  useVisibilityReseed(kingdomReseedQueries);
 
   const kingdoms = useModels(ModelsMapping.PlayerKingdom);
 

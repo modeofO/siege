@@ -10,6 +10,7 @@ import {
 } from "@/bindings/typescript/models.gen";
 
 import { safeNum, flatModels } from "@/lib/modelUtils";
+import { useVisibilityReseed } from "@/lib/useReseed";
 
 export const BRACKET_NAMES = ["Newcomer", "Developing", "Experienced", "Veteran", "Elite"] as const;
 export type BracketName = (typeof BRACKET_NAMES)[number];
@@ -38,18 +39,44 @@ export interface MatchRecordData {
   isBloodRival: boolean;
 }
 
+// Static queries — never keyed by the player address. See playerKingdomQuery
+// in worldState.ts for why: an address-keyed query changes when the wallet
+// connects, which routes the SDK through its broken updateEntitySubscription
+// path ("expected instance of V") and the new address's data never loads.
+// Selectors filter by address client-side instead.
+function reputationQuery() {
+  return new ToriiQueryBuilder<SchemaType>()
+    .withClause(
+      KeysClause<SchemaType>(
+        [ModelsMapping.PlayerReputation, ModelsMapping.PlayerKingdom],
+        [undefined],
+        "VariableLen",
+      ).build(),
+    )
+    .withEntityModels([ModelsMapping.PlayerReputation, ModelsMapping.PlayerKingdom])
+    .withLimit(10_000)
+    .includeHashedKeys();
+}
+
+function matchRecordsQuery() {
+  return new ToriiQueryBuilder<SchemaType>()
+    .withClause(KeysClause<SchemaType>([ModelsMapping.MatchRecord], [undefined], "VariableLen").build())
+    .withEntityModels([ModelsMapping.MatchRecord])
+    .withLimit(10_000)
+    .includeHashedKeys();
+}
+
+function reputationReseedQueries() {
+  return [reputationQuery()];
+}
+
+function matchRecordsReseedQueries() {
+  return [matchRecordsQuery()];
+}
+
 export function usePlayerReputation(playerAddress: string | null): PlayerReputationData | null {
-  useEntityQuery(
-    new ToriiQueryBuilder<SchemaType>()
-      .withClause(
-        KeysClause<SchemaType>(
-          [ModelsMapping.PlayerReputation, ModelsMapping.PlayerKingdom],
-          [playerAddress ?? undefined],
-          "VariableLen",
-        ).build(),
-      )
-      .includeHashedKeys(),
-  );
+  useEntityQuery(reputationQuery());
+  useVisibilityReseed(reputationReseedQueries);
 
   const reputations = useModels(ModelsMapping.PlayerReputation);
   const kingdoms = useModels(ModelsMapping.PlayerKingdom);
@@ -77,13 +104,8 @@ export function usePlayerReputation(playerAddress: string | null): PlayerReputat
 }
 
 export function useMatchRecords(playerAddress: string | null): MatchRecordData[] {
-  useEntityQuery(
-    new ToriiQueryBuilder<SchemaType>()
-      .withClause(
-        KeysClause<SchemaType>([ModelsMapping.MatchRecord], [playerAddress ?? undefined], "VariableLen").build(),
-      )
-      .includeHashedKeys(),
-  );
+  useEntityQuery(matchRecordsQuery());
+  useVisibilityReseed(matchRecordsReseedQueries);
 
   const matchRecords = useModels(ModelsMapping.MatchRecord);
 

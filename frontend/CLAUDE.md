@@ -33,10 +33,22 @@ all matches ever) poll a one-shot gRPC `RetrieveEntities` with member clause +
 (`fetchConquestOutcome`, the match page's post-tx poll). `usePoll` skips ticks
 while the tab is hidden and catches up on re-show.
 
-Known tradeoff: /world now makes zero periodic Torii reads, so
-`useToriiHealth` (fed only by SQL reads) cannot flip on that page — a dead
-subscription stream shows as quietly stale data, not as unhealthy. Accepted
-for architectural consistency; revisit if stuck pages are ever reported.
+Stream lifetime is bounded by infrastructure, not the app (measured
+2026-07-26): Railway's edge (hikari) kills an idle streaming response at
+exactly 300s — h2 gets RST_STREAM(CANCEL), h1 sockets are terminated —
+regardless of torii's h2 PING keepalives, which don't traverse the edge.
+`@dojoengine/grpc` auto-resubscribes but replays only the last already-seen
+message; events emitted while a stream was down are lost until the entity
+next changes. Mitigations in place: every subscription entry point pairs a
+`useVisibilityReseed` (re-run the seed fetch when the tab becomes visible —
+event-driven, zero steady-state), and subscription queries must be STATIC —
+never key one on a value that changes after mount (wallet address): a changed
+query routes the SDK through updateEntitySubscription, which is broken in the
+shipped torii-wasm ("expected instance of V") and silently strands the hook
+on the old query. Selectors filter by address client-side instead. A truly
+dead stream in a visible tab still shows as stale data (useToriiHealth is
+SQL-fed only) — accepted; the durable fix is an application-level heartbeat
+in torii's subscription streams, which is an upstream ask.
 
 Measured facts about torii query semantics the SDK docs do not tell you. Both
 deployments run torii 1.8.16 (verified 2026-07-26); the version-dependent one
