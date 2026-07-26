@@ -8,10 +8,15 @@ import { useNetwork } from "@/lib/useNetwork";
 // hydration for a player who has switched — the server always renders the
 // build's own network.
 //
-// The wording is deliberately blunt about two separate things: the practice
-// chain runs katana's default dev seed, so its admin keys are public and any
-// balance can be taken; and nothing earned there carries over to mainnet, which
-// is a separate world with separate token contracts.
+// Says the one thing a player needs: nothing here carries over. Mainnet is a
+// separate world with separate token contracts, so practice progress is not
+// portable — that is also what makes the chain safe to leave wide open.
+//
+// It deliberately does NOT warn that the chain's admin keys are public (they
+// are — katana's default dev seed owns the world and mints every token). That
+// is true but reads as a security warning about assets nobody can lose: there
+// is nothing on this chain worth stealing, which is the entire design. Realms
+// ships the same public-key setup on their slot chain with no warning at all.
 export function TestNetworkBanner() {
   const network = useNetwork();
 
@@ -22,8 +27,7 @@ export function TestNetworkBanner() {
       <div className="max-w-6xl mx-auto px-4 py-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] tracking-wider">
         <span className="text-[#b5523a] font-bold">PRACTICE</span>
         <span className="text-[#7a7060]">
-          Free sandbox — no stakes, and nothing here carries over to mainnet. The chain&apos;s admin
-          keys are public, so any balance or ability can be taken by anyone.
+          Free practice — no stakes, and nothing here carries over to mainnet.
         </span>
         <button
           type="button"
