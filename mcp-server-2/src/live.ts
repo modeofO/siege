@@ -34,7 +34,8 @@ interface StartLiveStateBridgeArgs {
   state: StateClient;
   config: Config;
   isWatched: (matchId: number) => boolean;
-  notifyMatchChanged: (server: McpServer, state: StateClient, matchId: number) => Promise<void>;
+  /** Debounced — safe to call at gRPC push rate; errors are handled internally. */
+  notifyMatchChanged: (server: McpServer, state: StateClient, matchId: number) => void;
   log: (message: string) => void;
 }
 
@@ -66,9 +67,7 @@ export async function startLiveStateBridge({
     (entity) => {
       for (const matchId of matchIdsFromEntity(entity)) {
         if (!isWatched(matchId)) continue;
-        void notifyMatchChanged(server, state, matchId).catch((err: unknown) => {
-          log(`live notification failed for match ${matchId}: ${errorMessage(err)}`);
-        });
+        notifyMatchChanged(server, state, matchId);
       }
     },
     (payload) => {
@@ -116,9 +115,6 @@ function tyToSafeInteger(value: Ty | unknown): number | null {
   return null;
 }
 
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 function payloadShape(payload: unknown): string {
   if (Array.isArray(payload)) return `array(${payload.length})`;

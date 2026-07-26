@@ -51,16 +51,17 @@ import { readFileSync } from "node:fs";
 import type { AccountInterface } from "starknet";
 import { z } from "zod";
 
-import { loadConfig, type Config } from "./config.js";
+import { loadConfig } from "./config.js";
 import { getAccount } from "./session.js";
 import { StateClient } from "./state.js";
 import { startLiveStateBridge, type LiveStateBridge } from "./live.js";
+import { registerMatchResources } from "./match-resource.js";
 import {
-  buildMatchResourceSnapshot,
-  matchStateResourceUri,
-  registerMatchResources,
-  type MatchResourceSnapshot,
-} from "./match-resource.js";
+  notifyMatchChanged,
+  subscribedMatchResourceUris,
+  watchMatch,
+  watchedMatches,
+} from "./notify.js";
 import { registerSiegeTools, type NotReadyState, type ToolContext } from "./tools.js";
 
 const log = (msg: string) => process.stderr.write(`[siege-mcp] ${msg}\n`);
@@ -246,73 +247,6 @@ function registerAgentResources(server: McpServer, agentPrompt: string): void {
       ],
     }),
   );
-}
-
-// ── watched match resource invalidation ─
-
-const watchedMatches = new Set<number>();
-const subscribedMatchResourceUris = new Set<string>();
-const matchResourceSnapshots = new Map<number, string>();
-
-export async function notifyMatchChanged(server: McpServer, state: StateClient, matchId: number): Promise<void> {
-  const { changed, snapshot } = await updateMatchSnapshot(state, matchId);
-  if (!changed) return;
-
-  const uri = matchStateResourceUri(matchId);
-  if (subscribedMatchResourceUris.has(uri)) {
-    await server.server.sendResourceUpdated({ uri });
-  }
-
-  await pushChannelEvent(server, snapshot).catch((err: unknown) => {
-    log(`channel notification failed for match ${matchId}: ${errorMessage(err)}`);
-  });
-}
-
-/** Exposed so tools/resources can opt a match into live notifications. */
-export function watchMatch(state: StateClient, matchId: number): void {
-  if (watchedMatches.has(matchId)) return;
-  watchedMatches.add(matchId);
-  void updateMatchSnapshot(state, matchId).catch((err: unknown) => {
-    log(`failed to seed match ${matchId} snapshot: ${errorMessage(err)}`);
-  });
-}
-
-async function updateMatchSnapshot(
-  state: StateClient,
-  matchId: number,
-): Promise<{ changed: boolean; snapshot: MatchResourceSnapshot }> {
-  const snapshot = await buildMatchResourceSnapshot(state, matchId);
-  const next = JSON.stringify({ ...snapshot, updated_at: undefined });
-  const prev = matchResourceSnapshots.get(matchId);
-  matchResourceSnapshots.set(matchId, next);
-  return { changed: prev !== undefined && prev !== next, snapshot };
-}
-
-async function pushChannelEvent(server: McpServer, snapshot: MatchResourceSnapshot): Promise<void> {
-  const content =
-    `match ${snapshot.match_id} round ${snapshot.current_round} ${snapshot.phase}: ` +
-    `${snapshot.commits}/2 committed, ${snapshot.reveals}/2 revealed — ` +
-    `HP ${snapshot.vault_a_hp}/${snapshot.vault_b_hp}`;
-  // Cast: the SDK's notification type union doesn't statically know about the
-  // `notifications/claude/channel` extension method, but the underlying
-  // Protocol.notification accepts any { method, params } and the server's
-  // assertNotificationCapability falls through for unknown methods.
-  await (server.server.notification as (n: unknown) => Promise<void>)({
-    method: "notifications/claude/channel",
-    params: {
-      content,
-      meta: {
-        match_id: String(snapshot.match_id),
-        phase: snapshot.phase,
-        round: String(snapshot.current_round),
-        commits: String(snapshot.commits),
-        reveals: String(snapshot.reveals),
-        hp_a: String(snapshot.vault_a_hp),
-        hp_b: String(snapshot.vault_b_hp),
-        status: snapshot.status,
-      },
-    },
-  });
 }
 
 function errorMessage(err: unknown): string {

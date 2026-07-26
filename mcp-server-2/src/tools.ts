@@ -68,6 +68,11 @@ function sameAddress(a: string, b: string): boolean {
   return normalizeAddress(a) === normalizeAddress(b);
 }
 
+/** Torii stores an unclaimed parcel's owner as a zero-padded zero address. */
+function isClaimed(owner: string): boolean {
+  return BigInt(owner) !== BigInt(0);
+}
+
 function roleFor(state: { player_a: string; player_b: string }, address: string): number | null {
   if (sameAddress(state.player_a, address)) return ROLE_A;
   if (sameAddress(state.player_b, address)) return ROLE_B;
@@ -104,36 +109,11 @@ function phaseFor(
   return "resolving";
 }
 
-const MODIFIER_INFO: Record<number, { name: string; effect: string }> = {
-  0: { name: "Normal", effect: "No change. Damage = max(attacker_atk - defender_def, 0)." },
-  1: { name: "NarrowPass", effect: "Both attack and defense at this gate are capped at 3." },
-  2: {
-    name: "Mirror",
-    effect:
-      "Attack and defense values swap at this gate for both sides — placing defense effectively becomes attack and vice versa.",
-  },
-  3: { name: "Deadlock", effect: "No damage at this gate, regardless of values. Reflection skips this gate too." },
-  4: {
-    name: "Reflection",
-    effect:
-      "Damage at this gate becomes overflow. Per-gate split = overflow/2 (integer division — odd values lose 1) is added to each other non-deadlock gate, reduced by the target's unused defense at that receiving gate. Defense at this gate still absorbs incoming attack normally.",
-  },
-};
-
-function describeModifiers(gates: number[] | null | undefined): Array<{
-  gate: number;
-  code: number;
-  name: string;
-  effect: string;
-}> | null {
-  if (!gates || gates.length !== 3) return null;
-  return gates.map((code, gate) => ({
-    gate,
-    code,
-    name: MODIFIER_INFO[code]?.name ?? "Unknown",
-    effect: MODIFIER_INFO[code]?.effect ?? "Unknown modifier code.",
-  }));
-}
+// Gate-modifier prose used to ship with every match-state response as
+// `modifier_details` — ~149 tokens of static text per call, roughly half the
+// payload. It now lives in agent-prompt.md, which becomes the server's
+// `instructions` and is prompt-cached once per session. Tools still return the
+// raw `modifiers: [g0, g1, g2]` codes.
 
 import {
   effectiveMoves,
@@ -333,6 +313,29 @@ async function execute(signer: AccountInterface, calls: Call[]): Promise<string>
   return txHash;
 }
 
+/**
+ * Whether `extractTxError` failed to recover a real reason, meaning the raw
+ * error object is worth attaching as `_debug`.
+ *
+ * Deliberately NOT keyed on message length. Cairo `felt252` short strings cap
+ * at 31 characters, so every genuine revert reason is short — all 84 in this
+ * repo are under 30 chars, the longest being 28. The previous `length < 30`
+ * rule therefore attached a ~1k-token raw dump to every clear error
+ * ('Over budget', 'Already committed'), which was exactly backwards.
+ */
+export function isUninformative(message: string): boolean {
+  const m = message.trim().toLowerCase();
+  return (
+    m.length === 0 ||
+    m === "transaction execution error" ||
+    m === "[object object]" ||
+    m === "undefined" ||
+    m === "null" ||
+    m === "error" ||
+    m === "unknown error"
+  );
+}
+
 function safeStringifyError(err: unknown): string {
   const seen = new WeakSet();
   const replacer = (_key: string, value: unknown) => {
@@ -486,9 +489,7 @@ function makeRegister(reg: RegisterArgs) {
           return jsonError({ message: `Invalid arguments: ${detail}` });
         }
         const message = extractTxError(err);
-        const debug = message === "Transaction execution error" || message.length < 30
-          ? safeStringifyError(err)
-          : undefined;
+        const debug = isUninformative(message) ? safeStringifyError(err) : undefined;
         return jsonError(debug ? { message, _debug: debug } : { message });
       }
     }) as ToolCallback<S>;
@@ -532,13 +533,17 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     },
     async ({ match_id }, ctx) => {
       ctx.watchMatch(match_id);
+      // Each state.* call is its own Torii HTTP request; only the round-keyed
+      // reads depend on matchState, so the rest fan out in parallel.
       const state = await ctx.state.matchState(match_id);
-      const nodes = await ctx.state.nodeStates(match_id);
-      const round = await ctx.state.roundMoves(match_id, state.current_round).catch(() => undefined);
-      const modifiers = await ctx.state
-        .roundModifiers(match_id, state.current_round)
-        .then((m) => m.gates)
-        .catch(() => null);
+      const [nodes, round, modifiers] = await Promise.all([
+        ctx.state.nodeStates(match_id),
+        ctx.state.roundMoves(match_id, state.current_round).catch(() => undefined),
+        ctx.state
+          .roundModifiers(match_id, state.current_round)
+          .then((m) => m.gates)
+          .catch(() => null),
+      ]);
 
       const myRole = ctx.agentAddress ? roleFor(state, ctx.agentAddress) : null;
       return {
@@ -559,7 +564,6 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         commits: round?.commit_count ?? 0,
         reveals: round?.reveal_count ?? 0,
         modifiers,
-        modifier_details: describeModifiers(modifiers),
         nodes: nodes.map((n) => ({ index: n.node_index, owner: n.owner })),
         spectate_url: `${ctx.config.frontendUrl}/match-1v1/${match_id}/spectate`,
       };
@@ -578,14 +582,15 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     async ({ match_id, num_rounds }, ctx) => {
       ctx.watchMatch(match_id);
       const state = await ctx.state.matchState(match_id);
-      const rounds = [];
+      // Fetch every requested round concurrently rather than walking them one
+      // HTTP round-trip at a time. Missing rounds resolve to null and drop out.
+      const wanted: number[] = [];
       for (let r = Math.max(1, state.current_round - num_rounds + 1); r <= state.current_round; r++) {
-        try {
-          rounds.push(await ctx.state.roundMoves(match_id, r));
-        } catch {
-          // missing future rounds are fine
-        }
+        wanted.push(r);
       }
+      const rounds = (
+        await Promise.all(wanted.map((r) => ctx.state.roundMoves(match_id, r).catch(() => null)))
+      ).filter((round): round is NonNullable<typeof round> => round !== null);
       const withTraps = await Promise.all(
         rounds.map(async (round) => ({
           round,
@@ -631,11 +636,18 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     },
     async ({ match_id, round }, ctx) => {
       ctx.watchMatch(match_id);
-      const state = await ctx.state.matchState(match_id);
+      // nodeStates is match-scoped so it rides along with matchState; the
+      // round-keyed reads then fan out together once `r` is known.
+      const [state, nodeStates] = await Promise.all([
+        ctx.state.matchState(match_id),
+        ctx.state.nodeStates(match_id).catch(() => null),
+      ]);
       const r = round ?? state.current_round;
-      const moves = await ctx.state.roundMoves(match_id, r);
-      const modifiers = await ctx.state.roundModifiers(match_id, r).catch(() => null);
-      const traps = await ctx.state.roundTraps(match_id, r).catch(() => null);
+      const [moves, modifiers, traps] = await Promise.all([
+        ctx.state.roundMoves(match_id, r),
+        ctx.state.roundModifiers(match_id, r).catch(() => null),
+        ctx.state.roundTraps(match_id, r).catch(() => null),
+      ]);
       const a_move = {
         attack: [moves.a_p0, moves.a_p1, moves.a_p2],
         defense: [moves.a_g0, moves.a_g1, moves.a_g2],
@@ -648,7 +660,6 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       // Node defense owners: for the current (unresolved) round, current node
       // state is pre-contest, so apply this round's contests. For past rounds
       // current ownership is already post-contest (exact for the most recent).
-      const nodeStates = await ctx.state.nodeStates(match_id).catch(() => null);
       const owners = nodeStates
         ? r === state.current_round
           ? postContestOwners(
@@ -673,7 +684,6 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         commit_deadline: moves.commit_deadline,
         reveal_deadline: moves.reveal_deadline,
         modifiers: modifiers?.gates ?? null,
-        modifier_details: describeModifiers(modifiers?.gates),
         effective_moves: effective,
         predicted_damage: predicted,
         player_a: {
@@ -721,18 +731,17 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         return { error: true, message: `Address ${address} is not a player in match ${match_id}` };
       }
 
-      const nodes = await ctx.state.nodeStates(match_id);
-      let round;
-      let committed = false;
-      let revealed = false;
-      try {
-        round = await ctx.state.roundMoves(match_id, state.current_round);
-        const cmt = await ctx.state.commitment(match_id, state.current_round, role);
-        committed = cmt.committed;
-        revealed = cmt.revealed;
-      } catch {
-        round = undefined;
-      }
+      // `role` gates the commitment lookup, so matchState has to land first;
+      // after that these three are independent and issue together. Each carries
+      // its own catch — before, a missing round also suppressed the commitment
+      // read because they shared one try block.
+      const [nodes, round, cmt] = await Promise.all([
+        ctx.state.nodeStates(match_id),
+        ctx.state.roundMoves(match_id, state.current_round).catch(() => undefined),
+        ctx.state.commitment(match_id, state.current_round, role).catch(() => null),
+      ]);
+      const committed = cmt?.committed ?? false;
+      const revealed = cmt?.revealed ?? false;
 
       const vault_hp = role === ROLE_A ? state.vault_a_hp : state.vault_b_hp;
       return {
@@ -772,12 +781,15 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       if (!address) {
         throw new Error("player_address not supplied and the session is not yet authenticated.");
       }
-      const state = await ctx.state.matchState(match_id);
+      // Both are keyed only on match_id — no ordering dependency between them.
+      const [state, ma] = await Promise.all([
+        ctx.state.matchState(match_id),
+        ctx.state.matchAbilities(match_id).catch(() => null),
+      ]);
       const role = roleFor(state, address);
       if (role === null) {
         return { error: true, message: `Address ${address} is not a player in match ${match_id}` };
       }
-      const ma = await ctx.state.matchAbilities(match_id).catch(() => null);
       if (!ma) {
         return { match_id, player_address: address, role, role_name: roleName(role), abilities: [] };
       }
@@ -800,27 +812,57 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     "siege_get_world_state",
     {
       description:
-        "Get metagame world config, resource-token config, and a parcel list for land/kingdom planning.",
+        "Get metagame world config, resource-token config, and the parcel grid for land/kingdom planning. " +
+        "Parcels are returned sparsely: `owner` is present ONLY when the parcel is claimed (absent = unclaimed and " +
+        "available to claim), and `is_home` is present ONLY when true. `parcel_type` is 0 Forge (iron + linen), " +
+        "1 Quarry (stone + wood), 2 Grove (ember + seeds), 255 untyped/unassigned. " +
+        "Use filter='unclaimed' when hunting for a parcel to claim, or 'owned' to review holdings — 'all' returns " +
+        "the whole grid, which you need for adjacency reasoning.",
       inputSchema: {
         limit: z.number().int().positive().max(500).default(200),
+        filter: z
+          .enum(["all", "unclaimed", "owned"])
+          .default("all")
+          .describe("Restrict the parcel list. 'all' is required for adjacency reasoning."),
       },
     },
-    async ({ limit }, ctx) => {
-      const [world, resources, parcels] = await Promise.all([
+    async ({ limit, filter }, ctx) => {
+      const [world, resources, rawParcels] = await Promise.all([
         ctx.state.worldConfig(),
         ctx.state.resourceConfig().catch(() => null),
         ctx.state.parcels(limit),
       ]);
+
+      // Sparse encoding. A full grid is 96 parcels; emitting a zero-padded
+      // 66-char owner and `is_home: false` on every unclaimed one tripled the
+      // payload for no information. Absent owner means unclaimed — stated in
+      // the tool description above so the agent can rely on it.
+      const parcels = rawParcels
+        .filter((p) => {
+          if (filter === "all") return true;
+          const claimed = isClaimed(p.owner);
+          return filter === "owned" ? claimed : !claimed;
+        })
+        .map((p) => {
+          const out: {
+            parcel_id: number;
+            col: number;
+            row: number;
+            parcel_type: number;
+            owner?: string;
+            is_home?: true;
+          } = { parcel_id: p.parcel_id, col: p.col, row: p.row, parcel_type: p.parcel_type };
+          if (isClaimed(p.owner)) out.owner = normalizeAddress(p.owner);
+          if (p.is_home) out.is_home = true;
+          return out;
+        });
+
       return {
         world,
         resources,
+        parcel_count: parcels.length,
+        filter,
         parcels,
-        parcel_type_legend: {
-          0: "Forge: iron + linen",
-          1: "Quarry: stone + wood",
-          2: "Grove: ember + seeds",
-          255: "Untyped/unassigned",
-        },
       };
     },
   );
@@ -1806,36 +1848,42 @@ export function registerSiegeTools(reg: RegisterArgs): void {
     async (args, ctx) => {
       ctx.watchMatch(args.match_id);
 
-      // Auto-detect budget from node ownership
+      // One read of the two match rows that budget detection, trap validation
+      // and the modifier preview all need. Previously each step fetched them
+      // itself — three matchState and two nodeStates round-trips per commit.
+      const [matchState, nodes] = await Promise.all([
+        ctx.state.matchState(args.match_id).catch(() => null),
+        ctx.state.nodeStates(args.match_id).catch(() => null),
+      ]);
+      const role = matchState && ctx.agentAddress ? roleFor(matchState, ctx.agentAddress) : null;
+
+      // Auto-detect budget from node ownership; fall back to args.budget.
       let budget = args.budget;
-      if (ctx.agentAddress) {
-        try {
-          const st = await ctx.state.matchState(args.match_id);
-          const r = roleFor(st, ctx.agentAddress);
-          if (r !== null) {
-            const ns = await ctx.state.nodeStates(args.match_id);
-            budget = budgetFor(ns, r, st.current_round);
-          }
-        } catch { /* fall back to args.budget */ }
+      if (matchState && nodes && role !== null) {
+        budget = budgetFor(nodes, role, matchState.current_round);
       }
 
       const move = moveAllocationFromInput(args as unknown as MoveInput);
       const total = validateMove(move, budget);
 
       // Trap ownership validation. Mirror `commit_reveal_1v1.cairo:167-181` so
-      // a bad trap fails fast client-side instead of reverting on-chain.
+      // a bad trap fails fast client-side instead of reverting on-chain. Stays
+      // fail-closed: if the state needed to validate is unavailable, refuse
+      // rather than commit a hash the contract will reject at reveal.
       if (move.traps.some((t) => t > 0)) {
         if (!ctx.agentAddress) {
           throw new Error("agent address not yet authenticated; cannot validate trap ownership.");
         }
-        const matchState = await ctx.state.matchState(args.match_id);
-        const role = roleFor(matchState, ctx.agentAddress);
+        if (!matchState || !nodes) {
+          throw new Error(
+            `Could not read match ${args.match_id} state from Torii; cannot validate trap ownership.`,
+          );
+        }
         if (role === null) {
           throw new Error(
             `Address ${ctx.agentAddress} is not a player in match ${args.match_id}; cannot place traps.`,
           );
         }
-        const nodes = await ctx.state.nodeStates(args.match_id);
         const myTeam = role === ROLE_A ? "TeamA" : "TeamB";
         for (let i = 0; i < 3; i++) {
           if (move.traps[i] !== 1) continue;
@@ -1855,10 +1903,9 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         capped?: boolean; raw_attack?: number; raw_defense?: number;
       }> | null = null;
       try {
-        const matchState = await ctx.state.matchState(args.match_id);
-        const mods = await ctx.state
-          .roundModifiers(args.match_id, matchState.current_round)
-          .catch(() => null);
+        const mods = matchState
+          ? await ctx.state.roundModifiers(args.match_id, matchState.current_round).catch(() => null)
+          : null;
         if (mods?.gates) {
           effective_allocation_preview = [];
           for (let g = 0; g < 3; g++) {

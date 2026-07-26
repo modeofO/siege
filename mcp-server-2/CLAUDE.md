@@ -1,7 +1,7 @@
 # MCP Notes
 
 `mcp-server-2/` is the active MCP implementation (`mcp-server/` is older and unused).
-It registers 40 tools and signs writes through a Cartridge session. It reads Dojo
+It registers 44 tools and signs writes through a Cartridge session. It reads Dojo
 contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses
 come from env/defaults.
 
@@ -43,6 +43,8 @@ to the consumer between the VRF request and the real call. That inserted view
 entrypoint also needs a slot paymaster policy. See issue #44.
 
 ## Build and test
+
+Use pnpm, not bun — this package has a pnpm lockfile.
 
 ```bash
 cd mcp-server-2

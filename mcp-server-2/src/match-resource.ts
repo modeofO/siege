@@ -1,6 +1,7 @@
 import { ResourceTemplate, type McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SubscribeRequestSchema, UnsubscribeRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 
+import { roundBudget } from "./move.js";
 import type { StateClient } from "./state.js";
 
 const ROLE_A = 0;
@@ -52,15 +53,21 @@ export async function buildMatchResourceSnapshot(
   state: StateClient,
   matchId: number,
 ): Promise<MatchResourceSnapshot> {
+  // Two round-trip generations, not six. Only `roundMoves` and `roundModifiers`
+  // depend on the match (they key off current_round), so everything else fans
+  // out in parallel. Each Torii SQL call is a separate HTTP request — issuing
+  // them serially cost ~6x the latency of the slowest one.
   const match = await state.matchState(matchId);
-  const nodes = await state.nodeStates(matchId);
-  const round = await state.roundMoves(matchId, match.current_round).catch(() => undefined);
-  const modifiers = await state
-    .roundModifiers(matchId, match.current_round)
-    .then((m) => m.gates)
-    .catch(() => null);
-  const abilities = await state.matchAbilities(matchId).catch(() => null);
-  const stakes = await state.matchStakes(matchId).catch(() => null);
+  const [nodes, round, modifiers, abilities, stakes] = await Promise.all([
+    state.nodeStates(matchId),
+    state.roundMoves(matchId, match.current_round).catch(() => undefined),
+    state
+      .roundModifiers(matchId, match.current_round)
+      .then((m) => m.gates)
+      .catch(() => null),
+    state.matchAbilities(matchId).catch(() => null),
+    state.matchStakes(matchId).catch(() => null),
+  ]);
 
   return {
     match_id: matchId,
@@ -72,8 +79,8 @@ export async function buildMatchResourceSnapshot(
     reveal_deadline: round?.reveal_deadline ?? null,
     vault_a_hp: match.vault_a_hp,
     vault_b_hp: match.vault_b_hp,
-    player_a: { address: match.player_a, budget: budgetFor(nodes, ROLE_A) },
-    player_b: { address: match.player_b, budget: budgetFor(nodes, ROLE_B) },
+    player_a: { address: match.player_a, budget: budgetFor(nodes, ROLE_A, match.current_round) },
+    player_b: { address: match.player_b, budget: budgetFor(nodes, ROLE_B, match.current_round) },
     commits: round?.commit_count ?? 0,
     reveals: round?.reveal_count ?? 0,
     modifiers,
@@ -166,9 +173,15 @@ export function registerMatchResources({
   });
 }
 
-function budgetFor(nodes: { owner: string }[], role: number): number {
+/**
+ * Delegates to the canonical formula in move.ts. This used to inline
+ * `10 + owned_nodes`, silently dropping the rounds 7-10 escalation term — the
+ * snapshot under-reported budget by up to 4 in the endgame, and the channel
+ * event now surfaces this value directly.
+ */
+function budgetFor(nodes: { owner: string }[], role: number, round: number): number {
   const team = role === ROLE_A ? "TeamA" : "TeamB";
-  return 10 + nodes.filter((n) => n.owner === team).length;
+  return roundBudget(nodes.filter((n) => n.owner === team).length, round);
 }
 
 function phaseFor(

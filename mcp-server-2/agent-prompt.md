@@ -27,6 +27,42 @@ Cartridge session approval in their browser. Tell them what to do and stop.
   effective budget is `10 + owned_nodes + max(0, round - 6)` (max 17 in
   round 10 with all three nodes).
 
+### Getting into a match
+
+You need a registered Hold first (`siege_register_player`). There are two ways
+into a battle.
+
+**Matchmaking queue — the normal path.** `siege_queue_for_match(token,
+abilities)` wagers 1-3 abilities you own and joins a queue.
+
+- You only pair with a player wagering the **same number** of abilities.
+  There are three independent sub-queues, one per wager size, so stakes
+  never get trimmed to match.
+- Wager size is capped by your tier (1 at Polis, 2 at Strategos, 3 above).
+- `token` is the entry buy-in: `strk`, `lords`, `eth`, or a `0x` address.
+  Amounts come from on-chain config. **Nothing is charged until a match
+  actually forms** — the buy-in and the wagered abilities are escrowed by
+  the pairing transaction, not by queueing.
+- The tool handles ERC-20 allowance and ability-operator approval for you.
+- If someone is already waiting at your wager size, *your* call creates the
+  match and the result includes `match_id`. Otherwise you are queued.
+
+**When queued, poll `siege_queue_status` — it is free and sends no
+transaction.** Do NOT call `siege_queue_for_match` again as a heartbeat;
+every call is a sponsored transaction. Your entry stays valid for 10
+minutes; only re-queue after that window expires.
+
+Queue matches are full staked matches — they settle, transfer abilities,
+award parcels and reputation exactly like a manually staked one, and they
+additionally have an entry pot (see the post-match checklist).
+
+**Direct challenge.** `siege_create_staked_match(opponent, abilities)` opens
+a pending match against a specific address, which they accept with
+`siege_join_staked_match`. Cancel an unaccepted one with
+`siege_cancel_staked_match` to get your abilities back. `siege_create_match`
+creates an unstaked practice match; it has no rewards and is not sponsored,
+so prefer the queue.
+
 ### Round flow
 
 1. `siege_whoami` — confirm your address (only needed once).
@@ -51,6 +87,21 @@ match's state changes. Tag attributes:
 
 - `match_id`, `phase` (`committing` / `revealing` / `resolving` / `finished`),
   `round`, `commits` (`0`–`2`), `reveals` (`0`–`2`), `hp_a`, `hp_b`, `status`.
+- `budget_a` / `budget_b` — each side's budget for this round, escalation
+  included.
+- `nodes` — node control as `a`/`b`/`-` per index, e.g. `a,-,b` means you hold
+  node 0 if you are Player A, node 1 is unowned, node 2 is Player B's.
+- `mods` — this round's gate modifiers as codes, e.g. `0,2,4`. See
+  [Gate modifiers](#gate-modifiers) below.
+- `deadline` — unix seconds for whichever clock is running (commit until both
+  commits land, then reveal). Empty when neither is pending.
+
+**A channel event carries everything a normal round decision needs.** When one
+arrives, go straight to `siege_commit` or `siege_reveal` — do not call
+`siege_get_match_state` first just to re-read what the tag already told you.
+Reach for the tools when you need something the tag omits: revealed moves
+(`siege_get_round_details`), ability availability (`siege_my_abilities`), or
+your slot if you have somehow lost track of it (`siege_get_my_status`).
 
 Use these to time your moves:
 
@@ -62,6 +113,23 @@ Use these to time your moves:
 
 If channels aren't enabled, fall back to polling `siege_get_match_state`
 between turns.
+
+### Gate modifiers
+
+Each round rolls a modifier per gate. Tools report them as a `[g0, g1, g2]`
+array of codes; channel events carry the same thing as `mods="0,2,4"`.
+
+- `0` **Normal** — damage = `max(attacker_atk - defender_def, 0)`.
+- `1` **Narrow Pass** — attack and defense at this gate are both capped at 3.
+  Anything you allocate above 3 here is wasted.
+- `2` **Mirror** — attack and defense swap at this gate, for both sides. What
+  you place as defense attacks, and vice versa.
+- `3` **Deadlock** — no damage at this gate regardless of values. Reflection
+  skips it too. Allocating here is a dead spend.
+- `4` **Reflection** — damage at this gate becomes overflow instead. Each other
+  non-deadlock gate takes `overflow / 2` (integer division, so odd values lose
+  1), reduced by the target's unused defense at that receiving gate. Defense at
+  this gate still absorbs incoming attack normally.
 
 ### Move shape
 
@@ -100,12 +168,15 @@ A staked 1v1 is the gateway to land — not just a duel. Read
 so you know what victory is for.
 
 If you **win**:
-- Opponent's escrowed ability tokens get re-minted to you on settle.
+- Opponent's escrowed ability tokens are transferred to you out of escrow
+  on settle.
+- On a queue match you also take 65% of *each* side's entry buy-in, paid
+  in that side's token. This is a separate call — see the checklist below.
 - You become eligible to call `siege_claim_parcel` for ONE unclaimed
-  parcel that is tile-adjacent to one of your existing parcels (homes or
-  prior conquered land). You choose the parcel's resource type
-  (`0` Forge / `1` Quarry / `2` Grove). There is no cap — claim as many
-  parcels as you can win.
+  parcel adjacent to one of your existing parcels (homes or prior
+  conquered land). You choose the parcel's resource type
+  (`0` Forge / `1` Quarry / `2` Grove). One parcel per match, but there is
+  no cap on how many you accumulate across matches.
 - `PlayerKingdom.total_wins++` (path to tier upgrade), reputation
   bracket may shift, head-to-head `MatchRecord` updates.
 - If your territory borders any of the opponent's home parcels, you
@@ -113,8 +184,9 @@ If you **win**:
   on one of those homes and siphon its drip until they break it.
 
 If you **lose**: the opponent gets your escrowed abilities and the same
-parcel / pillage eligibilities against you. A draw returns escrowed
-abilities to both sides and grants neither parcel nor pillage rights.
+parcel / pillage eligibilities against you, plus 65% of your buy-in on a
+queue match. A draw returns escrowed abilities to both sides, refunds both
+buy-ins in full, and grants neither parcel nor pillage rights.
 
 ### After the match — always settle, claim, and drip
 
@@ -123,24 +195,33 @@ When `phase="finished"` arrives, **always do all of the following**:
 1. **Settle** — call `siege_settle_match`. Either player can call it;
    the second call reverts with `Already settled` (harmless). Settling
    transfers staked abilities to the winner.
-2. **Claim resource drip** — call `siege_claim_drip` **regardless of
+2. **Claim the entry pot** — on a queue-made match, call
+   `siege_claim_winnings(match_id)`. This is a **separate payout from
+   settling, and settling does not do it for you.** The winner receives
+   65% of each side's buy-in; a draw refunds both sides in full. It is
+   permissionless, so either player may call it, but it pays the winner
+   either way — never skip it after a queue match. `siege_get_staked_match`
+   or an error mentioning no pot tells you the match was not queue-made.
+3. **Claim resource drip** — call `siege_claim_drip` **regardless of
    whether you won or lost**. This mints resources for every non-pillaged
-   home parcel you own. Always do this after every match.
-3. **If you won — claim a parcel**:
+   home parcel you own. Drip accrues hourly, so back-to-back matches will
+   mint nothing; call it anyway, and expect no resources if you claimed
+   within the last hour.
+4. **If you won — claim a parcel**:
    - `siege_get_world_state` to see the parcel grid and ownership.
-   - Pick an unclaimed parcel (`owner == 0x0`) tile-adjacent to one of
-     your existing parcels.
+   - Pick an unclaimed parcel (`owner == 0x0`) adjacent to one of your
+     existing parcels.
    - Call `siege_claim_parcel(match_id, parcel_id, parcel_type)`.
      `parcel_type` is your choice — claimed parcels are typed at claim
-     time, not pre-typed on the map. There is no parcel cap.
-4. If `siege_get_player_kingdom` shows a fresh `pillage_eligibility`,
+     time, not pre-typed on the map. One parcel per match.
+5. If `siege_get_player_kingdom` shows a fresh `pillage_eligibility`,
    call `siege_initiate_pillage(match_id, home_parcel_id)` within the
    24-hour window, then `siege_claim_pillage_drip` periodically to
    siphon resources from the targeted home parcel.
 
-**Do not skip steps 1–3.** Settling collects your won abilities, drip
-collects your resources, and claiming expands your territory. All three
-are essential after every match.
+**Do not skip steps 1–4.** Settling collects your won abilities, claiming
+winnings collects the entry pot, drip collects your resources, and claiming
+a parcel expands your territory. All four are essential after every match.
 
 ### Plan claims at match start, not match end
 
@@ -168,6 +249,10 @@ Read (always available):
 - `siege_get_staked_match` — match state plus staked ability escrow.
 - `siege_get_pillage_status` — active pillages and open eligibilities.
 - `siege_get_factions` — factions, members, and pending invites.
+- `siege_queue_status` — your matchmaking state (idle / queued / matched).
+  Free — poll this while queued instead of re-queueing.
+- `siege_get_forge_info` — circuit and component reference data.
+- `siege_get_player_cosmetics` — equipped banner / parcel skin / decoration.
 
 Write (require Cartridge session — first run prompts auth in browser):
 - `siege_whoami` — your authenticated address.
@@ -180,9 +265,15 @@ Write (require Cartridge session — first run prompts auth in browser):
 - `siege_claim_drip` — claim resource drip from home parcels.
 - `siege_upgrade_kingdom` — upgrade tier after meeting win/resource requirements.
 - `siege_set_ability_operator_approval` — approve world_system to escrow abilities.
+- `siege_queue_for_match` — wager 1-3 abilities and join the matchmaking queue.
+- `siege_leave_queue` — leave the queue. Safe to call when not queued.
+- `siege_claim_winnings` — pay out a finished queue match's entry pot.
 - `siege_create_staked_match` / `siege_join_staked_match` — stake abilities into a pending 1v1.
+- `siege_cancel_staked_match` — cancel your own unaccepted match, refunding your stakes.
 - `siege_settle_match` — settle finished staked matches.
 - `siege_claim_parcel` — claim adjacent land after a settled win.
+- `siege_craft_ability` — craft T1/T2 ability tokens from resources.
+- `siege_set_cosmetic` — equip a forged circuit as a cosmetic.
 - `siege_set_preset_defense` — configure async conquest defense.
 - `siege_initiate_conquest` — attack adjacent non-home parcels.
 - `siege_initiate_pillage` / `siege_claim_pillage_drip` — use pillage eligibilities.
