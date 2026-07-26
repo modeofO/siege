@@ -175,3 +175,9 @@ scripts/play-round.js
 docs/mcp/
 deploy*.env
 *.har
+
+# Vendored agent skills (Cartridge controller/slot docs). Kept locally, not in
+# the repo — .claude/skills/controller-* and slot-* are symlinks into .agents/.
+/.agents/
+/.claude/skills/controller-*
+/.claude/skills/slot-*
