@@ -37,15 +37,7 @@ Do not rename Cairo models or entrypoints to match UI copy.
 
 ## Toolchain
 
-| Tool                 | Version / source            |
-| -------------------- | --------------------------- |
-| Cairo                | 2.13.1                      |
-| Scarb                | 2.13.1                      |
-| Dojo dependency      | v1.8.0                      |
-| Katana/Torii         | `ghcr.io/dojoengine/dojo:v1.8.0` containers |
-| Frontend             | Next 16.2.6, React 19.2.3   |
-| Starknet.js frontend | 8.9.2                       |
-| Starknet.js MCP      | 8.9.2                       |
+Versions live in `Scarb.toml`, `frontend/package.json`, and `mcp-server-2/package.json`.
 
 Always run sozo through the Docker builder — the locally installed sozo is older than the project toolchain:
 
@@ -124,6 +116,17 @@ Ability IDs:
 - 4/9 Hex.
 - 5/10 Fortify.
 
+### Stale-match recovery
+
+`force_timeout` is participant-only and drives a stalled match to Finished
+in stages, each gated on a 300 s deadline: it fills a missing commit and
+arms the reveal deadline, then forces reveals and resolves, then (round
+with zero commits) arms and trips the zero-commit abandon path, ending the
+match as a draw with equalized vaults. `settle_match` then refunds ability
+stakes and `claim_winnings` refunds the entry pot. If BOTH players abandon,
+nobody can finish the match and escrow is stranded — there is no
+permissionless timeout.
+
 ## The Marches
 
 The Marches is an offset hex grid (`col`/`row` per parcel, `utils/hex.cairo` distance metric). The Sepolia v9 world is initialized by `scripts/init-hex-world.sh` as 8 columns x 4 rows = 32 parcels. There is no fold mechanic, no zones, and no sectors — older docs describing a tile graph with folds are obsolete.
@@ -146,255 +149,97 @@ Conquest attacks adjacent non-home parcels in one transaction. Attacker budget i
 
 ## Tiers
 
-Cairo tier functions (`world_system.cairo`):
+Tier thresholds, ability slots, preset counts, and upgrade costs live in the
+tier functions in `world_system.cairo`, mirrored in `frontend/src/lib/tiers.ts`.
 
-| Tier | Name      | Wins required | Match ability slots | Defense presets |
-| ---- | --------- | ------------- | ------------------- | --------------- |
-| 0    | Polis     | 0             | 1                   | 1               |
-| 1    | Strategos | 10            | 2                   | 2               |
-| 2    | Hegemonia | 30            | 3                   | 3               |
-| 3    | Basileia  | 60            | 3                   | 4               |
-
-`MatchStakes1v1` stores at most 3 stake slots per player; tier 3 caps at 3 ability slots everywhere (Cairo, frontend `tiers.ts`, MCP).
-
-Upgrade costs:
-
-- Strategos: 20 Iron, 20 Stone, 10 Wood.
-- Hegemonia: 50 Iron, 50 Stone, 30 Wood, 20 Ember.
-- Basileia: 100 Iron, 100 Stone, 60 Wood, 40 Ember, 20 Seeds.
+`MatchStakes1v1` stores at most 3 stake slots per player, so tier 3 caps at 3
+ability slots everywhere (Cairo, frontend, MCP) even though it grants a 4th
+defense preset.
 
 ## Mainnet (active)
 
 Production network. Siege is deployed to Starknet mainnet and the Vercel
 frontend points here. Same world seed as sepolia (`siege_dojo_v9`) so the world
-address matches, but system/token addresses differ — always read them from
-`manifest_mainnet.json`.
+address matches, but system/token addresses differ — **always read contract and
+token addresses from `manifest_mainnet.json`**, never from a copy in docs.
 
 - Seed: `siege_dojo_v9`
 - World: `0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73` (deployed at block `11948230`)
 - Profile: `sozo -P mainnet` via the Docker builder; config in `dojo_mainnet.toml`.
 - RPC (sozo): a Lava `v0_9` endpoint set in `dojo_mainnet.toml` — Cartridge's mainnet RPC serves spec `0.10.2`, which sozo v1.8 cannot consume.
-
-Contract addresses come from `manifest_mainnet.json`. Current important tags:
-
-- `siege_dojo-actions_1v1`: `0x47dfe0aaa197fb59299890a2acef546bb532d0a8796034aa8fafa00f0d54571`
-- `siege_dojo-commit_reveal_1v1`: `0x382f07de9095da6d2d51fb4d465d9451265c2d72aa58f32fd87ccff4a6c25cf`
-- `siege_dojo-resolution_1v1`: `0x425943e5c3322762f1feb8eb1599a3ab64e8a55c8c516948f91511d266a1f16`
-- `siege_dojo-crafting_1v1`: `0x1f8085720ec1c5b153c273b522878365c2c19d55a22141c70e907e27df19ad3`
-- `siege_dojo-world_system`: `0x186b8b191ec895a79c3aa10e7deeb0f69b85d2cdbeb113a4643a3017c3723b0`
-- `siege_dojo-conquest`: `0x5e8997406aa1d0fb7a33a4b17e94ff8c5708ddaf4c8a7de812a31b2199e404f`
-- `siege_dojo-matchmaking`: `0x44da6123cb69a66ff7f5d7756b269841b28becd5ac6951f94c2d397c5819fef`
-- `AbilityToken` (ERC-1155): `0x583fb029535b4f18d267ea1462ffd7f3a785edcd873c4fd305f8d787e3ccbcc`
-- Cartridge VRF provider: `0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f` (same address as sepolia; verified live)
-
-Resource ERC-20 addresses:
-
-| Resource | Address |
-| -------- | ------- |
-| Iron  | `0x2be5138b0e987d3f84fe7850861a17b4a608a9f583c45c8d647486c304d8947` |
-| Linen | `0x1df4ab0d418e43322f1134470a959d59da22cd7c5b03f9ba1ae375f271589c2` |
-| Stone | `0x4a1acd44fc316535f126ec06d7a60a0de356f6e3530c0940bd8c952c9949401` |
-| Wood  | `0x5fdb13ea34654956ca7fdda8da6d5ee3fb741d1c14ffe944d59e4288a7976c` |
-| Ember | `0x1b784f80e5b87cbb6138954cd2016de77f7e641fe55c51baaa1c23908d35376` |
-| Seeds | `0x4a6655dafd9505a9c96362475c6ad0f1744ba831c7503bf5b7d762f5f8613a7` |
+- Cartridge VRF provider: `0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f` (same address as sepolia; verified live).
 
 Torii: `https://siege-torii-mainnet-production.up.railway.app` (Railway service
 `siege-torii-mainnet` in project `siege-katana`, source `infra/torii-mainnet/`).
 Its RPC is the Alchemy public demo `v0_9` endpoint because torii 1.8.3 cannot
 consume Cartridge's spec 0.10.2 — swap to a dedicated Alchemy key if indexing
 lags. Redeploy: `railway up ./infra/torii-mainnet --path-as-root --service siege-torii-mainnet`.
+Torii dropping events is a real failure mode (it has stranded matches mid-resolve);
+a restart does NOT backfill — reindex by pointing `--db-dir` at a fresh path.
 
-Deployment sequence (Starknet 0.14 requires the `--use-blake2s-casm-class-hash`
-flag on both `migrate` and `auth grant`; deployer account
-`0x0351d9177810f624efa1ee1eba0648dab27ed38f74c45ab23aa762dbbf6c9f78`, keystore
-in `~/.siege-mainnet/`):
+Deploy runbook: see the `deploy-mainnet` skill.
 
-```bash
-source deploy.mainnet.env   # git-ignored; exports DOJO_ACCOUNT_ADDRESS / DOJO_PRIVATE_KEY
+## Self-hosted Katana (dev environment + Practice tier)
 
-docker compose run --rm builder sozo build -P mainnet
-docker compose run --rm -e DOJO_ACCOUNT_ADDRESS -e DOJO_PRIVATE_KEY \
-  builder sozo -P mainnet migrate --use-blake2s-casm-class-hash
-docker compose run --rm -e DOJO_ACCOUNT_ADDRESS -e DOJO_PRIVATE_KEY \
-  builder sozo -P mainnet auth grant writer --use-blake2s-casm-class-hash \
-  siege_dojo,siege_dojo-actions_1v1 \
-  siege_dojo,siege_dojo-commit_reveal_1v1 \
-  siege_dojo,siege_dojo-resolution_1v1 \
-  siege_dojo,siege_dojo-crafting_1v1 \
-  siege_dojo,siege_dojo-world_system \
-  siege_dojo,siege_dojo-conquest
-```
+Fee-less appchain, used for integration testing and as the player-facing
+**Practice** tier. RPC `https://siege-katana-production.up.railway.app`, chain id
+short-string `SIEGE` (`0x5349454745`), Torii
+`https://siege-torii-katana-production.up.railway.app`. Same world address as
+mainnet (same seed); system addresses differ — read `manifest_katana.json`.
 
-Post-migration bootstrap (idempotent — declares/deploys tokens, grid init,
-operator + config wiring; prints the address block):
+Entry buy-ins are the six ResourceTokens at 1 whole unit (0 decimals), so a
+player funds themselves via `claim_drip` rather than an operator top-up;
+`scripts/fund-katana-tester.ts` mints directly when the hourly drip is too slow.
 
-```bash
-bun x tsx scripts/init-mainnet-world.ts
-```
+Re-provision with `bun x tsx scripts/init-katana-world.ts` — idempotent, safe to
+re-run after every migrate. Setup, the mandatory Cartridge-VRF wiring, and the
+dev-account gotchas: see the `dev-katana` skill.
 
-Then upload the ability SVGs (separate step — `init-mainnet-world.ts` does NOT
-do this; without it every ability renders as a "…" placeholder because the
-`uri` metadata `image` field is empty):
+## Networks and the switcher
 
-```bash
-source deploy.mainnet.env
-RPC_URL="https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_9/demo" \
-  ABILITY_TOKEN=<mainnet AbilityToken> bun x tsx scripts/set-ability-svgs.ts
-```
+Each network is its own Vercel project off the same branch, differing only in
+env: `www.siegedojo.world` (mainnet) and `siege-dev.vercel.app` (katana). Both
+ship the switcher — the hostname only sets the default. Resolution and the rules
+that keep it safe live in `frontend/src/lib/network.ts`; read that file before
+touching anything network-dependent. Two invariants:
 
-Frontend: `NEXT_PUBLIC_NETWORK=mainnet`, plus the required
-`NEXT_PUBLIC_TORII_URL=<torii domain>` (`toriiSql.ts` defaults to localhost
-otherwise). Vercel project root directory is `frontend/`; bun is auto-detected
-from `bun.lock`.
+- Commit salts are namespaced per network (`crypto.ts`). Every network shares one
+  world address and match ids are sequential, so ids collide 1:1 across chains.
+- Nothing merges state across networks. No leaderboard, win count, or achievement
+  view may read more than one Torii — that separation is what stops the free
+  Practice tier cannibalising mainnet.
 
-MCP: copy `mcp-server-2/.env.mainnet` over `.env` to switch. Signing uses the
-Cartridge session flow (no `AGENT_*` vars — their absence selects session
-signing, unlike katana). `SESSION_DIR` is `.cartridge-mainnet`.
-
-## Self-hosted Katana (dev environment)
-
-Production runs on Starknet mainnet (see above). This self-hosted katana
-appchain is the local/dev environment — fee-less and fast, used for
-integration testing without touching mainnet. It was the active network while
-sepolia was parked (Cartridge's sepolia AVNU sponsorship broke 2026-07-14,
-session approvals failing with "Transaction failed", and slot deployments were
-discontinued):
-
-- RPC: `https://siege-katana-production.up.railway.app` (Railway service
-  `siege-katana`, project `siege-katana`, source `infra/katana/`). Chain id
-  short-string `SIEGE` (`0x5349454745`). Flags: `--dev --dev.no-fee
-  --cartridge.paymaster` — fee-less, Controller classes at genesis, keychain
-  auto-deploys controller accounts. Deployer = katana dev account 0 (public dev
-  key, inline in `dojo_katana.toml`).
-- Torii: `https://siege-torii-katana-production.up.railway.app` (service
-  `siege-torii-katana`, source `infra/torii-katana/`).
-- World: same address as sepolia (same seed) — `manifest_katana.json`; system
-  addresses differ. Profile: `sozo -P katana` via the Docker builder.
-- Bootstrap after a fresh migrate: `bun x tsx scripts/init-katana-world.ts`
-  (declares/deploys AbilityToken + resource tokens + DevVrfProvider, grid init,
-  operator + config wiring; prints the address block).
-- VRF: `DevVrfProvider` (`src/tokens/dev_vrf_provider.cairo`) — pseudo-random,
-  dev chain only. The Cartridge VRF address in the sepolia docs does not exist
-  here.
-- Frontend/MCP switch on `NEXT_PUBLIC_NETWORK=katana` / `mcp-server-2/.env`.
-- MCP agent signing: Cartridge headless sessions cannot be created for a
-  custom chain id, so on katana the MCP signs with a raw account
-  (`AGENT_ACCOUNT_ADDRESS`/`AGENT_PRIVATE_KEY` env; unset = Cartridge session
-  flow for sepolia). The agent account is a `DevAgentAccount`
-  (`src/tokens/dev_agent_account.cairo`, deployed by
-  `scripts/deploy-agent-account.ts`) because katana's predeployed dev accounts
-  lack SRC5 and fail ERC-1155 acceptance checks (register_player starter
-  mints revert 'ERC1155: safe transfer failed').
-- Redeploy infra: `railway up ./infra/katana --path-as-root` (or
-  `./infra/torii-katana` with `--service siege-torii-katana`).
+Endpoints must come from `lib/network`, never `process.env` directly, or they
+keep pointing at the build's own network after a switch.
 
 ## Sepolia (parked — sponsorship outage)
 
-Current config files point at:
+Parked since Cartridge's sepolia AVNU sponsorship broke 2026-07-14 (session
+approvals fail with "Transaction failed"). Same world address and seed as
+mainnet; read `manifest_sepolia.json` for addresses. Runbook: see the
+`deploy-sepolia` skill.
 
-- Seed: `siege_dojo_v9`
-- World: `0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73`
-- RPC: `https://api.cartridge.gg/x/starknet/sepolia`
-- Torii: `https://siege-torii-production-d1a1.up.railway.app` (Railway; Cartridge slot torii discontinued — do not pass `slot: "siege-dojo"` to ControllerConnector, its dead torii breaks keychain session approval)
-- Torii start block: `10547399`
-
-Contract addresses should come from `manifest_sepolia.json`. Current important tags:
-
-- `siege_dojo-actions_1v1`: `0x5def5daa769122af26d2b6fdb1ab8aa5485232a6cebc32053e19e715a2ffab2`
-- `siege_dojo-commit_reveal_1v1`: `0x7a11369feb1812c88b1b027d1f5a3493c2f09c03612460372664dae7fbe4ff5`
-- `siege_dojo-resolution_1v1`: `0x227d85f88211383106235553ee51e96dfa795ca4dcff86a734e63e9bb20f39e`
-- `siege_dojo-crafting_1v1`: `0x1f8085720ec1c5b153c273b522878365c2c19d55a22141c70e907e27df19ad3`
-- `siege_dojo-world_system`: `0x1c35fca268af0253265c3ef881ec3f7d7d0afa94626a8a2ddc5bb133e8be401`
-- `siege_dojo-conquest`: `0x5d9d790df9b1003b144521d1bf9821a1c9dca7332a5a6c99f003af5b2ca4394`
-- `AbilityToken`: `0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05`
-- Cartridge VRF provider: `0x051fea4450da9d6aee758bdeba88b2f665bcbf549d2c61421aa724e9ac0ced8f`
-
-Resource token addresses live in `scripts/init-sepolia-resource-config.sh` and `frontend/src/lib/useResourceBalances.ts` (kept in sync).
-
-Deployment sequence:
-
-```bash
-export DOJO_ACCOUNT_ADDRESS="0x..."
-export DOJO_PRIVATE_KEY="0x..."
-
-docker compose run --rm builder sozo build -P sepolia
-docker compose run --rm builder sozo -P sepolia migrate
-docker compose run --rm builder sozo -P sepolia auth grant writer \
-  siege_dojo,siege_dojo-actions_1v1 \
-  siege_dojo,siege_dojo-commit_reveal_1v1 \
-  siege_dojo,siege_dojo-resolution_1v1 \
-  siege_dojo,siege_dojo-crafting_1v1 \
-  siege_dojo,siege_dojo-world_system \
-  siege_dojo,siege_dojo-conquest
-```
-
-Post-migration setup (fresh world only):
-
-```bash
-bash scripts/init-hex-world.sh
-bash scripts/setup-ability-token.sh
-bash scripts/init-sepolia-resource-config.sh
-```
-
-Use Starkli's v0.8 RPC endpoint for Starkli commands:
-
-```text
-https://api.cartridge.gg/x/starknet/sepolia/rpc/v0_8
-```
+Never pass `slot: "siege-dojo"` to ControllerConnector — its torii was deleted
+and the dead endpoint breaks keychain session approval.
 
 ## Frontend Notes
 
-The frontend supports `devnet`, `katana`, `sepolia`, and `mainnet` modes through `src/app/providers.tsx` (`NEXT_PUBLIC_NETWORK`).
-
-- Devnet uses local Katana accounts.
-- Sepolia uses Cartridge Controller and `SESSION_POLICIES`.
-- Session policies are fixed when the player connects. After adding policies, tell players to reconnect.
-- The world UI renders `HexGrid`.
-- Torii SQL is the default polling read path. Do not add new GraphQL queries.
-- Torii stores u64 key columns (e.g. `match_id`) as zero-padded hex text; use `sqlU64()` from `toriiSql.ts` for comparisons.
-
-Use `BigInt(0)` rather than `0n` in frontend code.
+See `frontend/CLAUDE.md`.
 
 ## MCP Notes
 
-Use `mcp-server-2/`. It registers 40 tools and signs writes through a Cartridge session. It reads Dojo contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses come from env/defaults.
-
-Cartridge session auth: write tools return `not_ready` with an auth URL until the session is approved in a browser. The URL's `policies` query param is thousands of characters and MUST be passed whole — launch it directly (`open '<url>'`), never copy it from wrapped terminal output. A truncated URL silently approves a zero-policy session (`allowed_policies_root = 0`) whose writes all fail with `session/not-registered`. The 5-minute approval window starts at MCP server launch and the bootstrap does not retry after "Callback timeout" — reconnect the server (`/mcp` → siege → reconnect) to mint a fresh URL, then retry a write tool immediately to get it. Approved sessions live about a week in `mcp-server-2/.cartridge/session.json` (~11 KB; a ~200-byte signer-only file means unapproved).
-
-Cartridge VRF quirk: the VRF server keys the seed to the contract called immediately after `request_random` in the multicall. When the consumer is reached through a nested call (e.g. `force_timeout` → `resolve_round`), sandwich a harmless direct view call to the consumer between the VRF request and the real call. See issue #44.
-
-Build and test:
-
-```bash
-cd mcp-server-2
-pnpm run build
-pnpm run test
-```
+Use `mcp-server-2/`; see `mcp-server-2/CLAUDE.md`.
 
 ## Tests
 
-Contract tests:
+Contract tests must go through the Docker builder:
 
 ```bash
 docker compose run --rm builder sozo test
 ```
 
-Frontend:
-
-```bash
-cd frontend
-bun run lint
-bun run test
-bun run build
-```
-
-Docs site:
-
-```bash
-cd site
-bun run test
-bun run build
-```
+Frontend (`frontend/`), docs site (`site/`): standard `bun run lint` / `test` /
+`build`; see each package's `package.json`.
 
 ## Historical Docs
 
