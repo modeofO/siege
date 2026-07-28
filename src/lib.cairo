@@ -66,4 +66,5 @@ pub mod tests {
     pub mod test_pillaging;
     pub mod test_factions;
     pub mod test_matchmaking;
+    pub mod test_gas_scaling;
 }

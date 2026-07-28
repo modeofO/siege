@@ -227,6 +227,14 @@ pub mod conquest {
             let config: WorldConfig = world.read_model(0_u8);
             let mut has_adjacent = false;
 
+            // Attacker's closest non-home parcel to the target, tracked during
+            // the SAME sweep as the adjacency check. A losing attack used to
+            // scan the whole map a second time to find it; every parcel read is
+            // a separate world call, so a loss cost twice what a win did.
+            let mut has_non_home = false;
+            let mut closest_id: u32 = 0;
+            let mut min_dist: u16 = 65535;
+
             // Check if defender wants reinforcement. defender_member was already
             // read above for the friendly-fire check — reuse it here.
             let defender_kingdom: PlayerKingdom = world.read_model(defender);
@@ -249,10 +257,19 @@ pub mod conquest {
             let mut pi: u32 = 0;
             while pi < config.total_parcels {
                 let parcel_iter: Parcel = world.read_model(pi);
-                // Attacker adjacency
-                if !has_adjacent && parcel_iter.owner == attacker {
-                    if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+                // Attacker adjacency, and the loss-forfeit candidate. One
+                // hex_distance serves both — is_neighbor just compares it to 1.
+                if parcel_iter.owner == attacker {
+                    let d = hex::hex_distance(
+                        parcel_iter.col, parcel_iter.row, target.col, target.row,
+                    );
+                    if d == 1 {
                         has_adjacent = true;
+                    }
+                    if !parcel_iter.is_home && d < min_dist {
+                        min_dist = d;
+                        closest_id = pi;
+                        has_non_home = true;
                     }
                 }
                 // Faction ally reinforcement. Deduped per ally PLAYER (issue #29):
@@ -433,27 +450,10 @@ pub mod conquest {
                 dk.parcel_count -= 1;
                 world.write_model(@dk);
             } else {
-                // Attacker loses — find their parcel closest to the target
-                // and transfer it to the defender.
+                // Attacker loses — transfer their parcel closest to the target
+                // to the defender. The candidate was found during the adjacency
+                // sweep above, so there is no second map scan here.
                 // Exception: last stand (attacker has only home parcels) → no loss.
-                let mut has_non_home = false;
-                let mut closest_id: u32 = 0;
-                let mut min_dist: u16 = 65535;
-
-                let mut p2: u32 = 0;
-                while p2 < config.total_parcels {
-                    let parcel: Parcel = world.read_model(p2);
-                    if parcel.owner == attacker && !parcel.is_home {
-                        has_non_home = true;
-                        let dist = hex::hex_distance(parcel.col, parcel.row, target.col, target.row);
-                        if dist < min_dist {
-                            min_dist = dist;
-                            closest_id = p2;
-                        }
-                    }
-                    p2 += 1;
-                };
-
                 if has_non_home {
                     let mut lost_parcel: Parcel = world.read_model(closest_id);
                     lost_parcel.owner = defender;

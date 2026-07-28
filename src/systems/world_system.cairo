@@ -85,9 +85,9 @@ pub fn burn_upgrade_resources(token_addr: starknet::ContractAddress, from: stark
 pub mod world_system {
     use core::num::traits::Zero;
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
-    use dojo::model::ModelStorage;
+    use dojo::model::{Model, ModelPtr, ModelStorage};
     use dojo::world::{IWorldDispatcherTrait, WorldStorageTrait};
-    use siege_dojo::models::parcel::Parcel;
+    use siege_dojo::models::parcel::{Parcel, ParcelPlacement};
     use siege_dojo::models::player_kingdom::PlayerKingdom;
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::resource_config::ResourceConfig;
@@ -299,17 +299,33 @@ pub mod world_system {
             //
             // Result: new players spawn in the least-crowded region, with their
             // three homes adjacent enough to form a defensible cluster.
+            //
+            // All three selections read the map ONCE, into memory. This used to
+            // sweep the map four times over (claimed positions, then the anchor,
+            // then once per clustered home) — and since every read_model is a
+            // separate call_contract into the world, that made registration the
+            // heaviest sponsored transaction in the game: ~316M L2 gas at 96
+            // parcels, against a paymaster that starts refusing around 100M.
+            // The selection logic below is unchanged; only where it reads from is.
+
+            let mut ptrs: Array<ModelPtr<Parcel>> = ArrayTrait::new();
+            let mut scan: u32 = 0;
+            while scan < config.total_parcels {
+                ptrs.append(Model::<Parcel>::ptr_from_keys(scan));
+                scan += 1;
+            };
+            let placements: Array<ParcelPlacement> = world.read_schemas(ptrs.span());
 
             let mut claimed_cols: Array<u16> = ArrayTrait::new();
             let mut claimed_rows: Array<u16> = ArrayTrait::new();
-            let mut scan: u32 = 0;
-            while scan < config.total_parcels {
-                let p: Parcel = world.read_model(scan);
+            let mut scan2: u32 = 0;
+            while scan2 < config.total_parcels {
+                let p = *placements.at(scan2);
                 if p.owner != zero_addr {
                     claimed_cols.append(p.col);
                     claimed_rows.append(p.row);
                 }
-                scan += 1;
+                scan2 += 1;
             };
             let n_claimed = claimed_cols.len();
 
@@ -324,7 +340,7 @@ pub mod world_system {
 
             let mut p_idx: u32 = 0;
             while p_idx < config.total_parcels {
-                let parcel: Parcel = world.read_model(p_idx);
+                let parcel = *placements.at(p_idx);
                 if parcel.owner == zero_addr {
                     // Min-distance to any already-claimed parcel (sentinel if empty).
                     let score: u16 = if n_claimed == 0 {
@@ -369,7 +385,7 @@ pub mod world_system {
 
                 let mut p: u32 = 0;
                 while p < config.total_parcels {
-                    let parcel: Parcel = world.read_model(p);
+                    let parcel = *placements.at(p);
                     if parcel.owner == zero_addr {
                         let mut already_used = false;
                         let mut j: u32 = 0;
@@ -403,16 +419,25 @@ pub mod world_system {
             let h1 = *home_ids.at(1);
             let h2 = *home_ids.at(2);
 
-            let mut i: u32 = 0;
-            while i < 3 {
-                let pid = *home_ids.at(i);
-                let mut parcel: Parcel = world.read_model(pid);
-                parcel.owner = caller;
-                parcel.is_home = true;
-                parcel.parcel_type = *home_types.at(i);
-                world.write_model(@parcel);
-                i += 1;
+            // col/row already came back in the sweep, so the three homes are
+            // rebuilt from it and written in one batched call — no read-back,
+            // and one world call instead of six.
+            let hp0 = *placements.at(h0);
+            let hp1 = *placements.at(h1);
+            let hp2 = *placements.at(h2);
+            let home_0 = Parcel {
+                parcel_id: h0, col: hp0.col, row: hp0.row,
+                parcel_type: *home_types.at(0), owner: caller, is_home: true,
             };
+            let home_1 = Parcel {
+                parcel_id: h1, col: hp1.col, row: hp1.row,
+                parcel_type: *home_types.at(1), owner: caller, is_home: true,
+            };
+            let home_2 = Parcel {
+                parcel_id: h2, col: hp2.col, row: hp2.row,
+                parcel_type: *home_types.at(2), owner: caller, is_home: true,
+            };
+            world.write_models([@home_0, @home_1, @home_2].span());
 
             // Checks-effects-interactions: persist the kingdom with
             // registered = true BEFORE minting starter abilities. mint uses
@@ -476,8 +501,10 @@ pub mod world_system {
             let rc: ResourceConfig = world.read_model(0_u8);
             assert(rc.ability_token.is_non_zero(), 'Ability token not set');
 
-            // Escrow: transfer abilities from caller to this contract
-            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+            // Escrow: transfer abilities from caller to this contract.
+            // This IS world_system, so read the address directly — a dns
+            // lookup would cost a world resource() call plus get_class_hash_at.
+            let world_sys_addr = get_contract_address();
 
             // Build ERC-1155 interface for safe_transfer_from
             let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
@@ -561,7 +588,7 @@ pub mod world_system {
 
             let rc: ResourceConfig = world.read_model(0_u8);
             let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
-            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+            let world_sys_addr = get_contract_address();
 
             // Escrow B's wager amount
             let mut i: u32 = 0;
@@ -655,7 +682,7 @@ pub mod world_system {
 
             let rc: ResourceConfig = world.read_model(0_u8);
             let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
-            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+            let world_sys_addr = get_contract_address();
 
             let a_stakes: Array<u8> = array![stakes.a_stake_1, stakes.a_stake_2, stakes.a_stake_3];
             let mut i: u32 = 0;
@@ -696,7 +723,7 @@ pub mod world_system {
 
             let rc: ResourceConfig = world.read_model(0_u8);
             let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
-            let (world_sys_addr, _) = world.dns(@"world_system").unwrap();
+            let world_sys_addr = get_contract_address();
 
             // Determine winner: team 1 = player_a, team 2 = player_b, 0 = draw
             let winner_team: u8 = if state.vault_a_hp > state.vault_b_hp {
