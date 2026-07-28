@@ -228,11 +228,13 @@ pub mod world_system {
             // The grid is always a full rectangle (init scripts and this
             // entrypoint both maintain that), so current bounds are the max
             // col/row over existing parcels plus one.
+            let placements = self.fetch_placements(config.total_parcels);
+
             let mut cur_cols: u16 = 0;
             let mut cur_rows: u16 = 0;
             let mut i: u32 = 0;
             while i < config.total_parcels {
-                let p: Parcel = world.read_model(i);
+                let p = *placements.at(i);
                 if p.col + 1 > cur_cols {
                     cur_cols = p.col + 1;
                 }
@@ -793,9 +795,12 @@ pub mod world_system {
                 // heavy for paymaster sponsorship.
                 let mut loser_kingdom: PlayerKingdom = world.read_model(loser);
                 let config: WorldConfig = world.read_model(0_u8);
-                let lh0: Parcel = world.read_model(loser_kingdom.home_0);
-                let lh1: Parcel = world.read_model(loser_kingdom.home_1);
-                let lh2: Parcel = world.read_model(loser_kingdom.home_2);
+                let placements = self.fetch_placements(config.total_parcels);
+                let placements_span = placements.span();
+                // The homes come out of the same sweep — parcel_id is the index.
+                let lh0 = self.placement_at(placements_span, loser_kingdom.home_0);
+                let lh1 = self.placement_at(placements_span, loser_kingdom.home_1);
+                let lh2 = self.placement_at(placements_span, loser_kingdom.home_2);
 
                 let mut max_dist: u16 = 0;
                 let mut furthest_id: u32 = 0;
@@ -805,8 +810,15 @@ pub mod world_system {
 
                 let mut p: u32 = 0;
                 while p < config.total_parcels {
-                    let parcel: Parcel = world.read_model(p);
-                    if parcel.owner == loser && !parcel.is_home {
+                    let parcel = *placements_span.at(p);
+                    // `is_home` is set only by registration, only on these three
+                    // ids, and homes are never released or conquered — so an
+                    // id comparison is exactly the `!parcel.is_home` test, and
+                    // keeps `is_home` out of the read schema.
+                    let is_loser_home = p == loser_kingdom.home_0
+                        || p == loser_kingdom.home_1
+                        || p == loser_kingdom.home_2;
+                    if parcel.owner == loser && !is_loser_home {
                         // Min distance to any of the loser's home parcels
                         let d0 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh0.col, lh0.row);
                         let d1 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh1.col, lh1.row);
@@ -1018,29 +1030,36 @@ pub mod world_system {
             assert(parcel.owner == eligibility.loser, 'Not loser home parcel');
             assert(parcel.is_home, 'Not a home parcel');
 
-            // Verify caller still has adjacency to THIS specific home parcel
+            // Verify caller still has adjacency to THIS specific home parcel.
+            // The sweep is fetched ONCE and reused by the faction check below —
+            // this entrypoint used to walk the whole map twice.
+            let config: WorldConfig = world.read_model(0_u8);
+            let placements = self.fetch_placements(config.total_parcels);
+            let placements_span = placements.span();
             assert(
-                self.is_adjacent_to_territory(caller, parcel.col, parcel.row),
+                self.is_adjacent_in_placements(placements_span, caller, parcel.col, parcel.row),
                 'No adjacency to parcel',
             );
 
             // Faction pillage protection — if any faction ally borders the target home parcel, block
             let target_member: FactionMember = world.read_model(parcel.owner);
             if target_member.faction_id != 0 {
-                let config: WorldConfig = world.read_model(0_u8);
                 let mut p_iter: u32 = 0;
                 let mut protected = false;
                 while p_iter < config.total_parcels {
                     if !protected {
-                        let ally_parcel: Parcel = world.read_model(p_iter);
-                        if ally_parcel.owner.is_non_zero() && ally_parcel.owner != parcel.owner {
+                        let ally_parcel = *placements_span.at(p_iter);
+                        // Adjacency (in memory) gates the FactionMember read, which
+                        // is a world call: at most 6 parcels border the target, so
+                        // this is <=6 reads instead of one per owned parcel.
+                        if ally_parcel.owner.is_non_zero()
+                            && ally_parcel.owner != parcel.owner
+                            && siege_dojo::utils::hex::is_neighbor(
+                                ally_parcel.col, ally_parcel.row, parcel.col, parcel.row,
+                            ) {
                             let ally_member: FactionMember = world.read_model(ally_parcel.owner);
                             if ally_member.faction_id == target_member.faction_id {
-                                if siege_dojo::utils::hex::is_neighbor(
-                                    ally_parcel.col, ally_parcel.row, parcel.col, parcel.row
-                                ) {
-                                    protected = true;
-                                }
+                                protected = true;
                             }
                         }
                     }
@@ -1385,17 +1404,50 @@ pub mod world_system {
             }
         }
 
-        fn is_adjacent_to_territory(
-            self: @ContractState, player: ContractAddress, col: u16, row: u16,
-        ) -> bool {
+        /// Fetch every parcel's position + owner in ONE world call.
+        ///
+        /// `read_model` is a call_contract into the world (~520k L2 gas), so a
+        /// per-parcel loop makes an entrypoint's cost track the grid size. The
+        /// returned array is indexed BY parcel_id — the pointers are built in
+        /// id order 0..total_parcels, so `placements.at(id)` is that parcel.
+        fn fetch_placements(self: @ContractState, total_parcels: u32) -> Array<ParcelPlacement> {
             let world = self.world_default();
-            let config: WorldConfig = world.read_model(0_u8);
+            let mut ptrs: Array<ModelPtr<Parcel>> = ArrayTrait::new();
+            let mut i: u32 = 0;
+            while i < total_parcels {
+                ptrs.append(Model::<Parcel>::ptr_from_keys(i));
+                i += 1;
+            };
+            world.read_schemas(ptrs.span())
+        }
 
+        /// Parcel by id, or an all-zero placement when the id is off the grid —
+        /// matching what `read_model` returns for a parcel that was never written.
+        fn placement_at(
+            self: @ContractState, placements: Span<ParcelPlacement>, id: u32,
+        ) -> ParcelPlacement {
+            if id < placements.len() {
+                *placements.at(id)
+            } else {
+                ParcelPlacement { col: 0, row: 0, owner: 0.try_into().unwrap() }
+            }
+        }
+
+        /// Pure in-memory adjacency check over an already-fetched sweep. Callers
+        /// that need the map for anything else must reuse their own sweep rather
+        /// than calling `is_adjacent_to_territory`, which fetches its own.
+        fn is_adjacent_in_placements(
+            self: @ContractState,
+            placements: Span<ParcelPlacement>,
+            player: ContractAddress,
+            col: u16,
+            row: u16,
+        ) -> bool {
             let mut p: u32 = 0;
             let mut adjacent = false;
-            while p < config.total_parcels {
+            while p < placements.len() {
                 if !adjacent {
-                    let parcel: Parcel = world.read_model(p);
+                    let parcel = *placements.at(p);
                     if parcel.owner == player {
                         if siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, col, row) {
                             adjacent = true;
@@ -1405,6 +1457,15 @@ pub mod world_system {
                 p += 1;
             };
             adjacent
+        }
+
+        fn is_adjacent_to_territory(
+            self: @ContractState, player: ContractAddress, col: u16, row: u16,
+        ) -> bool {
+            let world = self.world_default();
+            let config: WorldConfig = world.read_model(0_u8);
+            let placements = self.fetch_placements(config.total_parcels);
+            self.is_adjacent_in_placements(placements.span(), player, col, row)
         }
     }
 }
