@@ -266,14 +266,18 @@ pub mod conquest {
             };
             let placements: Array<ParcelPlacement> = world.read_schemas(ptrs.span());
 
+            // The target is fixed for the whole sweep, so its cube coordinates
+            // are converted once rather than on every distance.
+            let target_cube = hex::offset_to_cube(target.col, target.row);
+
             let mut pi: u32 = 0;
             while pi < config.total_parcels {
                 let parcel_iter = *placements.at(pi);
                 // Attacker adjacency, and the loss-forfeit candidate. One
-                // hex_distance serves both — is_neighbor just compares it to 1.
+                // distance serves both — is_neighbor just compares it to 1.
                 if parcel_iter.owner == attacker {
-                    let d = hex::hex_distance(
-                        parcel_iter.col, parcel_iter.row, target.col, target.row,
+                    let d = hex::cube_distance(
+                        hex::offset_to_cube(parcel_iter.col, parcel_iter.row), target_cube,
                     );
                     if d == 1 {
                         has_adjacent = true;

@@ -40,6 +40,14 @@ pub trait IERC1155Ability<T> {
         value: u256,
         data: Span<felt252>,
     );
+    fn safe_batch_transfer_from(
+        ref self: T,
+        from: ContractAddress,
+        to: ContractAddress,
+        token_ids: Span<u256>,
+        values: Span<u256>,
+        data: Span<felt252>,
+    );
     fn balance_of(self: @T, account: ContractAddress, token_id: u256) -> u256;
     fn is_approved_for_all(
         self: @T, owner: ContractAddress, operator: ContractAddress,
@@ -132,6 +140,13 @@ pub mod matchmaking {
     // Escrow one side's wagered abilities at world_system (settle_match pays
     // stakes out from there, so queue matches settle exactly like manual
     // staked matches).
+    //
+    // One batched ERC-1155 call, not one per ability: each safe transfer costs
+    // two call boundaries (the token, then the recipient's acceptance hook).
+    // OpenZeppelin implements safe_transfer_from as a one-element
+    // safe_batch_transfer_from, so a single-ability wager behaves exactly as
+    // before — TransferSingle, on_erc1155_received. Two or three switch to
+    // TransferBatch / on_erc1155_batch_received.
     fn escrow_abilities(
         erc1155: IERC1155AbilityDispatcher,
         from: ContractAddress,
@@ -139,14 +154,23 @@ pub mod matchmaking {
         a1: u8, a2: u8, a3: u8,
     ) {
         let ids = array![a1, a2, a3];
+        let mut token_ids: Array<u256> = ArrayTrait::new();
+        let mut values: Array<u256> = ArrayTrait::new();
         let mut i: u32 = 0;
         while i < 3 {
             let id = *ids.at(i);
             if id > 0 {
-                erc1155.safe_transfer_from(from, escrow, id.into(), 1_u256, array![].span());
+                token_ids.append(id.into());
+                values.append(1_u256);
             }
             i += 1;
         };
+        if token_ids.len() == 0 {
+            return;
+        }
+        erc1155.safe_batch_transfer_from(
+            from, escrow, token_ids.span(), values.span(), array![].span(),
+        );
     }
 
     #[abi(embed_v0)]

@@ -1,29 +1,43 @@
-/// Compute hex distance between two cells using offset coordinates (even-row).
-/// Converts to cube coordinates internally.
-pub fn hex_distance(col1: u16, row1: u16, col2: u16, row2: u16) -> u16 {
-    let c1: i64 = col1.into();
-    let r1: i64 = row1.into();
-    let c2: i64 = col2.into();
-    let r2: i64 = row2.into();
+/// Cube coordinates for a hex cell. Always satisfies x + y + z == 0.
+#[derive(Copy, Drop, Serde, PartialEq)]
+pub struct Cube {
+    pub x: i64,
+    pub y: i64,
+    pub z: i64,
+}
 
+/// Convert an even-row offset cell to cube coordinates.
+///
+/// Callers sweeping the map should hoist this out of their inner loop: the
+/// widening, parity modulo and signed division here are the bulk of what a
+/// distance costs, and a fixed endpoint only needs converting once.
+pub fn offset_to_cube(col: u16, row: u16) -> Cube {
+    let c: i64 = col.into();
+    let r: i64 = row.into();
     // even-row offset: parity via modulo on the original u16 row
-    let r1_parity: i64 = (row1 % 2).into();
-    let r2_parity: i64 = (row2 % 2).into();
+    let parity: i64 = (row % 2).into();
 
-    let x1: i64 = c1 - (r1 - r1_parity) / 2;
-    let z1: i64 = r1;
-    let y1: i64 = -x1 - z1;
+    let x: i64 = c - (r - parity) / 2;
+    let z: i64 = r;
+    let y: i64 = -x - z;
 
-    let x2: i64 = c2 - (r2 - r2_parity) / 2;
-    let z2: i64 = r2;
-    let y2: i64 = -x2 - z2;
+    Cube { x, y, z }
+}
 
-    let dx = abs_i64(x1 - x2);
-    let dy = abs_i64(y1 - y2);
-    let dz = abs_i64(z1 - z2);
+/// Hex distance between two cells already in cube coordinates.
+pub fn cube_distance(a: Cube, b: Cube) -> u16 {
+    let dx = abs_i64(a.x - b.x);
+    let dy = abs_i64(a.y - b.y);
+    let dz = abs_i64(a.z - b.z);
 
     let max_val = max_i64(dx, max_i64(dy, dz));
     max_val.try_into().unwrap()
+}
+
+/// Compute hex distance between two cells using offset coordinates (even-row).
+/// Converts to cube coordinates internally.
+pub fn hex_distance(col1: u16, row1: u16, col2: u16, row2: u16) -> u16 {
+    cube_distance(offset_to_cube(col1, row1), offset_to_cube(col2, row2))
 }
 
 fn abs_i64(v: i64) -> i64 {

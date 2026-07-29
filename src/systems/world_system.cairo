@@ -88,6 +88,7 @@ pub mod world_system {
     use dojo::model::{Model, ModelPtr, ModelStorage};
     use dojo::world::{IWorldDispatcherTrait, WorldStorageTrait};
     use siege_dojo::models::parcel::{Parcel, ParcelPlacement};
+    use siege_dojo::utils::hex;
     use siege_dojo::models::player_kingdom::PlayerKingdom;
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::resource_config::ResourceConfig;
@@ -112,7 +113,9 @@ pub mod world_system {
     const DRIP_INTERVAL: u64 = 3600; // 1 hour in seconds
     const PILLAGE_WINDOW: u64 = 86400; // 24 hours in seconds
 
-    // ERC-1155 dispatcher for safe_transfer_from calls
+    // ERC-1155 dispatcher for the ability escrow transfers. A dispatcher trait
+    // is just an ABI subset — AbilityToken embeds the full OpenZeppelin
+    // ERC1155Impl, so safe_batch_transfer_from is really there.
     #[starknet::interface]
     trait IERC1155<T> {
         fn safe_transfer_from(
@@ -123,12 +126,56 @@ pub mod world_system {
             value: u256,
             data: Span<felt252>,
         );
+        fn safe_batch_transfer_from(
+            ref self: T,
+            from: starknet::ContractAddress,
+            to: starknet::ContractAddress,
+            token_ids: Span<u256>,
+            values: Span<u256>,
+            data: Span<felt252>,
+        );
         fn balance_of(self: @T, account: starknet::ContractAddress, token_id: u256) -> u256;
         fn is_approved_for_all(
             self: @T,
             owner: starknet::ContractAddress,
             operator: starknet::ContractAddress,
         ) -> bool;
+    }
+
+    /// Move a set of abilities in ONE ERC-1155 call instead of one call per id.
+    /// Zero ids are skipped; an empty set makes no call at all.
+    ///
+    /// Every safe transfer is two call boundaries — the token, then the
+    /// recipient's acceptance callback — so a 6-ability winner payout cost
+    /// twelve. OpenZeppelin implements safe_transfer_from as a one-element
+    /// safe_batch_transfer_from, so a single-id batch here is indistinguishable
+    /// from what this code did before: it still emits TransferSingle and still
+    /// calls on_erc1155_received. Two or more ids switch to TransferBatch and
+    /// on_erc1155_batch_received. Duplicate ids are legal and settle correctly
+    /// (balances are updated per index, so two copies of one ability move two).
+    fn send_abilities(
+        erc1155: IERC1155Dispatcher,
+        from: ContractAddress,
+        to: ContractAddress,
+        ids: Span<u8>,
+    ) {
+        let mut token_ids: Array<u256> = ArrayTrait::new();
+        let mut values: Array<u256> = ArrayTrait::new();
+        let mut i: u32 = 0;
+        while i < ids.len() {
+            let id = *ids.at(i);
+            if id > 0 {
+                token_ids.append(id.into());
+                values.append(1_u256);
+            }
+            i += 1;
+        };
+        if token_ids.len() == 0 {
+            return;
+        }
+        erc1155.safe_batch_transfer_from(
+            from, to, token_ids.span(), values.span(), array![].span(),
+        );
     }
 
     // Resource token mint interface
@@ -247,13 +294,18 @@ pub mod world_system {
             assert(new_cols >= cur_cols && new_rows >= cur_rows, 'Cannot shrink world');
             assert(new_cols > cur_cols || new_rows > cur_rows, 'No growth');
 
+            // Every write_model is a separate call into the world (~520k L2 gas
+            // of call boundary), so the new cells are collected in the same
+            // row-major order as before and written in ONE batched call —
+            // next_id still lands on the same (col, row) it always did.
             let mut next_id: u32 = config.next_parcel_id;
+            let mut new_parcels: Array<Parcel> = ArrayTrait::new();
             let mut row: u16 = 0;
             while row < new_rows {
                 let mut col: u16 = 0;
                 while col < new_cols {
                     if col >= cur_cols || row >= cur_rows {
-                        world.write_model(@Parcel {
+                        new_parcels.append(Parcel {
                             parcel_id: next_id,
                             col,
                             row,
@@ -267,6 +319,15 @@ pub mod world_system {
                 };
                 row += 1;
             };
+
+            let new_span = new_parcels.span();
+            let mut refs: Array<@Parcel> = ArrayTrait::new();
+            let mut w: u32 = 0;
+            while w < new_span.len() {
+                refs.append(new_span.at(w));
+                w += 1;
+            };
+            world.write_models(refs.span());
 
             world.write_model(@WorldConfig {
                 id: 0,
@@ -318,18 +379,22 @@ pub mod world_system {
             };
             let placements: Array<ParcelPlacement> = world.read_schemas(ptrs.span());
 
-            let mut claimed_cols: Array<u16> = ArrayTrait::new();
-            let mut claimed_rows: Array<u16> = ArrayTrait::new();
+            // Claimed positions are held as cube coordinates, not offset: the
+            // selection below is O(unclaimed x claimed) distance evaluations
+            // (~1800 at the 96-parcel mainnet grid), and converting offset to
+            // cube — i64 widening, parity modulo, signed division — is most of
+            // what a distance costs. Converting each endpoint once here leaves
+            // the inner loop as three subtractions and a max.
+            let mut claimed_cubes: Array<hex::Cube> = ArrayTrait::new();
             let mut scan2: u32 = 0;
             while scan2 < config.total_parcels {
                 let p = *placements.at(scan2);
                 if p.owner != zero_addr {
-                    claimed_cols.append(p.col);
-                    claimed_rows.append(p.row);
+                    claimed_cubes.append(hex::offset_to_cube(p.col, p.row));
                 }
                 scan2 += 1;
             };
-            let n_claimed = claimed_cols.len();
+            let n_claimed = claimed_cubes.len();
 
             let first_type = *home_types.at(0);
             assert(first_type <= 2, 'Invalid parcel type');
@@ -348,13 +413,11 @@ pub mod world_system {
                     let score: u16 = if n_claimed == 0 {
                         65535_u16
                     } else {
+                        let cand = hex::offset_to_cube(parcel.col, parcel.row);
                         let mut min_dist: u16 = 65535_u16;
                         let mut q: u32 = 0;
                         while q < n_claimed {
-                            let d = siege_dojo::utils::hex::hex_distance(
-                                parcel.col, parcel.row,
-                                *claimed_cols.at(q), *claimed_rows.at(q),
-                            );
+                            let d = hex::cube_distance(cand, *claimed_cubes.at(q));
                             if d < min_dist { min_dist = d; }
                             q += 1;
                         };
@@ -375,6 +438,9 @@ pub mod world_system {
 
             let mut home_ids: Array<u32> = ArrayTrait::new();
             home_ids.append(first_home_id);
+
+            // Fixed endpoint for both clustering passes — convert once.
+            let first_home_cube = hex::offset_to_cube(first_home_col, first_home_row);
 
             let mut type_idx: u32 = 1;
             while type_idx < 3 {
@@ -398,9 +464,9 @@ pub mod world_system {
                             j += 1;
                         };
                         if !already_used {
-                            let d = siege_dojo::utils::hex::hex_distance(
-                                parcel.col, parcel.row,
-                                first_home_col, first_home_row,
+                            let d = hex::cube_distance(
+                                hex::offset_to_cube(parcel.col, parcel.row),
+                                first_home_cube,
                             );
                             if !found || d < best_dist {
                                 best_id = p;
@@ -511,17 +577,15 @@ pub mod world_system {
             // Build ERC-1155 interface for safe_transfer_from
             let erc1155 = IERC1155Dispatcher { contract_address: rc.ability_token };
 
+            let mut escrow_ids: Array<u8> = ArrayTrait::new();
             let mut i: u32 = 0;
             while i < count {
                 let ability_id: u8 = *abilities.at(i);
                 assert(ability_id >= 1 && ability_id <= 10, 'Invalid ability ID');
-                erc1155.safe_transfer_from(
-                    caller, world_sys_addr,
-                    ability_id.into(), 1_u256,
-                    array![].span(),
-                );
+                escrow_ids.append(ability_id);
                 i += 1;
             };
+            send_abilities(erc1155, caller, world_sys_addr, escrow_ids.span());
 
             // Consume VRF here so the consumer is the directly-called contract
             let vrf_addr = if rc.vrf_provider.is_non_zero() {
@@ -593,17 +657,15 @@ pub mod world_system {
             let world_sys_addr = get_contract_address();
 
             // Escrow B's wager amount
+            let mut escrow_ids: Array<u8> = ArrayTrait::new();
             let mut i: u32 = 0;
             while i < wager {
                 let ability_id: u8 = *abilities.at(i);
                 assert(ability_id >= 1 && ability_id <= 10, 'Invalid ability ID');
-                erc1155.safe_transfer_from(
-                    caller, world_sys_addr,
-                    ability_id.into(), 1_u256,
-                    array![].span(),
-                );
+                escrow_ids.append(ability_id);
                 i += 1;
             };
+            send_abilities(erc1155, caller, world_sys_addr, escrow_ids.span());
 
             // Record B's stakes
             let b1 = if b_count > 0 { *abilities.at(0) } else { 0 };
@@ -617,18 +679,13 @@ pub mod world_system {
             // Refund A's excess (abilities beyond wager count)
             if a_count > wager {
                 let a_stakes: Array<u8> = array![stakes.a_stake_1, stakes.a_stake_2, stakes.a_stake_3];
+                let mut refund_ids: Array<u8> = ArrayTrait::new();
                 let mut j: u32 = wager;
                 while j < a_count {
-                    let refund_id = *a_stakes.at(j);
-                    if refund_id > 0 {
-                        erc1155.safe_transfer_from(
-                            world_sys_addr, state.player_a,
-                            refund_id.into(), 1_u256,
-                            array![].span(),
-                        );
-                    }
+                    refund_ids.append(*a_stakes.at(j));
                     j += 1;
                 };
+                send_abilities(erc1155, world_sys_addr, state.player_a, refund_ids.span());
                 // Clear refunded slots
                 if wager < 3 { stakes.a_stake_3 = 0; }
                 if wager < 2 { stakes.a_stake_2 = 0; }
@@ -687,18 +744,7 @@ pub mod world_system {
             let world_sys_addr = get_contract_address();
 
             let a_stakes: Array<u8> = array![stakes.a_stake_1, stakes.a_stake_2, stakes.a_stake_3];
-            let mut i: u32 = 0;
-            while i < 3 {
-                let ability_id = *a_stakes.at(i);
-                if ability_id > 0 {
-                    erc1155.safe_transfer_from(
-                        world_sys_addr, caller,
-                        ability_id.into(), 1_u256,
-                        array![].span(),
-                    );
-                }
-                i += 1;
-            };
+            send_abilities(erc1155, world_sys_addr, caller, a_stakes.span());
         }
 
         fn settle_match(ref self: ContractState, match_id: u64) {
@@ -741,25 +787,18 @@ pub mod world_system {
             let wager: u32 = stakes.stake_count.into();
 
             if winner_team == 0 {
-                // Draw: return all escrowed abilities to their owners
+                // Draw: return all escrowed abilities to their owners — one
+                // batched ERC-1155 call per player instead of one per ability.
+                let mut a_refund: Array<u8> = ArrayTrait::new();
+                let mut b_refund: Array<u8> = ArrayTrait::new();
                 let mut i: u32 = 0;
                 while i < wager {
-                    let a_id = *a_stakes.at(i);
-                    if a_id > 0 {
-                        erc1155.safe_transfer_from(
-                            world_sys_addr, state.player_a,
-                            a_id.into(), 1_u256, array![].span(),
-                        );
-                    }
-                    let b_id = *b_stakes.at(i);
-                    if b_id > 0 {
-                        erc1155.safe_transfer_from(
-                            world_sys_addr, state.player_b,
-                            b_id.into(), 1_u256, array![].span(),
-                        );
-                    }
+                    a_refund.append(*a_stakes.at(i));
+                    b_refund.append(*b_stakes.at(i));
                     i += 1;
                 };
+                send_abilities(erc1155, world_sys_addr, state.player_a, a_refund.span());
+                send_abilities(erc1155, world_sys_addr, state.player_b, b_refund.span());
             } else {
                 let (winner, loser) = if winner_team == 1 {
                     (state.player_a, state.player_b)
@@ -767,25 +806,17 @@ pub mod world_system {
                     (state.player_b, state.player_a)
                 };
 
-                // Transfer ALL escrowed abilities to winner
+                // Transfer ALL escrowed abilities to the winner in ONE call.
+                // This was up to six safe transfers, i.e. twelve call
+                // boundaries counting the acceptance callback each one runs.
+                let mut payout: Array<u8> = ArrayTrait::new();
                 let mut i: u32 = 0;
                 while i < wager {
-                    let a_id = *a_stakes.at(i);
-                    if a_id > 0 {
-                        erc1155.safe_transfer_from(
-                            world_sys_addr, winner,
-                            a_id.into(), 1_u256, array![].span(),
-                        );
-                    }
-                    let b_id = *b_stakes.at(i);
-                    if b_id > 0 {
-                        erc1155.safe_transfer_from(
-                            world_sys_addr, winner,
-                            b_id.into(), 1_u256, array![].span(),
-                        );
-                    }
+                    payout.append(*a_stakes.at(i));
+                    payout.append(*b_stakes.at(i));
                     i += 1;
                 };
+                send_abilities(erc1155, world_sys_addr, winner, payout.span());
 
                 // Single pass over the map: find the loser's furthest-from-home
                 // parcel to release AND whether the winner borders any of the
@@ -801,6 +832,13 @@ pub mod world_system {
                 let lh0 = self.placement_at(placements_span, loser_kingdom.home_0);
                 let lh1 = self.placement_at(placements_span, loser_kingdom.home_1);
                 let lh2 = self.placement_at(placements_span, loser_kingdom.home_2);
+                // The three homes are fixed for the whole sweep, so their cube
+                // coordinates are hoisted out of it — each swept parcel then
+                // converts once instead of six times (three distances, two
+                // endpoint conversions each).
+                let lh0_cube = hex::offset_to_cube(lh0.col, lh0.row);
+                let lh1_cube = hex::offset_to_cube(lh1.col, lh1.row);
+                let lh2_cube = hex::offset_to_cube(lh2.col, lh2.row);
 
                 let mut max_dist: u16 = 0;
                 let mut furthest_id: u32 = 0;
@@ -820,9 +858,10 @@ pub mod world_system {
                         || p == loser_kingdom.home_2;
                     if parcel.owner == loser && !is_loser_home {
                         // Min distance to any of the loser's home parcels
-                        let d0 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh0.col, lh0.row);
-                        let d1 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh1.col, lh1.row);
-                        let d2 = siege_dojo::utils::hex::hex_distance(parcel.col, parcel.row, lh2.col, lh2.row);
+                        let pc = hex::offset_to_cube(parcel.col, parcel.row);
+                        let d0 = hex::cube_distance(pc, lh0_cube);
+                        let d1 = hex::cube_distance(pc, lh1_cube);
+                        let d2 = hex::cube_distance(pc, lh2_cube);
                         let min_d = if d0 < d1 { if d0 < d2 { d0 } else { d2 } } else { if d1 < d2 { d1 } else { d2 } };
 
                         if min_d > max_dist || !found_furthest {
@@ -831,9 +870,11 @@ pub mod world_system {
                             found_furthest = true;
                         }
                     } else if parcel.owner == winner && !winner_borders_loser_home {
-                        if siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, lh0.col, lh0.row)
-                            || siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, lh1.col, lh1.row)
-                            || siege_dojo::utils::hex::is_neighbor(parcel.col, parcel.row, lh2.col, lh2.row) {
+                        // is_neighbor is just "distance == 1" — same precompute.
+                        let pc = hex::offset_to_cube(parcel.col, parcel.row);
+                        if hex::cube_distance(pc, lh0_cube) == 1
+                            || hex::cube_distance(pc, lh1_cube) == 1
+                            || hex::cube_distance(pc, lh2_cube) == 1 {
                             winner_borders_loser_home = true;
                         }
                     }
