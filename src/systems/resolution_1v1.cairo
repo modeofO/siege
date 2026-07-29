@@ -79,6 +79,18 @@ pub mod resolution_1v1 {
         if token_id == 0 { 0 } else { ((token_id - 1) / 5) + 1 }
     }
 
+    /// Resolve one node contest. The higher contest allocation takes the node;
+    /// a tie leaves the previous owner in place.
+    fn contest_owner(current: NodeOwner, contest_a: u8, contest_b: u8) -> NodeOwner {
+        if contest_a > contest_b {
+            NodeOwner::TeamA
+        } else if contest_b > contest_a {
+            NodeOwner::TeamB
+        } else {
+            current
+        }
+    }
+
     #[abi(embed_v0)]
     impl Resolution1v1Impl of super::IResolution1v1<ContractState> {
         // safe_dispatcher: next-round VRF is called via the SafeDispatcher so a
@@ -109,38 +121,43 @@ pub mod resolution_1v1 {
             let b_atk: [u8; 3] = [rm.b_p0, rm.b_p1, rm.b_p2];
             let b_def: [u8; 3] = [rm.b_g0, rm.b_g1, rm.b_g2];
 
-            // Snapshot node owners before contest resolution (for trap detection)
-            let pre_n0: NodeState = world.read_model((match_id, 0_u8));
-            let pre_n1: NodeState = world.read_model((match_id, 1_u8));
-            let pre_n2: NodeState = world.read_model((match_id, 2_u8));
-            let pre_node_owners: [NodeOwner; 3] = [pre_n0.owner, pre_n1.owner, pre_n2.owner];
+            // Snapshot node owners before contest resolution (for trap detection).
+            // One batched world call instead of three: every read_model is a
+            // separate call_contract into the world, and the call boundary —
+            // not the storage read — is what dominates the cost.
+            let node_keys: Array<(u64, u8)> = array![
+                (match_id, 0_u8), (match_id, 1_u8), (match_id, 2_u8),
+            ];
+            let pre_nodes: Array<NodeState> = world.read_models(node_keys.span());
+            let pre_0 = *pre_nodes.at(0).owner;
+            let pre_1 = *pre_nodes.at(1).owner;
+            let pre_2 = *pre_nodes.at(2).owner;
+            let pre_node_owners: [NodeOwner; 3] = [pre_0, pre_1, pre_2];
 
             // Node contests resolve BEFORE gate damage: owning node i grants
             // +1 defense at gate i in the same round it is captured, so node
             // investment pays off immediately (budget bonus still lands next
             // round, via calc_budget reading post-contest ownership).
-            let mut n: u8 = 0;
-            while n < 3 {
-                let (contest_a, contest_b) = if n == 0 {
-                    (rm.a_nc0, rm.b_nc0)
-                } else if n == 1 {
-                    (rm.a_nc1, rm.b_nc1)
-                } else {
-                    (rm.a_nc2, rm.b_nc2)
-                };
+            //
+            // Post-contest ownership is derived in memory and reused for gate
+            // defense, trap detection and the resource mint — re-reading it
+            // back from the world (as this used to, three times over) buys
+            // nothing but three more world calls each time.
+            let post_0 = contest_owner(pre_0, rm.a_nc0, rm.b_nc0);
+            let post_1 = contest_owner(pre_1, rm.a_nc1, rm.b_nc1);
+            let post_2 = contest_owner(pre_2, rm.a_nc2, rm.b_nc2);
+            let post_node_owners: [NodeOwner; 3] = [post_0, post_1, post_2];
 
-                if contest_a > contest_b {
-                    world.write_model(@NodeState { match_id, node_index: n, owner: NodeOwner::TeamA });
-                } else if contest_b > contest_a {
-                    world.write_model(@NodeState { match_id, node_index: n, owner: NodeOwner::TeamB });
-                }
-                n += 1;
-            };
-
-            let post_n0: NodeState = world.read_model((match_id, 0_u8));
-            let post_n1: NodeState = world.read_model((match_id, 1_u8));
-            let post_n2: NodeState = world.read_model((match_id, 2_u8));
-            let post_node_owners: [NodeOwner; 3] = [post_n0.owner, post_n1.owner, post_n2.owner];
+            let n0 = NodeState { match_id, node_index: 0, owner: post_0 };
+            let n1 = NodeState { match_id, node_index: 1, owner: post_1 };
+            let n2 = NodeState { match_id, node_index: 2, owner: post_2 };
+            let mut changed_nodes: Array<@NodeState> = array![];
+            if post_0 != pre_0 { changed_nodes.append(@n0); }
+            if post_1 != pre_1 { changed_nodes.append(@n1); }
+            if post_2 != pre_2 { changed_nodes.append(@n2); }
+            if changed_nodes.len() > 0 {
+                world.write_models(changed_nodes.span());
+            }
 
             // Per-gate damage calculation with modifiers
             // damage_to_b[i] = damage dealt by A to B's vault at gate i
@@ -450,17 +467,21 @@ pub mod resolution_1v1 {
             state.vault_a_hp = hp_a;
             state.vault_b_hp = hp_b;
 
-            // Award resource tokens for node ownership
+            // Award resource tokens for node ownership. Config is read once for
+            // both this and the next-round VRF lookup below — it used to be read
+            // twice, and each read is a world call.
             let config: ResourceConfig = world.read_model(0_u8);
             let zero_addr: starknet::ContractAddress = 0.try_into().unwrap();
             // Only mint if resource config has been set (non-zero addresses)
             if config.iron != zero_addr {
                 let mut rn: u8 = 0;
                 while rn < 3 {
-                    let node: NodeState = world.read_model((match_id, rn));
-                    let owner_addr = if node.owner == NodeOwner::TeamA {
+                    // Post-contest ownership is already in hand from the
+                    // contest step — no need to read the nodes back.
+                    let node_owner = *post_node_owners.span()[rn.into()];
+                    let owner_addr = if node_owner == NodeOwner::TeamA {
                         state.player_a
-                    } else if node.owner == NodeOwner::TeamB {
+                    } else if node_owner == NodeOwner::TeamB {
                         state.player_b
                     } else {
                         // Node is unowned, no resources
@@ -516,9 +537,9 @@ pub mod resolution_1v1 {
             } else {
                 state.current_round = round + 1;
 
-                // Generate next round's modifiers via vRNG
-                // Read VRF address from config; fall back to hardcoded if not set
-                let config: ResourceConfig = world.read_model(0_u8);
+                // Generate next round's modifiers via vRNG.
+                // VRF address comes from the config read above; fall back to
+                // the hardcoded provider if it was never set.
                 let vrf_addr = if config.vrf_provider.is_non_zero() {
                     config.vrf_provider
                 } else {

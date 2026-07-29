@@ -43,11 +43,12 @@ export function setAgentAddress(address: string): void {
 }
 
 /**
- * Coalescing window for a burst of Torii entity updates belonging to the same
- * match. One `resolve_round` writes MatchState1v1, up to three NodeState rows
- * and RoundModifiers1v1 — five separate gRPC pushes describing a single
- * logical transition. Rebuilding the snapshot per push meant five full SQL
- * fan-outs whose diffs mostly collapsed to "unchanged" anyway.
+ * Coalescing window for a burst of activity-probe wakeups belonging to the
+ * same match. One `resolve_round` writes MatchState1v1 plus, conditionally,
+ * changed NodeState rows and RoundModifiers1v1 — several entity updates
+ * describing a single logical transition. Rebuilding the snapshot per update
+ * meant several full SQL fan-outs whose diffs mostly collapsed to
+ * "unchanged" anyway.
  *
  * A trailing debounce rebuilds once, after the writes settle. It costs up to
  * this much added latency on the notification, which is negligible against the

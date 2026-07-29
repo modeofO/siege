@@ -38,9 +38,9 @@ pub fn ability_tier_from_token(token_id: u8) -> u8 {
 pub mod conquest {
     use core::num::traits::Zero;
     use starknet::{ContractAddress, get_caller_address, get_contract_address, get_block_timestamp};
-    use dojo::model::ModelStorage;
+    use dojo::model::{Model, ModelPtr, ModelStorage};
     use dojo::event::EventStorage;
-    use siege_dojo::models::parcel::Parcel;
+    use siege_dojo::models::parcel::{Parcel, ParcelPlacement};
     use siege_dojo::models::player_kingdom::PlayerKingdom;
     use siege_dojo::models::world_config::WorldConfig;
     use siege_dojo::models::preset_defense::PresetDefense;
@@ -227,6 +227,14 @@ pub mod conquest {
             let config: WorldConfig = world.read_model(0_u8);
             let mut has_adjacent = false;
 
+            // Attacker's closest non-home parcel to the target, tracked during
+            // the SAME sweep as the adjacency check. A losing attack used to
+            // scan the whole map a second time to find it; every parcel read is
+            // a separate world call, so a loss cost twice what a win did.
+            let mut has_non_home = false;
+            let mut closest_id: u32 = 0;
+            let mut min_dist: u16 = 65535;
+
             // Check if defender wants reinforcement. defender_member was already
             // read above for the friendly-fire check — reuse it here.
             let defender_kingdom: PlayerKingdom = world.read_model(defender);
@@ -246,13 +254,44 @@ pub mod conquest {
             let mut ally_owner_2: ContractAddress = zero_addr;
             let mut ally_owner_3: ContractAddress = zero_addr;
 
+            // One world call for the whole map instead of one per parcel: every
+            // read_model is a call_contract into the world (~520k L2 gas), so the
+            // per-parcel loop made this entrypoint's cost track the grid size.
+            // The array is indexed by parcel_id (pointers built in id order).
+            let mut ptrs: Array<ModelPtr<Parcel>> = ArrayTrait::new();
+            let mut scan: u32 = 0;
+            while scan < config.total_parcels {
+                ptrs.append(Model::<Parcel>::ptr_from_keys(scan));
+                scan += 1;
+            };
+            let placements: Array<ParcelPlacement> = world.read_schemas(ptrs.span());
+
+            // The target is fixed for the whole sweep, so its cube coordinates
+            // are converted once rather than on every distance.
+            let target_cube = hex::offset_to_cube(target.col, target.row);
+
             let mut pi: u32 = 0;
             while pi < config.total_parcels {
-                let parcel_iter: Parcel = world.read_model(pi);
-                // Attacker adjacency
-                if !has_adjacent && parcel_iter.owner == attacker {
-                    if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+                let parcel_iter = *placements.at(pi);
+                // Attacker adjacency, and the loss-forfeit candidate. One
+                // distance serves both — is_neighbor just compares it to 1.
+                if parcel_iter.owner == attacker {
+                    let d = hex::cube_distance(
+                        hex::offset_to_cube(parcel_iter.col, parcel_iter.row), target_cube,
+                    );
+                    if d == 1 {
                         has_adjacent = true;
+                    }
+                    // `is_home` is set only by registration, only on the kingdom's
+                    // three home ids, and homes are never released or conquered —
+                    // so this id test is exactly the old `!parcel_iter.is_home`.
+                    let is_attacker_home = pi == atk_kingdom.home_0
+                        || pi == atk_kingdom.home_1
+                        || pi == atk_kingdom.home_2;
+                    if !is_attacker_home && d < min_dist {
+                        min_dist = d;
+                        closest_id = pi;
+                        has_non_home = true;
                     }
                 }
                 // Faction ally reinforcement. Deduped per ally PLAYER (issue #29):
@@ -265,9 +304,11 @@ pub mod conquest {
                         || owner == ally_owner_2
                         || owner == ally_owner_3;
                     if owner.is_non_zero() && owner != defender && !already_counted {
-                        let ally_member: FactionMember = world.read_model(owner);
-                        if ally_member.faction_id == defender_faction_id {
-                            if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+                        // Adjacency (in memory) gates the FactionMember read: only
+                        // the <=6 parcels bordering the target can ever fill a slot.
+                        if hex::is_neighbor(parcel_iter.col, parcel_iter.row, target.col, target.row) {
+                            let ally_member: FactionMember = world.read_model(owner);
+                            if ally_member.faction_id == defender_faction_id {
                                 let ally_defense: siege_dojo::models::preset_defense::PresetDefense = world.read_model(owner);
                                 if ally_count == 0 {
                                     ally_p0_1 = ally_defense.p0_p0; ally_p1_1 = ally_defense.p0_p1; ally_p2_1 = ally_defense.p0_p2;
@@ -433,27 +474,10 @@ pub mod conquest {
                 dk.parcel_count -= 1;
                 world.write_model(@dk);
             } else {
-                // Attacker loses — find their parcel closest to the target
-                // and transfer it to the defender.
+                // Attacker loses — transfer their parcel closest to the target
+                // to the defender. The candidate was found during the adjacency
+                // sweep above, so there is no second map scan here.
                 // Exception: last stand (attacker has only home parcels) → no loss.
-                let mut has_non_home = false;
-                let mut closest_id: u32 = 0;
-                let mut min_dist: u16 = 65535;
-
-                let mut p2: u32 = 0;
-                while p2 < config.total_parcels {
-                    let parcel: Parcel = world.read_model(p2);
-                    if parcel.owner == attacker && !parcel.is_home {
-                        has_non_home = true;
-                        let dist = hex::hex_distance(parcel.col, parcel.row, target.col, target.row);
-                        if dist < min_dist {
-                            min_dist = dist;
-                            closest_id = p2;
-                        }
-                    }
-                    p2 += 1;
-                };
-
                 if has_non_home {
                     let mut lost_parcel: Parcel = world.read_model(closest_id);
                     lost_parcel.owner = defender;
