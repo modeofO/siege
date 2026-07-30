@@ -1993,15 +1993,29 @@ export function registerSiegeTools(reg: RegisterArgs): void {
       inputSchema: {
         match_id: z.number().int().nonnegative(),
         salt: z.string().describe("Salt returned by siege_commit"),
-        budget: z.number().int().positive().default(10),
+        budget: z.number().int().positive().default(10).describe("Fallback budget; auto-detected from match state when possible"),
         ...moveShape,
       },
       requiresSigner: true,
     },
     async (args, ctx) => {
       ctx.watchMatch(args.match_id);
+
+      // Auto-detect budget from node ownership, same as siege_commit — the
+      // default of 10 rejects legitimate reveals once the player owns nodes
+      // (or endgame escalation kicks in) and the committed move used them.
+      const [matchState, nodes] = await Promise.all([
+        ctx.state.matchState(args.match_id).catch(() => null),
+        ctx.state.nodeStates(args.match_id).catch(() => null),
+      ]);
+      const role = matchState && ctx.agentAddress ? roleFor(matchState, ctx.agentAddress) : null;
+      let budget = args.budget;
+      if (matchState && nodes && role !== null) {
+        budget = budgetFor(nodes, role, matchState.current_round);
+      }
+
       const move = moveAllocationFromInput(args as unknown as MoveInput);
-      const total = validateMove(move, args.budget);
+      const total = validateMove(move, budget);
       const commitmentHash = buildMoveCommitHash1v1(args.salt, move);
 
       const tx = await execute(ctx.signer!, [
@@ -2016,7 +2030,7 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         tx_hash: tx,
         commitment_hash: commitmentHash,
         total_allocated: total,
-        budget: args.budget,
+        budget,
       };
     },
   );
@@ -2260,14 +2274,24 @@ export function registerSiegeTools(reg: RegisterArgs): void {
         const tx = await execute(ctx.signer!, calls);
         return { tx_hash: tx, match_id };
       } catch (err) {
-        const raw = String((err as { data?: unknown })?.data ?? (err as Error)?.message ?? "");
-        if (raw.includes("not consumed")) {
+        // The VRF wrap only pays off when force_timeout reaches the round
+        // resolution stage; the arm/abandon stages consume nothing, so the
+        // paymaster's appended assert_consumed reverts the whole multicall.
+        // The revert string varies by chain/executor (katana surfaces only
+        // the outer __execute__ frame), so retry bare on ANY revert and let
+        // the bare call produce the authoritative error.
+        try {
           const tx = await execute(ctx.signer!, [
             call(ctx.config.contracts.commitReveal1v1, "force_timeout", [String(match_id)]),
           ]);
           return { tx_hash: tx, match_id, skip_vrf: true };
+        } catch (bareErr) {
+          const wrapped = String((err as { data?: unknown })?.data ?? (err as Error)?.message ?? "");
+          const bare = String(
+            (bareErr as { data?: unknown })?.data ?? (bareErr as Error)?.message ?? "",
+          );
+          throw new Error(`force_timeout failed. Bare call: ${bare} — VRF-wrapped call: ${wrapped}`);
         }
-        throw err;
       }
     },
   );
