@@ -1,5 +1,8 @@
 # Self-hosted Sepolia Torii for Railway (Cartridge slot no longer accepts new
-# torii deployments). Build context is infra/torii/ — torii_sepolia.toml here is
+# torii deployments). Sepolia itself is PARKED (Cartridge sponsorship outage,
+# see repo CLAUDE.md) — this service is kept for revival, and unlike the
+# mainnet/katana toriis it is still on the pre-split dojo image (torii 1.8.3).
+# Build context is infra/torii/ — torii_sepolia.toml here is
 # a copy of the repo-root file; keep them in sync when the config changes.
 #
 # Deploy: railway up (service: siege-torii). A Railway volume must be mounted at

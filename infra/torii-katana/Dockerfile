@@ -18,8 +18,8 @@ EXPOSE 8080
 # doubles as the reindex that backfills event_messages_historical (the
 # [sql] historical config never ran under 1.8.3 — it was silently dropped
 # from its old [events] location — so pre-upgrade ConquestResolved emissions
-# only exist via replay). The old 1.8.3 database stays untouched at /data/*
-# for rollback; delete it once 1.8.16 has soaked.
+# only exist via replay). The old 1.8.3 database was parked at /data/* for
+# rollback and deleted 2026-08-03 after the upgrade soaked.
 CMD ["torii", \
   "--config", "/torii.toml", \
   "--db-dir", "/data/torii-v1816", \

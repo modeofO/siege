@@ -15,7 +15,7 @@
 # with zero warnings/errors.
 # NOTE: this is Alchemy's shared public demo key and is throttled. If indexing
 # starts lagging under load, replace it with a dedicated Alchemy (or other
-# spec-0.9) mainnet key, and/or set index_pending = false below to cut the
+# spec-0.9) mainnet key, and/or set preconfirmed = false below to cut the
 # per-second pending-block fetch load. Do NOT switch to the Cartridge URL until
 # a spec-0.9 Cartridge endpoint exists.
 rpc = "https://starknet-mainnet.g.alchemy.com/starknet/version/rpc/v0_9/demo"
