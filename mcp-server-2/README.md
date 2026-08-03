@@ -2,7 +2,7 @@
 
 `mcp-server-2` is the active MCP server for Siege. It reads Torii state, watches matches, and submits write transactions through a Cartridge session after browser approval.
 
-Run it with Node, not Bun. Cartridge's WASM shims are not reliable under Bun's runtime.
+Run it with Node, not Bun — Cartridge's WASM shims misbehave under Bun's runtime.
 
 ## Setup
 
@@ -19,7 +19,7 @@ That file sets the mainnet Torii URL, the Cartridge mainnet RPC, `CHAIN_ID=SN_MA
 
 `RPC_URL` must be the **Cartridge** mainnet RPC. The write path is the Cartridge WASM `SessionProvider`, which needs Cartridge's own RPC/keychain to resolve the chain id and mint sessions; a third-party node breaks session creation.
 
-`AGENT_ACCOUNT_ADDRESS` and `AGENT_PRIVATE_KEY` are deliberately absent. Their absence is what selects the Cartridge session flow in `src/session.ts`. Setting either switches the server to raw-key signing, which is only viable on the fee-less self-hosted katana.
+`AGENT_ACCOUNT_ADDRESS` and `AGENT_PRIVATE_KEY` are deliberately absent — leaving them unset selects the Cartridge session flow in `src/session.ts`. Setting either switches the server to raw-key signing, viable only on the fee-less self-hosted katana.
 
 `SIEGE_FRONTEND_URL` is optional (default `https://localhost:3000`) and only builds the `spectate_url` field in tool output.
 
@@ -28,10 +28,12 @@ That file sets the mainnet Torii URL, the Cartridge mainnet RPC, `CHAIN_ID=SN_MA
 | Network | Manifest | Signing | Notes |
 | :------ | :------- | :------ | :---- |
 | mainnet | `manifest_mainnet.json` | Cartridge session | Live. Use `.env.mainnet`. |
-| katana  | `manifest_katana.json`  | Raw key (`AGENT_*`) | Self-hosted dev chain. Cartridge headless sessions can't be created for a custom chain id. |
+| katana  | `manifest_katana.json`  | Cartridge session (`.env.katana-session`) or raw key (`AGENT_*`) | Self-hosted dev chain / Practice tier. The keychain resolves the custom `SIEGE` chain from the auth URL's `rpc_url`; katana's built-in paymaster sponsors writes. Raw key signs as a separate dev account, not the user's Controller. |
 | sepolia | `manifest_sepolia.json` | Cartridge session | Parked — Cartridge's sepolia sponsorship is down. |
 
 Set `SESSION_DIR` per network so approvals for different chains don't collide.
+
+`VRF_PROVIDER_ADDRESS` defaults to the Cartridge **mainnet** VRF address (`src/config.ts`). Katana has its own predeployed VRF at a different address, so the var must be set explicitly when pointing at katana — `.env.katana-session` does.
 
 ## Claude Code
 
@@ -39,7 +41,7 @@ Set `SESSION_DIR` per network so approvals for different chains don't collide.
 claude mcp add siege -- node /path/to/siege/mcp-server-2/dist/index.js
 ```
 
-The server self-locates `.env`, the manifest, `agent-prompt.md`, and the Cartridge session directory from `import.meta.url`, never `process.cwd()` — so it works whichever way it is launched. First write use prints a Cartridge auth URL to stderr. Approve it once; the session persists in `SESSION_DIR` (`.cartridge-mainnet/` on mainnet).
+The server self-locates `.env`, the manifest, `agent-prompt.md`, and the Cartridge session directory from `import.meta.url`, never `process.cwd()` — so it works however it is launched. The first write attempt prints a Cartridge auth URL to stderr. Approve it once; the session persists in `SESSION_DIR` (`.cartridge-mainnet/` on mainnet).
 
 Read tools work as soon as Torii is reachable. Write tools return a `not_ready` status until the Cartridge session is approved.
 
@@ -55,10 +57,12 @@ Read tools work as soon as Torii is reachable. Write tools return a `not_ready` 
 The server pushes match-state changes straight into the session so an agent can wait for the opponent instead of polling. When a watched match changes, a tag appears in Claude's context:
 
 ```text
-<channel source="siege" match_id="7" phase="revealing" round="3" commits="2" reveals="1" hp_a="42" hp_b="38" status="Active">
+<channel source="siege" match_id="7" you="a" phase="revealing" round="3" commits="2" reveals="1" hp_a="42" hp_b="38" status="Active" budget_a="11" budget_b="12" nodes="a,-,b" mods="0,2,0" deadline="1760000000">
 match 7 round 3 revealing: 2/2 committed, 1/2 revealed — HP 42/38
 </channel>
 ```
+
+`you` is `a`/`b`/`spectator` — act only when you are a participant. The extra attributes (budgets, node owners, gate modifiers, running deadline) carry everything a round decision needs, so the common loop doesn't have to re-read match state.
 
 `agent-prompt.md` tells the agent to wait for `commits="2"` before revealing and `reveals="2"` before resolving.
 
@@ -75,13 +79,13 @@ Startup shows a confirmation dialog, then a dim notice confirming the channel re
 - `channelsEnabled: true` in managed settings for Team and Enterprise organizations.
 - The server is named in this session's channels list (the flag above, or `--channels`).
 
-**Failure is silent.** Nothing is returned to the server when events are dropped. If no `<channel>` tags arrive, the agent falls back to polling `siege_get_match_state`, which is correct but slower.
+**Failure is silent.** Dropped events send nothing back to the server. If no `<channel>` tags arrive, the agent falls back to polling `siege_get_match_state` — correct, but slower.
 
 Implementation notes:
 
-- Emitted as `notifications/claude/channel` with `{ content, meta }` from `notifyMatchChanged` in `src/index.ts`, driven by the Torii gRPC bridge in `src/live.ts`.
+- Emitted as `notifications/claude/channel` with `{ content, meta }` from `notifyMatchChanged` in `src/notify.ts`, driven by the watch-scoped poller in `src/live.ts` (5 s tick, one cheap activity probe per watched match, snapshot rebuild + diff only when the probe moves). There is deliberately no gRPC subscription — Railway's edge kills idle streams, and a lost push strands a blocking agent; a poll tick of latency is invisible against 300 s game clocks.
 - Each `meta` key becomes a tag attribute. **Keys must be identifiers** — letters, digits, and underscores only. A key containing a hyphen is silently dropped, so keep using `match_id`, not `match-id`.
-- Only *watched* matches push. A match becomes watched when any tool touches it by id.
+- Only *watched* live matches push. A match becomes watched when any tool touches it by id; reading a finished match never watches it. A watched match that finishes emits its final event and is auto-released; `siege_unwatch_match` is the explicit off switch. Empty watch set → zero Torii traffic. `siege_whoami` reports the watch set and poller liveness.
 - The first snapshot of a match seeds silently; pushes begin from the second change.
 - Events queue and are delivered together on the next turn if several land while Claude is busy. Each push is a full snapshot, so the newest one wins.
 - The same trigger also fires a standard `notifications/resources/updated` for any subscriber of `siege://match-1v1/{match_id}/state`.
@@ -102,11 +106,12 @@ src/index.ts           MCP process, stdio transport, session bootstrap, live upd
 src/config.ts          env and Dojo manifest loading
 src/session.ts         Cartridge SessionProvider singleton
 src/policies.ts        session policy construction
-src/tools.ts           44 tool definitions and handlers
+src/tools.ts           45 tool definitions and handlers
 src/stakedCalls.ts     staked-match call builders
 src/state.ts           Torii SQL state reads
 src/torii.ts           generic Torii helpers
-src/live.ts            Torii gRPC invalidation bridge
+src/live.ts            watch-scoped live match poller
+src/notify.ts          snapshot diff, channel + resource notifications
 src/match-resource.ts  SQL-backed MCP match resource
 src/hash.ts            Poseidon commitment helpers
 src/move.ts            move schema and budget validation
@@ -119,7 +124,7 @@ Contract addresses come from `MANIFEST_PATH`, so policy targets and transaction 
 
 ## Tools
 
-Current registered tools: 44.
+Current registered tools: 45.
 
 Read tools:
 
@@ -137,6 +142,7 @@ Read tools:
 - `siege_get_pillage_status`
 - `siege_get_factions`
 - `siege_queue_status`
+- `siege_unwatch_match`
 
 Write tools:
 
@@ -173,7 +179,7 @@ Write tools:
 
 ## Match Flow For Agents
 
-Getting into a match: `siege_queue_for_match` wagers 1-3 abilities and pairs with a player wagering the same count, which is the primary path. `siege_create_staked_match` / `siege_join_staked_match` set one up against a named opponent instead. Both require a registered Hold (`siege_register_player`).
+The primary path into a match is `siege_queue_for_match`, which wagers 1-3 abilities and pairs you with a player wagering the same count. `siege_create_staked_match` / `siege_join_staked_match` set one up against a named opponent instead. Both paths require a registered Hold (`siege_register_player`).
 
 Then, per round:
 
@@ -186,4 +192,4 @@ Then, per round:
 7. Resolve after both reveals, the same way. `siege_resolve_round` elects the lower address as resolver; the other player gets a `waiting_for_resolver` status and can override with `force=true`.
 8. After a staked match finishes, call `siege_settle_match`, then `siege_claim_winnings` for a queue-made match's entry pot, then claim drip and, if eligible, a parcel or pillage.
 
-Ability activations are single-use per match. `siege_my_abilities` should be checked before committing an ability id.
+Ability activations are single-use per match. Check `siege_my_abilities` before committing an ability id.

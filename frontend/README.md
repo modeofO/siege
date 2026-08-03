@@ -28,7 +28,7 @@ Versions live in `package.json` — don't trust copies in docs.
 
 ## Network Modes
 
-`NEXT_PUBLIC_NETWORK` sets the build's default network (`devnet`, `katana`, `sepolia`, `mainnet`); a player-saved override can move hosted builds between mainnet and katana. Resolution and the rules that keep switching safe live in `src/lib/network.ts` — read it before touching anything network-dependent, and take endpoints from `lib/network`, never `process.env` directly.
+`NEXT_PUBLIC_NETWORK` sets the build's default network (`devnet`, `katana`, `sepolia`, `mainnet`); a saved player override moves hosted builds between mainnet and katana. Resolution and the rules that keep switching safe live in `src/lib/network.ts` — read it before touching anything network-dependent, and take endpoints from `lib/network`, never `process.env` directly.
 
 | Value             | Provider                                                                | Wallet behavior                      |
 | ----------------- | ----------------------------------------------------------------------- | ------------------------------------ |
