@@ -29,8 +29,9 @@ Cartridge session approval in their browser. Tell them what to do and stop.
 
 ### Getting into a match
 
-You need a registered Hold first (`siege_register_player`). There are two ways
-into a battle.
+You need a registered Hold first (`siege_register_player`). Call
+`siege_whoami` once at the start of a session to confirm your address; it does
+not need repeating per round. There are two ways into a battle.
 
 **Matchmaking queue — the normal path.** `siege_queue_for_match(token,
 abilities)` wagers 1-3 abilities you own and joins a queue.
@@ -65,18 +66,21 @@ so prefer the queue.
 
 ### Round flow
 
-1. `siege_whoami` — confirm your address (only needed once).
-2. `siege_get_match_state` with `match_id` — phase, vault HP, nodes, budgets.
-3. `siege_get_my_status` with `match_id` — your slot and commit/reveal status.
-4. Decide your move within budget.
-5. `siege_commit` — signs and submits. Returns `{ tx_hash, salt, move }`.
-   **Remember the `salt` and the exact `move` object** — you'll need both for
-   reveal. Stash them in your reasoning.
-6. Wait for a `<channel source="siege" phase="..." commits="2">` event before
+1. `siege_get_match_state` with `match_id` — phase, vault HP, nodes, budgets.
+2. `siege_get_my_status` with `match_id` — your slot and commit/reveal status.
+3. Decide your move within budget.
+4. `siege_commit` — signs and submits. Returns `{ tx_hash, salt, move }`.
+   **The `salt` and exact `move` object stay in your transcript in that
+   result** — re-read it before revealing; never reconstruct the move from
+   memory.
+5. Wait for a `<channel source="siege" phase="..." commits="2">` event before
    revealing — the server pushes one every time match state changes.
-7. `siege_reveal` with the same salt and move — signs and submits.
-8. After both reveal (`<channel ... reveals="2">`), anyone may call
-   `siege_resolve_round` to advance.
+6. `siege_reveal` with the same salt and move — signs and submits.
+7. After both reveal (`<channel ... reveals="2">`), call `siege_resolve_round`
+   to advance. The lower address is the designated resolver: if the tool
+   returns `waiting_for_resolver`, the other player resolves — wait for the
+   round to advance via channel, and call again with `force=true` (or use
+   `siege_force_timeout`) only if they never act.
 
 ### Live updates via channels
 
@@ -90,8 +94,10 @@ match's state changes. Tag attributes:
 - `you` — your relationship to this match: `a` or `b` when you are that
   player, `spectator` otherwise. **Only act (commit/reveal) on events where
   you are a participant** — writes from a spectator revert with `'Not a match
-  participant'`. On a spectated match, just observe (you may still call
-  `siege_resolve_round` after both reveals; resolution is permissionless).
+  participant'`. On a spectated match, just observe. (Resolution is
+  permissionless on-chain, but the tool elects the lower player address as
+  resolver — as a spectator, `siege_resolve_round` returns
+  `waiting_for_resolver` unless you pass `force=true`.)
 - `budget_a` / `budget_b` — each side's budget for this round, escalation
   included.
 - `nodes` — node control as `a`/`b`/`-` per index, e.g. `a,-,b` means you hold
@@ -157,27 +163,25 @@ array of codes; channel events carry the same thing as `mods="0,2,4"`.
 
 Total cost: `sum(attack) + sum(defense) + 2*repair + sum(nodes) + 2*sum(traps)`
 
-### Abilities are single-use per battle — once used, gone for the match
+### Abilities are single-use per battle
 
-Each staked ability can only be activated **once per match**. The moment
-you reveal with a given `ability_id`, its `used` flag in
-`MatchAbilities1v1` flips true permanently for that battle. You cannot
-use the same ability again in any later round — it is consumed.
-Activating an already-used id, or one you never staked, reverts the
-reveal with `Ability not available`. Because the commit hash binds
-`ability_id`, a mistaken commit cannot be salvaged: reveal will keep
-reverting until the deadline passes and you forfeit the round to
-`siege_force_timeout`.
+Each staked ability can be activated **once per match**: the moment you
+reveal with a given `ability_id`, its `used` flag in `MatchAbilities1v1`
+flips true for the rest of the battle. Activating an already-used id, or
+one you never staked, reverts the reveal with `Ability not available`.
+Because the commit hash binds `ability_id`, a mistaken commit cannot be
+salvaged: reveal will keep reverting until the deadline passes and you
+forfeit the round to `siege_force_timeout`.
 
-**Before every commit**, call `siege_my_abilities` to confirm the id is
-still available. Stakes from `MatchStakes1v1` show what's escrowed, but
-only `MatchAbilities1v1` shows what's still usable mid-match. Plan your
-ability usage carefully — burning your strongest ability in round 1
-leaves you without it for the rest of the battle.
+**Before any commit that activates an ability**, call `siege_my_abilities`
+to confirm the id is still available. Stakes from `MatchStakes1v1` show
+what's escrowed, but only `MatchAbilities1v1` shows what's still usable
+mid-match. Plan ability usage across the whole match — burning your
+strongest ability in round 1 leaves you without it for the endgame.
 
 ### What's at stake in a staked match
 
-A staked 1v1 is the gateway to land — not just a duel. Read
+A staked 1v1 decides land as well as abilities. Read
 `siege_get_player_kingdom` and `siege_get_world_state` *before round 1*
 so you know what victory is for.
 
@@ -204,7 +208,9 @@ buy-ins in full, and grants neither parcel nor pillage rights.
 
 ### After the match — always settle, claim, and drip
 
-When `phase="finished"` arrives, **always do all of the following**:
+When `phase="finished"` arrives, work through this checklist. Steps 1 and 3
+apply after **every** match, step 2 only to queue-made matches, step 4 only
+when you won:
 
 1. **Settle** — call `siege_settle_match`. Either player can call it;
    the second call reverts with `Already settled` (harmless). Settling
@@ -233,9 +239,10 @@ When `phase="finished"` arrives, **always do all of the following**:
    24-hour window, then `siege_claim_pillage_drip` periodically to
    siphon resources from the targeted home parcel.
 
-**Do not skip steps 1–4.** Settling collects your won abilities, claiming
-winnings collects the entry pot, drip collects your resources, and claiming
-a parcel expands your territory. All four are essential after every match.
+**Do not skip a step that applies.** Settling collects won abilities,
+claiming winnings collects the entry pot, drip collects your resources, and
+claiming a parcel expands your territory — skipping one leaves abilities,
+tokens, resources, or land on the table.
 
 ### Plan claims at match start, not match end
 
@@ -246,8 +253,8 @@ Don't wait until victory to figure out what to claim. Before round 1:
   candidate enemy home parcels you'd be eligible to pillage.
 
 If you can't find an adjacent unclaimed parcel, the parcel reward is
-unreachable this match — adjust your risk calculus accordingly. The
-abilities and tier-progression rewards still apply.
+unreachable this match; the abilities and tier-progression rewards still
+apply, so weigh your wager on those alone.
 
 ### Tools
 

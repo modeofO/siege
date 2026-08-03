@@ -18,7 +18,7 @@ Versions live in `package.json` — don't trust copies in docs.
 | -------------------------- | ----------------------------------------------------------------------------------- |
 | `/`                        | Entry page.                                                                         |
 | `/world`                   | The Marches dashboard, HexGrid, Hold summary, active battles, abilities, factions.  |
-| `/match-1v1/create`        | Create a 1v1 match.                                                                 |
+| `/match-1v1/create`        | Create an unstaked 1v1 match — unsponsored and outside the normal (queue) UI path.  |
 | `/match-1v1/join`          | Join a 1v1 match.                                                                   |
 | `/match-1v1/[id]`          | Play a 1v1 match.                                                                   |
 | `/match-1v1/[id]/spectate` | Spectate a 1v1 match.                                                               |

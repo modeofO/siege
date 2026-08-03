@@ -2,7 +2,7 @@
 
 `mcp-server-2` is the active MCP server for Siege. It reads Torii state, watches matches, and submits write transactions through a Cartridge session after browser approval.
 
-Run it with Node, not Bun — Cartridge's WASM shims misbehave under Bun's runtime.
+Run it with Node, not Bun — Cartridge's WASM shims fail under Bun's runtime.
 
 ## Setup
 
@@ -83,7 +83,7 @@ Startup shows a confirmation dialog, then a dim notice confirming the channel re
 
 Implementation notes:
 
-- Emitted as `notifications/claude/channel` with `{ content, meta }` from `notifyMatchChanged` in `src/notify.ts`, driven by the watch-scoped poller in `src/live.ts` (5 s tick, one cheap activity probe per watched match, snapshot rebuild + diff only when the probe moves). There is deliberately no gRPC subscription — Railway's edge kills idle streams, and a lost push strands a blocking agent; a poll tick of latency is invisible against 300 s game clocks.
+- Events are emitted as `notifications/claude/channel` with `{ content, meta }` from `notifyMatchChanged` in `src/notify.ts`. The watch-scoped poller in `src/live.ts` drives it: a 5 s tick runs one cheap activity probe per watched match, and the snapshot is rebuilt and diffed only when the probe moves. There is deliberately no gRPC subscription: Railway's edge kills idle streams, a lost push strands a blocking agent, and a poll tick of latency is invisible against 300 s game clocks.
 - Each `meta` key becomes a tag attribute. **Keys must be identifiers** — letters, digits, and underscores only. A key containing a hyphen is silently dropped, so keep using `match_id`, not `match-id`.
 - Only *watched* live matches push. A match becomes watched when any tool touches it by id; reading a finished match never watches it. A watched match that finishes emits its final event and is auto-released; `siege_unwatch_match` is the explicit off switch. Empty watch set → zero Torii traffic. `siege_whoami` reports the watch set and poller liveness.
 - The first snapshot of a match seeds silently; pushes begin from the second change.
@@ -124,72 +124,23 @@ Contract addresses come from `MANIFEST_PATH`, so policy targets and transaction 
 
 ## Tools
 
-Current registered tools: 45.
+The full tool list, with a one-line description per tool, lives in
+`agent-prompt.md` — the copy agents actually read, and the one place the list
+is maintained. Read tools query Torii and need no session; write tools sign
+through the Cartridge session.
 
-Read tools:
+## Match flow for agents
 
-- `siege_get_match_state`
-- `siege_get_round_history`
-- `siege_get_round_details`
-- `siege_get_my_status`
-- `siege_my_abilities`
-- `siege_get_world_state`
-- `siege_get_parcel`
-- `siege_get_player_kingdom`
-- `siege_get_player_cosmetics`
-- `siege_get_forge_info`
-- `siege_get_staked_match`
-- `siege_get_pillage_status`
-- `siege_get_factions`
-- `siege_queue_status`
-- `siege_unwatch_match`
-
-Write tools:
-
-- `siege_whoami`
-- `siege_set_cosmetic`
-- `siege_craft_ability`
-- `siege_register_player`
-- `siege_claim_drip`
-- `siege_upgrade_kingdom`
-- `siege_create_staked_match`
-- `siege_join_staked_match`
-- `siege_cancel_staked_match`
-- `siege_settle_match`
-- `siege_claim_parcel`
-- `siege_set_preset_defense`
-- `siege_initiate_conquest`
-- `siege_initiate_pillage`
-- `siege_claim_pillage_drip`
-- `siege_create_faction`
-- `siege_invite_faction_member`
-- `siege_accept_faction_invite`
-- `siege_leave_faction`
-- `siege_kick_faction_member`
-- `siege_set_faction_reinforcement`
-- `siege_set_ability_operator_approval`
-- `siege_create_match`
-- `siege_queue_for_match`
-- `siege_leave_queue`
-- `siege_claim_winnings`
-- `siege_commit`
-- `siege_reveal`
-- `siege_resolve_round`
-- `siege_force_timeout`
-
-## Match Flow For Agents
-
-The primary path into a match is `siege_queue_for_match`, which wagers 1-3 abilities and pairs you with a player wagering the same count. `siege_create_staked_match` / `siege_join_staked_match` set one up against a named opponent instead. Both paths require a registered Hold (`siege_register_player`).
+The primary path into a match is `siege_queue_for_match`, which wagers 1-3 abilities and pairs you with a player wagering the same count. `siege_create_staked_match` / `siege_join_staked_match` set one up against a named opponent instead. Both paths require a registered Hold (`siege_register_player`). Call `siege_whoami` once per session to confirm the authenticated address.
 
 Then, per round:
 
-1. Call `siege_whoami`.
-2. Call `siege_get_match_state` and `siege_get_my_status`.
-3. Build a move within budget.
-4. Call `siege_commit`; store the returned salt and exact move.
-5. Reveal only after both commits are present — wait for `<channel ... commits="2">`, or poll `siege_get_match_state` if channels are not enabled.
-6. Call `siege_reveal` with the same salt and move.
-7. Resolve after both reveals, the same way. `siege_resolve_round` elects the lower address as resolver; the other player gets a `waiting_for_resolver` status and can override with `force=true`.
-8. After a staked match finishes, call `siege_settle_match`, then `siege_claim_winnings` for a queue-made match's entry pot, then claim drip and, if eligible, a parcel or pillage.
+1. Call `siege_get_match_state` and `siege_get_my_status`.
+2. Build a move within budget.
+3. Call `siege_commit`; store the returned salt and exact move.
+4. Reveal only after both commits are present — wait for `<channel ... commits="2">`, or poll `siege_get_match_state` if channels are not enabled.
+5. Call `siege_reveal` with the same salt and move.
+6. Resolve after both reveals, the same way. `siege_resolve_round` elects the lower address as resolver; the other player gets a `waiting_for_resolver` status and can override with `force=true`.
+7. After a staked match finishes, call `siege_settle_match`, then `siege_claim_winnings` for a queue-made match's entry pot, then claim drip and, if eligible, a parcel or pillage.
 
 Ability activations are single-use per match. Check `siege_my_abilities` before committing an ability id.

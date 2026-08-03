@@ -8,6 +8,7 @@ bun install
 bun run dev
 bun run test
 bun run build
+bun run preview
 ```
 
 Docs live in `site/docs/pages`. Shared card data lives in `site/src/data`.

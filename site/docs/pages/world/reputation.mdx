@@ -18,16 +18,14 @@ Wins live on `PlayerKingdom.total_wins`; losses live on `PlayerReputation.total_
 
 ## Brackets
 
-The contract calculates brackets from total games and win rate.
+The contract calculates brackets from total games and win rate. You land in the highest bracket you qualify for.
 
-| Bracket  | Rule                                     |
-| -------- | ---------------------------------------- |
-| Unranked | Fewer than 10 games.                     |
-| Bronze   | 10+ games and below higher thresholds.   |
-| Silver   | 30+ games and win rate above threshold.  |
-| Gold     | 60+ games and win rate above threshold.  |
-| Diamond  | 100+ games and win rate above threshold. |
-
-The exact threshold logic is in `calculate_bracket` in `world_system.cairo`.
+| Bracket  | Requirement                        |
+| -------- | ---------------------------------- |
+| Unranked | Fewer than 10 games.               |
+| Bronze   | 10+ games.                         |
+| Silver   | 30+ games and win rate above 40%.  |
+| Gold     | 60+ games and win rate above 50%.  |
+| Diamond  | 100+ games and win rate above 55%. |
 
 Reputation is public world state. It does not replace tier; tier is based on cumulative wins and explicit upgrades.

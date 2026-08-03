@@ -31,13 +31,12 @@ All networks share one world seed (`siege_dojo_v9`), so the world address is
 the same everywhere:
 `0x031b19dadbea8c6f16b623de37f0085bb898a721f1ed0d52b3f2cdb1353dab73`. System
 and token addresses differ per network — **always read them from the manifest
-files**, never from copies in docs (they drift — this README contains no
-others).
+files**, never from copies in docs (docs drift; the world address above is
+deliberately the only address in this README).
 
 Each network has its own Torii indexer (mainnet and katana run on Railway from
 `infra/torii-mainnet/` and `infra/torii-katana/`). Nothing merges state across
-networks — that separation is what keeps the free Practice tier from
-cannibalizing mainnet.
+networks, so the free Practice tier cannot cannibalize mainnet.
 
 Deployment runbooks live in the repo's skills: `deploy-mainnet`, `dev-katana`,
 and `deploy-sepolia`.
@@ -54,7 +53,7 @@ everything. Commit and reveal deadlines are 300 seconds each.
 Each player spends a budget of `10 + owned_resource_nodes + max(0, round - 6)`
 (endgame escalation, rounds 7-10) across:
 
-- `attack` / `defense`: 3 gate pressure and garrison values.
+- `attack` / `defense`: three per-gate attack and defense values.
 - `repair`: heals the vault at 2 budget per HP, uncapped (vault max 50).
 - `nodes`: 3 resource-node contest values.
 - `traps`: 3 hidden node traps, 2 budget each.
@@ -102,8 +101,8 @@ crafting system and the MCP/frontend mirrors — not here.
 `matchmaking.queue_for_match(token, abilities)` takes an entry buy-in from an
 owner-managed `EntryToken` allowlist plus a 1-3 ability wager, and runs three
 sub-queues keyed by wager size — players only pair with equal wagers, so stakes
-never trim. Entries expire after 600
-seconds (no heartbeat — clients poll Torii and re-queue). Pairing escrows both
+never trim. Entries expire after 600 seconds (no heartbeat — clients poll
+Torii and re-queue). Pairing escrows both
 buy-ins and both wagers; queue matches are full staked matches. Permissionless
 `claim_winnings(match_id)` pays the winner the configured `winner_bps` share of
 each side's buy-in (treasury takes the rest; draws refund in full). Clients
@@ -125,8 +124,8 @@ draw.
 
 The world is an offset hex grid — `col`/`row` per `Parcel`, distance metric in
 `src/utils/hex.cairo`. Grid size is per-world and growable via `expand_world`,
-so read `WorldConfig.total_parcels` rather than assuming (mainnet is currently
-12x8 = 96 parcels; katana/sepolia 8x4 = 32).
+so read `WorldConfig.total_parcels` rather than assuming a grid size (mainnet
+is currently 12x8 = 96 parcels; katana/sepolia 8x4 = 32).
 
 Registering a Hold claims three home parcels: the first maximizes distance to
 already-claimed parcels, the other two cluster near it; the caller picks the
@@ -139,8 +138,8 @@ winner siphon an adjacent loser home's drip.
 
 Conquest attacks an adjacent non-home parcel in one transaction: attacker
 budget 10 and HP 10 versus defender preset budget 12 and HP 15; ties go to the
-defender. Up to three adjacent faction allies can reinforce (deduplicated per
-ally player). Defenders with no presets defend with a fixed default, so every
+defender. Up to three adjacent faction allies can reinforce (each ally fills at
+most one of the three slots, however many adjacent parcels they own). Defenders with no presets defend with a fixed default, so every
 Hold is always attackable.
 
 Factions, cosmetics, reputation, and tier progression all live in

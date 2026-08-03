@@ -2,7 +2,7 @@
 
 Reference for rendering props for the Siege Dojo frontend. Captures the camera rig, lighting recipe, material node graphs, and specific parameters used across the desk, citadel, gates, resource nodes, and the spellbook sprites. Read this before starting any new Blender asset so the aesthetic stays consistent.
 
-## Asset Inventory (as of 2026-04-05)
+## Asset Inventory (as of 2026-08-03)
 
 | Sprite | Path | Purpose |
 |---|---|---|
@@ -17,6 +17,14 @@ Reference for rendering props for the Siege Dojo frontend. Captures the camera r
 | Book (closed) | `frontend/public/sprites/book_preview.png` | Fixed corner element linking to `/craft` |
 | Book (half open) | `frontend/public/sprites/book_half.png` | Mid-frame of the open animation |
 | Book (open) | `frontend/public/sprites/book_open.png` | `/craft` page background |
+| Battlefield | `frontend/public/sprites/battlefield.png` | 16:9 backdrop in `BattlefieldView` |
+| Battlefield (old) | `frontend/public/sprites/battlefield_old.png` | Unreferenced — superseded by `battlefield.png` |
+| Battlefield (render) | `frontend/public/sprites/battlefield_render.png` | Unreferenced — superseded by `battlefield.png` |
+| Compass | `frontend/public/sprites/compass.png` | `CompassLink` to the docs site |
+| Parchment map | `frontend/public/sprites/parchment-map.png` | Hex-grid frame on `/world` (The Marches) |
+| Torch sconce | `frontend/public/sprites/torch-sconce.png` | Torch overlays on the parchment frame |
+| Ability icons | `frontend/public/sprites/abilities/*.svg` | Five ability icons; `siege-sword.svg` is the favicon (SVGs, not Blender renders) |
+| Troops | `frontend/public/sprites/troops/troop_*.png` | Battle-animation troop sprites: attack/defense/healer/node × teams a/b |
 
 ## Core Aesthetic
 
@@ -119,7 +127,7 @@ rim.data.color = (1.0, 0.75, 0.45)   # warm amber
 ## Render Settings
 
 ```python
-scene.render.engine = 'BLENDER_EEVEE'   # NOT BLENDER_EEVEE_NEXT — enum name
+scene.render.engine = 'BLENDER_EEVEE'   # the enum is still named BLENDER_EEVEE in this Blender version, not BLENDER_EEVEE_NEXT
 scene.render.resolution_x = 1024
 scene.render.resolution_y = 1024
 scene.render.film_transparent = True    # for sprite compositing
@@ -224,7 +232,7 @@ Brass-cousin material for nail heads on the desk.
 
 ### Ruby Gem
 
-**Note:** The ruby gem was removed after the user requested no occult imagery. Keeping this recipe as reference only — do not use on book covers.
+**Note:** The ruby gem was removed by request (no occult imagery). Keeping this recipe as reference only — do not use on book covers.
 
 ## Build Patterns
 
@@ -238,7 +246,7 @@ Brass-cousin material for nail heads on the desk.
 
 ### Scale Factor-of-2 Gotcha
 
-`bpy.ops.mesh.primitive_cube_add(size=1.0)` creates a cube with vertices at ±0.5. The total span in each axis is 1.0, not 0.5. When setting `obj.scale = (w, h, d)`, the final span equals `(w, h, d)` — **not** `(2w, 2h, 2d)`. Early in the desk build I set `scale = (PLANK_HEIGHT - GAP) / 2` thinking I needed half-extents, which made every plank half as tall as intended.
+`bpy.ops.mesh.primitive_cube_add(size=1.0)` creates a cube with vertices at ±0.5. The total span in each axis is 1.0, not 0.5. When setting `obj.scale = (w, h, d)`, the final span equals `(w, h, d)` — **not** `(2w, 2h, 2d)`. Early in the desk build we set `scale = (PLANK_HEIGHT - GAP) / 2` thinking we needed half-extents, which made every plank half as tall as intended.
 
 ### Light Position Must Scale With Asset Size
 

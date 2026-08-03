@@ -50,7 +50,7 @@ docker compose run --rm builder sozo test
 
 ## Core Battle Rules
 
-1v1 state lives in `MatchState1v1`. Vault HP starts at 50. Matches end when a vault hits 0 or after round 10. `create_match_1v1` requires the caller to have a registered Hold (spam guard); staked matches go through `world_system.create_staked_match`, which guards separately.
+1v1 state lives in `MatchState1v1`. Vault HP starts at 50. Matches end when a vault hits 0 or after round 10. `create_match_1v1` requires the caller to have a registered Hold (spam guard); staked matches go through `world_system.create_staked_match`, which does its own registration check.
 
 Each round:
 
@@ -68,28 +68,37 @@ salt, p0, p1, p2, g0, g1, g2, repair, nc0, nc1, nc2, trap0, trap1, trap2, abilit
 
 Budget is `10 + owned_resource_nodes + max(0, round - 6)` (endgame escalation, rounds 7-10). Trap cost is 2 each. Repair costs 2 budget per HP and is uncapped during resolution.
 
-Matchmaking (paid + staked): `matchmaking.queue_for_match(token, abilities)`
-requires a 1-3 ability wager (tier-capped; ownership + matchmaking
-ERC-1155 operator approval checked at queue time) and runs three
-single-slot sub-queues keyed by wager size — players only pair with the
-same count, so stakes never trim. Entries have a fixed 600 s validity
-window, NO heartbeat (every poke is a sponsored tx); clients poll Torii
-and re-queue after expiry. Pairing (`create_match_1v1_delegated`, waiting
+Matchmaking (paid + staked). Queueing:
+`matchmaking.queue_for_match(token, abilities)` requires a 1-3 ability
+wager (tier-capped; ownership and matchmaking ERC-1155 operator approval
+checked at queue time) and runs three single-slot sub-queues keyed by
+wager size — players only pair with the same wager count, so no one's
+stake is cut down to match an opponent. Entries have a fixed 600 s
+validity window, NO heartbeat (every poke is a sponsored tx); clients
+poll Torii and re-queue after expiry.
+
+Pairing and escrow: pairing (`create_match_1v1_delegated`, waiting
 player = player_a) escrows the entry buy-ins at matchmaking (`MatchPot`)
 and both ability wagers at world_system, writing `MatchStakes1v1` +
-`MatchAbilities1v1` — queue matches are full staked matches (settle_match,
-parcel release, reputation). Entry buy-ins come from the owner-managed
-`EntryToken` allowlist (STRK/ETH/LORDS mainnet; reprice via
-`scripts/init-entry-config.sh`); permissionless `claim_winnings(match_id)`
-pays the winner `winner_bps` (6500) of each side's buy-in per-token,
-treasury the rest, draws refund in full. Clients always send the
-`[vrf request_random, queue_for_match]` multicall (contract consumes
+`MatchAbilities1v1`. Queue matches are full staked matches (settle_match,
+parcel release, reputation).
+
+Payouts: entry buy-ins come from the owner-managed `EntryToken` allowlist
+(STRK/ETH/LORDS mainnet; reprice via `scripts/init-entry-config.sh`).
+Permissionless `claim_winnings(match_id)` pays the winner `winner_bps`
+(6500 = 65%) of each side's buy-in per token and sends the rest to the
+treasury; draws refund both sides in full.
+
+Client call protocol: clients always send the
+`[vrf request_random, queue_for_match]` multicall (the contract consumes
 unconditionally); `leave_queue`/`claim_winnings` are bare; ERC-20 and
-ERC-1155 approvals are separate receipt-awaited txs (VRF wrap forbids
-calls between request_random and the game call). Free practice matches
-are removed from UI and paymaster (create_match_1v1 on-chain but
-unsponsored). Session-policy approve caps are deliberately small
-(~20 games) because the consent screen displays them.
+ERC-1155 approvals are separate receipt-awaited txs (the VRF wrap forbids
+calls between request_random and the game call).
+
+Free practice matches are gone from the UI and the paymaster policy;
+`create_match_1v1` is still on-chain but unsponsored. Session-policy
+approve caps are deliberately small (~20 games) because the consent
+screen displays them.
 
 Node contests resolve before gate damage: owning node `i` grants +1 defense at gate `i` the same round it is captured or held, plus +1 budget next round.
 
@@ -122,8 +131,8 @@ Ability IDs:
 
 `force_timeout` is participant-only and drives a stalled match to Finished
 in stages, each gated on a 300 s deadline: it fills a missing commit and
-arms the reveal deadline, then forces reveals and resolves, then (round
-with zero commits) arms and trips the zero-commit abandon path, ending the
+arms the reveal deadline, then forces reveals and resolves, then, in a
+round with zero commits, arms and trips the abandon path, ending the
 match as a draw with equalized vaults. `settle_match` then refunds ability
 stakes and `claim_winnings` refunds the entry pot. If BOTH players abandon,
 nobody can finish the match and escrow is stranded — there is no
@@ -133,7 +142,7 @@ permissionless timeout.
 
 The Marches is an offset hex grid (`col`/`row` per parcel, `utils/hex.cairo` distance metric). There is no fold mechanic, no zones, and no sectors — older docs describing a tile graph with folds are obsolete.
 
-Grid size is per-world and can be grown after deploy with `expand_world`, so read `WorldConfig.total_parcels` rather than assuming:
+Grid size is per-world and can be grown after deploy with `expand_world`, so read `WorldConfig.total_parcels` rather than assuming a fixed size:
 
 | World | Grid | Parcels |
 | ----- | ---- | ------- |
@@ -182,10 +191,10 @@ Torii: `https://siege-torii-mainnet-production.up.railway.app` (Railway service
 `siege-torii-mainnet` in project `siege-katana`, source `infra/torii-mainnet/`,
 image `ghcr.io/dojoengine/torii:v1.8.16` — torii ships its own image now; the
 `dojo:v1.8.X` bundle stopped at torii 1.8.3). Its RPC is the Alchemy public
-demo `v0_9` endpoint: torii <= 1.8.15 hard-refused Cartridge's spec 0.10.2, and
-1.8.16 merely downgrades that to a warning while still implementing only 0.9
-semantics, so Cartridge RPC is testable but unvalidated — swap to a dedicated
-Alchemy key if indexing lags. Redeploy: `railway up ./infra/torii-mainnet
+demo `v0_9` endpoint. Torii <= 1.8.15 hard-refused Cartridge's spec 0.10.2;
+1.8.16 downgrades that to a warning but still implements only 0.9 semantics,
+so Cartridge RPC is testable but unvalidated. If indexing lags, swap to a
+dedicated Alchemy key. Redeploy: `railway up ./infra/torii-mainnet
 --path-as-root --service siege-torii-mainnet`.
 Torii dropping events is a real failure mode (it has stranded matches mid-resolve);
 a restart does NOT backfill — reindex by pointing `--db-dir` at a fresh path.
@@ -275,8 +284,8 @@ bun x tsx scripts/check-versions.ts --strict     # exit 1 if anything is behind
 ```
 
 Read-only and non-blocking by design. It reports bump **size**, not blast
-radius — semver understates risk here (torii 1.8.3 -> 1.8.4 was a "patch" that
-changed KeysClause from vacuous-match to actually filtering). Adding a new
+radius — semver understates risk here (the torii 1.8.4 "patch" changed
+KeysClause filtering; see `frontend/CLAUDE.md`). Adding a new
 pinned version anywhere means adding it to the `PINNED` array; each entry reads
 its value out of the real file by regex, so the report cannot drift from what
 is deployed.
@@ -289,7 +298,7 @@ is deployed.
    `no-op` / `mechanical` / `needs-migration` per item with `file:line`
    evidence, posted as an issue comment.
 
-The gate is what keeps stage 2 cheap: it fires only for majors and infra pins
+The gate keeps stage 2 cheap: it fires only for majors and infra pins
 whose upstream version moved since the last report. The baseline lives in a
 `<!-- version-baseline:{…} -->` comment at the end of the issue body, so no
 commit and no `contents: write` are needed. Force a re-run of the analysis via
@@ -355,8 +364,7 @@ HTTP endpoint) and `Worlds` (enumerate indexed worlds — Torii is multi-world
 since 1.8, hence `world_addresses` in `Query`).
 
 The 1.8.3 → 1.8.16 upgrade also changed query semantics the frontend depends
-on: the gRPC KeysClause was vacuous (matched everything) through 1.8.3 and
-filters correctly from 1.8.4 — details and the resulting rules live in
+on (gRPC KeysClause filtering); the history and the resulting rules live in
 `frontend/CLAUDE.md` under "Reads". `[sql] historical` is active on both
 deployments; katana was reindexed from genesis on upgrade (old 1.8.3 database
 parked at the volume root, `--db-dir` now `/data/torii-v1816`), mainnet was

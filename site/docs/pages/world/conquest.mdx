@@ -19,7 +19,7 @@ Rules:
 
 ## Attack
 
-`initiate_conquest(target_parcel, p0, p1, p2, g0, g1, g2, ability_id, ability_target)` resolves in one transaction.
+`initiate_conquest(target_parcel, p0, p1, p2, g0, g1, g2, ability_id, ability_target)` resolves in one transaction. The contract picks the defending allocation at random (Cartridge vRNG) from the defender's stored presets, plus any ally presets when reinforcement applies.
 
 Rules:
 
@@ -35,7 +35,7 @@ If the defender has faction reinforcement enabled, up to three adjacent faction 
 
 A defender with no presets and no ally reinforcement fights with a fixed, publicly known default: 2/2/2 assault and 2/2/2 gate defense. Every Hold is always attackable — and always defended.
 
-If `ability_id` is non-zero, the contract checks that the attacker owns the ability token and transfers one copy from the attacker to the conquest contract before resolving. Current Cairo does not return that token after resolution, so conquest ability use behaves as a token lock/consume path and requires ERC-1155 operator approval for the conquest contract.
+An ability used in conquest is spent — you do not get the token back, win or lose. Using one requires ERC-1155 operator approval for the conquest contract, and you must own the ability token when you attack.
 
 On attacker win, the target transfers to the attacker. On attacker loss, the attacker's non-home parcel closest to the target transfers to the defender, if one exists.
 

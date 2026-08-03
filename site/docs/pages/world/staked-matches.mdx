@@ -15,7 +15,7 @@ While the match is still pending, the creator can call `cancel_staked_match` to 
 
 ## Joining
 
-`join_staked_match(match_id, abilities)` can only be called by the named opponent. The contract escrows the matched wager amount, refunds creator excess if the creator offered more abilities than the joiner matches, copies staked ability IDs into `MatchAbilities1v1`, and activates the match.
+`join_staked_match(match_id, abilities)` can only be called by the named opponent. The contract escrows a wager of the same size. If the creator offered more abilities than the joiner matches, the excess is refunded. Both stakes are recorded in `MatchAbilities1v1` and the match activates.
 
 ## Matchmaking queue
 

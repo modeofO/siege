@@ -1,7 +1,7 @@
 # MCP Notes
 
 `mcp-server-2/` is the active MCP implementation (`mcp-server/` is older and unused).
-It registers 45 tools and signs writes through a Cartridge session. It reads Dojo
+It signs writes through a Cartridge session. It reads Dojo
 contract addresses from `MANIFEST_PATH`; AbilityToken and resource token addresses
 come from env/defaults.
 
@@ -12,9 +12,9 @@ poller (`live.ts`, 5 s tick): one `latestMatchActivity` probe per watched match
 per tick, full snapshot rebuild + diff (`notify.ts`) only when the probe moves,
 channel event + `resources/updated` only on a real delta. There is deliberately
 no gRPC subscription: Railway's edge kills idle streams at 300 s (measured
-2026-07-26), torii-client 1.8.2 had no reconnect, and the agent — which BLOCKS
-on channel events per agent-prompt.md — cannot perceive push latency but is
-stranded by a lost event. Polling guarantees delivery; a tick of latency is
+2026-07-26); torii-client 1.8.2 had no reconnect; and the agent blocks on
+channel events (per agent-prompt.md), so push latency is invisible to it but
+a lost event strands it. Polling guarantees delivery; a tick of latency is
 invisible against 300 s game clocks.
 
 Watch lifecycle invariant: the watch set only contains live matches the agent
@@ -32,7 +32,7 @@ too (verified 2026-07-26): the keychain resolves the custom SIEGE chain from the
 `rpc_url` in the auth URL, and writes are sponsored by katana's built-in
 paymaster. Setting `AGENT_ACCOUNT_ADDRESS` / `AGENT_PRIVATE_KEY` instead selects
 raw-key signing as a DevAgentAccount (katana only — no browser approval, but a
-different address than the user's Controller).
+different address from the user's Controller).
 
 ## Cartridge session auth
 
@@ -47,7 +47,8 @@ If the error message itself is truncated in the transcript, read the full URL fr
 
 The 5-minute approval window starts at MCP server launch, and the bootstrap does
 not retry after "Callback timeout" — reconnect the server (`/mcp` → siege →
-reconnect) to mint a fresh URL, then retry a write tool immediately to get it.
+reconnect) to mint a fresh URL, then call a write tool immediately to surface
+the new URL.
 Approved sessions live about a week in `.cartridge-mainnet/session.json` (~11 KB;
 a ~200-byte signer-only file means unapproved).
 
