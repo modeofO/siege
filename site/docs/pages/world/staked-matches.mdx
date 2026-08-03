@@ -11,9 +11,17 @@ A staked match wraps a 1v1 battle in world consequences.
 
 `create_staked_match(opponent, abilities)` escrows 1 to 3 ability tokens from the creator, subject to tier ability-slot limits, then creates a pending 1v1 match.
 
+While the match is still pending, the creator can call `cancel_staked_match` to end it and reclaim the escrowed abilities.
+
 ## Joining
 
 `join_staked_match(match_id, abilities)` can only be called by the named opponent. The contract escrows the matched wager amount, refunds creator excess if the creator offered more abilities than the joiner matches, copies staked ability IDs into `MatchAbilities1v1`, and activates the match.
+
+## Matchmaking queue
+
+Ranked matchmaking creates staked matches too. `queue_for_match` wagers 1 to 3 abilities plus an entry buy-in in an allowed token, and only pairs you with an opponent wagering the same number of abilities. A queue entry stays valid for 600 seconds; after that, re-queue.
+
+Once a queue match settles, `claim_winnings` pays the winner 65% of each side's entry buy-in, with the rest going to the treasury. Draws refund both buy-ins in full.
 
 ## Settlement
 
@@ -25,9 +33,10 @@ Settlement:
 - Transfers all matched escrowed abilities to the winner on decisive result.
 - Increments the winner's total wins.
 - Updates reputation and head-to-head records.
-- Releases the loser's highest-id non-home parcel, if one exists.
-- Mints one resource reward for all parcels owned by both match players.
+- Releases the loser's non-home parcel furthest from their homes, if one exists.
 - Grants pillage eligibility if the winner borders any loser home parcel.
 - Breaks pillages where the loser was pillaging the winner.
 
-After settlement, the winner may call `claim_parcel` once for an unclaimed adjacent tile and choose its parcel type.
+Settlement does not mint resources — collect those through the hourly claim drip.
+
+After settlement, the winner may call `claim_parcel` once for an unclaimed adjacent parcel and choose its parcel type.

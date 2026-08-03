@@ -7,7 +7,7 @@ description: Registration, homes, and drip.
 
 Your Hold is your permanent base in The Marches.
 
-Registration calls `register_player(home_types)`. You choose three home parcel types. The contract chooses three unclaimed frontier tiles in the sector with the most available frontier space, marks them as homes, and records your Hold.
+Registration calls `register_player(home_types)`. You choose three home parcel types. The contract places your first home on the unclaimed parcel farthest from all claimed territory, clusters the other two next to it, marks them as homes, and records your Hold.
 
 Valid home types:
 
@@ -23,14 +23,6 @@ If AbilityToken is configured, registration also mints starter abilities 1, 2, a
 
 `claim_drip` mints resources for your three home parcels after enough time has elapsed. The drip interval is one hour.
 
-Homes under active pillage are skipped. Stranded homes are also skipped.
+Each home mints its two resources per elapsed interval. Homes under active pillage are skipped.
 
-Zone multiplier:
-
-| Zone     | Multiplier |
-| -------- | ---------- |
-| Core     | 3x         |
-| Mid      | 2x         |
-| Frontier | 1x         |
-
-Current Cairo mints claim drip from homes only. Settlement can also mint a one-time resource reward for all parcels owned by the match players.
+Claim drip is the only resource mint — match settlement does not mint resources.

@@ -28,12 +28,15 @@ Rules:
 - Defender HP is 15.
 - Target must be owned, non-home, not your own, and adjacent to your territory.
 - You cannot conquest a faction ally.
+- You can attack at most once per hour.
 - Ties go to the defender.
 
 If the defender has faction reinforcement enabled, up to three adjacent faction allies can add preset defenses to the random preset pool.
 
+A defender with no presets and no ally reinforcement fights with a fixed, publicly known default: 2/2/2 assault and 2/2/2 gate defense. Every Hold is always attackable — and always defended.
+
 If `ability_id` is non-zero, the contract checks that the attacker owns the ability token and transfers one copy from the attacker to the conquest contract before resolving. Current Cairo does not return that token after resolution, so conquest ability use behaves as a token lock/consume path and requires ERC-1155 operator approval for the conquest contract.
 
-On attacker win, the target transfers to the attacker. On attacker loss, one attacker non-home parcel transfers to the defender if available.
+On attacker win, the target transfers to the attacker. On attacker loss, the attacker's non-home parcel closest to the target transfers to the defender, if one exists.
 
-Numeric ability effects are doubled while the world is folded.
+Ability effects scale with the ability's tier.

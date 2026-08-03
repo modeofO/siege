@@ -11,7 +11,7 @@ An ERC-1155 token that can be crafted, staked into a match, and activated once d
 
 ## Ability slot
 
-The number of abilities a Hold can stake in a staked match. Current Cairo slots by tier are 1, 2, 3, and 3.
+The number of abilities a Hold can stake in a staked match. Slots by tier are 1, 2, 3, and 3.
 
 ## Allocation
 
@@ -23,7 +23,7 @@ Tier 3 Hold rank. Requires 60 wins and an explicit upgrade.
 
 ## Budget
 
-Points spent each round. Budget is `10 + owned resource nodes`.
+Points spent each round. Budget is `10 + owned resource nodes`, plus 1 per round from round 7 onward.
 
 ## Claim drip
 
@@ -51,11 +51,7 @@ An ability that deals direct vault damage after gate damage. T1 deals 2; T2 deal
 
 ## Faction
 
-An on-chain alliance. Factions affect conquest ally checks, optional reinforcement, pillage protection, and fold stranded checks.
-
-## Fold
-
-A world event. A world fold toggles the global folded state; a sector fold changes sector state along an axis. Folds can break pillages and strand parcels.
+An on-chain alliance. Factions affect conquest ally checks, optional reinforcement, and pillage protection.
 
 ## Forge
 
@@ -107,7 +103,7 @@ One of three battle resource points: Forge, Quarry, Grove. Controlled nodes mint
 
 ## Parcel
 
-A tile in The Marches. Parcels are keyed by `tile_id` and store sector, zone, shape, type, owner, home, and stranded state.
+A plot of land in The Marches. Each parcel has a position on the hex grid, a type (Forge, Quarry, or Grove), an owner, and home status.
 
 ## Pillage
 
@@ -135,7 +131,7 @@ A gate modifier that stores overflow damage at the gate, then splits half to eac
 
 ## Repair
 
-Budget spent to heal your vault before damage. Resolution caps repair at 3.
+Budget spent to heal your vault before damage. Repair costs 2 budget per HP and is uncapped — budget is the only limit.
 
 ## Reveal
 
@@ -147,7 +143,7 @@ An ability that sets attack at a target gate. T1 sets it to 5; T2 sets it to 10.
 
 ## Staked match
 
-A 1v1 match created through `world_system` where both players escrow ability tokens. Settlement transfers or refunds those stakes and updates world state.
+A 1v1 match where both players escrow ability tokens. Settlement transfers or refunds those stakes and updates world state.
 
 ## Stone Cloak
 
@@ -157,17 +153,9 @@ An ability that reduces damage taken. T1 halves gate damage; T2 halves gate dama
 
 Tier 1 Hold rank. Requires 10 wins and an explicit upgrade.
 
-## Stranded
-
-A parcel state used after folds. Owned non-home parcels can become stranded if they no longer connect back to home through owned or faction-bridged territory.
-
 ## The Marches
 
-The persistent tile-graph world around Siege battles.
-
-## Tile graph
-
-The current map model. Tiles have up to four adjacency edges; missing edges use the `0xFFFFFFFF` sentinel.
+The persistent hex-grid world around Siege battles.
 
 ## Trap
 
@@ -179,4 +167,4 @@ Your match health. A vault starts at 50 HP.
 
 ## vRNG
 
-Cartridge verifiable randomness, used for gate modifiers, conquest preset selection, and fold rolls.
+Cartridge verifiable randomness, used for gate modifiers and conquest preset selection.

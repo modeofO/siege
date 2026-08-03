@@ -1,27 +1,24 @@
 ---
 title: The Marches
-description: The persistent tile world around Siege battles.
+description: The persistent parcel world around Siege battles.
 ---
 
 # The Marches
 
-The Marches is the persistent world around 1v1 battles. It is a tile graph of square and rhombus parcels, not a hex grid.
+The Marches is the persistent world around 1v1 battles: a hex grid of parcels. Each parcel borders up to six neighbors, and adjacency is hex distance.
 
-Each tile has:
+Each parcel has:
 
-- A `tile_id`.
-- A sector from 0 to 7.
-- A zone: core, mid, or frontier.
-- A shape: square or rhombus.
+- A `parcel_id` and a `col`/`row` position.
 - A parcel type: Forge, Quarry, Grove, or untyped.
-- An owner, home flag, and stranded flag.
+- An owner and a home flag.
 
-Tile adjacency is stored edge by edge. The map can fold, which changes sector state, may break pillages, and can strand owned territory that no longer connects back to home.
+The grid size is set per world and can grow over time. Mainnet is currently 12 columns by 8 rows — 96 parcels.
 
 ## What The Marches adds
 
 - **[Your Hold](/world/holds)** - register three home parcels.
-- **[Kingdom tiers](/world/tiers)** - progress through wins and resource burns.
+- **[Hold tiers](/world/tiers)** - progress through wins and resource burns.
 - **[Staked matches](/world/staked-matches)** - wager abilities in 1v1 battles.
 - **[Conquest](/world/conquest)** - attack non-home neighbor parcels against preset defenses.
 - **[Pillaging](/world/pillaging)** - siphon home drip from a defeated neighbor.

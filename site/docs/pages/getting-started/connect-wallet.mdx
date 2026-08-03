@@ -1,22 +1,23 @@
 ---
 title: Connect your wallet
-description: Wallet and account modes.
+description: Networks, Cartridge Controller, and sessions.
 ---
 
 # Connect your wallet
 
-Siege has two frontend account modes.
+Siege runs on two networks:
 
-## Sepolia
+- **Starknet mainnet** at [www.siegedojo.world](https://www.siegedojo.world) — the real game, where matches have entry buy-ins and ability wagers.
+- **Practice** at [siege-dev.vercel.app](https://siege-dev.vercel.app) — a free network for learning the game with nothing at stake.
 
-Sepolia uses Cartridge Controller. The first connection creates a session with policies for common gameplay actions: creating matches, committing, revealing, resolving, crafting, staking, claiming drip, conquest, pillage, factions, cosmetics, and approvals.
+Both use an in-app network switcher, so you can move between them from either site.
+
+## Cartridge Controller
+
+Both networks use Cartridge Controller. The first connection creates a session and shows a consent screen listing exactly what the session may do: creating matches, committing, revealing, resolving, crafting, staking, claiming drip, conquest, pillage, factions, cosmetics, and approvals.
 
 If the app adds a new session policy after you connected, disconnect and reconnect. Existing sessions keep the policy set they had when they were created.
 
-## Local dev
-
-Local development uses hardcoded Katana accounts. In dev mode, the app shows an account selector instead of Cartridge.
-
 ## Transactions
 
-Most Sepolia actions are submitted through the Controller session. If a transaction opens a review sheet, the action is probably missing from the current session policy or your session was created before that policy existed.
+Gameplay transactions are sponsored — you do not pay gas. Actions are submitted through the Controller session without a signing prompt. If a transaction opens a review sheet, the action is probably missing from the current session policy or your session was created before that policy existed.

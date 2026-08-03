@@ -25,7 +25,8 @@ export const MODIFIERS: Modifier[] = [
     name: "Narrow Pass",
     probability: 10,
     flavor: "The way is choked with rubble. Only so many can pass.",
-    effect: "Both attack and defense at this gate are capped at 3.",
+    effect:
+      "Allocated attack and defense at this gate are capped at 3. Ability effects and node defense bonuses apply after the cap and can exceed it.",
   },
   {
     slug: "mirror-gate",
