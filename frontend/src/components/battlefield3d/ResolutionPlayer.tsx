@@ -221,8 +221,8 @@ export default function ResolutionPlayer({
           break;
         }
         default:
-          // hp_tick has no mesh; banner_finish is aftermath (Task 8) — both are
-          // silent here but still counted in `total` so playback runs full length.
+          // hp_tick and banner_finish have no effect mesh here — both are
+          // silent but still counted in `total` so playback runs full length.
           break;
       }
     }

@@ -12,9 +12,8 @@ const eslintConfig = defineConfig([
     },
   },
   prettier,
-  // Override default ignores of eslint-config-next.
+  // Re-declare eslint-config-next's default ignores (overridden by globalIgnores).
   globalIgnores([
-    // Default ignores of eslint-config-next:
     ".next/**",
     "out/**",
     "build/**",

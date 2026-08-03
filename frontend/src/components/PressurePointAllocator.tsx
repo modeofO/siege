@@ -18,7 +18,6 @@ export function PressurePointAllocator({ role, budget, allocations, onChange }: 
   const handleChange = (index: number, value: number) => {
     const newAlloc = [...allocations];
     newAlloc[index] = value;
-    // Don't allow exceeding budget
     const newTotal = newAlloc.reduce((a, b) => a + b, 0);
     if (newTotal <= budget) {
       onChange(newAlloc);

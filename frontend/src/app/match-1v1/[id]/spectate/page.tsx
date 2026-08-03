@@ -1,4 +1,3 @@
-// frontend/src/app/match-1v1/[id]/spectate/page.tsx
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
@@ -220,7 +219,6 @@ export default function SpectatorPage() {
     setHeldHp(null);
   }, []);
 
-  // Loading
   if (loading || !state) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -261,7 +259,6 @@ export default function SpectatorPage() {
     phaseText = "Match finished";
   }
 
-  // Determine winner label
   const isFinished = state.phase === "finished" && state.winner !== null;
   let winnerLabel = "";
   if (isFinished) {

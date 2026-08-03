@@ -1,6 +1,6 @@
 // Pure layout math + palette for the war-table battlefield scene.
-// These values are the shared visual language: later scene tasks (and their
-// tests) import them, so the exact coordinates here are load-bearing.
+// These values are the shared visual language: the scene components and their
+// tests import them, so the exact coordinates here are load-bearing.
 
 export const PALETTE = {
   parchment: "#d8c9a3",

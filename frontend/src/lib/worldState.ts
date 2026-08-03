@@ -1,4 +1,3 @@
-// frontend/src/lib/worldState.ts
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -96,12 +95,11 @@ const EMPTY_KINGDOM: PlayerKingdomData = {
 };
 
 /**
- * Static query — deliberately NOT keyed by the player address. Embedding the
- * address made the query change when the wallet connected mid-session, which
- * sent the SDK down its updateEntitySubscription path — broken in the shipped
- * torii-wasm ("Error: expected instance of V", a failed wasm instanceof check
- * on the stored subscription), after which the re-fetch for the new address
- * never ran and kingdom data silently stayed empty. A query that never
+ * Static query — deliberately NOT keyed by the player address. A query that
+ * changes after mount (e.g. when the wallet connects) routes the SDK through
+ * its updateEntitySubscription path, which re-keys the live stream but never
+ * re-runs the seed fetch — the new address's data then appears only as it
+ * next changes on-chain (see frontend/CLAUDE.md "Reads"). A query that never
  * changes never takes that path. The selector filters by address instead;
  * PlayerKingdom is player-count sized, so the wildcard stays cheap.
  */

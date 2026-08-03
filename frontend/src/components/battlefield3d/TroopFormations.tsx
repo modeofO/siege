@@ -13,7 +13,7 @@ import { PALETTE, citadelPosition, formationSlots, gatePosition, nodePosition } 
 // stack is baked into each geometry so a single matrix places both. Pieces lerp
 // out from the citadel to their formation slot as allocations rise and retreat
 // back home as they fall — all in useFrame via refs, never setState. Total
-// pawn height ≈0.30u, matching the Shared Visual Language (~0.28u).
+// pawn height ≈0.30u.
 
 // ---------------------------------------------------------------------------
 // Allocation → formation groups

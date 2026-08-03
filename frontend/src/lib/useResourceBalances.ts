@@ -1,5 +1,5 @@
-// useResourceBalances.ts — read ERC-20 resource token balances for a player
-// via Torii's token index (pushed updates), not direct Starknet RPC calls.
+// Read ERC-20 resource token balances for a player via Torii's token index
+// (pushed updates), not direct Starknet RPC calls.
 import { useMemo } from "react";
 import { useTokens } from "@dojoengine/sdk/react";
 import { IS_KATANA, IS_MAINNET } from "./network";

@@ -1,9 +1,6 @@
 import { hash } from "starknet";
 import { NETWORK } from "./network";
 
-/**
- * Generate a random salt for commit-reveal
- */
 export function generateSalt(): string {
   const bytes = new Uint8Array(31); // 31 bytes to stay within felt252
   crypto.getRandomValues(bytes);
@@ -96,24 +93,15 @@ export function storeMove1v1(matchId: string, round: number, move: number[]) {
   localStorage.setItem(key("move", matchId, round), JSON.stringify(move));
 }
 
-/**
- * Retrieve stored 1v1 move
- */
 export function getMove1v1(matchId: string, round: number): number[] | null {
   const data = read("move", matchId, round);
   return data ? JSON.parse(data) : null;
 }
 
-/**
- * Store salt for 1v1 move
- */
 export function storeSalt1v1(matchId: string, round: number, salt: string) {
   localStorage.setItem(key("salt", matchId, round), salt);
 }
 
-/**
- * Retrieve stored 1v1 salt
- */
 export function getSalt1v1(matchId: string, round: number): string | null {
   return read("salt", matchId, round);
 }
@@ -127,9 +115,6 @@ export function storeAbility1v1(matchId: string, round: number, ability: StoredA
   localStorage.setItem(key("ability", matchId, round), JSON.stringify(ability));
 }
 
-/**
- * Retrieve the stored ability, defaulting to "no ability" when absent
- */
 export function getAbility1v1(matchId: string, round: number): StoredAbility1v1 {
   const data = read("ability", matchId, round);
   return data ? JSON.parse(data) : { abilityId: 0, abilityTarget: 0 };

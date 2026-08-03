@@ -25,9 +25,7 @@ function contractAddress(tag: string, envName: string, fallback = ""): string {
 
 // VRF provider — a fixed network address, not a Dojo contract. Lives here (an
 // address-only module) rather than contracts1v1.ts so sessionPolicies can read
-// it without pulling the controllerSession import cycle. Sepolia uses the
-// Cartridge VRF service; the self-hosted katana uses DevVrfProvider
-// (pseudo-random, deployed by scripts/init-katana-world.ts).
+// it without pulling the controllerSession import cycle.
 // Katana predeploys its own Cartridge VRF provider at genesis (a consequence of
 // --cartridge.paymaster), at a different address than mainnet/sepolia. It must
 // be the one used: when a transaction goes through the paymaster as an
@@ -73,9 +71,8 @@ export const CRAFTING_1V1_ADDRESS = contractAddress(
   "0x18700cba1d48b91aa99f2a7542a8739576fec35e4938d8c5dd11879688fe7b2",
 );
 
-// Matchmaking ships before its first migrate — the manifest has no
-// siege_dojo-matchmaking tag yet, so this resolves to "" and the frontend
-// hides the Find Opponent flow until a deploy adds it.
+// Resolves to "" on a manifest without the matchmaking tag, in which case the
+// frontend hides the Find Opponent flow.
 export const MATCHMAKING_ADDRESS = contractAddress(
   "siege_dojo-matchmaking",
   "NEXT_PUBLIC_MATCHMAKING_ADDRESS",

@@ -1,4 +1,3 @@
-// frontend/src/components/intel/IntelDrawer.tsx
 "use client";
 
 import React, { useState } from "react";

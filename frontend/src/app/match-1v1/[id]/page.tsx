@@ -1,4 +1,3 @@
-// frontend/src/app/match-1v1/[id]/page.tsx
 "use client";
 
 import { useState, useCallback, useEffect, useRef, useMemo } from "react";
@@ -49,7 +48,6 @@ export default function Match1v1Page() {
   const history = useRoundHistory1v1(matchId);
   const resources = useResourceBalances(address);
 
-  // Role detection
   const addrMatch = (a: string | undefined, b: string | undefined) => {
     if (!a || !b) return false;
     try {
@@ -72,7 +70,6 @@ export default function Match1v1Page() {
   // Commitment status from chain — refreshKey ensures these re-fetch when match state updates
   const { committed, revealed } = useCommitmentStatus1v1(matchId, state?.round ?? 1, role, refreshKey);
 
-  // Round status for polling commit/reveal counts
   const roundStatus = useRoundStatus1v1(matchId, state?.round ?? 1, refreshKey);
 
   const modifiers = useRoundModifiers1v1(matchId, state?.round ?? 1);
@@ -136,13 +133,11 @@ export default function Match1v1Page() {
     };
   }, [optimisticOutcome, revealedMoves, state]);
 
-  // Ability selection state
   const [selectedAbility, setSelectedAbility] = useState(0);
   const [selectedTarget, setSelectedTarget] = useState(0);
 
   const matchAbilities = useMatchAbilities1v1(matchId, address || null, state?.playerA || null, refreshKey);
 
-  // Stakes for the match header (#4) — both sides' wagered abilities.
   const matchStakes = useMatchStakes1v1(matchId, refreshKey);
 
   const cosmeticsA = usePlayerCosmetics(state?.playerA ?? undefined);
@@ -192,18 +187,17 @@ export default function Match1v1Page() {
     setSelectedTarget(target);
   }, []);
 
-  // Reset ability selection when round changes
   useEffect(() => {
     setSelectedAbility(0);
     setSelectedTarget(0);
   }, [state?.round]);
 
-  // Allocations: [p0,p1,p2, g0,g1,g2, repair, nc0,nc1,nc2]
+  // Allocations: [p0,p1,p2, g0,g1,g2, repair, nc0,nc1,nc2, trap0,trap1,trap2]
   const [allocations, setAllocations] = useState<number[]>(new Array(13).fill(0));
   const [submitting, setSubmitting] = useState(false);
   // After a commit tx resolves, we stay in `confirming` until Torii reports
   // the committed flag on-chain. Keeps the button disabled in a visibly
-  // pending state during the ~5-10s indexing lag (issue #11).
+  // pending state during the ~5-10s indexing lag.
   const [confirming, setConfirming] = useState(false);
   const [autoRevealStatus, setAutoRevealStatus] = useState<"idle" | "pending" | "done" | "error">("idle");
   const [autoRevealError, setAutoRevealError] = useState("");
@@ -254,12 +248,10 @@ export default function Match1v1Page() {
   // offer waits out a grace period instead of flagging "stalled" instantly.
   const roundSeenAtRef = useRef(Math.floor(Date.now() / 1000));
 
-  // Effective values: max of subscription data and poll data
   const effectiveCommitCount = Math.max(roundStatus.commitCount, pollCommitCount ?? 0);
   const effectiveRevealCount = Math.max(roundStatus.revealCount, pollRevealCount ?? 0);
   const effectiveCommitted = committed || pollCommitted === true;
 
-  // Cleanup polling on unmount
   useEffect(() => {
     return () => {
       if (pollTimerRef.current) {
@@ -290,7 +282,6 @@ export default function Match1v1Page() {
    */
   const startPostTxPoll = useCallback(
     (opts: { expectCommitCount?: number; expectRevealCount?: number; expectCommitted?: boolean }) => {
-      // Clear any existing poll
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
         pollTimerRef.current = null;
@@ -316,7 +307,6 @@ export default function Match1v1Page() {
         }
 
         try {
-          // Poll RoundMoves1v1 for commit_count / reveal_count
           const rmRows = await toriiSql<{ commit_count: unknown; reveal_count: unknown }>(
             `SELECT commit_count, reveal_count FROM "siege_dojo-RoundMoves1v1" WHERE match_id = ${sqlInt(currentMatchId)} AND round = ${sqlInt(currentRound)}`,
           );
@@ -329,7 +319,6 @@ export default function Match1v1Page() {
             setPollRevealCount(rc);
           }
 
-          // Poll Commitment for our committed flag
           let isCommittedNow = false;
           if (opts.expectCommitted) {
             const cRows = await toriiSql<{ committed: unknown }>(
@@ -341,7 +330,6 @@ export default function Match1v1Page() {
             }
           }
 
-          // Check if we've reached the expected state and can stop early
           let done = true;
           if (opts.expectCommitCount !== undefined && cc < opts.expectCommitCount) done = false;
           if (opts.expectRevealCount !== undefined && rc < opts.expectRevealCount) done = false;
@@ -357,7 +345,6 @@ export default function Match1v1Page() {
       };
 
       pollTimerRef.current = setInterval(doPoll, INTERVAL);
-      // Fire immediately (don't wait 2s for first check)
       void doPoll();
     },
     [matchId, state?.round, role],
@@ -365,7 +352,6 @@ export default function Match1v1Page() {
 
   const budget = state ? (isPlayerA ? state.budgetA : state.budgetB) : 10;
 
-  // Reset state on round change
   useEffect(() => {
     setAllocations(new Array(13).fill(0));
     setAutoRevealStatus("idle");
@@ -381,7 +367,6 @@ export default function Match1v1Page() {
     setError("");
     setForceTimeoutError("");
     roundSeenAtRef.current = Math.floor(Date.now() / 1000);
-    // Reset poll state on round change
     setPollCommitCount(null);
     setPollRevealCount(null);
     setPollCommitted(null);
@@ -466,12 +451,11 @@ export default function Match1v1Page() {
     console.log("[siege] match-1v1 page loaded — reveal gate diagnostics v1");
   }, []);
 
-  // Check if an error is a known recoverable case
   const isAlreadyRevealed = (msg: string) =>
     msg.includes("Already revealed") || msg.includes("416c72656164792072657665616c6564");
 
   // Auto-reveal: when both committed & we haven't revealed yet.
-  // No VRF needed — reveal no longer triggers resolution (issue #16).
+  // No VRF needed — reveal doesn't trigger resolution.
   useEffect(() => {
     console.log("[auto-reveal] gate check", {
       hasAccount: !!account,
@@ -577,7 +561,7 @@ export default function Match1v1Page() {
   // Auto-resolve: only the elected player (lower address) fires resolve_round.
   // The non-elected player waits for the subscription to deliver the round
   // update, with a manual button as fallback. Single-caller avoids competing
-  // transactions that trigger Controller "Review Transactions" prompts (#21/#22).
+  // transactions that trigger Controller "Review Transactions" prompts.
   useEffect(() => {
     if (
       !account ||
@@ -686,7 +670,6 @@ export default function Match1v1Page() {
     setDismissedOptimisticRound(state?.round ?? 0);
   }, [state?.round]);
 
-  // Commit handler
   const handleCommit = useCallback(async () => {
     if (!account || !state || commitLock.current) return;
     const trapCost = (allocations[10] + allocations[11] + allocations[12]) * 2;
@@ -743,8 +726,7 @@ export default function Match1v1Page() {
     }
   }, [account, state, allocations, budget, matchId, refresh, selectedAbility, selectedTarget, startPostTxPoll, roundStatus.commitCount]);
 
-  // Clear confirming once Torii reports the commit on-chain (ends the
-  // 5-10s indexing lag where the button was previously re-enabling).
+  // Clear confirming once Torii reports the commit on-chain.
   useEffect(() => {
     if (effectiveCommitted && confirming) setConfirming(false);
   }, [effectiveCommitted, confirming, setConfirming]);
@@ -841,7 +823,6 @@ export default function Match1v1Page() {
     [account, matchId, refresh],
   );
 
-  // Loading
   if (loading || !state) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -850,7 +831,6 @@ export default function Match1v1Page() {
     );
   }
 
-  // Not a player
   if (address && !roleFound) {
     return (
       <div className="max-w-lg mx-auto mt-20 space-y-4 text-center">
@@ -902,7 +882,6 @@ export default function Match1v1Page() {
     );
   }
 
-  // End screen
   if (state.phase === "finished" && state.winner !== null) {
     const winnerNum = (state.winner === 0 || state.winner === 1 || state.winner === 2 ? state.winner : 0) as 0 | 1 | 2;
     return (
@@ -929,7 +908,6 @@ export default function Match1v1Page() {
   const enemyPct = Math.max(0, Math.min(100, (enemyVault / 50) * 100));
   const hpBarColor = (pct: number) => (pct > 50 ? "bg-green-500" : pct > 20 ? "bg-yellow-500" : "bg-red-500");
 
-  // Phase status text
   let phaseText = "";
   if (effectiveCommitted && !revealed && effectiveCommitCount < 2) {
     phaseText = "Waiting for opponent to commit...";

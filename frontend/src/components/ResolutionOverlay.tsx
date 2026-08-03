@@ -347,7 +347,6 @@ export function ResolutionOverlay({
   const completedRef = useRef(false);
   const tlRef = useRef<ReturnType<typeof createTimeline> | null>(null);
 
-  // Build all effect descriptors
   const gateImpacts = buildGateImpacts(result, isPlayerA);
   const damageNumbers = buildDamageNumbers(result, isPlayerA);
   const nodeFlips = buildNodeFlips(prevNodes, newNodes, isPlayerA);
@@ -365,7 +364,6 @@ export function ResolutionOverlay({
   if (myAbilityEffect) abilityEffects.push(myAbilityEffect);
   if (enemyAbilityEffect) abilityEffects.push(enemyAbilityEffect);
 
-  // Collect DOM refs for anime.js targets
   const overlayElRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -392,7 +390,6 @@ export function ResolutionOverlay({
     });
     tlRef.current = tl;
 
-    // Fade out the whole overlay near the end
     tl.add(
       overlay,
       { opacity: [1, 0], duration: 200, ease: "easeOutQuad" },

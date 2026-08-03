@@ -39,11 +39,10 @@ export interface MatchRecordData {
   isBloodRival: boolean;
 }
 
-// Static queries — never keyed by the player address. See playerKingdomQuery
-// in worldState.ts for why: an address-keyed query changes when the wallet
-// connects, which routes the SDK through its broken updateEntitySubscription
-// path ("expected instance of V") and the new address's data never loads.
-// Selectors filter by address client-side instead.
+// Static queries — never keyed by the player address; see playerKingdomQuery
+// in worldState.ts for why (an address-keyed query changes when the wallet
+// connects, and a changed query never re-runs its seed fetch). Selectors
+// filter by address client-side instead.
 function reputationQuery() {
   return new ToriiQueryBuilder<SchemaType>()
     .withClause(

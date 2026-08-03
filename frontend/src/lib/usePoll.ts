@@ -9,8 +9,7 @@ import { getToriiHealthy, subscribeToriiHealth } from "./toriiSql";
  * - Skips a tick while the previous one is still in flight, so slow Torii
  *   responses never stack overlapping requests.
  * - Skips a tick while the tab is hidden, and catches up with one immediate
- *   run when it becomes visible again. A backgrounded tab was previously
- *   polling indefinitely at full rate.
+ *   run when it becomes visible again.
  * - Passes an `alive()` accessor; callers must check it before setState to
  *   avoid writing state after unmount or after deps changed (which also
  *   guards against out-of-order responses clobbering fresh data).

@@ -1,4 +1,3 @@
-// frontend/src/components/HexGrid.tsx
 "use client";
 
 import { useMemo, useRef, useState, useEffect, useCallback } from "react";

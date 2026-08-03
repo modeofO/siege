@@ -121,7 +121,6 @@ export default function CraftPage() {
 
   const [playerTier, setPlayerTier] = useState(0);
 
-  // Per-item quantity selections
   const [abilityQtys, setAbilityQtys] = useState<Record<number, number>>({});
   const [partQtys, setPartQtys] = useState<Record<string, number>>({});
 

@@ -1,4 +1,4 @@
-// craftingContracts.ts — wrappers for the crafting_1v1 Dojo system
+// Wrappers for the crafting_1v1 Dojo system.
 import type { AccountInterface, Call } from "starknet";
 import { CRAFTING_1V1_ADDRESS } from "./contractAddresses";
 import { resilientExecute } from "./controllerSession";

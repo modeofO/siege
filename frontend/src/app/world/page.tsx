@@ -312,7 +312,6 @@ export default function WorldPage() {
     !!address,
   );
 
-  // Get home parcel types for display
   const homeParcelTypes = kingdom.registered
     ? [kingdom.home0, kingdom.home1, kingdom.home2].map((id) => parcels.find((p) => p.parcelId === id)).filter(Boolean)
     : [];

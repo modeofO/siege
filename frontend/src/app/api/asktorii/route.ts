@@ -1,4 +1,4 @@
-// Dev-only proxy to asktorii.com/mcp — injects the streamable-HTTP
+// Proxy to asktorii.com/mcp (used by AskToriiChat) — injects the streamable-HTTP
 // Accept header the MCP server requires and bypasses browser CORS.
 
 export const runtime = "nodejs";

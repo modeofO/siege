@@ -1,4 +1,3 @@
-// frontend/src/components/forge/WardGlyph.tsx
 "use client";
 
 import type { ComponentKind } from "@/lib/forge/circuits";

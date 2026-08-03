@@ -34,7 +34,6 @@ const addrEq = (a: string | undefined, b: string | undefined): boolean => {
   }
 };
 
-// Short display form of an address.
 const truncAddr = (a: string): string => (a && a.length > 10 ? `${a.slice(0, 6)}…${a.slice(-4)}` : a || "");
 
 export function FactionPanel({ account, address, kingdom, refresh }: FactionPanelProps) {

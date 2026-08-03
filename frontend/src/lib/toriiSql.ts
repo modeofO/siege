@@ -4,9 +4,9 @@
 import { TORII_URL } from "./network";
 
 // --- Connection health tracking ---
-// toriiSql still returns [] on failure so callers stay simple, but failures
-// are no longer silent: they update a shared health state (see useToriiHealth)
-// so the UI can distinguish "no data" from "Torii unreachable". Caveat: only
+// toriiSql returns [] on failure so callers stay simple, but failures also
+// update a shared health state (see useToriiHealth) so the UI can
+// distinguish "no data" from "Torii unreachable". Caveat: only
 // SQL reads feed this — /world is fully subscription-driven and makes no
 // periodic reads at all, so a dead gRPC stream there shows as stale data, not
 // as unhealthy. Health flips only on pages/actions that still hit SQL.

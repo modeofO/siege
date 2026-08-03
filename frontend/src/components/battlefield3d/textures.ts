@@ -487,7 +487,7 @@ export function makeParchment(ink: boolean): TexturePair {
 }
 
 // ---------------------------------------------------------------------------
-// Holo map overlay (variant 1b)
+// Holo map overlay
 // ---------------------------------------------------------------------------
 
 /**

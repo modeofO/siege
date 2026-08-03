@@ -90,7 +90,7 @@ function PostFX({ variant }: { variant: BattlefieldVariant }) {
   return null;
 }
 
-// Scrolling scanline shader for the holo overlay (variant 1b).
+// Scrolling scanline shader for the holo overlay.
 const SCAN_VERT = /* glsl */ `
   varying vec2 vUv;
   void main() {
@@ -225,11 +225,9 @@ export interface Battlefield3DProps {
   children?: React.ReactNode;
 }
 
-// Scene foundation: wooden table, parchment map plane with a dark border frame,
-// and a warm-key / cool-fill light rig with soft shadows. Real pieces,
-// formations, and choreography arrive in later tasks. The map plane is 10 x 6
-// world units on XZ; the table surface is y = 0. See layout.ts / the Shared
-// Visual Language for the coordinate system.
+// Composition root for the war-table scene. The map plane is 10 x 6 world
+// units on XZ; the table surface is y = 0. See layout.ts for the coordinate
+// system and palette.
 export default function Battlefield3D({
   children,
   allocations,

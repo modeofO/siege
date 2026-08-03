@@ -1,4 +1,3 @@
-// frontend/src/app/match-1v1/join/page.tsx
 "use client";
 
 import { useState, useMemo, useEffect, Suspense } from "react";

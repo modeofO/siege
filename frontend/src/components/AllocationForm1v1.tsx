@@ -1,4 +1,3 @@
-// frontend/src/components/AllocationForm1v1.tsx
 "use client";
 
 import React from "react";
@@ -16,7 +15,6 @@ interface AllocationForm1v1Props {
   error: string;
   nodes: [NodeOwner, NodeOwner, NodeOwner];
   isPlayerA: boolean;
-  // Ability selection (Phase 2B)
   abilities: [number, number, number];
   abilitiesUsed: [boolean, boolean, boolean];
   selectedAbility: number;
@@ -109,7 +107,7 @@ export function AllocationForm1v1({
         </span>
       </div>
 
-      {/* Ability selector — Phase 2B */}
+      {/* Ability selector */}
       <AbilitySelector
         abilities={abilities}
         used={abilitiesUsed}

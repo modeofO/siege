@@ -118,9 +118,7 @@ export async function setPresetDefense(
 export interface ConquestSubmitResult {
   txHash: string;
   // A non-zero abilityId is CONSUMED by the attack (single-use in conquest —
-  // not returned win or lose). Surface this to the player when the attack UI
-  // is wired up. There is currently no conquest-attack component consuming
-  // this helper, so this is the notification plumbing for that future UI.
+  // not returned win or lose). Surface this to the player.
   abilityConsumed: boolean;
 }
 
@@ -288,9 +286,8 @@ function normalizeAddr(a: string): string {
 }
 
 // Map each parcel owner to its faction id, so ally parcels can be greyed out.
-// The whole FactionMember model is in the store (see worldSubscription.ts), so
-// this no longer needs the owner list to build an IN clause — the argument is
-// kept only to scope the result to addresses actually on the map.
+// The whole FactionMember model is in the store (see worldSubscription.ts);
+// the owner list only scopes the result to addresses actually on the map.
 export function useOwnerFactionIds(owners: string[]): Record<string, number> {
   const members = useModels(ModelsMapping.FactionMember);
 

@@ -10,7 +10,7 @@ import { resilientExecute } from "@/lib/controllerSession";
 
 const IS_DEVNET = (process.env.NEXT_PUBLIC_NETWORK || "devnet") === "devnet";
 
-// Re-exported for back-compat — the canonical definition now lives in
+// Re-exported for back-compat — the canonical definition lives in
 // contractAddresses.ts to avoid a sessionPolicies/controllerSession import cycle.
 export { VRF_PROVIDER_ADDRESS };
 

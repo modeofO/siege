@@ -1,4 +1,3 @@
-// frontend/src/app/match-1v1/create/page.tsx
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
@@ -70,7 +69,6 @@ export default function Create1v1Page() {
     }
   }, [mode, kingdom.registered]);
 
-  // Debounced username lookup
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     const input = opponentInput.trim();

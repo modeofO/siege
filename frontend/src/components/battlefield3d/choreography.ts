@@ -1,7 +1,7 @@
 // Pure choreography timeline builder for the 3D war table.
 //
 // Turns a resolved round's `RoundEvent[]` (from resolution1v1.ts) into a flat,
-// time-stamped animation script. No three.js, no React, no clock — Task 7's
+// time-stamped animation script. No three.js, no React, no clock —
 // ResolutionPlayer walks these steps on the frame clock. Keeping this pure makes
 // the timing fully unit-testable and deterministic.
 //

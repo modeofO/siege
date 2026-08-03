@@ -12,7 +12,7 @@ import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
 // here is idle motion driven off the single frame clock (state.clock) with zero
 // per-frame allocation: scratch state lives in refs / useMemo'd typed arrays
 // that are mutated in place, and nothing here calls setState. Composed by
-// Battlefield3D. See the Shared Visual Language for coordinates and palette.
+// Battlefield3D. See layout.ts for coordinates and palette.
 
 // Deterministic pseudo-random in [0, 1) from a seed (fract of sin), matching the
 // codebase's Math.sin hashing (see jitter() in pieces.tsx). Pure, so it is safe

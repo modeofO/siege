@@ -3,14 +3,14 @@
 The frontend supports `devnet`, `katana`, `sepolia`, and `mainnet` modes through `src/app/providers.tsx` (`NEXT_PUBLIC_NETWORK`).
 
 - Devnet uses local Katana accounts.
-- Sepolia and mainnet use Cartridge Controller and `SESSION_POLICIES`.
+- Every other mode (katana, sepolia, mainnet) uses Cartridge Controller and `SESSION_POLICIES`.
 - Session policies are fixed when the player connects. After adding policies, tell players to reconnect.
 - The world UI renders `HexGrid`.
 - gRPC subscriptions are the default read path. Do not add new GraphQL queries,
   and do not add a new SQL poller without a reason the read cannot be a
   subscription — see "Reads" below.
 - Torii stores u64 key columns (e.g. `match_id`) as zero-padded hex text; use `sqlU64()` from `toriiSql.ts` for comparisons.
-- `NEXT_PUBLIC_TORII_URL` is required — `toriiSql.ts` defaults to localhost otherwise.
+- Endpoints (`TORII_URL`, `RPC_URL`) come from `src/lib/network.ts`, never `process.env` directly — the `NEXT_PUBLIC_*_URL` vars are optional per-deployment pins, ignored after a network switch.
 
 ## Reads
 
@@ -41,11 +41,18 @@ regardless of torii's h2 PING keepalives, which don't traverse the edge.
 message; events emitted while a stream was down are lost until the entity
 next changes. Mitigations in place: every subscription entry point pairs a
 `useVisibilityReseed` (re-run the seed fetch when the tab becomes visible —
-event-driven, zero steady-state), and subscription queries must be STATIC —
-never key one on a value that changes after mount (wallet address): a changed
-query routes the SDK through updateEntitySubscription, which is broken in the
-shipped torii-wasm ("expected instance of V") and silently strands the hook
-on the old query. Selectors filter by address client-side instead. A truly
+event-driven, zero steady-state). Changing a subscription query on a live
+hook works at the transport level but skips the reseed: SDK 1.9.0 routes
+subscriptions through the pure-TS `@dojoengine/grpc` client, whose
+`updateEntitySubscription` re-keys a live stream cleanly (verified against
+katana torii 1.8.16 on 2026-07-27 — repeated re-keys accepted, stream stays
+up; the old torii-wasm "expected instance of V" failure no longer applies).
+However `useEntityQuery`'s update path sends only the new clause and never
+re-runs the seed fetch, so a re-keyed subscription starts with no snapshot
+for the new key — entities appear only as they next change on-chain. To key
+a query on the wallet address, remount the hook on address change (fresh
+mount = full seed + subscribe) rather than mutating the query in place; the
+wildcard-clause + client-side-filter pattern also remains valid. A truly
 dead stream in a visible tab still shows as stale data (useToriiHealth is
 SQL-fed only) — accepted; the durable fix is an application-level heartbeat
 in torii's subscription streams, which is an upstream ask.

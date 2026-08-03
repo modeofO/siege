@@ -1,4 +1,3 @@
-// frontend/src/components/RegisterKingdom.tsx
 "use client";
 
 import { useState } from "react";

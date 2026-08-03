@@ -1,4 +1,3 @@
-// frontend/src/lib/worldSubscription.ts
 "use client";
 
 import { useEntityQuery } from "@dojoengine/sdk/react";

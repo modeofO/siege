@@ -1,4 +1,4 @@
-// abilityToken.ts — wrappers for reading ERC-1155 ability balances
+// Wrappers for reading ERC-1155 ability balances.
 import { byteArray, type RpcProvider } from "starknet";
 import { envPin, IS_KATANA, IS_MAINNET } from "./network";
 
@@ -9,7 +9,7 @@ export const ABILITY_TOKEN_ADDRESS =
     ? // Katana deployment — scripts/init-katana-world.ts
       "0x60159dd1eb29a2aef41134b6ac536f551769f6238100cd34fc9d50875f226e2"
     : IS_MAINNET
-      ? // Mainnet deployment — Task 5
+      ? // Mainnet deployment
         "0x583fb029535b4f18d267ea1462ffd7f3a785edcd873c4fd305f8d787e3ccbcc"
       : "0x5be2347827f78d20b484352e2f219b82a3817cc84fc34c6f3fc7a0670473e05");
 
@@ -47,7 +47,6 @@ const ABILITY_FIELD_BY_ID: (keyof AbilityInventory)[] = [
  */
 export async function fetchAbilityBalances(provider: RpcProvider, playerAddress: string): Promise<AbilityInventory> {
   try {
-    // Build calldata: 5 accounts (all the same player), 5 token ids (1..5)
     const accountsLen = "5";
     const accountRepeats = [playerAddress, playerAddress, playerAddress, playerAddress, playerAddress];
     const tokenIdsLen = "5";

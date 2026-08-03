@@ -8,7 +8,7 @@ import { PALETTE } from "./layout";
 import { getSharedTextures } from "./textures";
 import { VARIANT_TOKENS, type BattlefieldVariant } from "./variants";
 
-// Procedural "carved miniature" pieces for the candlelit war table (design 1a).
+// Procedural "carved miniature" pieces for the candlelit war table.
 // No external assets — geometry is three.js primitives, surfaces use the shared
 // procedural stone textures. All solid pieces cast and receive shadows so they
 // throw silhouettes across the parchment under the candle key light.

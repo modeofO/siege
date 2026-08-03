@@ -1,4 +1,3 @@
-// frontend/src/lib/gameState1v1.ts
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { useEntityQuery, useModels } from "@dojoengine/sdk/react";
 import { ToriiQueryBuilder, KeysClause } from "@dojoengine/sdk";
@@ -116,19 +115,18 @@ const MATCH_MODELS = [
   ModelsMapping.MatchAbilities1v1,
 ] as const;
 
-// The key clause does not filter (see worldSubscription.ts), so this pulls
-// every match's rows and the page selects its own by match_id. Sized to clear
-// the whole-history row count with room to grow.
+// The SDK's page limit defaults to 100 and only the first page is merged
+// (next_cursor is never followed), so an explicit generous limit is required.
 const MATCH_ENTITY_LIMIT = 10_000;
 
 /**
  * Subscribes via gRPC to all match-scoped entities (MatchState1v1 + NodeState + RoundMoves1v1)
  * keyed by match_id, then synthesizes the unified MatchState1v1 view from the store.
  *
- * Public shape ({ state, loading, refresh, refreshKey }) is preserved so dependent hooks
- * and the match page work unchanged. `refresh` is now a no-op (push updates make polling
- * redundant); `refreshKey` bumps whenever the synthesized state changes, which dependent
- * hooks still use to invalidate their own polling until they're migrated too.
+ * Public shape is { state, loading, refresh, refreshKey }. `refresh` is a no-op
+ * (push updates make polling redundant); `refreshKey` bumps whenever the
+ * synthesized state changes, which dependent hooks use to invalidate their own
+ * polling.
  */
 // withEntityModels + withLimit are both load-bearing; see the measured torii
 // behaviour documented in worldSubscription.ts. Without the model list this
@@ -138,8 +136,8 @@ const MATCH_ENTITY_LIMIT = 10_000;
 //
 // Keyed by match_id — safe because the route param is stable for the life of
 // the page instance. Do NOT key a query on a value that changes after mount
-// (e.g. wallet address): a changed query routes the SDK through its broken
-// updateEntitySubscription path (see playerKingdomQuery in worldState.ts).
+// (e.g. wallet address): useEntityQuery's update path re-keys the stream but
+// never re-runs the seed fetch (see playerKingdomQuery in worldState.ts).
 function matchQuery(matchId: string | null) {
   return new ToriiQueryBuilder<SchemaType>()
     .withClause(KeysClause<SchemaType>([...MATCH_MODELS], [toFeltHex(matchId)], "VariableLen").build())
@@ -471,10 +469,8 @@ export interface MatchStakesData {
  * header (issue #4). Non-staked 1v1 matches will return all zeros and
  * `isStaked: false`.
  */
-// NOTE (pre-existing): despite the name, this reads MatchAbilities1v1 (the
-// abilities-in-play model) rather than the dedicated MatchStakes1v1 model.
-// Preserved verbatim from the original behavior — semantic cleanup is out of
-// scope for this transport migration.
+// NOTE: despite the name, this reads MatchAbilities1v1 (the abilities-in-play
+// model) rather than the dedicated MatchStakes1v1 model.
 export function useMatchStakes1v1(matchId: string | null, _refreshKey?: number): MatchStakesData {
   const matchAbilities = useModels(ModelsMapping.MatchAbilities1v1);
 
