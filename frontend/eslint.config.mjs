@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // sozo-generated bindings — regenerated wholesale, never hand-edited.
+    "src/bindings/typescript/*.gen.ts",
   ]),
 ]);
 

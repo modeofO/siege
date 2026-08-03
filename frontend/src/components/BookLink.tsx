@@ -43,9 +43,13 @@ export function BookLink() {
     [phase, router],
   );
 
-  useEffect(() => {
-    if (pathname !== "/craft") setPhase("idle");
-  }, [pathname, setPhase]);
+  // Any navigation cancels a mid-flight opening animation. Adjust-during-render
+  // (guarded by the previous-pathname comparison) instead of a setState effect.
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (pathname !== prevPathname) {
+    setPrevPathname(pathname);
+    setPhase("idle");
+  }
 
   if (pathname === "/craft") return null;
 

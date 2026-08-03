@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
 import type { AccountInterface } from "starknet";
 import {
   type CircuitKey,
@@ -70,6 +70,35 @@ function savePersisted(state: PersistedState) {
   }
 }
 
+// Module-level store over localStorage, consumed via useSyncExternalStore:
+// the server snapshot is DEFAULT_PERSISTED (so SSR/hydration match), and React
+// re-renders with the real localStorage state right after hydration — replacing
+// the old load-in-a-mount-effect pattern.
+let persistedCache: PersistedState | null = null;
+const persistedListeners = new Set<() => void>();
+
+function subscribePersisted(listener: () => void): () => void {
+  persistedListeners.add(listener);
+  return () => {
+    persistedListeners.delete(listener);
+  };
+}
+
+function readPersisted(): PersistedState {
+  if (persistedCache === null) persistedCache = loadPersisted();
+  return persistedCache;
+}
+
+function readServerPersisted(): PersistedState {
+  return DEFAULT_PERSISTED;
+}
+
+function writePersisted(next: PersistedState) {
+  persistedCache = next;
+  savePersisted(next);
+  for (const listener of persistedListeners) listener();
+}
+
 export function useForgeState(account?: AccountInterface) {
   const [currentView, setCurrentView] = useState<ForgeView>("forge");
   const [activeCircuit, setActiveCircuitRaw] = useState<CircuitKey>("half-wave-rectifier");
@@ -77,22 +106,24 @@ export function useForgeState(account?: AccountInterface) {
     Record<string, PlacedComponent>
   >({});
   const [isLit, setIsLit] = useState(false);
-  const [persisted, setPersisted] = useState<PersistedState>(DEFAULT_PERSISTED);
+  const persisted = useSyncExternalStore(subscribePersisted, readPersisted, readServerPersisted);
   const [equipError, setEquipError] = useState<string | null>(null);
-  const [sessionInventory, setSessionInventory] = useState<Record<ComponentKind, number>>(
+  // Session inventory is derived: persisted counts plus this session's delta
+  // (placements subtract, removals add back, confirmForge cancels against the
+  // persisted decrement). Deriving keeps it in lockstep with the store without
+  // a seeding effect.
+  const [inventoryDelta, setInventoryDelta] = useState<Record<ComponentKind, number>>(
     () => ({ ...EMPTY_INVENTORY }),
   );
+  const sessionInventory = useMemo(() => {
+    const out = { ...EMPTY_INVENTORY };
+    for (const kind of Object.keys(EMPTY_INVENTORY) as ComponentKind[]) {
+      out[kind] = Math.max(0, persisted.componentInventory[kind] + inventoryDelta[kind]);
+    }
+    return out;
+  }, [persisted.componentInventory, inventoryDelta]);
 
-  useEffect(() => {
-    const loaded = loadPersisted();
-    setPersisted(loaded);
-    setSessionInventory({ ...loaded.componentInventory });
-  }, []);
-
-  const persist = useCallback((next: PersistedState) => {
-    setPersisted(next);
-    savePersisted(next);
-  }, []);
+  const persist = writePersisted;
 
   const circuit = CIRCUITS[activeCircuit];
 
@@ -105,10 +136,7 @@ export function useForgeState(account?: AccountInterface) {
         return next;
       });
       if (isNew) {
-        setSessionInventory((inv) => ({
-          ...inv,
-          [kind]: Math.max(0, inv[kind] - 1),
-        }));
+        setInventoryDelta((d) => ({ ...d, [kind]: d[kind] - 1 }));
       }
     },
     [circuit, placedComponents],
@@ -122,7 +150,7 @@ export function useForgeState(account?: AccountInterface) {
       delete next[instanceId];
       return next;
     });
-    setSessionInventory((inv) => ({ ...inv, [comp.kind]: inv[comp.kind] + 1 }));
+    setInventoryDelta((d) => ({ ...d, [comp.kind]: d[comp.kind] + 1 }));
     setIsLit(false);
   }, [placedComponents]);
 
@@ -130,9 +158,9 @@ export function useForgeState(account?: AccountInterface) {
     setActiveCircuitRaw(key);
     setPlacedComponents({});
     setIsLit(false);
-    setSessionInventory({ ...persisted.componentInventory });
+    setInventoryDelta({ ...EMPTY_INVENTORY });
     setCurrentView("forge");
-  }, [persisted.componentInventory]);
+  }, []);
 
   const confirmForge = useCallback(() => {
     if (!isLit) return;
@@ -155,6 +183,16 @@ export function useForgeState(account?: AccountInterface) {
       componentInventory: newInventory,
     };
     persist(next);
+    // The forge consumed the placed parts from persisted; cancel them in the
+    // delta so the on-screen session counts don't drop twice.
+    setInventoryDelta((d) => {
+      const out = { ...d };
+      for (const [kind, count] of Object.entries(usedParts)) {
+        const k = kind as ComponentKind;
+        out[k] = out[k] + (count ?? 0);
+      }
+      return out;
+    });
     setCurrentView("celebration");
   }, [isLit, persisted, activeCircuit, placedComponents, persist]);
 
@@ -219,10 +257,8 @@ export function useForgeState(account?: AccountInterface) {
         },
       };
       persist(next);
-      setSessionInventory((inv) => ({
-        ...inv,
-        [kind]: inv[kind] + quantity,
-      }));
+      // sessionInventory derives from persisted + delta, so the persisted
+      // increment above already surfaces in the session counts.
     },
     [persisted, persist],
   );

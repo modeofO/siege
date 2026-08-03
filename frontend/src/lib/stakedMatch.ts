@@ -246,42 +246,41 @@ export function useClaimCandidates(
 
 // ---------- Ability balances hook ----------
 
+const ZERO_ABILITY_BALANCES: Record<number, number> = Object.fromEntries(
+  Array.from({ length: 10 }, (_, i) => [i + 1, 0]),
+);
+
 export function useAbilityBalances(
   provider: RpcProvider | undefined,
   address: string | null | undefined,
   bumpKey: number = 0,
 ): { balances: Record<number, number>; loading: boolean; error: string | null } {
-  const [balances, setBalances] = useState<Record<number, number>>(() =>
-    Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 0])),
-  );
-  // derived-loading pattern: loading = liveKey !== loadedKey (avoids setState-in-effect for lint).
-  const [loadedKey, setLoadedKey] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  // derived pattern: fetched results carry the key they were fetched under, and
+  // anything whose key no longer matches liveKey derives away — so a key change
+  // (address A -> B) hides A's numbers with no setState-in-effect reset.
+  const [fetched, setFetched] = useState<{ key: string; balances: Record<number, number> } | null>(null);
+  const [fetchError, setFetchError] = useState<{ key: string; message: string } | null>(null);
 
   const liveKey = provider && address ? `${address}:${bumpKey}` : null;
-  const loading = liveKey !== null && loadedKey !== liveKey && error === null;
+  const balances = fetched !== null && fetched.key === liveKey ? fetched.balances : ZERO_ABILITY_BALANCES;
+  const error = fetchError !== null && fetchError.key === liveKey ? fetchError.message : null;
+  const loading = liveKey !== null && fetched?.key !== liveKey && error === null;
 
   useEffect(() => {
-    let cancelled = false;
-    // Key changed — clear stale state so address A's numbers don't render under address B.
-    const zeros = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [i + 1, 0]));
-    setBalances(zeros);
-    setError(null);
-    setLoadedKey(null);
     if (!provider || !address) return;
+    let cancelled = false;
     const key = `${address}:${bumpKey}`;
     fetchAllAbilityBalances(provider, address)
       .then((result) => {
         if (cancelled) return;
-        setBalances(result);
-        setLoadedKey(key);
-        setError(null);
+        setFetched({ key, balances: result });
+        setFetchError(null);
       })
       .catch((e: unknown) => {
         if (cancelled) return;
         const msg = e instanceof Error ? e.message : String(e);
         console.error("[useAbilityBalances] balance_of_batch failed:", e);
-        setError(msg);
+        setFetchError({ key, message: msg });
       });
     return () => {
       cancelled = true;
