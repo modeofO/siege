@@ -210,11 +210,14 @@ dev-account gotchas: see the `dev-katana` skill.
 
 ## Networks and the switcher
 
-Each network is its own Vercel project off the same branch, differing only in
-env: `www.siegedojo.world` (mainnet) and `siege-dev.vercel.app` (katana). Both
-ship the switcher — the hostname only sets the default. Resolution and the rules
-that keep it safe live in `frontend/src/lib/network.ts`; read that file before
-touching anything network-dependent. Two invariants:
+One Vercel frontend project (`siege-kny6`, `www.siegedojo.world`) serves both
+hosted networks: `NEXT_PUBLIC_NETWORK` sets the build default (mainnet) and the
+in-app switcher moves players between mainnet and the katana Practice tier.
+There is no separate katana deployment — `siege-dev.vercel.app` is dead
+(DEPLOYMENT_NOT_FOUND); never point docs or players at it. (The second Vercel
+project, `siege`/`siege-mauve.vercel.app`, is the Vocs docs site.) Resolution
+and the rules that keep switching safe live in `frontend/src/lib/network.ts`;
+read that file before touching anything network-dependent. Two invariants:
 
 - Commit salts are namespaced per network (`crypto.ts`). Every network shares one
   world address and match ids are sequential, so ids collide 1:1 across chains.
